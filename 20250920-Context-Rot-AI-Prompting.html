@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>長いプロンプトはAIを劣化させるのか？論文「Context Rot」解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+        }
+
+        body {
+            font-family: 'Kaisei Decol', serif;
+            background-color: #FFF8F5;
+            color: #333;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        header h1 i {
+            font-size: 60px;
+        }
+        
+        header p {
+            font-size: 14px;
+            color: #777777;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+        
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 14px;
+            color: #777;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-file-circle-question" style="color: var(--ui-color-1);"></i>長いプロンプトはAIを劣化させるのか？</h1>
+            <p>論文「Context Rot」解説 - 2025年9月20日</p>
+        </header>
+
+        <div class="section-layout">
+            <!-- 1. 長文プロンプトの問題点 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;"></i>
+                    <h2>長文プロンプトの問題点</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ruler-horizontal"></i>AIは長文を扱えるが、性能は低下する</li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i>既存の評価方法(NIAH)は単純な抽出能力しか見れない</li>
+                        <li><i class="fa-solid fa-brain"></i>論文「Context Rot」が現実的なシナリオで検証</li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb"></i> 長ければ良い、という訳ではない！</span>
+                </div>
+            </div>
+
+            <!-- 2. 実験①：類似性を下げてみる -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-not-equal fa-5x" style="color: var(--ui-color-1);"></i>
+                    <h2>実験①：類似性を下げてみる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-question"></i>質問と情報の類似性を下げて実験</li>
+                        <li><i class="fa-solid fa-arrow-trend-down"></i>全モデルで精度が低下</li>
+                        <li><i class="fa-solid fa-text-height"></i>特にプロンプトが長くなると急激に悪化</li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-magnifying-glass-chart"></i> 単純な検索以上の能力が求められると弱い？</span>
+                </div>
+            </div>
+
+            <!-- 3. 実験②：邪魔な情報を入れる -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-secret fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>実験②：邪魔な情報を入れる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-comment-slash"></i>正解に似た「ディストラクタ」を混入</li>
+                        <li><i class="fa-solid fa-circle-nodes"></i>ディストラクタが多いほど精度が低下</li>
+                        <li><i class="fa-solid fa-file-circle-question"></i>文脈の曖昧さを処理する能力を測定</li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 top">
+                    <span class="handwritten"><i class="fa-solid fa-shuffle"></i> 紛らわしい情報に惑わされやすい！</span>
+                </div>
+            </div>
+
+            <!-- 4. 実験③：余計な情報を入れる -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-zipper fa-5x" style="color: var(--ui-color-5);"></i>
+                    <h2>実験③：余計な情報を入れる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines"></i>全情報 vs 必要な情報のみで比較</li>
+                        <li><i class="fa-solid fa-chart-line"></i>全モデルで明確に精度が低下</li>
+                        <li><i class="fa-solid fa-brain"></i>Gemini 2.5 Proは比較的健闘</li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-trash-can"></i> ノイズは性能劣化の大きな原因！</span>
+                </div>
+            </div>
+
+            <!-- 5. 実験④：文章をシャッフル -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shuffle fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s infinite;"></i>
+                    <h2>実験④：文章をシャッフル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-up-right-dots"></i>文章の順序をバラバラにすると…</li>
+                        <li><i class="fa-solid fa-face-surprise"></i>なんと、なぜか精度が向上！</li>
+                        <li><i class="fa-solid fa-gears"></i>人間とは異なる処理方法の可能性</li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb"></i> 順序は気にしなくて良いかも？</span>
+                </div>
+            </div>
+
+            <!-- 6. プロンプト作成の教訓 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-book-open-reader fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>プロンプト作成の教訓</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scissors"></i><span class="keyword-tag">最重要</span>：余計な情報は徹底的に削る</li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i>まずAIに要約させてからタスクを依頼する</li>
+                        <li><i class="fa-solid fa-sort"></i>情報の順序はあまり気にしなくてOK</li>
+                        <li><i class="fa-solid fa-file-pdf"></i>PDF読込はRAG利用のツールが有利か</li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-bullseye"></i> 「必要な情報だけ」が精度向上の鍵！</span>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <p>情報ソース: <a href="https://www.youtube.com/watch?v=LzQbj5gIVgI" target="_blank">https://www.youtube.com/watch?v=LzQbj5gIVgI</a></p>
+        </footer>
+    </div>
+</body>
+</html>

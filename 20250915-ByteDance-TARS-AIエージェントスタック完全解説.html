@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ByteDance TARS - AIエージェントスタック完全解説</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Kaisei Decol', serif;
+            background-color: #FFF8F5;
+            color: #333333;
+            line-height: 1.6;
+            overflow-x: auto;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            border-radius: 30px;
+            color: white;
+            box-shadow: 10px 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header .mega-icon {
+            font-size: 8rem;
+            margin-bottom: 20px;
+            animation: fa-bounce 3s infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        /* セクションレイアウト */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            margin-bottom: 40px;
+            justify-content: center;
+        }
+
+        /* カードスタイル */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 25px;
+            padding: 25px;
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+            position: relative;
+            overflow: visible;
+            transform: translateY(0);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 12px 12px 35px rgba(0,0,0,0.2);
+        }
+
+        .section-card.fade-in-scale {
+            animation: fadeInScale 0.8s ease-out forwards;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        /* カード内アイコンコンテナ */
+        .mega-icon-container {
+            text-align: center;
+            margin: 20px 0 30px 0;
+        }
+
+        .mega-icon-container i {
+            font-size: 5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-bottom: 10px;
+        }
+
+        /* カードコンテンツ */
+        .card-content {
+            padding: 0 5px 20px;
+        }
+
+        /* キーワードリスト */
+        .keyword-list {
+            margin: 20px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        .keyword-list li i {
+            margin-right: 12px;
+            color: var(--ui-color-2);
+            min-width: 20px;
+            margin-top: 2px;
+            font-size: 18px;
+        }
+
+        /* キーワードタグ */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 4px 10px;
+            border-radius: 8px;
+            margin: 0 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+            border: 2px solid var(--ui-color-2);
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 25px;
+            padding: 15px 20px;
+            margin: 20px 10px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 30px;
+            border-width: 15px 10px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 30px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        /* 手書き文字 */
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* コードプレビュー */
+        .code-preview {
+            background: #f8f8f8;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 15px 0;
+            overflow-x: auto;
+            color: #333;
+        }
+
+        .code-preview .comment {
+            color: #666;
+            font-style: italic;
+        }
+
+        /* 特別なカード色分け */
+        .card-agent-tars .mega-icon-container i {
+            color: var(--ui-color-1);
+            animation: fa-beat-fade 3s infinite;
+        }
+
+        .card-ui-tars .mega-icon-container i {
+            color: var(--ui-color-2);
+            animation: fa-flip 2s infinite;
+        }
+
+        .card-features .mega-icon-container i {
+            color: var(--ui-color-5);
+            animation: fa-bounce 2s infinite;
+        }
+
+        .card-installation .mega-icon-container i {
+            color: #2E8B57;
+            animation: fa-pulse 2s infinite;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 300px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 350px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 400px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+
+            .header .mega-icon {
+                font-size: 6rem;
+            }
+
+            .header h1 {
+                font-size: 28px;
+            }
+        }
+
+        /* アニメーション追加 */
+        @keyframes pulse-highlight {
+            0%, 100% { background-color: transparent; }
+            50% { background-color: rgba(191, 129, 54, 0.1); }
+        }
+
+        .highlight-pulse {
+            animation: pulse-highlight 2s infinite;
+            padding: 2px 5px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <i class="fa-solid fa-robot mega-icon" aria-hidden="true"></i>
+            <h1>ByteDance TARS - 革新的AIエージェントスタック</h1>
+            <p class="date">2024年最新リリース | マルチモーダルAI技術の最前線</p>
+        </div>
+
+        <!-- セクション1: Agent TARS概要 -->
+        <div class="section-layout">
+            <div class="section-card card-agent-tars fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" aria-hidden="true"></i>
+                    <h2>Agent TARS 概要</h2>
+                </div>
+
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">オープンソース</span>マルチモーダルAIエージェントスタック</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-laptop" aria-hidden="true"></i>
+                            <span>CLI + Web UI の<span class="keyword-tag">デュアルインターフェース</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>GUI エージェント + <span class="keyword-tag">ビジョン機能</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                            <span>ターミナル・ブラウザ・アプリケーション統合</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span>各種<span class="keyword-tag">MCP</span>サーバーとシームレス連携</span>
+                        </li>
+                    </ul>
+
+                    <div class="code-preview">
+<span class="comment"># インストールコマンド</span>
+npx agent-tars
+
+<span class="comment"># Web UI アクセス</span>
+http://localhost:3000
+                    </div>
+                </div>
+
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        人間らしいタスク完了を実現！<br>
+                        <span class="keyword-tag">Apache 2.0</span>ライセンスで完全無料
+                    </span>
+                </div>
+            </div>
+
+            <!-- UI TARS Desktop -->
+            <div class="section-card card-ui-tars fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-desktop fa-5x" aria-hidden="true"></i>
+                    <h2>UI TARS Desktop</h2>
+                </div>
+
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-window-maximize" aria-hidden="true"></i>
+                            <span>ネイティブ<span class="keyword-tag">デスクトップアプリ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span>UI TARS 1.5/1.6<span class="keyword-tag">マルチモーダルモデル</span>搭載</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-computer" aria-hidden="true"></i>
+                            <span>ローカル・リモート<span class="keyword-tag">コンピュータ制御</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                            <span>特殊化された<span class="keyword-tag">ブラウザオペレーター</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gears" aria-hidden="true"></i>
+                            <span>システムオペレーターでEnd-to-End実行</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-magic-wand-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+                        AIオペレーティングシステム<br>
+                        のような体験！<br>
+                        <span class="keyword-tag">macOS</span>で最高のパフォーマンス
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション2: 実用機能 -->
+        <div class="section-layout">
+            <div class="section-card card-features fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" aria-hidden="true"></i>
+                    <h2>実用機能・事例</h2>
+                </div>
+
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-plane" aria-hidden="true"></i>
+                            <span>フライト予約の<span class="keyword-tag">完全自動化</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-search" aria-hidden="true"></i>
+                            <span>Product Hunt<span class="keyword-tag">トレンド調査</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                            <span>株価データ収集・<span class="keyword-tag">レポート作成</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span>システムコマンド<span class="keyword-tag">実行・管理</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-bar" aria-hidden="true"></i>
+                            <span>データビジュアライゼーション<span class="keyword-tag">MCP連携</span></span>
+                        </li>
+                    </ul>
+
+                    <div class="code-preview">
+<span class="comment"># 実際のタスク例</span>
+"Book earliest flight San Jose → NYC on Sep 1st
+ and return flight on Sep 6th using Priceline"
+
+<span class="comment"># 結果: 完全自動で予約完了</span>
+✓ フライト検索
+✓ 最適オプション選択
+✓ 予約プロセス実行
+                    </div>
+                </div>
+
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i>
+                        リアルワールドのワークフローで<br>
+                        デジタルアシスタントが<br>
+                        <span class="keyword-tag highlight-pulse">実際に仕事を完了</span>！
+                    </span>
+                </div>
+            </div>
+
+            <!-- インストール・セットアップ -->
+            <div class="section-card card-installation fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-download fa-5x" aria-hidden="true"></i>
+                    <h2>インストール・セットアップ</h2>
+                </div>
+
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-brands fa-node-js" aria-hidden="true"></i>
+                            <span>必要条件：<span class="keyword-tag">Node.js</span>最新版</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span>推奨：<span class="keyword-tag">Anthropic Claude</span>API キー</span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-windows" aria-hidden="true"></i>
+                            <span>対応OS：<span class="keyword-tag">macOS</span> / Linux / Windows</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-server" aria-hidden="true"></i>
+                            <span>MCP設定：<span class="keyword-tag">config.json</span>でサーバー追加</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-play" aria-hidden="true"></i>
+                            <span>即座に利用開始可能</span>
+                        </li>
+                    </ul>
+
+                    <div class="code-preview">
+<span class="comment"># Agent TARS起動</span>
+npx agent-tars
+
+<span class="comment"># UI TARS Desktopダウンロード</span>
+GitHub Releases →
+  ✓ MacOS (推奨)
+  ✓ Linux
+  ✓ Windows
+
+<span class="comment"># MCP統合設定</span>
+config.json に MCP サーバー情報を追加
+                    </div>
+                </div>
+
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-zap fa-lg" style="color: #2E8B57;"></i>
+                        わずか数分で<br>
+                        <span class="keyword-tag">AI エージェント</span>が<br>
+                        あなたの作業を開始！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション3: 技術仕様と将来性 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microchip fa-5x" style="color: #6B46C1; animation: fa-spin 3s linear infinite;" aria-hidden="true"></i>
+                    <h2>技術仕様</h2>
+                </div>
+
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            <span>開発元：<span class="keyword-tag">ByteDance</span>（TikTok運営会社）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-balance-scale" aria-hidden="true"></i>
+                            <span>ライセンス：<span class="keyword-tag">Apache 2.0</span>（商用利用可）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layers" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">マルチモーダル</span>大規模言語モデル対応</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                            <span>継続的アップデート・<span class="keyword-tag">改良中</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>拡張可能な<span class="keyword-tag">プラグインシステム</span></span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-rocket fa-lg" style="color: #6B46C1;"></i>
+                        最新のAI技術を活用した<br>
+                        <span class="keyword-tag">次世代ツール</span>で<br>
+                        生産性を大幅向上！
+                    </span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-crystal-ball fa-5x" style="color: #EC4899; animation: fa-beat 2s infinite;" aria-hidden="true"></i>
+                    <h2>活用シーン・将来性</h2>
+                </div>
+
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-briefcase" aria-hidden="true"></i>
+                            <span>ビジネス<span class="keyword-tag">ワークフロー自動化</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+                            <span>研究・<span class="keyword-tag">データ分析</span>業務</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-paint-brush" aria-hidden="true"></i>
+                            <span>クリエイティブ<span class="keyword-tag">コンテンツ制作</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                            <span>DevOps・<span class="keyword-tag">システム管理</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-future" aria-hidden="true"></i>
+                            <span>未来の<span class="keyword-tag">AI OS</span>プラットフォーム</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-chart-line fa-lg" style="color: #EC4899;"></i>
+                        人とAIの協働する<br>
+                        <span class="keyword-tag highlight-pulse">新しい働き方</span>の<br>
+                        スタンダードになる可能性！
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // フェードインアニメーション
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('fade-in-scale');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('.section-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // ハイライト効果
+        document.addEventListener('DOMContentLoaded', function() {
+            const highlightElements = document.querySelectorAll('.keyword-tag');
+
+            highlightElements.forEach((element, index) => {
+                setTimeout(() => {
+                    element.style.animation = `pulse-highlight 2s infinite ${index * 0.1}s`;
+                }, 1000 + index * 200);
+            });
+        });
+    </script>
+</body>
+</html>

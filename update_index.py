@@ -1,63 +1,33 @@
 import os
 import re
-from bs4 import BeautifulSoup
 
-def extract_title_and_date(file_path):
-    with open(file_path, 'r', encoding='utf-8') as f:
-        soup = BeautifulSoup(f, 'html.parser')
-        title = soup.title.string if soup.title else 'No Title'
-        
-        # Extract date from filename
-        match = re.match(r'\d{8}', os.path.basename(file_path))
-        date = match.group(0) if match else '99999999' # Default to a high value to sort last if no date
+# 1. docsフォルダにあるすべての`YYYYMMDD-*.html`形式のファイルをリストアップします。
+docs_dir = 'docs'
+files = [f for f in os.listdir(docs_dir) if re.match(r'\d{8}-.*\.html', f)]
 
-        return date, title
+# 2. 各ファイルから日付とタイトルを抽出し、日付の新しい順にソートします。
+articles = []
+for f in files:
+    match = re.match(r'(\d{8})-(.*)\.html', f)
+    if match:
+        date = match.group(1)
+        title = match.group(2).replace('-', ' ')
+        articles.append({'date': date, 'title': title, 'filename': f})
 
-def update_index_html():
-    docs_dir = 'docs'
-    articles = []
+articles.sort(key=lambda x: x['date'], reverse=True)
 
-    # List all YYYYMMDD-*.html files
-    for filename in os.listdir(docs_dir):
-        if re.match(r'\d{8}-.*\.html', filename):
-            file_path = os.path.join(docs_dir, filename)
-            date, title = extract_title_and_date(file_path)
-            articles.append({'date': date, 'title': title, 'filename': os.path.join(docs_dir, filename)})
+# 3. `index.html`の`<ul>`タグ内に、各記事へのリンクを`<li><a href="ファイル名">タイトル</a></li>`の形式で追加します。
+with open('index.html', 'r', encoding='utf-8') as f:
+    index_content = f.read()
 
-    # Sort articles by date in descending order
-    articles.sort(key=lambda x: x['date'], reverse=True)
+list_items = ''
+for article in articles:
+    list_items += f'<li><a href="docs/{article["filename"]}">{article["date"]} - {article["title"]}</a></li>\n'
 
-    # Generate new <ul> content
-    new_ul_content = []
-    for article in articles:
-        new_ul_content.append(f'<li><a href="{article["filename"]}">{article["title"]}</a></li>')
-    
-    new_ul_tag = '<ul>\n' + '\n'.join(new_ul_content) + '\n</ul>'
+updated_content = re.sub(r'<ul>[\s\S]*?</ul>', f'<ul>\n{list_items}</ul>', index_content)
 
-    # Read existing index.html
-    with open('index.html', 'r', encoding='utf-8') as f:
-        index_html_content = f.read()
+# 4. 更新された`index.html`を書き込みます。
+with open('index.html', 'w', encoding='utf-8') as f:
+    f.write(updated_content)
 
-    # Find and replace the <ul> tag
-    soup = BeautifulSoup(index_html_content, 'html.parser')
-    
-    # Find the existing <ul> tag within the body
-    existing_ul = soup.body.find('ul')
-
-    if existing_ul:
-        existing_ul.replace_with(BeautifulSoup(new_ul_tag, 'html.parser'))
-    else:
-        # If no <ul> tag exists, append it after the <p> tag
-        p_tag = soup.body.find('p', string='記事一覧')
-        if p_tag:
-            p_tag.insert_after(BeautifulSoup(new_ul_tag, 'html.parser'))
-        else:
-            # Fallback: append to body if no specific insertion point
-            soup.body.append(BeautifulSoup(new_ul_tag, 'html.parser'))
-
-    # Write updated index.html
-    with open('index.html', 'w', encoding='utf-8') as f:
-        f.write(str(soup))
-
-if __name__ == '__main__':
-    update_index_html()
+print("index.html has been updated successfully.")

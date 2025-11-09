@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自作版Claude CodeアシスタントをLangGraphとMCPで構築する方法</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+            --bg-color: #FFF8F5;
+        }
+        body {
+            font-family: 'Zen Kurenaido', sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .header h1 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 36px;
+            color: #333;
+            font-weight: bold;
+            margin: 0;
+        }
+        .header .header-icon {
+            font-size: 48px;
+            color: var(--ui-color-1);
+        }
+        .header-date {
+            font-size: 14px;
+            color: #777;
+        }
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .section-card {
+            flex: 1;
+            min-width: 300px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .mega-icon-container h2 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 24px;
+            color: #555;
+            margin-top: 10px;
+        }
+        .card-content {
+            padding: 0 10px 15px;
+        }
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+        }
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 4px 10px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 15px 20px;
+            margin: 20px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -15px;
+            left: 30px;
+            border-width: 15px 10px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 16px;
+            line-height: 1.6;
+            color: #333;
+        }
+        .handwritten i {
+            color: var(--ui-color-2);
+            margin-right: 5px;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f2f2f2;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+            opacity: 0;
+            transform: scale(0.95);
+        }
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 14px;
+            color: #777;
+        }
+        .footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <i class="fa-solid fa-laptop-code fa-2x header-icon" aria-hidden="true"></i>
+            <div>
+                <h1>自作版Claude CodeアシスタントをLangGraphとMCPで構築</h1>
+                <p class="header-date">2025年11月9日</p>
+            </div>
+        </header>
+
+        <main class="section-layout">
+            <!-- アーキテクチャ概要 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-pulse 2s infinite;"></i>
+                    <h2>アーキテクチャ概要</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-cogs" aria-hidden="true"></i><span>オーケストレーション: <span class="keyword-tag">LangGraph</span></span></li>
+                        <li><i class="fa-solid fa-tools" aria-hidden="true"></i><span>ツール連携: <span class="keyword-tag">MCPサーバー</span></span></li>
+                        <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>LLM: <span class="keyword-tag">Claude Sonnet 4.5</span></span></li>
+                        <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>インターフェース: <span class="keyword-tag">CLI (rich)</span></span></li>
+                        <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>状態永続化: <span class="keyword-tag">SQLite</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb"></i>LangGraphでエージェントの複雑な状態を管理し、MCP経由で多彩なツールを活用する構成！</span>
+                </div>
+            </div>
+
+            <!-- LangGraphによるオーケストレーション -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>LangGraphの役割</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shoe-prints" aria-hidden="true"></i><span><span class="keyword-tag">状態管理:</span> ユーザー入力、モデル応答、ツール使用の3つのノードで状態を管理。</span></li>
+                        <li><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span><span class="keyword-tag">グラフ構造:</span> ノードとエッジでエージェントのワークフローを定義し、コンパイルして実行。</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span><span class="keyword-tag">ループ処理:</span> 再帰上限を設定し、エージェントがループ内でタスクを実行。</span></li>
+                        <li><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span><span class="keyword-tag">永続化:</span> SQLite Checkpointingでエージェントの状態をDBに保存。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-star"></i>単なるLLM呼び出しではなく、状態を持つグラフとしてエージェントの思考プロセスを構築できるのが強力！</span>
+                </div>
+            </div>
+
+            <!-- MCPサーバーとツール -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>MCPサーバーとツール群</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-folder-open" aria-hidden="true"></i><span><span class="keyword-tag">ローカルツール:</span> ファイルの読み書き、一覧、検索、テスト実行など。</span></li>
+                        <li><i class="fa-solid fa-globe" aria-hidden="true"></i><span><span class="keyword-tag">MCPツール (Web):</span> DuckDuckGoによるWeb検索。</span></li>
+                        <li><i class="fa-brands fa-github" aria-hidden="true"></i><span><span class="keyword-tag">MCPツール (GitHub):</span> PATを利用したリポジトリ管理。</span></li>
+                        <li><i class="fa-solid fa-box" aria-hidden="true"></i><span><span class="keyword-tag">MCPツール (Sandbox):</span> 安全な環境でのPythonコード実行。</span></li>
+                    </ul>
+                    <pre><code># MCPツールのコマンド例
+npx @mcp-tools/duckduckgo-mcp-server
+npx @mcp-tools/github-mcp-server</code></pre>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-puzzle-piece"></i>ローカルとリモートのツールをMCPという標準規格で統一的に扱えるのがミソ！</span>
+                </div>
+            </div>
+
+            <!-- 開発者へのメッセージ -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.4s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-graduate fa-5x" style="color: var(--ui-color-1);"></i>
+                    <h2>真のAIエキスパートへ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>単なる<span class="keyword-tag">プロンプトエンジニア</span>で終わらない。</span></li>
+                        <li><i class="fa-solid fa-wrench" aria-hidden="true"></i><span>Claude CodeやCursorのようなツールを<span class="keyword-tag">自ら構築する</span>知識を。</span></li>
+                        <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>VS Code(OSS)をベースに、モデルやワークフローを組み合わせる。</span></li>
+                        <li><i class="fa-solid fa-microscope" aria-hidden="true"></i><span>コンパイラやOSの仕組みまで深く探求することが重要。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-book-open-reader"></i>ツールを使う側から作る側へ。技術の深淵を覗き、マスターを目指そう！</span>
+                </div>
+            </div>
+
+        </main>
+
+        <footer class="footer">
+            <p>情報ソース: <a href="https://www.youtube.com/watch?v=WXGjHbEB3Wc" target="_blank">YouTube</a></p>
+            <p>GitHubリポジトリ: <a href="https://github.com/your-repo/your-claude-code" target="_blank">Your-Claude-Code</a> (Apache 2.0)</p>
+        </footer>
+    </div>
+</body>
+</html>

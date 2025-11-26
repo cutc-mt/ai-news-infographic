@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロダクション対応マルチモーダルLLMファインチューニングパイプライン</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Yomogi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --ui-color-1: #667eea;
+            --ui-color-2: #764ba2;
+            --ui-color-3: #f093fb;
+            --ui-color-4: #4facfe;
+            --ui-color-5: #43e97b;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        h1 {
+            font-size: 3em;
+            font-weight: 900;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 1.3em;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+
+        .date {
+            margin-top: 15px;
+            font-size: 1.1em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInScale 0.6s ease backwards;
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card h2 {
+            font-size: 1.5em;
+            margin-bottom: 15px;
+            color: #2d3748;
+            font-weight: 700;
+        }
+
+        .card p {
+            color: #4a5568;
+            line-height: 1.8;
+            font-size: 1.05em;
+        }
+
+        .card ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .card ul li {
+            color: #4a5568;
+            line-height: 1.8;
+            font-size: 1.05em;
+            padding-left: 1.5em;
+            position: relative;
+        }
+
+        .card ul li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: var(--ui-color-1);
+            font-weight: bold;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-5));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+        .card:nth-child(4) { animation-delay: 0.4s; }
+        .card:nth-child(5) { animation-delay: 0.5s; }
+        .card:nth-child(6) { animation-delay: 0.6s; }
+        .card:nth-child(7) { animation-delay: 0.7s; }
+        .card:nth-child(8) { animation-delay: 0.8s; }
+        .card:nth-child(9) { animation-delay: 0.9s; }
+        .card:nth-child(10) { animation-delay: 1.0s; }
+        .card:nth-child(11) { animation-delay: 1.1s; }
+        .card:nth-child(12) { animation-delay: 1.2s; }
+        .card:nth-child(13) { animation-delay: 1.3s; }
+        .card:nth-child(14) { animation-delay: 1.4s; }
+        .card:nth-child(15) { animation-delay: 1.5s; }
+        .card:nth-child(16) { animation-delay: 1.6s; }
+        .card:nth-child(17) { animation-delay: 1.7s; }
+        .card:nth-child(18) { animation-delay: 1.8s; }
+
+        @media (max-width: 1600px) {
+            .grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            h1 {
+                font-size: 2.5em;
+            }
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            h1 {
+                font-size: 2em;
+            }
+            .subtitle {
+                font-size: 1.1em;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 20px 10px;
+            }
+            h1 {
+                font-size: 1.8em;
+            }
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .card {
+                padding: 25px;
+            }
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 60px;
+            padding: 30px;
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+            border-bottom: 2px solid rgba(255,255,255,0.5);
+            transition: border-color 0.3s ease;
+        }
+
+        footer a:hover {
+            border-color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔬 プロダクション対応マルチモーダルLLMファインチューニング</h1>
+            <p class="subtitle">Google Cloudで構築する本番環境レベルのAIモデル最適化パイプライン</p>
+            <p class="date">2025年11月26日</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-bullseye"></i>
+                </div>
+                <h2>ファインチューニングの必要性</h2>
+                <p>LLMは広範なインターネットデータで学習済みだが、<span class="highlight">特定ドメインの専門知識</span>が不足。プロンプトエンジニアリングでは限界あり。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-gem"></i>
+                </div>
+                <h2>Gemma & MedGemma</h2>
+                <p>オープンモデルの<span class="highlight">Gemma</span>や医療特化の<span class="highlight">MedGemma</span>。Llama、Mistralなども業務データで適応可能。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h2>精度向上の効果</h2>
+                <p>ドメイン特化タスクで<span class="highlight">精度が10倍以上向上</span>。企業の標準・用語に合致。業界コンテキストを深く理解した回答を実現。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-eye"></i>
+                </div>
+                <h2>マルチモーダルの急成長</h2>
+                <p>2023年は1%だったマルチモーダルLLMが<span class="highlight">2027年には40%</span>に拡大予測。実装スピードが75%高速化。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h2>マルチモーダルの課題</h2>
+                <p>リソース消費が<span class="highlight">4〜8倍増加</span>。テキスト単体モデルより複雑。インフラ&データ管理の難易度が高い。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-hospital"></i>
+                </div>
+                <h2>実用事例：ヘルスケア</h2>
+                <p><span class="highlight">33,000枚の皮膚鏡画像</span>でメラノーマ検出。悪性・良性の二値分類。専門皮膚科医のアノテーション付き高解像度医療画像。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-gap"></i>
+                </div>
+                <h2>実装ギャップの克服</h2>
+                <p>多くの組織が<span class="highlight">プロトタイプから本番移行に苦戦</span>。ビジネス価値認識とスケール実現の間に大きな溝。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-server"></i>
+                </div>
+                <h2>インフラの複雑性</h2>
+                <p>高性能<span class="highlight">GPU/TPUへのアクセス困難</span>。ストックアウト頻発。マルチノード・マルチGPU設定が複雑。VRAM飽和が難題。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h2>データ準備の壁</h2>
+                <p>画像とテキストの<span class="highlight">正確な関係性維持</span>が必須。ミスアライメントでパフォーマンス大幅劣化。多様なファイル形式・解像度の処理が複雑。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <h2>トレーニング管理の課題</h2>
+                <p><span class="highlight">分散学習設定</span>、パラメータチューニング、チェックポイント管理、メモリ最適化。観測、エラー処理、リソーススケジューリングも必要。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-cloud"></i>
+                </div>
+                <h2>Google Cloudの強み</h2>
+                <p><span class="highlight">マルチモーダル最適化</span>された専用ハードウェア。Cloud Batch、Vertex AI、GKE Autopilot。エンタープライズレベルのセキュリティ&コンプライアンス。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-layer-group"></i>
+                </div>
+                <h2>3つのデプロイ選択肢</h2>
+                <ul>
+                    <li><span class="highlight">Cloud Batch</span>：最も簡単</li>
+                    <li><span class="highlight">Vertex AI</span>：MLOps統合</li>
+                    <li><span class="highlight">GKE Autopilot</span>：完全制御</li>
+                </ul>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-cubes"></i>
+                </div>
+                <h2>GKE Autopilotの利点</h2>
+                <p><span class="highlight">Kubernetesの柔軟性</span>とGoogle Cloudの自動化を融合。コンテナワークロードに最適。学習インフラの完全コントロール。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-toolbox"></i>
+                </div>
+                <h2>フレームワーク: Axolotl</h2>
+                <p><span class="highlight">設定駆動型</span>アプローチでファインチューニング大幅簡素化。HuggingFace、PyTorch、Kerasと組み合わせて強力なエコシステム構築。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-brain"></i>
+                </div>
+                <h2>汎用性から専門性へ</h2>
+                <p>ファインチューニングは<span class="highlight">汎用能力と特化性能</span>のギャップを埋める。真にドメインコンテキストを理解するAIシステムを実現。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <h2>75%実装高速化</h2>
+                <p>適切なインフラストラクチャで<span class="highlight">市場投入が75%高速化</span>。プロトタイプから本番環境への移行障壁を大幅削減。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <h2>コスト最適化の鍵</h2>
+                <p>加速器の高額コスト対策。<span class="highlight">GPU/TPU VRAMの飽和率向上</span>が重要。ストックアウト問題への対応も必須。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-trophy"></i>
+                </div>
+                <h2>成功への道のり</h2>
+                <p>概念から本番環境まで。<span class="highlight">設定管理、データパイプライン、インフラ自動化</span>が揃えば、カスタムモデルの展開が現実に。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p>YouTube動画より作成 | <a href="https://www.youtube.com/watch?v=8R8BMQZj_aQ" target="_blank">元動画を見る</a></p>
+        </footer>
+    </div>
+</body>
+</html>

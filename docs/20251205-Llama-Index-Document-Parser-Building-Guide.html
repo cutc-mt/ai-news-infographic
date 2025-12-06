@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Llama Index文書パーサー構築ガイド・3つのアプローチ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Yomogi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --ui-color-1: #667eea;
+            --ui-color-2: #764ba2;
+            --ui-color-3: #f093fb;
+            --ui-color-4: #4facfe;
+            --ui-color-5: #00f2fe;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+
+        .date {
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInScale 0.6s ease-out backwards;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+        .card:nth-child(4) { animation-delay: 0.4s; }
+        .card:nth-child(5) { animation-delay: 0.5s; }
+        .card:nth-child(6) { animation-delay: 0.6s; }
+        .card:nth-child(7) { animation-delay: 0.7s; }
+        .card:nth-child(8) { animation-delay: 0.8s; }
+        .card:nth-child(9) { animation-delay: 0.9s; }
+        .card:nth-child(10) { animation-delay: 1.0s; }
+        .card:nth-child(11) { animation-delay: 1.1s; }
+        .card:nth-child(12) { animation-delay: 1.2s; }
+        .card:nth-child(13) { animation-delay: 1.3s; }
+        .card:nth-child(14) { animation-delay: 1.4s; }
+        .card:nth-child(15) { animation-delay: 1.5s; }
+        .card:nth-child(16) { animation-delay: 1.6s; }
+        .card:nth-child(17) { animation-delay: 1.7s; }
+        .card:nth-child(18) { animation-delay: 1.8s; }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .card p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 1600px) {
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .subtitle {
+                font-size: 1rem;
+            }
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Llama Index文書パーサー構築ガイド・3つのアプローチ</h1>
+            <p class="subtitle">ヒューリスティック・VLM・エージェント型パーシングの比較と実装</p>
+            <p class="date">2025年12月5日</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-file-pdf"></i></div>
+                <h3>PDF構造の複雑性</h3>
+                <p>PDFはWord・Markdownと異なりPostScript命令セット。座標・描画命令のプログラミング言語的性質。テキストブロック・バウンディングボックスのパッチワーク。位置・サイズ・フォーマット情報から再構築必要。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sort-amount-down"></i></div>
+                <h3>読み順序検出の課題</h3>
+                <p>PyPDF等はPDF内部順序で抽出(実際の読み順序と不一致)。Y座標でブロックをライン化→左右ソート。複数カラム検出(垂直ギャップ分析・XY-Cutアルゴリズム・ビジョン分類器)。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-heading"></i></div>
+                <h3>見出し検出ヒューリスティック</h3>
+                <p>フォントサイズヒストグラム分析。平均サイズの1.3倍以上を見出しと判定。H1・H2・H3レベル自動分類。Markdown変換で#マーク追加。シンプルだが効果的。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-table"></i></div>
+                <h3>テーブル抽出・PDF Plumber</h3>
+                <p>PDF Plumber機械学習でテーブル検出。バウンディングボックス・カラム情報取得。Markdown・HTML・DataFrameへ変換。200行コードで実用的パーサー構築可能。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-tools"></i></div>
+                <h3>ヒューリスティック型の限界</h3>
+                <p>同一レイアウト文書なら高速・高精度・低コスト($1/1000ページ)。複雑レイアウト・ロングテール問題で精度低下。3文書に1つが特殊ケース。手動調整・テンプレート管理が必要。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-camera"></i></div>
+                <h3>VLMスクリーンショット手法</h3>
+                <p>各ページをスクリーンショット→Claude・Gemini送信→Markdown生成。コード量激減・柔軟性向上。Raiju・Gemini・DeepSeek等が高精度。テーブル・チャート・複雑レイアウト対応。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-clock"></i></div>
+                <h3>VLM型のトレードオフ</h3>
+                <p>処理速度:3秒~数分/ページ。コスト:$0.01~$0.20/ページ(モデル次第)。精度:一般的に高いがハルシネーション・省略リスク。メタデータ・埋め込みリンク・スピーカーノート喪失。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <h3>VLM失敗モード</h3>
+                <p>Max Token制限到達→不完全出力。繰り返しループ(低Temperature時)。省略・要約(100行テーブル→3行+省略コメント)。一貫性欠如(ページ間でフォーマット変動)。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <h3>エージェント型パーシング</h3>
+                <p>Llama Index Workflowで失敗モード処理。イベント駆動(Generate・Continue・FixRepetition・ExtractionComplete)。繰り返し検出→修正指示。未完了検出→続行要求。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sync-alt"></i></div>
+                <h3>エージェントループ設計</h3>
+                <p>Start Event→Generate→Router→Continue/FixRepetition→Complete。最大イテレーション制限でコスト管理。モデル別失敗パターン学習・対策実装。QAループでファクトチェック。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-balance-scale"></i></div>
+                <h3>3手法比較まとめ</h3>
+                <p>ヒューリスティック:高速・安価だがレイアウト依存。VLM:柔軟だが省略・コスト課題。エージェント:高精度・再試行可能だが複雑・高コスト。用途・文書タイプで使い分け。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-graduation-cap"></i></div>
+                <h3>Llama Parse提供サービス</h3>
+                <p>ParsePageWithoutAI($1/1000ページ・OCR込)。ParsePageWithLLM(VLM oneshot+QA・繰り返しループ)。ParsePageWithAgent(全モデル対応・予測可能価格・$3~$90/1000ページ)。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-language"></i></div>
+                <h3>多言語・バウンディングボックス</h3>
+                <p>右→左言語(アラビア語等)は専用パイプライン推奨。タイ語等も特殊処理必要。VLM型はバウンディングボックス喪失→OCR・レイアウト分類と融合で復元。ビューポート座標変換が課題。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-table"></i></div>
+                <h3>スプレッドシート特殊課題</h3>
+                <p>1シート内100サブテーブル。埋め込み画像。数値中心で意味希薄→チャンキング困難。Llama Sheet Agent:構造抽出・インデックス化・エージェント操作対応。別ウェビナーで詳解。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-shield-alt"></i></div>
+                <h3>データ保持ポリシー</h3>
+                <p>Llama Parse:48時間後自動削除。トレーニング利用なし。オンプレミス・BYOC(AWS Bedrock・Azure)対応。専用テナントオプション。エンタープライズ向けセキュリティ。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-cogs"></i></div>
+                <h3>RAGパイプライン推奨</h3>
+                <p>ローカルモデル:DeepSeek・Qwen推奨。パーシング後チャンキング・埋め込み・検索戦略が鍵。文書タイプ別(財務・コード・医療)に最適化。Llama Index 100+ノートブック参照。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-history"></i></div>
+                <h3>DoclingとVLM比較</h3>
+                <p>Docling:レイアウト分類→要素別パーシング。5年前アプローチ・複合エラー問題。VLM:1ステップ→エラー複合なし。ベンチマークでVLM優位。コストは依然課題だが改善中。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-lightbulb"></i></div>
+                <h3>実装のベストプラクティス</h3>
+                <p>同一レイアウト→ヒューリスティック優先。多様文書→VLM/エージェント。言語検出→パイプライン分岐。モデル別失敗モード対策(10~20パターン)。予測可能コスト設計が成功の鍵。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fab fa-youtube"></i> 元動画: <a href="https://www.youtube.com/watch?v=apzklu5wnBM" target="_blank">https://www.youtube.com/watch?v=apzklu5wnBM</a></p>
+        </footer>
+    </div>
+</body>
+</html>

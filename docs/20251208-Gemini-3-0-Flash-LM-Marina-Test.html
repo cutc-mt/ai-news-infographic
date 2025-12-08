@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini 3.0 FlashのリークとLM Marinaでのテスト：Googleの次世代AIモデル</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+            --background-color: #FFF8F5;
+        }
+
+        body {
+            font-family: 'Zen Kurenaido', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: #333333;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px; /* 4カラム構成に合わせて調整 */
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background-color: var(--ui-color-3);
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        header h1 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 36px;
+            color: var(--ui-color-4);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        header h1 i {
+            font-size: 7x; /* 特大アイコン */
+            color: var(--ui-color-1);
+        }
+
+        header p {
+            font-size: 14px;
+            color: #777777;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px; /* 4カラム対応 */
+            max-width: 320px; /* 4カラム対応 */
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInScale 0.8s ease-out forwards;
+            opacity: 0;
+        }
+
+        .section-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container i {
+            font-size: 5x; /* 特大サイズ */
+            color: var(--ui-color-1);
+            animation: fa-beat-fade 3s infinite alternate;
+        }
+
+        .section-card h2 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 24px;
+            color: #555555;
+            text-align: center;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .section-card h2 i {
+            font-size: 1.5rem;
+            color: var(--ui-color-2);
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 3px; /* アイコンとテキストの垂直方向の調整 */
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #ffffff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+            z-index: 10;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777777;
+            background-color: var(--ui-color-3);
+            border-radius: 15px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                max-width: 45%; /* 2カラム */
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+                align-items: center;
+            }
+            .section-card {
+                min-width: 90%;
+                max-width: 90%;
+            }
+            header h1 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-gem fa-bounce" style="color: var(--ui-color-1);"></i> Gemini 3.0 FlashのリークとLM Marinaでのテスト：Googleの次世代AIモデル</h1>
+            <p>公開日: 2025年12月8日</p>
+        </header>
+
+        <div class="section-layout">
+            <!-- カード1: Gemini 3.0 Flashの登場 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-lightbulb"></i> Gemini 3.0 Flashの概要</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info"></i>
+                            <span><span class="keyword-tag">新モデルリーク</span>: Geminiの最新かつ最高のモデルとされる「Gemini 3.0 Flash」または「Gemini 3.5」の存在が示唆されています。</span>
+                        </li>
+                        <li><i class="fa-solid fa-dollar-sign"></i>
+                            <span><span class="keyword-tag">コスト効率</span>: Gemini 3.0シリーズのコスト効率に優れた、高速バージョン。</span>
+                        </li>
+                        <li><i class="fa-solid fa-rocket"></i>
+                            <span><span class="keyword-tag">超高速</span>: 驚異的な速度でのタスク処理能力が期待されています。</span>
+                        </li>
+                        <li><i class="fa-solid fa-microchip"></i>
+                            <span><span class="keyword-tag">次世代アーキテクチャ</span>: 「flashed architecture」によるスケーリングが特徴。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-arrow-up-right-dots fa-lg" style="color: var(--ui-color-2);"></i>
+                        Googleはすでに<span class="keyword-tag">新しいチェックポイント</span>をテスト中！
+                        <br>
+                        期待の新モデルが間もなく登場か！？
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード2: LM Marinaでのテスト -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flask-vial fa-5x" style="color: var(--ui-color-1); animation: fa-fade 2.5s infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-vials"></i> LM Marinaでのモデルテスト</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-globe"></i>
+                            <span><span class="keyword-tag">公開プラットフォーム</span>: LM MarinaはAIモデルを自律的にテストし、リアルタイムで比較できる公開プラットフォームです。</span>
+                        </li>
+                        <li><i class="fa-solid fa-users-line"></i>
+                            <span><span class="keyword-tag">匿名テスト</span>: 2つの匿名モデルをヘッド・トゥ・ヘッドで比較する「バトルモード」でテストが可能です。</span>
+                        </li>
+                        <li><i class="fa-solid fa-code"></i>
+                            <span><span class="keyword-tag">コードモード</span>: VS CodeクローンやブラウザベースOSの構築など、様々なプロンプトでモデルのコーディング能力を評価。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-1);"></i>
+                        Googleはここで自社モデルが競合他社より<span class="keyword-tag">優位性</span>を持つか確認しています！
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード3: SkyhawkとSeahawkの性能 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-feather-pointed fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-chart-line"></i> Skyhawk & Seahawkの能力</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-laptop-code"></i>
+                            <span><span class="keyword-tag">ブラウザベースOS生成</span>: 両モデルは通知機能や様々なアプリ（ブラウザ、ターミナル、メディアプレイヤーなど）を備えたOSを生成。</span>
+                        </li>
+                        <li><i class="fa-solid fa-cloud-sun-rain"></i>
+                            <span><span class="keyword-tag">クリエイティブな天気アプリ</span>: 鮮やかな3Dアニメーションと視覚効果を持つ天気アプリの生成も可能です。</span>
+                        </li>
+                        <li><i class="fa-solid fa-clock"></i>
+                            <span><span class="keyword-tag">精密な3D時計機構</span>: 対話型コントロールを備えたリアルな3D機械式時計機構の生成も試されました。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i>
+                        Skyhawkは<span class="keyword-tag">優れた出力品質</span>、Seahawkは<span class="keyword-tag">パフォーマンス</span>で優位性を見せています！
+                    </span>
+                </div>
+            </div>
+            
+            <!-- カード4: Googleの戦略とFlashの位置づけ -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gem fa-5x" style="color: var(--ui-color-1); animation: fa-spin 5s linear infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-bullseye"></i> Googleの戦略的モデル</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-comment-dots"></i>
+                            <span><span class="keyword-tag">Sundar Pichaiの言及</span>: Google CEOのSundar Pichai氏はGemini 3.0 Flashの登場を予告し、それが「非常に良い」ものになると発言しています。</span>
+                        </li>
+                        <li><i class="fa-solid fa-star"></i>
+                            <span><span class="keyword-tag">画期的なモデル</span>: 単なる低価格版ではなく、<span class="keyword-tag">「妥協ではない」画期的なモデル</span>として位置づけられています。</span>
+                        </li>
+                        <li><i class="fa-solid fa-brain"></i>
+                            <span><span class="keyword-tag">Gemini 3レベルの賢さ</span>: 高速、安価でありながらも、Gemini 3.0と同レベルのスマートさを持つモデルです。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-magnifying-glass-chart fa-lg" style="color: var(--ui-color-1);"></i>
+                        <span class="keyword-tag">Googleの最高傑作</span>になる可能性も！？
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>情報ソース: <a href="https://www.youtube.com/watch?v=-aVFx7EU5hE" target="_blank">YouTube: Gemini's Greatest Model Yet?! Gemini 3.0 Flash Leaks!</a></p>
+            <p>&copy; 2025 AI News Infographic</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Agentsフレームワーク徹底解説：階層型AIエージェントとコンテキスト分離</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+            --background-color: #FFF8F5;
+        }
+
+        body {
+            font-family: 'Zen Kurenaido', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--background-color);
+            color: #333333;
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1400px; /* 4カラム構成に合わせて調整 */
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+            background-color: var(--ui-color-3);
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+        }
+
+        header h1 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 36px;
+            color: var(--ui-color-4);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        header h1 i {
+            font-size: 7x; /* 特大アイコン */
+            color: var(--ui-color-1);
+        }
+
+        header p {
+            font-size: 14px;
+            color: #777777;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px; /* 4カラム対応 */
+            max-width: 320px; /* 4カラム対応 */
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInScale 0.8s ease-out forwards;
+            opacity: 0;
+        }
+
+        .section-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container i {
+            font-size: 5x; /* 特大サイズ */
+            color: var(--ui-color-1);
+            animation: fa-beat-fade 3s infinite alternate;
+        }
+
+        .section-card h2 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 24px;
+            color: #555555;
+            text-align: center;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .section-card h2 i {
+            font-size: 1.5rem;
+            color: var(--ui-color-2);
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 3px; /* アイコンとテキストの垂直方向の調整 */
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #ffffff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+            z-index: 10;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777777;
+            background-color: var(--ui-color-3);
+            border-radius: 15px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.05);
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                max-width: 45%; /* 2カラム */
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+                align-items: center;
+            }
+            .section-card {
+                min-width: 90%;
+                max-width: 90%;
+            }
+            header h1 {
+                font-size: 28px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-layer-group fa-bounce" style="color: var(--ui-color-1);"></i> Deep Agentsフレームワーク徹底解説：階層型AIエージェントとコンテキスト分離</h1>
+            <p>公開日: 2025年12月8日</p>
+        </header>
+
+        <div class="section-layout">
+            <!-- カード1: AIエージェントの課題 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-bug"></i> 既存エージェントの課題</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-box-archive"></i>
+                            <span><span class="keyword-tag">コンテキスト飽和</span>: 複雑なタスクでステップを重ねるとコンテキストが満杯になる。</span>
+                        </li>
+                        <li><i class="fa-solid fa-route"></i>
+                            <span><span class="keyword-tag">道筋喪失</span>: エージェントが途中でタスクの方向性を見失う。</span>
+                        </li>
+                        <li><i class="fa-solid fa-rotate-right"></i>
+                            <span><span class="keyword-tag">ループ</span>: 無限ループに陥る可能性。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        問題は<span class="keyword-tag">モデルの性能</span>だけでなく、<br>
+                        <span class="keyword-tag">アーキテクチャ</span>にある！
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード2: Deep Agentsフレームワークの概要 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-fade 2.5s infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-screwdriver-wrench"></i> Deep Agentsの解決策</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building-columns"></i>
+                            <span><span class="keyword-tag">階層型アーキテクチャ</span>: 問題をより小さな管理可能なタスクに分解。</span>
+                        </li>
+                        <li><i class="fa-solid fa-diagram-project"></i>
+                            <span><span class="keyword-tag">LangGraphベース</span>: LangGraph上に構築されたフレームワーク。</span>
+                        </li>
+                        <li><i class="fa-solid fa-list-check"></i>
+                            <span><span class="keyword-tag">ミドルウェア</span>: To-doリスト、ファイルシステム、サブエージェントなど固定リストのミドルウェア。</span>
+                        </li>
+                        <li><i class="fa-solid fa-user-tie"></i>
+                            <span><span class="keyword-tag">プロジェクトマネージャー</span>: デフォルトでエージェントはプロジェクトマネージャーとして機能。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gear fa-lg" style="color: var(--ui-color-1);"></i>
+                        モデルが初めてLLMを呼び出す前に、<br>
+                        <span class="keyword-tag">自身の状態を管理するツール</span>を搭載！
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード3: コンテキスト分離の重要性 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-crop-simple"></i> コンテキスト分離と安定性</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-box"></i>
+                            <span><span class="keyword-tag">サブエージェントのサンドボックス化</span>: サブエージェントは完全に新しいLangGraphで実行。</span>
+                        </li>
+                        <li><i class="fa-solid fa-filter"></i>
+                            <span><span class="keyword-tag">メッセージフィルタリング</span>: オーケストレーターはチャット履歴全体ではなく、命令のみをサブエージェントに渡す。</span>
+                        </li>
+                        <li><i class="fa-solid fa-eraser"></i>
+                            <span><span class="keyword-tag">中間状態の破棄</span>: サブエージェントの完了後、中間状態は破棄され、結果のみを返す。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-5);"></i>
+                        これがDeep Agentsの<span class="keyword-tag">安定性</span>を保つ鍵！<br>
+                        コンテキストの混濁を防ぎます。
+                    </span>
+                </div>
+            </div>
+            
+            <!-- カード4: サブエージェントの活用とプロンプトエンジニアリング -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-4); animation: fa-spin 5s linear infinite;" aria-hidden="true"></i>
+                </div>
+                <h2><i class="fa-solid fa-puzzle-piece"></i> サブエージェントと最適化</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-graduate"></i>
+                            <span><span class="keyword-tag">専門家エージェント</span>: 数学の専門家のような特定のタスクに特化したサブエージェントを定義。</span>
+                        </li>
+                        <li><i class="fa-solid fa-shuffle"></i>
+                            <span><span class="keyword-tag">動的な意思決定</span>: オーケストレーターはユーザーのクエリに基づいて、専門家サブエージェントを使用するかどうかを動的に判断。</span>
+                        </li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span><span class="keyword-tag">プロンプトエンジニアリング</span>: サブエージェントの使用を強制するには「自身の知識から直接ユーザーの質問に答えてはならない」などの制約を加える。</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-comments fa-lg" style="color: var(--ui-color-2);"></i>
+                        適切な<span class="keyword-tag">プロンプト</span>で<br>
+                        エージェントの振る舞いを制御！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>情報ソース: <a href="https://www.youtube.com/watch?v=_ZVty4A1-q0" target="_blank">YouTube: Deep Agents Framework Deep Dive: Hierarchical AI Agents & Context Isolation (LangChain)</a></p>
+            <p>&copy; 2025 AI News Infographic</p>
+        </footer>
+    </div>
+</body>
+</html>

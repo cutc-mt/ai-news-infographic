@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自己修復RAGシステム・LangGraph・クローズドループエージェント</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Yomogi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --ui-color-1: #667eea;
+            --ui-color-2: #764ba2;
+            --ui-color-3: #f093fb;
+            --ui-color-4: #4facfe;
+            --ui-color-5: #00f2fe;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+
+        .date {
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            animation: fadeInScale 0.6s ease-out backwards;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+        .card:nth-child(4) { animation-delay: 0.4s; }
+        .card:nth-child(5) { animation-delay: 0.5s; }
+        .card:nth-child(6) { animation-delay: 0.6s; }
+        .card:nth-child(7) { animation-delay: 0.7s; }
+        .card:nth-child(8) { animation-delay: 0.8s; }
+        .card:nth-child(9) { animation-delay: 0.9s; }
+        .card:nth-child(10) { animation-delay: 1.0s; }
+        .card:nth-child(11) { animation-delay: 1.1s; }
+        .card:nth-child(12) { animation-delay: 1.2s; }
+        .card:nth-child(13) { animation-delay: 1.3s; }
+        .card:nth-child(14) { animation-delay: 1.4s; }
+        .card:nth-child(15) { animation-delay: 1.5s; }
+        .card:nth-child(16) { animation-delay: 1.6s; }
+        .card:nth-child(17) { animation-delay: 1.7s; }
+        .card:nth-child(18) { animation-delay: 1.8s; }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card h3 {
+            color: #333;
+            margin-bottom: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .card p {
+            color: #666;
+            line-height: 1.6;
+            font-size: 0.95rem;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 1600px) {
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            }
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            .subtitle {
+                font-size: 1rem;
+            }
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>自己修復RAGシステム・LangGraph・クローズドループエージェント</h1>
+            <p class="subtitle">HyDE・クエリ分解・C-RAG・クロスエンコーダー・動的学習</p>
+            <p class="date">2025年12月11日</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sync-alt"></i></div>
+                <h3>自己修復RAG概要</h3>
+                <p>標準RAGを超越したクローズドループシステム。取得ドキュメント自動検証。品質問題検出→フォールバック戦略起動。正しいQ&Aペアから学習。時間とともに改善。FastAPIバックエンド・LangGraph・エージェント駆動アーキテクチャ。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-infinity"></i></div>
+                <h3>クローズドループアーキテクチャ</h3>
+                <p>質問→検索→検証→回答→フィードバック→改善のサイクル。単方向パイプラインではない。各ステップ監視・評価。問題発見→自動修正アクション。人間介入不要の自己改善システム。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-lightbulb"></i></div>
+                <h3>HyDE・仮説ドキュメント埋め込み</h3>
+                <p>Hypothetical Document Embedding。質問→仮想的理想回答生成→その埋め込みで検索。質問と回答の語彙ギャップ解決。「症状:頭痛」→「診断:偏頭痛、治療法...」仮想回答作成→医療文書検索精度向上。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-cut"></i></div>
+                <h3>クエリ分解・複雑質問対応</h3>
+                <p>複雑質問→複数サブクエリ分割。「製品Aと製品Bの価格と機能を比較」→4サブクエリ(A価格・A機能・B価格・B機能)。各サブクエリ独立検索→統合。多面的情報収集→包括的回答構築。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-shield-alt"></i></div>
+                <h3>C-RAG・修正型RAG</h3>
+                <p>Corrective RAG。取得ドキュメント自動評価。関連性スコア低い→追加検索トリガー。不十分ドキュメント→Web検索フォールバック。品質基準未満の結果を許容しない。回答前のガードレール。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sort-amount-down"></i></div>
+                <h3>クロスエンコーダー再ランキング</h3>
+                <p>検索結果精度向上の最終段階。質問+各ドキュメント→同時エンコード→関連性直接評価。バイエンコーダーより精密。上位候補を再評価→最良ドキュメント選択。LLM生成前の品質保証層。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+                <h3>動的学習・継続的改善</h3>
+                <p>正しいQ&Aペア→システムが学習。成功パターン認識・失敗パターン回避。埋め込みモデル微調整。検索パラメータ自動調整。使用するほど賢くなる。静的システムではない。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-project-diagram"></i></div>
+                <h3>LangGraph・ワークフロー管理</h3>
+                <p>複雑エージェントワークフロー構築。状態管理・条件分岐・ループ処理。ノード:各処理ステップ(HyDE・検索・検証・生成)。エッジ:条件付き遷移。グラフ構造で複雑ロジック表現。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-check-circle"></i></div>
+                <h3>ドキュメント検証ノード</h3>
+                <p>取得ドキュメント品質評価専用ステップ。関連性スコア計算。カバレッジチェック。矛盾検出。基準未達→再検索・フォールバック決定。ゲートキーパー役割。低品質ドキュメントでLLM汚染防止。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-globe"></i></div>
+                <h3>Webフォールバック検索</h3>
+                <p>内部ドキュメント不十分→自動Web検索起動。Tavily・Serp API等統合。最新情報・外部知識取得。知識ベース限界を補完。ハイブリッドアプローチ。内部知識+外部情報=包括的回答。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <h3>エージェントファーストアーキテクチャ</h3>
+                <p>ルールベースではなくエージェント判断。各ステップでLLM推論。「検索結果十分か」「追加情報必要か」AI判断。柔軟な意思決定。予期しない状況対応。硬直的パイプライン超越。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-database"></i></div>
+                <h3>ベクトルストア統合</h3>
+                <p>Pinecone・Weaviate・Chroma等対応。埋め込みベクトル高速検索。スケーラブルインデックス。メタデータフィルタリング。複数ベクトルストア切り替え可能。本番環境対応インフラ。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-comments"></i></div>
+                <h3>会話状態管理</h3>
+                <p>LangGraphで会話履歴・中間結果保存。マルチターン対話対応。「それ」「その製品」等代名詞解決。文脈維持。前回検索結果参照。自然な対話フロー実現。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-tachometer-alt"></i></div>
+                <h3>パフォーマンス監視</h3>
+                <p>各ステップレイテンシ計測。検索時間・生成時間・検証時間追跡。ボトルネック特定。成功率・失敗率記録。メトリクス可視化。システム健全性監視。継続的最適化データ収集。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-server"></i></div>
+                <h3>FastAPIバックエンド</h3>
+                <p>高速非同期API。WebSocket対応ストリーミング応答。認証・レート制限実装。スキーマ自動検証。OpenAPIドキュメント自動生成。本番環境対応設計。Docker・Kubernetes対応。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-wrench"></i></div>
+                <h3>カスタマイズ可能パラメータ</h3>
+                <p>検索件数・関連性閾値・HyDE有効化・C-RAG閾値・再ランキングモデル・Webフォールバック条件。全て設定可能。ユースケース最適化。A/Bテスト実施可能。実験的アプローチ支援。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-bug"></i></div>
+                <h3>デバッグ・可観測性</h3>
+                <p>LangGraph詳細トレース。各ノード入出力記録。決定理由ログ。エラー原因追跡。失敗ケース分析。システム動作透明性確保。改善ポイント発見容易。ブラックボックス回避。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-star"></i></div>
+                <h3>本番環境実装・ベストプラクティス</h3>
+                <p>エラーハンドリング完備。リトライロジック実装。タイムアウト設定。ログ構造化。秘密情報管理。スケーラブル設計。本番トラフィック対応可能。GitHubコード公開。即座にデプロイ可能。次世代RAGシステム。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fab fa-youtube"></i> 元動画: <a href="https://www.youtube.com/watch?v=H04Aak8rBE8" target="_blank">https://www.youtube.com/watch?v=H04Aak8rBE8</a></p>
+        </footer>
+    </div>
+</body>
+</html>

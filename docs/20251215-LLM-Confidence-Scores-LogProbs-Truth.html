@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM信頼度スコアの真実 ログ確率LogProbsの正しい使い方</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Yomogi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --ui-color-1: #667eea;
+            --ui-color-2: #764ba2;
+            --ui-color-3: #f093fb;
+            --ui-color-4: #4facfe;
+            --ui-color-5: #00f2fe;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, var(--ui-color-1) 0%, var(--ui-color-2) 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 50px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            font-weight: 900;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 1.3rem;
+            font-weight: 400;
+            margin-bottom: 15px;
+            opacity: 0.95;
+        }
+
+        .date {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+            animation: fadeInScale 0.6s ease-out backwards;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+        .card:nth-child(4) { animation-delay: 0.4s; }
+        .card:nth-child(5) { animation-delay: 0.5s; }
+        .card:nth-child(6) { animation-delay: 0.6s; }
+        .card:nth-child(7) { animation-delay: 0.7s; }
+        .card:nth-child(8) { animation-delay: 0.8s; }
+        .card:nth-child(9) { animation-delay: 0.9s; }
+        .card:nth-child(10) { animation-delay: 1.0s; }
+        .card:nth-child(11) { animation-delay: 1.1s; }
+        .card:nth-child(12) { animation-delay: 1.2s; }
+        .card:nth-child(13) { animation-delay: 1.3s; }
+        .card:nth-child(14) { animation-delay: 1.4s; }
+        .card:nth-child(15) { animation-delay: 1.5s; }
+        .card:nth-child(16) { animation-delay: 1.6s; }
+        .card:nth-child(17) { animation-delay: 1.7s; }
+        .card:nth-child(18) { animation-delay: 1.8s; }
+
+        .card:hover {
+            transform: translateY(-10px) rotate(1deg);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.3);
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #333;
+            line-height: 1.4;
+        }
+
+        .card-description {
+            font-size: 0.95rem;
+            color: #555;
+            line-height: 1.6;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            padding: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+            border-bottom: 2px solid white;
+            transition: opacity 0.3s;
+        }
+
+        footer a:hover {
+            opacity: 0.8;
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        @media (max-width: 1600px) {
+            .grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            h1 {
+                font-size: 2rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 1.8rem;
+            }
+
+            .subtitle {
+                font-size: 1.1rem;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>LLM信頼度スコアの真実</h1>
+            <p class="subtitle">98%は統計確率ではない・トークン予測の仕組み・LogProbs正しい使い方</p>
+            <p class="date">2025年12月15日</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <div class="card-title">よくある間違い信頼度質問</div>
+                <div class="card-description">エージェントデモで「ポルト旅行を計画」と判断した後、マネージャーが「信頼度は?」と質問。プロンプトに「0-100で自信を評価して」と追加してLLMが「98%」と出力するパターン。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-ban"></i></div>
+                <div class="card-title">これをやってはいけない理由</div>
+                <div class="card-description">LLMが「98%」と出力しても、それは統計的確率ではありません。詩やジョークを作るのと同じ方法で、信頼度スコアのように見えるトークンを予測しているだけです。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-puzzle-piece"></i></div>
+                <div class="card-title">トークン予測の本質</div>
+                <div class="card-description">LLMは常に次に最も確率の高いトークンを予測します。「98%」は数学的確実性を示すのではなく、単に次に来る最も可能性の高いトークン列として生成されただけです。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-cut"></i></div>
+                <div class="card-title">90%は2トークンで構成</div>
+                <div class="card-description">OpenAIトークナイザーで確認すると「90%」は1トークンではなく「90」と「%」の2トークン。出力は前の出力に基づいており、スコア計算には使えません。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-key"></i></div>
+                <div class="card-title">単一トークンyes/noが鍵</div>
+                <div class="card-description">正しいアプローチは「yes」(単一トークン)と「no」(単一トークン)を使うこと。これなら各トークンの確率を直接取得できます。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-table"></i></div>
+                <div class="card-title">トークンID大文字小文字問題</div>
+                <div class="card-description">「no」「No」「NO」はすべて異なるトークンID。大規模なトークンテーブルで別々に扱われるため、すべてのバリアントを考慮する必要があります。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-layer-group"></i></div>
+                <div class="card-title">バケット方式でまとめる</div>
+                <div class="card-description">すべての「yes」バリアントと「no」バリアントをバケットに集約。各バケットの確率を合計して、最終的に1つの確率を計算します。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="card-title">LogProbs設定方法</div>
+                <div class="card-description">ChatOpenAIクラスで`logprobs=True`と`top_logprobs=10`を設定。トークンの確率と最も可能性の高い上位10トークンを出力できます。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code"></i></div>
+                <div class="card-title">構造化出力でyes/no制限</div>
+                <div class="card-description">Pydanticモデルで回答を「yes」または「no」に制限。構造化出力を使い、単一トークンのみを出力させることで確率計算が可能になります。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <div class="card-title">GPT-4 miniでルーター構築</div>
+                <div class="card-description">5つのダミーエージェントカードを作成し、オーケストレーターがどのエージェントを使うか判断。「ポルト旅行計画」クエリでTravel Buddyエージェントへのルーティングをテスト。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-cogs"></i></div>
+                <div class="card-title">システムプロンプト設計</div>
+                <div class="card-description">「エージェントルーティング用のニュートラルな二値分類器」としてシステムプロンプトを設定。エージェントがクエリにマッチするかチェックします。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-calculator"></i></div>
+                <parameter name="card-title">ヘルパー関数で確率計算</div>
+                <div class="card-description">Logitsから実確率を計算する複数のヘルパー関数を作成。yes/noバケットの各トークンを収集し、数学的に正しい確率を導き出します。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-table"></i></div>
+                <div class="card-title">Tabulate美しいテーブル表示</div>
+                <div class="card-description">Tabulateライブラリで結果を見やすいテーブル形式で表示。エージェント名、クエリ、確率、各バケットの詳細が一目で確認できます。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-chart-pie"></i></div>
+                <div class="card-title">実行結果Travel Buddy確率1</div>
+                <div class="card-description">「ポルト旅行計画」クエリでTravel Buddyが確率1(100%)、他のエージェントは確率0。yesバケットに「Yes」「yes」、noバケットに「No」「no」「Y」「N」などが含まれます。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-times-circle"></i></div>
+                <div class="card-title">無視されるトークン</div>
+                <div class="card-description">yes/noバケット以外のトークンは無視されます。上位10トークンの中でバケットに該当しないものは計算から除外され、純粋なyes/no確率のみが残ります。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-percentage"></i></div>
+                <div class="card-title">結局100%確信になる問題</div>
+                <div class="card-description">経験上、モデルはほぼ常に一方向に100%確信します。ニュアンスのあるスコアが得られず、エージェント1と2の確率比較もできません。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-graduation-cap"></i></div>
+                <div class="card-title">デモのGitHubリポジトリ</div>
+                <div class="card-description">VS Codeでのデモ実装全体をGitHubリポジトリで公開。ノートブック形式で自分で試せるようになっており、説明欄からアクセス可能です。</div>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-lightbulb"></i></div>
+                <div class="card-title">TL;DR結論</div>
+                <div class="card-description">LLMに本来意図されていないことを強制してはいけません。信頼度スコアを直接出力させるのではなく、LogProbsを使って数学的に正しい確率を取得するのが唯一の方法です。</div>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fab fa-youtube"></i> 元動画: <a href="https://www.youtube.com/watch?v=STh6CGEMyPw" target="_blank">https://www.youtube.com/watch?v=STh6CGEMyPw</a></p>
+        </footer>
+    </div>
+</body>
+</html>

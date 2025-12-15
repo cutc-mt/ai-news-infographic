@@ -1,46 +1,68 @@
-import re
 import os
+import re
+from datetime import datetime
 
-docs_dir = 'docs'
-try:
-    file_list = [f for f in os.listdir(docs_dir) if f.endswith('.html')]
-except FileNotFoundError:
-    print(f"Error: The directory '{docs_dir}' was not found.")
-    exit()
+def update_index_html(index_file_path, docs_folder):
+    # Read the existing index.html content
+    with open(index_file_path, 'r', encoding='utf-8') as f:
+        index_content = f.read()
 
-articles = []
-for filename in file_list:
-    match = re.match(r"(\d{8})-(.*)\.html", filename)
-    if match:
-        date = match.group(1)
-        title = match.group(2).replace('-', ' ')
-        articles.append({"date": date, "filename": filename, "title": title})
+    # List to store information about each infographic file
+    infographics = []
 
-# Sort by date in descending order
-articles.sort(key=lambda x: x["date"], reverse=True)
+    # Get all HTML files in the docs folder
+    for filename in os.listdir(docs_folder):
+        if re.match(r'^\d{8}-.*\.html$', filename):
+            file_path = os.path.join(docs_folder, filename)
+            
+            # Extract date from filename
+            date_str = filename[:8]
+            
+            # Read the infographic file to get its title
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    infographic_content = f.read()
+                    title_match = re.search(r'<title>(.*?)</title>', infographic_content, re.IGNORECASE)
+                    title = title_match.group(1) if title_match else filename
+            except Exception as e:
+                print(f"Error reading {file_path}: {e}")
+                title = filename # Fallback title
 
-# Generate the new UL content
-new_ul_content = "<ul>\n"
-for article in articles:
-    new_ul_content += f'            <li><a href="docs/{article["filename"]}">{article["date"]} - {article["title"]}</a></li>\n'
-new_ul_content += "        </ul>"
+            infographics.append({
+                'date': datetime.strptime(date_str, '%Y%m%d'),
+                'title': title,
+                'filename': f'docs/{filename}' # Relative path for href with forward slash
+            })
 
-# Read the current index.html content
-index_html_path = "index.html"
-try:
-    with open(index_html_path, 'r', encoding='utf-8') as f:
-        current_index_html = f.read()
-except FileNotFoundError:
-    print(f"Error: '{index_html_path}' not found.")
-    exit()
+    # Sort infographics by date in descending order
+    infographics.sort(key=lambda x: x['date'], reverse=True)
 
+    # Generate new list items for index.html
+    new_list_items = []
+    for info in infographics:
+        new_list_items.append(f'            <li><a href="{info["filename"]}">{info["date"].strftime("%Y%m%d")} - {info["title"]}</a></li>')
+    
+    new_ul_content = "\n".join(new_list_items)
 
-# Replace the old UL with the new UL
-# Use re.DOTALL to make '.' match newlines as well
-updated_index_html = re.sub(r"<ul>.*?</ul>", new_ul_content, current_index_html, flags=re.DOTALL)
+    # Find the existing <ul> block and replace it
+    # This regex looks for <ul>...</ul> and captures the content within
+    # It assumes the <ul> is directly under <p>記事一覧</p> based on the provided index.html
+    # And it assumes the list items are indented by 12 spaces (4*3)
+    updated_index_content = re.sub(
+        r'<p>記事一覧</p>\s*<ul>.*?</ul>',
+        f'<p>記事一覧</p>\n<ul>\n{new_ul_content}\n        </ul>',
+        index_content,
+        flags=re.DOTALL
+    )
 
-# Write the updated content back to index.html
-with open(index_html_path, 'w', encoding='utf-8') as f:
-    f.write(updated_index_html)
+    # Write the updated index.html
+    with open(index_file_path, 'w', encoding='utf-8') as f:
+        f.write(updated_index_content)
+    
+    print(f"Successfully updated {index_file_path}")
 
-print("index.html updated successfully.")
+if __name__ == "__main__":
+    script_dir = os.path.dirname(__file__)
+    index_html_path = os.path.join(script_dir, 'index.html')
+    docs_path = os.path.join(script_dir, 'docs')
+    update_index_html(index_html_path, docs_path)

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>コンテキストエンジニアリング最前線 - Agentic RAG・Context Rot・MCP・Sub-agents - Nina Lopatina</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Yomogi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #6a11cb;
+            --color-2: #2575fc;
+            --color-3: #00d2ff;
+            --color-4: #3a7bd5;
+            --color-5: #00d2ff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--color-1) 0%, var(--color-2) 50%, var(--color-3) 100%);
+            color: white;
+            padding: 60px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: backgroundMove 20s linear infinite;
+        }
+
+        @keyframes backgroundMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        h1 {
+            font-size: 3em;
+            font-weight: 900;
+            margin-bottom: 20px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.3em;
+            opacity: 0.95;
+            position: relative;
+            z-index: 1;
+            font-weight: 700;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            padding: 40px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            border-left: 5px solid var(--color-1);
+            animation: fadeInUp 0.6s ease;
+            opacity: 0;
+            animation-fill-mode: forwards;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; border-left-color: var(--color-1); }
+        .card:nth-child(2) { animation-delay: 0.2s; border-left-color: var(--color-2); }
+        .card:nth-child(3) { animation-delay: 0.3s; border-left-color: var(--color-3); }
+        .card:nth-child(4) { animation-delay: 0.4s; border-left-color: var(--color-4); }
+        .card:nth-child(5) { animation-delay: 0.5s; border-left-color: var(--color-1); }
+        .card:nth-child(6) { animation-delay: 0.6s; border-left-color: var(--color-2); }
+        .card:nth-child(7) { animation-delay: 0.7s; border-left-color: var(--color-3); }
+        .card:nth-child(8) { animation-delay: 0.8s; border-left-color: var(--color-4); }
+        .card:nth-child(9) { animation-delay: 0.9s; border-left-color: var(--color-1); }
+        .card:nth-child(10) { animation-delay: 1.0s; border-left-color: var(--color-2); }
+        .card:nth-child(11) { animation-delay: 1.1s; border-left-color: var(--color-3); }
+        .card:nth-child(12) { animation-delay: 1.2s; border-left-color: var(--color-4); }
+        .card:nth-child(13) { animation-delay: 1.3s; border-left-color: var(--color-1); }
+        .card:nth-child(14) { animation-delay: 1.4s; border-left-color: var(--color-2); }
+        .card:nth-child(15) { animation-delay: 1.5s; border-left-color: var(--color-3); }
+        .card:nth-child(16) { animation-delay: 1.6s; border-left-color: var(--color-4); }
+        .card:nth-child(17) { animation-delay: 1.7s; border-left-color: var(--color-1); }
+        .card:nth-child(18) { animation-delay: 1.8s; border-left-color: var(--color-2); }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.2);
+        }
+
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+            font-weight: 700;
+        }
+
+        .card .highlight {
+            background: linear-gradient(120deg, #84fab0 0%, #8fd3f4 100%);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .card p {
+            color: #666;
+            line-height: 1.8;
+        }
+
+        footer {
+            background: #2c3e50;
+            color: white;
+            text-align: center;
+            padding: 30px;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2em; }
+            .subtitle { font-size: 1em; }
+            .grid { grid-template-columns: 1fr; padding: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-brain"></i> コンテキストエンジニアリング最前線</h1>
+            <p class="subtitle">Agentic RAG・Context Rot・MCP・Sub-agents完全解説 - Nina Lopatina (Contextual AI)</p>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-user-graduate"></i></div>
+                <h2>Nina Lopatina</h2>
+                <div class="highlight">
+                    神経科学博士 → Contextual AI
+                </div>
+                <p>神経科学で報酬学習と意思決定の研究。NeurIPS 2025参加（5回目）。Contextual AIでコンテキストエンジニアリング大規模インフラを構築。新カテゴリーをプロトタイプから本番環境へ。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-calendar-alt"></i></div>
+                <h2>2024年 - 6ヶ月が1年に感じた年</h2>
+                <div class="highlight">
+                    カテゴリー確立は2024年半ば
+                </div>
+                <p>コンテキストエンジニアリングが本格化したのは6ヶ月前（2024年半ば）だが、1年のように感じる。カテゴリーがプロトタイプ段階から本番環境スケールへ。2026年は全システムデザインパターンへ移行。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-skull-crossbones"></i></div>
+                <h2>Normal RAGの死 → Agentic RAG</h2>
+                <div class="highlight">
+                    議論は決着済み - Agentic RAGが新基準
+                </div>
+                <p>クエリ再構成（Query Reformulation）でサブクエリに分解。ドキュメント検索のマッチング精度が劇的に向上。パフォーマンス改善が圧倒的だったため新しいベースラインに。Normal RAGは死んだ。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <h2>Sub-agentsとTurn Limits</h2>
+                <div class="highlight">
+                    無制限エージェンシーはパフォーマンス低下
+                </div>
+                <p>ターン制限と明示的制約が重要。無制限エージェンシーはパフォーマンス低下とハルシネーション発生。Retail Universeハッカソン（10万ドキュメント）で学んだ教訓。検証ループで無限ループ防止。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-store"></i></div>
+                <h2>Retail Universe Hackathon</h2>
+                <div class="highlight">
+                    10万ドキュメント、数十億トークン
+                </div>
+                <p>Brian BischoffとHamill Husseinが主催。PDF、CSV、ログファイル。Dynamic Agentでチャレンジ。人間ベンチマーク23点、Nina 25点、優勝29点。Mix BreadとClaude、Cursor使用。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-fire"></i></div>
+                <h2>Context Rot</h2>
+                <div class="highlight">
+                    100万トークン中70万で検索精度30%に
+                </div>
+                <p>全ブログで引用されるが、Anthropicが数値化。100万トークンコンテキストウィンドウで70万トークン時点で検索精度が30%に低下。直感的だが数値で示すことで実行可能に。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-brain"></i></div>
+                <h2>Contextual AI</h2>
+                <div class="highlight">
+                    エンドツーエンドコンテキストエンジニアリング
+                </div>
+                <p>コード、法律、小売、Eコマース、サポート全ドメイン対応。マルチモーダル取り込み、ハイブリッド検索、Re-ranker、Dynamic Agent。初のInstruction-Following Re-ranker（2024年3月）。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sort-amount-down"></i></div>
+                <h2>Instruction-Following Re-ranker</h2>
+                <div class="highlight">
+                    大規模DB推論で精度向上
+                </div>
+                <p>初期検索で高リコール、コンテキストウィンドウに入れる前に高精度化。レイテンシが最大の苦情だがDynamic Agent（レイテンシ非感受性）ではゲームチェンジャー。大規模データベース推論で重要。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-tools"></i></div>
+                <h2>MCP - ドライバーかつ欠陥</h2>
+                <div class="highlight">
+                    巨大JSON定義でコンテキスト圧迫
+                </div>
+                <p>MCPは巨大JSONツール定義でコンテキストウィンドウを圧迫。10ツールですぐにContext Rot。ただしプロトタイプには優秀。本番環境では直接API呼び出しに最適化すべき。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-server"></i></div>
+                <h2>MCP Server選択</h2>
+                <div class="highlight">
+                    Re-rankerでMCP Server選択
+                </div>
+                <p>Nina自身がRe-rankerでMCPサーバー選択のプロトタイプ作成。サーバー選択自体がコンテキストチャレンジ。人間が選択すべき（セキュリティチェック必要）。Anthropic公式レジストリはエージェント向け。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-chart-bar"></i></div>
+                <h2>ベンチマーク飽和</h2>
+                <div class="highlight">
+                    Princeton HOW - 10月リリース、12月飽和
+                </div>
+                <p>研究論文再現タスクがClaude Codeで飽和。人間による評価が必要（超人的ソリューションのため）。ゴールドデータセットにエラー発見。100%達成はカナリア（何かがおかしい警告）。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-database"></i></div>
+                <h2>産業ベンチマークの必要性</h2>
+                <div class="highlight">
+                    おもちゃデータセットではなく実規模
+                </div>
+                <p>ほとんどのベンチマークは小規模データセット。Retail Universeは10万ドキュメント、数十億トークン。コンテキストウィンドウに絶対に収まらない。実規模で評価する産業ベンチマークが必要。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-memory"></i></div>
+                <h2>KV Cache決定フレームワーク</h2>
+                <div class="highlight">
+                    変わらないもの→前、変わるもの→後ろ
+                </div>
+                <p>システムプロンプト・初期ターン→前方。最近のターン・動的コンテキスト→後方。マルチターンエージェントで重要。効率性だけでなく安定環境提供。エージェントは混乱しやすく、パフォーマンス低下とハルシネーション防止。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-compress-arrows-alt"></i></div>
+                <h2>意図的コンテキスト圧縮</h2>
+                <div class="highlight">
+                    モデル任せにしない、能動的制限
+                </div>
+                <p>モデルはコンパクション（圧縮）がまだ苦手。Ninaはターン数を能動的に制限。Cursorでも会話途中で新しいウィンドウを開く（コンテキスト損失回避）。Dexの「Intentional Frequent Context Compression」。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-snowboarding"></i></div>
+                <h2>Embodied Eval - スノーボードコーチ</h2>
+                <div class="highlight">
+                    25周モーグルレース、3-4ヶ月トレーニング
+                </div>
+                <p>ChatGPTをスノーボードモーグルレースのトレーニングコーチとして評価。25周（40,000垂直フィート）。長期プロジェクト（3-4ヶ月）。ウィンドウ閉じて再起動したら多くのトレーニング情報喪失。今シーズンは複数モデル評価。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code"></i></div>
+                <h2>プロンプト最適化 - Jeppa & ACE</h2>
+                <div class="highlight">
+                    遺伝的進化 vs 小さなTweak
+                </div>
+                <p>Jeppa: DSPyの進化版、目標設定してLLMが自己最適化、遺伝的進化要素。ACE（Dented Context Engineering）: プロンプト全体書き換えではなく小さなTweakで情報損失防止、金融・複雑文書で高性能。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-layer-group"></i></div>
+                <h2>2025年 - プロトタイピング段階</h2>
+                <div class="highlight">
+                    デザインパターンが沸騰中
+                </div>
+                <p>統一デザインはまだない。デザインパターンが多数出現中。最初は無制限トークン使用、後から制約・最適化（KV Cacheなど）。2026年は本格スケール年になる予測。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-rocket"></i></div>
+                <h2>2026年予測 - Full System Design</h2>
+                <div class="highlight">
+                    コンポーネント革新 → 全システム設計
+                </div>
+                <p>「Re-rankerを最適化する方法」から「数十億トークンを本番環境で推論するエンドツーエンドアーキテクチャとは」へ。コンポーネントレベルから全システムデザインパターンへの移行。実規模での複雑タスク解決が増加。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fab fa-youtube"></i> Source: Latent Space - [State of Context Engineering] Agentic RAG, Context Rot, MCP, Subagents — Nina Lopatina, Contextual</p>
+            <p style="margin-top: 10px;">Created: 2026-01-01</p>
+        </footer>
+    </div>
+</body>
+</html>

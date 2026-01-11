@@ -3,11 +3,19 @@
 ## プロジェクト概要
 YouTube動画からAIニュースのインフォグラフィックHTML（18カード形式）を自動生成し、GitHubにコミット・プッシュするワークフロー。
 
+## プロジェクトの約束
+- 特別な指示がない限り、ユーザーから入力された情報ソースから `info-graphic-prompt.md` の指示に従ってHTML形式で情報を整理する
+- **ソースが英語や日本語以外の言語であっても、作成するインフォグラフィックは日本語で作成する**
+- HTMLファイルは `docs/` フォルダに格納する
+- ファイル名には日時をYYYYMMDD-の形式でprefixとして付ける
+- HTMLファイル生成後、自動的にgit add、commit、pushを実行する
+- index.html更新後も自動的にgit add、commit、pushを実行する
+
 ## 基本ワークフロー
 1. ユーザーがYouTube URLを提供
 2. `mcp__youtube-transcript__get_video_info` でビデオ情報取得
 3. `mcp__youtube-transcript__get_transcript` で文字起こし取得
-4. 18カードHTMLインフォグラフィック作成
+4. `info-graphic-prompt.md` に従って18カードHTMLインフォグラフィック作成
 5. `python update_index.py` でインデックス更新
 6. Git add → commit → push
 
@@ -104,6 +112,8 @@ YouTube動画からAIニュースのインフォグラフィックHTML（18カ�
 各カードで1-2箇所、最も重要なポイントを`<span class="highlight">`で強調
 
 ## Gitコミットメッセージ
+
+### HTMLファイル作成時
 ```bash
 git commit -m "$(cat <<'EOF'
 feat: 1個の新しいインフォグラフィック YYYYMMDD
@@ -113,6 +123,13 @@ feat: 1個の新しいインフォグラフィック YYYYMMDD
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 EOF
 )"
+```
+
+### index.html更新時
+```bash
+git commit -m "feat: Update index.html with new articles
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 ```
 
 ## Font Awesome アイコン選択ガイド

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>10列並行AIオーケストレーション - 将軍システムでGLM-4.7をぶん回す</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #8b5cf6;
+            --color-2: #7c3aed;
+            --color-3: #a78bfa;
+            --color-4: #6d28d9;
+            --color-5: #ede9fe;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); padding: 20px; line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        header { text-align: center; margin-bottom: 50px; padding-bottom: 30px; border-bottom: 4px solid var(--color-1); }
+        h1 { font-size: 2.8em; color: var(--color-2); margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        .subtitle { font-size: 1.3em; color: #666; margin-bottom: 15px; }
+        .meta-info { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 20px; font-size: 1.1em; color: #555; }
+        .meta-info span { display: flex; align-items: center; gap: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 30px; margin-bottom: 40px; }
+        .card { background: linear-gradient(135deg, #ffffff 0%, #ede9fe 100%); border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(139, 92, 246, 0.1); transition: all 0.3s ease; border: 2px solid var(--color-5); animation: fadeInUp 0.6s ease-out; }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 15px 40px rgba(139, 92, 246, 0.2); border-color: var(--color-3); }
+        .card-icon { font-size: 3em; color: var(--color-1); margin-bottom: 15px; text-align: center; }
+        .card h2 { color: var(--color-2); font-size: 1.4em; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--color-5); }
+        .card p { color: #444; font-size: 1.05em; line-height: 1.8; }
+        .highlight { background: linear-gradient(120deg, var(--color-5) 0%, #ddd6fe 100%); padding: 2px 8px; border-radius: 4px; font-weight: bold; color: var(--color-4); }
+        footer { margin-top: 50px; padding-top: 30px; border-top: 3px solid var(--color-1); text-align: center; color: #666; }
+        footer a { color: var(--color-1); text-decoration: none; font-weight: bold; }
+        footer a:hover { color: var(--color-2); text-decoration: underline; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 768px) { .container { padding: 20px; } h1 { font-size: 2em; } .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-layer-group"></i> 10列並行AIオーケストレーション</h1>
+            <div class="subtitle">将軍システムでClaude Code 10個を同時に走らせてGLM-4.7をぶん回す実験</div>
+            <div class="meta-info">
+                <span><i class="fas fa-user"></i> AI生態士</span>
+                <span><i class="fas fa-clock"></i> ライブ配信</span>
+                <span><i class="fas fa-calendar"></i> 2026年1月30日</span>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-chess-king"></i></div>
+                <h2>①将軍システムとは</h2>
+                <p>Claude Codeを10個同時に起動して<span class="highlight">戦国時代の軍制をモチーフにしたAI組織</span>を構築。将軍（総司令）→ 家老（ナンバー2）→ 足軽8体という階層構造でタスクを分担する。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sitemap"></i></div>
+                <h2>②階層構造: 将軍・家老・足軽</h2>
+                <p>将軍がユーザーからの指示を受け、<span class="highlight">家老がタスクを分解して足軽8体に振り分ける</span>。時代劇の口調で「でござる」「任務を遂行せよ」と会話するのが特徴。ダッシュボード.mdでリアルタイムに進捗表示。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <h2>③並列実行のエラー問題</h2>
+                <p>10個同時に走らせると<span class="highlight">コンテキストエラーやAPI障害がちょこちょこ発生</span>する。足軽が4体程度なら安定するが、10体フルだと個別対応が必要になる場面が増える。完全放置は難しい。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-brain"></i></div>
+                <h2>④Memory MCPの活用</h2>
+                <p>メモリーMCPを設定して<span class="highlight">過去のエラーや対処法、ユーザーの好みを記憶</span>。新しいセッションを立ち上げると過去の学習内容を読み込んで理解した上で実行する仕組み。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-bug"></i></div>
+                <h2>⑤家老が将軍に報告しない問題</h2>
+                <p>家老がダッシュボード.mdは更新するが<span class="highlight">将軍に直接報告しない</span>というバグが発生。将軍が能動的にダッシュボードを読まないと報告が届かない仕様に。Hooksの活用で解決できる可能性あり。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-dollar-sign"></i></div>
+                <h2>⑥GLM-4.7のコスパが破格</h2>
+                <p>性能はSonnetより若干良い程度でOpusには及ばないが、<span class="highlight">コスパが圧倒的に良く実験がしやすい</span>。10個並列でぶん回しても17%しか使用量が増えない。プロプランなら年間約129ドル。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-globe"></i></div>
+                <h2>⑦ニュースサイト構築実験</h2>
+                <p>「AIニュースだけが表示されるYahooニュース風サイトを作って」と指示。<span class="highlight">約30分でNext.jsベースのニュースサイトが完成</span>。Vercelにデプロイしようとするなど、AIが積極的に行動する場面も。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-balance-scale"></i></div>
+                <h2>⑧リサーチ vs 開発での使い分け</h2>
+                <p>リサーチや資料作成には並列実行が向いているが、<span class="highlight">本格的な開発案件には管理が追いつかない</span>。成果物の品質担保と中間チェックが課題。プロトタイプの高速作成には有効。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code-branch"></i></div>
+                <h2>⑨開発での並列実行の限界</h2>
+                <p>複数エージェントが同じリソースを触ると<span class="highlight">コンフリクトが頻発</span>する。品質ゲートを設けすぎると並列化の意味がなくなる。実用的にはHTML/CSS/JSを3人で分担する程度が安定。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-shield-alt"></i></div>
+                <h2>⑩排他制御の重要性</h2>
+                <p>共有リソースの同時更新で不整合が起きないよう、<span class="highlight">クリティカルセクションを1つずつに制限する排他制御</span>の実装が重要。この概念を将軍システムに取り入れることでコンフリクトを抑制できる可能性がある。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-user-tie"></i></div>
+                <h2>⑪人間はデバッグに回される</h2>
+                <p>並列実行では結局<span class="highlight">人間がデバッグ担当</span>になる。成果物の中身が理解できていないと品質保証ができず、納品レベルには達しない。専門知識と実務経験がないと制御しきれない。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-theater-masks"></i></div>
+                <h2>⑫口調カスタマイズの楽しさ</h2>
+                <p>将軍システムの口調をカスタマイズする楽しさが話題に。<span class="highlight">チェンソーマンのマキマ、五条先生、エヴァのキャラ</span>など、アニメキャラの口調でAIを動かすとテンションが上がる。ギャル調や学校の教室風も提案された。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-eye"></i></div>
+                <h2>⑬管理者の視点: 口出ししすぎ問題</h2>
+                <p>並列実行中に<span class="highlight">AIの作業に口出ししたくなる</span>のが管理者のジレンマ。上司として部下が動いているのに介入し続けるとAI自動化の意味がなくなる。社長としての器が試される。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-users"></i></div>
+                <h2>⑭Discordコミュニティの成長</h2>
+                <p>ライブ配信中のみ参加可能という厳しいルールにも関わらず、<span class="highlight">もうすぐ200人</span>に到達。勉強会（RayCast、HTML/CSS/JS基礎など）も定期開催。海外ブログやXの情報共有も活発。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-lightbulb"></i></div>
+                <h2>⑮指示は「受ける側」の視点で書く</h2>
+                <p>Discordメンバーからのアドバイス: <span class="highlight">指示を受ける側の立場になって、迷いなく動けるか</span>を考えてプロンプトを書くと良い。使う側の発想だけでなく、実行者視点での明確さが重要。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-industry"></i></div>
+                <h2>⑯理想的なチーム構成</h2>
+                <p>実際の開発では企画・進行管理、デバッグ担当、シニアエンジニア、ジュニアエンジニアに分かれる。<span class="highlight">将軍システムにはデバッグ専門エージェント</span>が足りない。家老を2人体制にする案も。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-coins"></i></div>
+                <h2>⑰AI活用のコスト感</h2>
+                <p>配信者の月間AI課金額は<span class="highlight">約2.7万〜3万円</span>。ChatGPT Pro、Claude Max、GLM Proなどを組み合わせ。GLMは半額キャンペーンで年間129ドル程度と非常にお得。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-star"></i></div>
+                <h2>⑱体験から得られた学び</h2>
+                <p>並列実行は<span class="highlight">体験しているかどうかで大きな差が出る</span>。実務には使えなくても、経験値として価値がある。リサーチ・資料作成には有効だが、開発案件には1モデルで丁寧に進める方が確実。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>出典:</strong> <a href="https://www.youtube.com/watch?v=xEazkbrmgq4" target="_blank">【ライブ配信 No.69】10列並行AIオーケストレーションでGLM-4.7をぶん回す！！ - AI生態士</a></p>
+            <p style="margin-top: 15px; color: #999;">このインフォグラフィックは動画の内容を要約したものです</p>
+        </footer>
+    </div>
+</body>
+</html>

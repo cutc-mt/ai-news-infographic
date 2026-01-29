@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Codeの新並列タスクシステム - Agent Swarmと依存グラフで開発が変わる</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #ec4899;
+            --color-2: #db2777;
+            --color-3: #f472b6;
+            --color-4: #be185d;
+            --color-5: #fce7f3;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #ec4899 0%, #be185d 100%); padding: 20px; line-height: 1.6; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        header { text-align: center; margin-bottom: 50px; padding-bottom: 30px; border-bottom: 4px solid var(--color-1); }
+        h1 { font-size: 2.8em; color: var(--color-2); margin-bottom: 20px; text-shadow: 2px 2px 4px rgba(0,0,0,0.1); }
+        .subtitle { font-size: 1.3em; color: #666; margin-bottom: 15px; }
+        .meta-info { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; margin-top: 20px; font-size: 1.1em; color: #555; }
+        .meta-info span { display: flex; align-items: center; gap: 8px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 30px; margin-bottom: 40px; }
+        .card { background: linear-gradient(135deg, #ffffff 0%, #fce7f3 100%); border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(236, 72, 153, 0.1); transition: all 0.3s ease; border: 2px solid var(--color-5); animation: fadeInUp 0.6s ease-out; }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 15px 40px rgba(236, 72, 153, 0.2); border-color: var(--color-3); }
+        .card-icon { font-size: 3em; color: var(--color-1); margin-bottom: 15px; text-align: center; }
+        .card h2 { color: var(--color-2); font-size: 1.4em; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid var(--color-5); }
+        .card p { color: #444; font-size: 1.05em; line-height: 1.8; }
+        .highlight { background: linear-gradient(120deg, var(--color-5) 0%, #fbcfe8 100%); padding: 2px 8px; border-radius: 4px; font-weight: bold; color: var(--color-4); }
+        footer { margin-top: 50px; padding-top: 30px; border-top: 3px solid var(--color-1); text-align: center; color: #666; }
+        footer a { color: var(--color-1); text-decoration: none; font-weight: bold; }
+        footer a:hover { color: var(--color-2); text-decoration: underline; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @media (max-width: 768px) { .container { padding: 20px; } h1 { font-size: 2em; } .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-project-diagram"></i> Claude Code 新並列タスクシステム</h1>
+            <div class="subtitle">Agent Swarmと依存グラフで16ステップが1ステップに</div>
+            <div class="meta-info">
+                <span><i class="fas fa-user"></i> AI LABS</span>
+                <span><i class="fas fa-clock"></i> 10分</span>
+                <span><i class="fas fa-calendar"></i> 2026年1月30日</span>
+            </div>
+        </header>
+
+        <div class="grid">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-users-cog"></i></div>
+                <h2>①Agent Swarm: AIが委任まで自動化</h2>
+                <p>これまで人間がAIにタスクを委任していたが、<span class="highlight">Claude自体がタスクの分解と委任を自動で行う</span>ようになった。プロジェクトマネージャーに話すように広いタスクを渡せば、Claudeが自動的にブレイクダウンする。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sitemap"></i></div>
+                <h2>②タスクコーディネーターの仕組み</h2>
+                <p>メインのClaudeが<span class="highlight">タスクグラフ（依存関係グラフ）を作成</span>。各タスクを「順次実行（前のタスク完了が必要）」か「並列実行（依存関係なし）」かに分類し、サブエージェントを生成して割り当てる。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-window-restore"></i></div>
+                <h2>③各エージェントに独立した200Kコンテキスト</h2>
+                <p>以前は単一のコンテキストウィンドウで全てを処理していたが、<span class="highlight">各エージェントが独自の200Kコンテキストウィンドウ</span>を持つ。1つのタスクに集中でき、コンテキストロスの問題が解消された。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-brain"></i></div>
+                <h2>④タスク複雑度に応じたモデル選択</h2>
+                <p>タスクの複雑さに応じて異なるモデルを割り当て。<span class="highlight">フォルダ探索にはHaikuやSonnet、複雑なタスクにはOpus 4.5</span>を使用。不要なトークン消費を抑えてコスト削減にもつながる。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-folder-open"></i></div>
+                <h2>⑤タスクの永続化: JSONファイル構造</h2>
+                <p>タスクは.claude/tasksフォルダ内にセッションIDごとのフォルダで保存。<span class="highlight">各タスクがJSON形式で名前・説明・ステータス・依存関係</span>を保持。clearコマンドやセッション再起動でもタスクが消えない。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-link"></i></div>
+                <h2>⑥blocksとblockedByの依存グラフ</h2>
+                <p>各タスクJSONには<span class="highlight">「blocks」（このタスクがブロックしているタスク）と「blockedBy」（先に完了が必要なタスク）</span>のキーがある。これにより正しい実行順序が保証され、タスクのスキップを防止する。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-redo"></i></div>
+                <h2>⑦RALPHループの終焉</h2>
+                <p>以前はタスクシステムの再アンカリングのためにRALPHループが必要だったが、<span class="highlight">タスクのファイル外部化により不要</span>に。compactも以前ほど頻繁に実行する必要がなくなった。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-terminal"></i></div>
+                <h2>⑧CLI環境変数でセッション名を固定</h2>
+                <p>フォルダ名はデフォルトでランダムIDだが、<span class="highlight">環境変数にカスタム名を設定</span>するとセッションが名前で識別される。ターミナルを閉じても同じセッションに戻れる。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-tachometer-alt"></i></div>
+                <h2>⑨並列実行の効果: 5波が3サイクルに</h2>
+                <p>タスク1と2に依存関係がなければ同時に実行、タスク3と4はタスク1の完了を待つ、というように<span class="highlight">依存関係に基づいて最適化</span>。5つの順次ステップが3サイクルで完了する。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-compress-arrows-alt"></i></div>
+                <h2>⑩実例: 16ステップが1ステップに</h2>
+                <p>PRDの複数セクションが互いに依存していないことをClaudeが分析し、<span class="highlight">16の順次ステップを並列化して1ステップ</span>に削減。複数エージェントが同時に独立して作業した。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-laptop-code"></i></div>
+                <h2>⑪Cowork: 非開発者向けのClaude Code</h2>
+                <p>Claude Codeの技術を非開発者向けに展開した<span class="highlight">Cowork</span>。ファイルシステムへのアクセスやフォルダ操作が可能で、より多くのガードレールを備えている。リサーチや企画管理にも活用できる。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-folder-plus"></i></div>
+                <h2>⑫Coworkの活用例: フォルダ整理</h2>
+                <p>大量のプロジェクトフォルダの中から特定のスキルを探す際、<span class="highlight">各プロジェクトの内容をドキュメント化</span>するよう指示。Agent Swarmで複数エージェントがファイルをバッチ読み込みし、各プロジェクトの要約を作成。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-search"></i></div>
+                <h2>⑬Coworkで市場調査</h2>
+                <p>アプリの<span class="highlight">実現可能性と市場調査</span>をCoworkで実行。質問に答えるとフォルダ内のドキュメントを参照しながら包括的なレポートを生成。専門スキルでフォーマットも整った状態で保存される。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-exchange-alt"></i></div>
+                <h2>⑭Cowork → Claude Codeの連携フロー</h2>
+                <p>Coworkでリサーチとドキュメント作成を完了させた後、<span class="highlight">Claude Codeで実装に移行</span>。PRDドキュメントを読み込ませると、各セクションを並列で処理するエージェントを自動生成した。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-magic"></i></div>
+                <h2>⑮タスク分解を明示的に指示する方法</h2>
+                <p>Claudeが自動でタスクを分解しない場合は、<span class="highlight">「break this down into tasks with dependencies」</span>とプロンプトすれば依存グラフを作成してワークフロー管理を開始する。Ctrl+Tでタスク一覧も確認可能。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-compress"></i></div>
+                <h2>⑯compactの頻度が激減</h2>
+                <p>以前はコンテキストウィンドウがすぐ埋まってcompactが必要だったが、<span class="highlight">各エージェントが独立コンテキストを持つ</span>ためcompactの頻度が大幅に減少。構造化ノートの手動管理も不要に。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-dollar-sign"></i></div>
+                <h2>⑰コスト最適化の効果</h2>
+                <p>タスクの複雑さに応じてモデルを使い分けるため、<span class="highlight">小さなタスクに余分なトークンを消費しない</span>。時間短縮だけでなくコスト面でも効率的な仕組みになっている。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-rocket"></i></div>
+                <h2>⑱まとめ: 抽象化レイヤーの追加</h2>
+                <p>Agent Swarmは<span class="highlight">人間→AI委任からAI→AI委任への進化</span>。タスクの永続化、依存グラフ、独立コンテキスト、モデル自動選択が組み合わさり、Claude Codeの実用性が大幅に向上した。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p><strong>出典:</strong> <a href="https://www.youtube.com/watch?v=li8bIt-mjbA" target="_blank">Claude Code's New Parallel System Is a Game Changer - AI LABS</a></p>
+            <p style="margin-top: 15px; color: #999;">このインフォグラフィックは動画の内容を要約したものです</p>
+        </footer>
+    </div>
+</body>
+</html>

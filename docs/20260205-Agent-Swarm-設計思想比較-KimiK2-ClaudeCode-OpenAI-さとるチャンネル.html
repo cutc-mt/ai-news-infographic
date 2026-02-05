@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Swarmの設計思想を徹底比較 - Kimi K2, Claude Code, OpenAI SDK</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #0891b2;
+            --ui-color-2: #d97706;
+            --ui-color-3: #e0f2fe;
+            --ui-color-4: #164e63;
+            --ui-color-5: #dc2626;
+        }
+        body {
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 20px;
+            background-color: #FFF8F5;
+        }
+        .container {
+            max-width: 2000px;
+            margin: auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        header h1 {
+            font-size: 36px;
+            color: #333333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        header .date {
+            font-size: 14px;
+            color: #777777;
+        }
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fade-in-scale 0.5s forwards;
+        }
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-top: 10px;
+        }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 14px;
+            color: #777;
+        }
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        @keyframes fade-in-scale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.15s; }
+        .section-card:nth-child(3) { animation-delay: 0.2s; }
+        .section-card:nth-child(4) { animation-delay: 0.25s; }
+        .section-card:nth-child(5) { animation-delay: 0.3s; }
+        .section-card:nth-child(6) { animation-delay: 0.35s; }
+        .section-card:nth-child(7) { animation-delay: 0.4s; }
+        .section-card:nth-child(8) { animation-delay: 0.45s; }
+        .section-card:nth-child(9) { animation-delay: 0.5s; }
+        .section-card:nth-child(10) { animation-delay: 0.55s; }
+        .section-card:nth-child(11) { animation-delay: 0.6s; }
+        .section-card:nth-child(12) { animation-delay: 0.65s; }
+        .section-card:nth-child(13) { animation-delay: 0.7s; }
+        .section-card:nth-child(14) { animation-delay: 0.75s; }
+        .section-card:nth-child(15) { animation-delay: 0.8s; }
+        .section-card:nth-child(16) { animation-delay: 0.85s; }
+        .section-card:nth-child(17) { animation-delay: 0.9s; }
+        .section-card:nth-child(18) { animation-delay: 0.95s; }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-bees fa-6x" style="color: var(--ui-color-1);"></i>Agent Swarmの設計思想を徹底比較</h1>
+            <p class="date">2026年2月5日</p>
+        </header>
+
+        <div class="section-layout">
+            <!-- Card 1: Swarmとは -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-network-wired fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>①Agent Swarmとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-users"></i><span><span class="keyword-tag">複数のAIエージェント</span>が協調して動作する仕組み。</span></li>
+                        <li><i class="fa-solid fa-expand"></i><span>単体AIの限界を超える「群れ」のアプローチ。</span></li>
+                        <li><i class="fa-solid fa-fire"></i><span>2026年、最もホットなAI開発トピックの一つ。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>1匹の蜂より100匹の蜂！AIも「群れ」で問題を解決する時代！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: 幅のスケーリング -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-left-right fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;"></i>
+                    <h2>②幅のスケーリングとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-chart-line"></i><span>従来の「深さ」のスケーリング：モデルを大きくする。</span></li>
+                        <li><i class="fa-solid fa-arrows-alt-h"></i><span><span class="keyword-tag">幅のスケーリング</span>：複数エージェントを並列に動かす。</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>計算リソースをエージェント数で活用する発想。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-1);"></i>モデルを大きくするだけじゃない！エージェントを増やして並列処理！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: 5大必須要件1 - タスク分解 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;"></i>
+                    <h2>③要件1: タスク分解</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scissors"></i><span>大きなタスクを<span class="keyword-tag">小さなサブタスク</span>に分割。</span></li>
+                        <li><i class="fa-solid fa-project-diagram"></i><span>依存関係を明確にしてタスクグラフを構築。</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span>各エージェントに担当範囲を割り当て。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-2);"></i>複雑なタスクを分解して、各エージェントが得意な部分を担当！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: 5大必須要件2 - 並列実行 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s infinite;"></i>
+                    <h2>④要件2: 並列実行</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clone"></i><span>複数のエージェントが<span class="keyword-tag">同時に動作</span>。</span></li>
+                        <li><i class="fa-solid fa-tachometer-alt"></i><span>処理時間を大幅に短縮できる。</span></li>
+                        <li><i class="fa-solid fa-server"></i><span>独立したタスクは同時に実行可能。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>10時間かかる仕事も10人で分担すれば1時間！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 5: 5大必須要件3 - 結果統合 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-object-group fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s infinite;"></i>
+                    <h2>⑤要件3: 結果統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-compress-arrows-alt"></i><span>各エージェントの出力を<span class="keyword-tag">マージ</span>する仕組み。</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>矛盾の検出と解消が必要。</span></li>
+                        <li><i class="fa-solid fa-code-merge"></i><span>最終成果物の一貫性を保証。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-hands-helping fa-lg" style="color: var(--ui-color-2);"></i>バラバラに作業した結果をうまく一つにまとめるのが腕の見せ所！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: 5大必須要件4 - 再試行 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rotate fa-5x" style="color: var(--ui-color-2); animation: fa-spin 4s linear infinite;"></i>
+                    <h2>⑥要件4: 再試行（リトライ）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-exclamation-triangle"></i><span>エージェントが失敗した場合の<span class="keyword-tag">リカバリー</span>。</span></li>
+                        <li><i class="fa-solid fa-redo"></i><span>自動的に再実行する仕組み。</span></li>
+                        <li><i class="fa-solid fa-shield-alt"></i><span>システム全体の堅牢性を向上。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-1);"></i>失敗しても大丈夫！自動でリトライして成功するまで頑張る！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7: 5大必須要件5 - 観測可能性 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2s infinite;"></i>
+                    <h2>⑦要件5: 観測可能性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-chart-bar"></i><span>各エージェントの状態を<span class="keyword-tag">可視化</span>。</span></li>
+                        <li><i class="fa-solid fa-clipboard-list"></i><span>ログとトレースで動作を追跡。</span></li>
+                        <li><i class="fa-solid fa-bug"></i><span>問題発生時のデバッグを容易に。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-binoculars fa-lg" style="color: var(--ui-color-2);"></i>誰が何をしているか常に把握！問題があればすぐ発見！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: よくある失敗パターン -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-beat 1.5s infinite;"></i>
+                    <h2>⑧よくある失敗パターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban"></i><span>タスク分解が不十分で<span class="keyword-tag">依存関係がカオス</span>に。</span></li>
+                        <li><i class="fa-solid fa-times-circle"></i><span>結果統合のルールがなく矛盾だらけ。</span></li>
+                        <li><i class="fa-solid fa-blind"></i><span>観測可能性がなく問題の原因が不明。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-exclamation fa-lg"></i>「エージェントを増やせば解決」は幻想！設計が命！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9: Kimi K2.5 概要 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-moon fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑨Kimi K2.5（Moonshot AI）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-magic"></i><span><span class="keyword-tag">自己オーケストレーション</span>型アプローチ。</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>モデル自身がタスク分解・割り当てを判断。</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i><span>PARL学習で協調パターンを学習済み。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg"></i>AIが自分で「どう分担するか」を考える賢いアプローチ！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: Kimi K2.5 PARL学習 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-dna fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;"></i>
+                    <h2>⑩Kimi K2.5のPARL学習</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flask"></i><span><span class="keyword-tag">PARL</span>: 並列エージェント強化学習。</span></li>
+                        <li><i class="fa-solid fa-users-cog"></i><span>複数エージェントの協調を事前に学習。</span></li>
+                        <li><i class="fa-solid fa-sync"></i><span>暗黙的なコミュニケーションで連携。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-1);"></i>言葉を交わさなくても阿吽の呼吸で協力できる！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: Claude Code 概要 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑪Claude Codeのアプローチ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">サブエージェント</span>を明示的に生成。</span></li>
+                        <li><i class="fa-solid fa-folder-tree"></i><span>git worktreeを使った並列開発環境。</span></li>
+                        <li><i class="fa-solid fa-user-tie"></i><span>メインエージェントが統括・調整を担当。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-code fa-lg" style="color: var(--ui-color-1);"></i>プログラマー的発想！git worktreeで並列に開発！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: Claude Code git worktree -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-brands fa-git-alt fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑫git worktreeによる並列開発</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-copy"></i><span>同じリポジトリの<span class="keyword-tag">複数作業ディレクトリ</span>を作成。</span></li>
+                        <li><i class="fa-solid fa-users"></i><span>各サブエージェントが独立したブランチで作業。</span></li>
+                        <li><i class="fa-solid fa-code-merge"></i><span>最後にマージして統合。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-code-branch fa-lg" style="color: var(--ui-color-2);"></i>ブランチを分けて並列作業、最後にマージ！開発者にはお馴染みの手法！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13: OpenAI Agents SDK 概要 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑬OpenAI Agents SDK</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-exchange-alt"></i><span><span class="keyword-tag">明示的Handoff</span>でエージェント間を引き継ぎ。</span></li>
+                        <li><i class="fa-solid fa-shield-alt"></i><span>Guardrailsで安全性を担保。</span></li>
+                        <li><i class="fa-solid fa-search"></i><span>Tracingで全体の動作を追跡。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-arrows-alt-h fa-lg" style="color: var(--ui-color-1);"></i>バトンリレーのように次のエージェントに明示的に引き継ぐ！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: OpenAI Handoffs & Guardrails -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hand-holding-hand fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.5s infinite;"></i>
+                    <h2>⑭Handoffs & Guardrails</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-right-left"></i><span><span class="keyword-tag">Handoffs</span>: エージェント間のタスク引き継ぎ。</span></li>
+                        <li><i class="fa-solid fa-traffic-light"></i><span><span class="keyword-tag">Guardrails</span>: 許可された範囲内での動作を保証。</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>セキュリティと予測可能性を重視。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-1);"></i>暴走しないようにガードレールを設置！安全第一！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: 3社比較まとめ -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑮3社比較まとめ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-moon"></i><span><span class="keyword-tag">Kimi K2</span>: 自律的、暗黙的な協調。</span></li>
+                        <li><i class="fa-solid fa-robot"></i><span><span class="keyword-tag">Claude Code</span>: 開発者フレンドリー、git統合。</span></li>
+                        <li><i class="fa-solid fa-plug"></i><span><span class="keyword-tag">OpenAI SDK</span>: 明示的、安全性重視。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-balance-scale fa-lg" style="color: var(--ui-color-2);"></i>どれが正解ではなく、ユースケースで選ぶのが正解！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16: 2026年の未来予測 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-crystal-ball fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;"></i>
+                    <h2>⑯2026年の未来予測</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plug-circle-check"></i><span><span class="keyword-tag">MCP（Model Context Protocol）</span>対応が進む。</span></li>
+                        <li><i class="fa-solid fa-key"></i><span>権限管理がより重要に。</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>エージェント間の相互運用性が向上。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>MCPで異なるベンダーのエージェントが連携する未来！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 17: 明日から試す3ステップ -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-list-ol fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2s infinite;"></i>
+                    <h2>⑰明日から試す3ステップ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">Step 1</span>: 単一エージェントで基本を理解。</span></li>
+                        <li><i class="fa-solid fa-2"></i><span><span class="keyword-tag">Step 2</span>: 2エージェントのHandoffを実装。</span></li>
+                        <li><i class="fa-solid fa-3"></i><span><span class="keyword-tag">Step 3</span>: 観測可能性（ログ・トレース）を追加。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-shoe-prints fa-lg" style="color: var(--ui-color-2);"></i>まずは小さく始めて、少しずつエージェントを増やそう！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18: まとめ -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑱まとめ：群れは魔法じゃない</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-pencil-ruler"></i><span>Swarmは<span class="keyword-tag">魔法ではなく設計</span>が重要。</span></li>
+                        <li><i class="fa-solid fa-cogs"></i><span>5大要件を満たす仕組みを作ること。</span></li>
+                        <li><i class="fa-solid fa-tools"></i><span>自分のユースケースに合ったツールを選ぶ。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-hammer fa-lg" style="color: var(--ui-color-1);"></i>「群れにすれば解決」ではない！しっかり設計してこそ真価を発揮！</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>出典:</p>
+            <p><a href="https://www.youtube.com/watch?v=Fguic2iIF2I" target="_blank">【最新】Agent Swarmの設計思想を徹底比較！Kimi K2、Claude Code、OpenAI SDKの違い - さとるチャンネル@毎日AIニュース</a></p>
+        </footer>
+    </div>
+</body>
+</html>

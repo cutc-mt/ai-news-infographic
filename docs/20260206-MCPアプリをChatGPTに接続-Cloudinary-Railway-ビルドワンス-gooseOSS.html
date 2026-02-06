@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCPアプリをChatGPTに接続！Build Once, Use Everywhereの実践</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #0d9488;
+            --ui-color-2: #f59e0b;
+            --ui-color-3: #f0fdfa;
+            --ui-color-4: #134e4a;
+            --ui-color-5: #e11d48;
+        }
+        body {
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 20px;
+            background-color: #FFF8F5;
+        }
+        .container {
+            max-width: 2000px;
+            margin: auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        header h1 {
+            font-size: 36px;
+            color: #333333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        header .date {
+            font-size: 14px;
+            color: #777777;
+        }
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fade-in-scale 0.5s forwards;
+        }
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-top: 10px;
+        }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #777;
+            font-size: 14px;
+        }
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+        footer a:hover { text-decoration: underline; }
+        @keyframes fade-in-scale {
+            to { opacity: 1; transform: scale(1); }
+        }
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.1s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.2s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.3s; }
+        .section-card:nth-child(7) { animation-delay: 0.35s; }
+        .section-card:nth-child(8) { animation-delay: 0.4s; }
+        .section-card:nth-child(9) { animation-delay: 0.45s; }
+        .section-card:nth-child(10) { animation-delay: 0.5s; }
+        .section-card:nth-child(11) { animation-delay: 0.55s; }
+        .section-card:nth-child(12) { animation-delay: 0.6s; }
+        .section-card:nth-child(13) { animation-delay: 0.65s; }
+        .section-card:nth-child(14) { animation-delay: 0.7s; }
+        .section-card:nth-child(15) { animation-delay: 0.75s; }
+        .section-card:nth-child(16) { animation-delay: 0.8s; }
+        .section-card:nth-child(17) { animation-delay: 0.85s; }
+        .section-card:nth-child(18) { animation-delay: 0.9s; }
+        .section-card:hover {
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+            transform: translateY(-3px);
+            transition: all 0.3s ease;
+        }
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>
+            <i class="fa-solid fa-plug fa-7x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+            MCPアプリをChatGPTに接続！Build Once, Use Everywhereの実践
+        </h1>
+        <p class="date"><i class="fa-solid fa-calendar-day"></i> 2026年2月5日 ｜ goose OSS (Block)</p>
+    </header>
+
+    <div class="section-layout">
+
+        <!-- Card 1 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-feather fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>①Codename Gooseとは: Blockが開発するオープンソースAIエージェント</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span><span class="keyword-tag">Codename Goose</span>はBlock社が開発するオンマシン型のオープンソースAIエージェント。複雑なタスクを自律的に処理できる。</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i><span>MCPベースのエクステンションでGitHub、JetBrains IDE、Google Driveなどと接続可能。カスタム統合も構築できる。</span></li>
+                    <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>様々なLLMプロバイダーに対応しており、好みのモデルを選んで統合できる。デスクトップアプリとCLIの両方で利用可能。</span></li>
+                    <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>コードマイグレーション（Ember→React、Ruby→Kotlin）、テスト生成、未知のコードベースの調査など幅広いタスクに対応。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+                    GooseはBlockが作る無料のAIエージェント！
+                    <br>MCPで何でもつながる
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrows-rotate fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s;" aria-hidden="true"></i>
+                <h2>②MCPアプリシリーズ: 前回からの続き</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-backward" aria-hidden="true"></i><span>前回のストリームでは、既存のCloudinary MCP UIサーバーを<span class="keyword-tag">MCPアプリ</span>に変換した。</span></li>
+                    <li><i class="fa-solid fa-forward" aria-hidden="true"></i><span>今回はそのMCPアプリをChatGPTアプリに接続する方法をライブコーディングで紹介。</span></li>
+                    <li><i class="fa-solid fa-user" aria-hidden="true"></i><span>プレゼンターはEbony Lewis氏。Block社のデベロッパーアドボケイト。</span></li>
+                    <li><i class="fa-solid fa-rocket" aria-hidden="true"></i><span>ChatGPTがMCPアプリをネイティブサポートしたばかりなので、以前のような複雑なアダプター作業は不要になった。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i>
+                    昨日まで大変だった作業が
+                    <br>今日はネイティブサポートで簡単に！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>③MCPアプリの核心: Build Once, Use Everywhere</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-repeat" aria-hidden="true"></i><span>MCPアプリの最大の利点は<span class="keyword-tag">「一度構築すればどこでも使える」</span>ポータビリティ。</span></li>
+                    <li><i class="fa-solid fa-network-wired" aria-hidden="true"></i><span>GooseでもChatGPTでも、同じMCPアプリが最小限の変更で動作する。これがMCPの設計思想。</span></li>
+                    <li><i class="fa-solid fa-handshake" aria-hidden="true"></i><span>JSON-RPCがMCPの通信標準として使われており、プロトコルの標準化がポータビリティを実現している。</span></li>
+                    <li><i class="fa-solid fa-code-compare" aria-hidden="true"></i><span>コードの書き直しなしに、異なるホスト間でアプリが動作することが最終目標。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-5);"></i>
+                    コードの書き直しなしに
+                    <br>どのAIホストでも動く！理想形
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-window-restore fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>④MCP UIとMCPアプリの違い: リソースとしてUIを送信</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>MCP UIではUIをインラインで送信するが、MCPアプリでは<span class="keyword-tag">リソースとしてUI</span>を送信する。</span></li>
+                    <li><i class="fa-solid fa-plus-circle" aria-hidden="true"></i><span>リソースのcapabilities、resource listメソッド、resource readメソッドを追加する必要がある。</span></li>
+                    <li><i class="fa-solid fa-exchange-alt" aria-hidden="true"></i><span>JSON-RPCが通信の標準化を担い、MCP UIサーバーからMCPアプリへの変換を可能にしている。</span></li>
+                    <li><i class="fa-solid fa-window-maximize" aria-hidden="true"></i><span>UIはiframe内で表示される。リソースURIがiframeのルートとして機能する。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-info-circle fa-lg" style="color: var(--ui-color-1);"></i>
+                    UIをリソースとして送るのが
+                    <br>MCPアプリのポイント！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-link fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                <h2>⑤静的URIへの変更: 動的から固定のリソースURIへ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-random" aria-hidden="true"></i><span>元のMCPアプリではアップロードのたびに<span class="keyword-tag">ランダムなURIページ</span>が動的に生成されていた。</span></li>
+                    <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span>ChatGPT対応のために、1つの安定した（static）URIに変更する必要がある。URIは変更されない。</span></li>
+                    <li><i class="fa-solid fa-route" aria-hidden="true"></i><span>この静的URIがiframeのルート名として機能し、ChatGPTがUIにアクセスする際のエントリポイントになる。</span></li>
+                    <li><i class="fa-solid fa-file-code" aria-hidden="true"></i><span>ファイル構成も変更: mcp-app.tsからindex.http.ts（ホスティング用）とstudio用の2ファイルに分離した。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten">
+                    <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i>
+                    動的URIから静的URIへの変更が
+                    <br>ChatGPT対応の第一歩！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑥HTTPエンドポイントの作成: ローカルからリモートへ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cloud-upload-alt" aria-hidden="true"></i><span>ChatGPTアプリに接続するには<span class="keyword-tag">HTTPのMCPエンドポイント</span>が必要。ローカルのままでは動作しない。</span></li>
+                    <li><i class="fa-solid fa-file-code" aria-hidden="true"></i><span>index.http.tsファイルを新規作成し、サーバーコードをホスティングできる形にした。</span></li>
+                    <li><i class="fa-solid fa-laptop-code" aria-hidden="true"></i><span>ローカルのstudioトランスポートも引き続き使えるように、別ファイルとして残している。</span></li>
+                    <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>サーバーファイルの作成はAIエージェントに「ローカルMCPアプリをホストしたい」と伝えれば生成してもらえる。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-laptop fa-lg" style="color: var(--ui-color-5);"></i>
+                    ローカルからHTTPへ！
+                    <br>AIに頼めばサーバーコードは即生成
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 7 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-train fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑦Railwayでホスティング: GitHubから簡単デプロイ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-brands fa-github" aria-hidden="true"></i><span>最も簡単な方法は<span class="keyword-tag">GitHubからコードをプッシュ</span>してRailwayに連携すること。</span></li>
+                    <li><i class="fa-solid fa-plus" aria-hidden="true"></i><span>Railwayでnew projectを作成し、GitHubリポジトリを選択するだけでデプロイが始まる。</span></li>
+                    <li><i class="fa-solid fa-key" aria-hidden="true"></i><span>環境変数としてCloudinaryの<span class="keyword-tag">API Key、API Secret、Cloud Name</span>を登録する必要がある。</span></li>
+                    <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>ポート8080で「running」のメッセージが確認できればデプロイ成功。Vercelなど他のサービスでも可能。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                    GitHubにプッシュ → Railwayで選択
+                    <br>環境変数を設定すればデプロイ完了！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 8 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑧Railwayのハマりポイント: GitHub連携の罠</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-unlink" aria-hidden="true"></i><span>Railwayのsettingsで「リポジトリが見つからない」エラーが発生する場合がある。</span></li>
+                    <li><i class="fa-solid fa-gear" aria-hidden="true"></i><span>原因: <span class="keyword-tag">RailwayアプリをGitHubに追加</span>していない。Account Settings→下部にスクロールで設定できる。</span></li>
+                    <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>GitHubとRailwayのアプリ連携を設定すると、リポジトリが正しく検出されるようになる。</span></li>
+                    <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>Ebony氏もここで時間を取られた。Railwayを初めて使う場合は要注意のポイント。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2 right">
+                <span class="handwritten">
+                    <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                    Account Settingsの下部で
+                    <br>GitHubアプリを追加するのを忘れずに！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 9 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s;" aria-hidden="true"></i>
+                <h2>⑨ドメイン生成: RailwayからURLを取得</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cog" aria-hidden="true"></i><span>Railwayのsettings → networking セクションで<span class="keyword-tag">ドメインを生成</span>する。</span></li>
+                    <li><i class="fa-solid fa-hashtag" aria-hidden="true"></i><span>ポートは8080を指定する。コード内のポート設定と一致させること。</span></li>
+                    <li><i class="fa-solid fa-globe" aria-hidden="true"></i><span>生成されたURLがChatGPTからMCPアプリにアクセスするためのエンドポイントになる。</span></li>
+                    <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span>URLの先頭に<span class="keyword-tag">https://</span>を必ず付けること。付けないとChatGPTがURLを認識できない。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                    Settings → Networking で
+                    <br>ドメイン生成 → httpsを忘れずに！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 10 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑩ChatGPTでの設定: デベロッパーモードを有効化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>Settings → Apps → <span class="keyword-tag">Advanced Settings</span>でDeveloper Modeをトグルオンにする。</span></li>
+                    <li><i class="fa-solid fa-lock-open" aria-hidden="true"></i><span>MCPアプリを追加するにはDeveloper Modeが必須。通常は無効化されている。</span></li>
+                    <li><i class="fa-solid fa-plus-square" aria-hidden="true"></i><span>「Create App」をクリックし、アプリ名・説明・MCP Server URLを入力する。</span></li>
+                    <li><i class="fa-solid fa-shield-alt" aria-hidden="true"></i><span>認証設定は「No Auth」を選択。セキュリティの警告が出るがそのまま進める。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-toggle-on fa-lg" style="color: var(--ui-color-2);"></i>
+                    Developer Modeをオンにしないと
+                    <br>MCPアプリは追加できないよ！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 11 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑪ChatGPT接続の手順まとめ: 5ステップで完了</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1" aria-hidden="true"></i><span>Settings → Apps → Advanced Settings → Developer Modeをオンにする。</span></li>
+                    <li><i class="fa-solid fa-2" aria-hidden="true"></i><span>「Create App」でアプリ名を入力（例: <span class="keyword-tag">Cloudinary MCP App</span>）。</span></li>
+                    <li><i class="fa-solid fa-3" aria-hidden="true"></i><span>RailwayのURLをhttps://付きでMCP Server URLに貼り付ける。</span></li>
+                    <li><i class="fa-solid fa-4" aria-hidden="true"></i><span>認証は「No Auth」→ 警告を承認 → 「Create」をクリックして完了。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-check-double fa-lg" style="color: var(--ui-color-5);"></i>
+                    たった5ステップで
+                    <br>MCPアプリがChatGPTで動く！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 12 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-sync fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                <h2>⑫リフレッシュボタンの罠: 変更が反映されない問題</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-bug" aria-hidden="true"></i><span>コードを変更してもChatGPTに反映されない問題にEbony氏が長時間悩まされた。</span></li>
+                    <li><i class="fa-solid fa-sync-alt" aria-hidden="true"></i><span>原因: Settings → Apps → アプリをクリック → 下にスクロールすると<span class="keyword-tag">Refreshボタン</span>がある。</span></li>
+                    <li><i class="fa-solid fa-exclamation-circle" aria-hidden="true"></i><span>コードを更新した後は必ずこのRefreshボタンを押す必要がある。これを知らないと変更が反映されない。</span></li>
+                    <li><i class="fa-solid fa-heart-crack" aria-hidden="true"></i><span>「Don't be me」とEbony氏。同じ過ちを繰り返さないためにも覚えておくべきポイント。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten">
+                    <i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--ui-color-1);"></i>
+                    Refreshボタンを見つけるまで
+                    <br>何度もなぜ反映されないの？と悩んだ…
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 13 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-paint-brush fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑬CSS問題: UIスタイルが表示されない</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-eye-slash" aria-hidden="true"></i><span>最初はUIのデータ（画像、Public IDなど）は表示されるが、<span class="keyword-tag">CSSスタイルが全く反映されない</span>状態だった。</span></li>
+                    <li><i class="fa-solid fa-file-code" aria-hidden="true"></i><span>原因はタイプミス（typo）。CSSのインポートパスなど細かいミスがスタイル欠落を引き起こしていた。</span></li>
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i><span>ボタンや情報は正しく表示されるがデザインが崩壊しているので、見た目だけでは原因がわかりにくい。</span></li>
+                    <li><i class="fa-solid fa-search" aria-hidden="true"></i><span>MCP UIからMCPアプリへの移行時は、CSS関連のパスやインポートに特に注意が必要。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-css3 fa-lg" style="color: var(--ui-color-2);"></i>
+                    CSSのtypoで見た目が崩壊…
+                    <br>データは正しいのにスタイルがない！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 14 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bell fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑭UI更新通知の欠落: データがあるのにUIに反映されない</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>detailsにはPublic ID、フォーマット、リソースタイプなど<span class="keyword-tag">全情報が揃っている</span>のにUIに画像が表示されない。</span></li>
+                    <li><i class="fa-solid fa-bell-slash" aria-hidden="true"></i><span>原因: リソース取得後にUIを更新する<span class="keyword-tag">通知（notification）の行</span>が欠けていた。</span></li>
+                    <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>リソースを読み込んでデータは保存されるが、UIに「情報が更新された」と通知しないと表示に反映されない。</span></li>
+                    <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>この1行の通知コードを追加したら問題が解決。シンプルだが見落としがちな重要ポイント。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-bell fa-lg" style="color: var(--ui-color-5);"></i>
+                    たった1行のnotificationで解決！
+                    <br>UIにデータ更新を通知するのを忘れずに
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 15 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-image fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s;" aria-hidden="true"></i>
+                <h2>⑮動作デモ: Cloudinary画像アップロード成功</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-upload" aria-hidden="true"></i><span>ChatGPTに「upload this to Cloudinary」とURL付きの画像を送信すると、MCPアプリが起動する。</span></li>
+                    <li><i class="fa-solid fa-shield-alt" aria-hidden="true"></i><span>ChatGPTは「どのデータが共有されるか」を事前に表示して確認を求める。セキュリティ面も配慮。</span></li>
+                    <li><i class="fa-solid fa-check-double" aria-hidden="true"></i><span>画像、Public ID、フォーマット、サイズなど<span class="keyword-tag">全ての情報がUI上に表示</span>される。変換例も表示。</span></li>
+                    <li><i class="fa-solid fa-equals" aria-hidden="true"></i><span>GooseとまったくUIで表示される。「一度構築してどこでも使える」が実証された瞬間。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-party-horn fa-lg" style="color: var(--ui-color-1);"></i>
+                    GooseでもChatGPTでも同じUI！
+                    <br>MCPアプリの真価を証明
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 16 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-file-arrow-up fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑯ローカルファイルの制限: URL経由のみアップロード可能</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>ホスティングされたMCPアプリはローカルファイルシステムにアクセスできないため、<span class="keyword-tag">ローカルファイルのアップロードは不可</span>。</span></li>
+                    <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>現時点ではURL経由の画像のみアップロードに対応している。</span></li>
+                    <li><i class="fa-solid fa-window-maximize" aria-hidden="true"></i><span>ChatGPT固有の解決策として<span class="keyword-tag">window.openai.uploadFile</span>メソッドが利用可能。</span></li>
+                    <li><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span>ホストに依存しない汎用的な解決をするにはより多くのコードが必要になるが、ChatGPT専用なら簡単。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten">
+                    <i class="fa-solid fa-file fa-lg" style="color: var(--ui-color-2);"></i>
+                    ローカルファイルは現状不可
+                    <br>ChatGPT専用APIで対応は可能！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 17 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑰ChatGPT拡張API: ホスト固有の機能</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-shopping-cart" aria-hidden="true"></i><span>ChatGPTはMCPの標準にない機能を追加できる拡張APIを提供。<span class="keyword-tag">Instant Checkout</span>（即時購入）も可能。</span></li>
+                    <li><i class="fa-solid fa-upload" aria-hidden="true"></i><span>File Upload、Post（投稿）、Modal（モーダルウィンドウ）など、ChatGPT専用の機能が利用できる。</span></li>
+                    <li><i class="fa-solid fa-balance-scale" aria-hidden="true"></i><span>ポータビリティとホスト固有機能のバランスが重要。汎用性を取るか、特定ホスト向け機能を取るかの判断が必要。</span></li>
+                    <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>MCPアプリの標準機能で足りない場合のみ、ホスト固有APIを活用するのが推奨される使い方。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-5);"></i>
+                    ChatGPT独自のAPIで
+                    <br>購入やモーダルも実装できる！
+                </span>
+            </div>
+        </div>
+
+        <!-- Card 18 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑱まとめ: MCPアプリの力はポータビリティにある</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-list" aria-hidden="true"></i><span>今回行った変更: 静的URI化、UI更新通知の追加、HTTPサーバーファイル作成、Railwayホスティング、ChatGPT接続。</span></li>
+                    <li><i class="fa-solid fa-minimize" aria-hidden="true"></i><span><span class="keyword-tag">最小限の変更</span>でGooseからChatGPTへの移行が完了。これがMCPアプリのあるべき姿。</span></li>
+                    <li><i class="fa-solid fa-forward" aria-hidden="true"></i><span>AI空間の変化の速さを実感。昨日まで必要だったアダプター作業が、ChatGPTのネイティブサポートで不要に。</span></li>
+                    <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>GitHubリポジトリにコードとテスト用curlコマンドを追加予定。Discordでの質問も歓迎。</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                    Build Once, Use Everywhere！
+                    <br>MCPアプリの標準化が進んでいる
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>出典:</p>
+        <p><a href="https://www.youtube.com/watch?v=jtAg1Hg8sF4" target="_blank"><i class="fa-brands fa-youtube"></i> Plug Your MCP App Into ChatGPT - goose OSS</a></p>
+    </footer>
+</div>
+</body>
+</html>

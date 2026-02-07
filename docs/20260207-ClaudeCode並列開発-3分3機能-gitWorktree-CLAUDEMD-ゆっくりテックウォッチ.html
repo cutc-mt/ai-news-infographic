@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code並列開発 - 3分で3機能同時実装！git worktreeとCLAUDE.MDの威力</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #65a30d;
+            --ui-color-2: #4d7c0f;
+            --ui-color-3: #ecfccb;
+            --ui-color-4: #365314;
+            --ui-color-5: #a3e635;
+        }
+        body {
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 20px;
+            background-color: #FAFFF5;
+        }
+        .container {
+            max-width: 2000px;
+            margin: auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        header h1 {
+            font-size: 36px;
+            color: #333333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        header .date {
+            font-size: 14px;
+            color: #777777;
+        }
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fade-in-scale 0.5s forwards;
+        }
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-top: 10px;
+        }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+        .speech-bubble.variant-1 {
+            background: #F0FFF0;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+        .speech-bubble.variant-2 {
+            background: #FFFFF0;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+        pre {
+            background: #f0f8f0;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+        footer a:hover { text-decoration: underline; }
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(101,163,13,0.25) 60%);
+            font-weight: bold;
+        }
+        @keyframes fade-in-scale {
+            to { opacity: 1; transform: scale(1); }
+        }
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.10s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.20s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.30s; }
+        .section-card:nth-child(7) { animation-delay: 0.35s; }
+        .section-card:nth-child(8) { animation-delay: 0.40s; }
+        .section-card:nth-child(9) { animation-delay: 0.45s; }
+        .section-card:nth-child(10) { animation-delay: 0.50s; }
+        .section-card:nth-child(11) { animation-delay: 0.55s; }
+        .section-card:nth-child(12) { animation-delay: 0.60s; }
+        .section-card:nth-child(13) { animation-delay: 0.65s; }
+        .section-card:nth-child(14) { animation-delay: 0.70s; }
+        .section-card:nth-child(15) { animation-delay: 0.75s; }
+        .section-card:nth-child(16) { animation-delay: 0.80s; }
+        .section-card:nth-child(17) { animation-delay: 0.85s; }
+        .section-card:nth-child(18) { animation-delay: 0.90s; }
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <i class="fa-solid fa-code-branch fa-7x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h1>Claude Code並列開発で3分3機能同時実装</h1>
+        <p style="font-size: 20px; color: #555;">git worktreeとCLAUDE.MDを駆使してAI3体が同時にコーディング - コンフリクトゼロの衝撃</p>
+        <p class="date"><i class="fa-solid fa-calendar-day"></i> 2026年2月7日 | <i class="fa-brands fa-youtube" style="color: #ea4335;"></i> ゆっくりテックウォッチ</p>
+    </header>
+
+    <div class="section-layout">
+
+        <!-- Card 1 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>①3分で3機能実装の衝撃: AI3体が同時に動く</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                        <span>WebアプリでJSON整形・Base64変換・JWTデコードの3機能を<span class="highlight">AI3体が同時に実装</span>した</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        <span>たった3分ですべて完成。合計<span class="keyword-tag">2514行</span><span class="keyword-tag">44ファイル</span>を生成</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                        <span>コンフリクトはゼロ。ビルドも1発で成功した</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i>
+                        3分で2500行超え！1人で書いたら何時間かかるか...
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-user-tie fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>②Boris Cherny氏の10個のチップス: 開発者直伝の活用術</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-star" aria-hidden="true"></i>
+                        <span><span class="highlight">Claude Code開発者のBoris Cherny氏</span>がチーム活用術を10個公開した</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+                        <span>今回はそのうち4つを実践: 並列実行、プランモード、CLAUDE.MD、スキル化</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                        <span>ただのツール紹介ではなく、実際に手を動かして検証している</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gem fa-lg" style="color: var(--ui-color-2);"></i>
+                        開発者本人が教えるベストプラクティス！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-4); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>③計画80%・実装20%のルール: 準備が質を決める</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                        <span><span class="highlight">計画の質がそのまま実装の質になる</span>という原則を重視している</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                        <span>プランモードで仕様を詰めてから実装に入る</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>3つの機能が<span class="keyword-tag">完全に独立</span>していることが並列開発の条件</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>依存関係があると並列化できないため、タスク分割の設計が最重要</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s;" aria-hidden="true"></i>
+                <h2>④CLAUDE.MD: AIの憲法を42秒で作成</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-scroll" aria-hidden="true"></i>
+                        <span>Claude Codeのプランモードで仕様を伝え、<span class="highlight">AIにCLAUDE.MDを書かせる</span></span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">264行</span>のルールブックがたった42秒で完成した</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-gavel" aria-hidden="true"></i>
+                        <span>CLAUDE.MDはAIが従うべきルールを定義する「憲法」のような役割を果たす</span>
+                    </li>
+                </ul>
+                <pre># CLAUDE.MD の構造例
+## プロジェクト概要
+- 開発者ツールWebアプリ
+
+## 技術スタック
+- Next.js / TypeScript / Tailwind CSS
+
+## コーディング規約
+- コンポーネントは機能ごとにフォルダ分け
+- 共通UIは /components/shared に配置
+
+## 各セッションの担当範囲
+- Session 1: JSON整形
+- Session 2: Base64変換
+- Session 3: JWTデコード</pre>
+            </div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑤タスク分割: 95項目を4セッションに振り分け</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">セッション0</span>共通の土台を構築する（サイドバー、エディタなど）</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-brackets-curly" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">セッション1</span>JSON整形機能を実装する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-exchange-alt" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">セッション2</span>Base64変換機能を実装する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-key" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">セッション3</span>JWTデコード機能を実装する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                        <span>合計<span class="highlight">95項目のタスク</span>を4つのセッションに明確に分割した</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-folder-tree fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑥git worktreeによるフォルダ分離: 3体同時の秘密</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                        <span>通常のブランチだとフォルダが1つで1体ずつしか動けない</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                        <span><span class="highlight">worktreeならフォルダ自体が分かれる</span>から3体が同時に動ける</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>各フォルダが独立したブランチとして機能する</span>
+                    </li>
+                </ul>
+                <pre># git worktreeの作成コマンド
+git worktree add ../session-1 -b feature/json
+git worktree add ../session-2 -b feature/base64
+git worktree add ../session-3 -b feature/jwt
+
+# 各フォルダで独立してClaude Codeを起動
+cd ../session-1 && claude
+cd ../session-2 && claude
+cd ../session-3 && claude</pre>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-copy fa-lg" style="color: var(--ui-color-4);"></i>
+                        フォルダが別れるから同時編集が可能に！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 7 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑦キープアウト設計: 立入禁止がコンフリクトを防ぐ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                        <span>セッション0が作った共通ファイルには<span class="highlight">絶対に触れない</span>ルールを設定</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-folder" aria-hidden="true"></i>
+                        <span>各セッションは<span class="keyword-tag">自分のフォルダだけ</span>を実装する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-handshake-slash" aria-hidden="true"></i>
+                        <span>これがコンフリクトゼロの秘密。ファイルの重複を物理的に排除している</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                        <span>CLAUDE.MDに「触れてはいけないファイル」を明記することで徹底する</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-do-not-enter fa-lg" style="color: var(--ui-color-2);"></i>
+                        「ここは触るな」を最初に決めるのが<br>並列開発の鉄則！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 8 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-building fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>⑧セッション0: 共通の土台を5分で構築</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-cube" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">Next.js</span>プロジェクトの骨格を作成する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                        <span>サイドバー、コードエディタ、コピーボタンなどの共有コンポーネントを実装</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-file" aria-hidden="true"></i>
+                        <span>各機能の<span class="highlight">プレースホルダーページ</span>を用意して接続点を明確にする</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        <span>この土台構築はわずか5分で完了した</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 9 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                <h2>⑨並列開発の準備: 人間がボトルネック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>git worktreeで3つの作業フォルダを作成する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-download" aria-hidden="true"></i>
+                        <span>ワークツリーの準備や依存関係のインストールを実施</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                        <span>セッション0のレビューも含めて<span class="highlight">準備に11分</span>かかった</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>AIではなく<span class="keyword-tag">人間がボトルネック</span>になっているのが興味深い</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-person-running fa-lg" style="color: var(--ui-color-2);"></i>
+                        AIの実装は3分なのに準備は11分...<br>人間が一番遅い！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 10 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-play fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 1.5s;" aria-hidden="true"></i>
+                <h2>⑩3分間の並列実行スタート: タイマーが回る</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                        <span>3つのターミナルを開き、それぞれのワークツリーフォルダで同時にClaude Codeを起動</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                        <span><span class="highlight">タイマースタート</span>。3体のAIが一斉にコーディングを開始する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-desktop" aria-hidden="true"></i>
+                        <span>各ターミナルにリアルタイムでコードが生成されていく光景は圧巻</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-4);"></i>
+                        3画面でAIが同時にコードを書く姿は<br>まさに未来の開発風景！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 11 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-brackets-curly fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑪セッション1: JSON整形を2分32秒で完了</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                        <span>ユーティリティ機能として整形・圧縮・構文チェックを実装</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code" aria-hidden="true"></i>
+                        <span>カスタムフックとUIコンポーネントも含めて完成</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        <span><span class="highlight">2分32秒</span>で全タスクが終了した</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-1);"></i>
+                        JSON整形・圧縮・バリデーションまで<br>すべて2分半で実装完了！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 12 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrows-rotate fa-5x" style="color: var(--ui-color-1); animation: fa-spin 3s linear infinite;" aria-hidden="true"></i>
+                <h2>⑫セッション2: Base64変換の実装</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-language" aria-hidden="true"></i>
+                        <span>Base64のユーティリティ機能を実装。<span class="highlight">日本語や絵文字にも対応</span>している</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">オートモード</span>で入力を自動判定してデコードする仕組み</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span>エンコード・デコードの双方向変換が完全に動作する</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-globe fa-lg" style="color: var(--ui-color-2);"></i>
+                        マルチバイト文字もちゃんと扱えるのが<br>地味にすごい！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 13 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-key fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑬セッション3: JWTデコードが最速2分21秒</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-unlock" aria-hidden="true"></i>
+                        <span>ヘッダーとペイロードのパース機能を実装</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-calendar-xmark" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">有効期限の計算</span>まで含めて実装された</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+                        <span><span class="highlight">2分21秒で作業が終了</span>し、3セッション中で最速だった</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-1);"></i>
+                        JWTデコードが最速！期限チェックまで<br>実装するとは優秀すぎる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 14 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code-merge fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑭マージ: コンフリクトゼロでビルド成功</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>3つのブランチをメインブランチに合流させる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        <span><span class="highlight">全ブランチでコンフリクトがゼロ</span>だった</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-hammer" aria-hidden="true"></i>
+                        <span>ビルドも1発で成功。エラーは一切発生しなかった</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                        <span>キープアウト設計が正しく機能した証拠</span>
+                    </li>
+                </ul>
+                <pre># マージコマンド
+git checkout main
+git merge feature/json    # コンフリクトなし
+git merge feature/base64  # コンフリクトなし
+git merge feature/jwt     # コンフリクトなし
+
+npm run build  # ビルド成功！</pre>
+            </div>
+        </div>
+
+        <!-- Card 15 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>⑮スキル化: 検証作業を自動化する</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                        <span>Boris Cherny氏のチップス「<span class="highlight">1日2回以上やることはスキル化</span>」を実践</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">MCPツール</span>を使って検証スキルを作成した</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                        <span>スラッシュコマンド1つでブラウザを自動操作し全機能をテストする</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-sparkles fa-lg" style="color: var(--ui-color-4);"></i>
+                        「/verify」と打つだけで全テスト完了！<br>自動化のレベルが違う
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 16 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑯検証結果: 全テストに合格</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">JSON整形</span>インデント・圧縮・異常系すべてパス</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">Base64</span>日本語・絵文字・不正入力すべてパス</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">JWT</span>カード表示・期限切れ警告・不正形式すべてパス</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                        <span><span class="highlight">ダークモードのバグ</span>は発見されたが、わずか1分で修正完了</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i>
+                        バグがあっても1分で直せるのが<br>AIコーディングの強み！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 17 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-chart-column fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 2.5s;" aria-hidden="true"></i>
+                <h2>⑰数字で振り返り: 計画から完成まで31分</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        <span>計画から完成まで合計<span class="highlight">わずか31分</span></span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code" aria-hidden="true"></i>
+                        <span>コード<span class="keyword-tag">2510行</span>、ファイル数<span class="keyword-tag">44個</span></span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                        <span>タスク完了率<span class="keyword-tag">100%</span>（95項目すべてクリア）</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-user-clock" aria-hidden="true"></i>
+                        <span>ただし人間がボトルネック: 準備に21分、AIの実装はたった3分</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-calculator fa-lg" style="color: var(--ui-color-1);"></i>
+                        AIの作業時間3分 vs 人間の準備21分<br>自動化の余地がまだまだある！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 18 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-users-gear fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑱Agent Teamsへの発展: 並列開発の未来</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                        <span>Anthropicが並列開発を公式機能<span class="highlight">「Claude Code Agent Teams」</span>として提供を開始した</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-wand-magic" aria-hidden="true"></i>
+                        <span>手動のworktree管理が<span class="keyword-tag">自動化</span>される</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-forward" aria-hidden="true"></i>
+                        <span>並列開発の未来はまだ始まったばかり。今後さらに進化していく</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                        <span>今回の手動ワークフローを学んでおくことで、自動化時代にも応用が効く</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--ui-color-2);"></i>
+                        手動worktreeの時代から公式Agent Teamsへ！<br>並列AI開発の進化が止まらない
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>出典: <a href="https://www.youtube.com/watch?v=oFWFzeMLOio" target="_blank"><i class="fa-brands fa-youtube"></i> 【機能実装3分！】Claude Code開発者が教える"3つ同時実装"がヤバすぎた【ゆっくり解説】 - ゆっくりテックウォッチ</a></p>
+        <p>
+            <a href="https://note.com/yukkuri_tech/n/nfcd90d766304" target="_blank"><i class="fa-solid fa-note-sticky"></i> note記事（ゆっくりテックウォッチ）</a> |
+            <a href="https://www.youtube.com/watch?v=oFWFzeMLOio" target="_blank"><i class="fa-brands fa-youtube"></i> 動画を視聴する</a>
+        </p>
+        <p style="font-size: 12px; color: #999;">Boris Cherny氏 (Claude Code開発者) のチーム活用チップスに基づく実践レポート</p>
+    </footer>
+</div>
+</body>
+</html>

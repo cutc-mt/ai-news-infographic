@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code Agent Teams徹底解説 - サブエージェントの発展とオーケストレーション</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #1e40af;
+            --ui-color-2: #7c3aed;
+            --ui-color-3: #eff6ff;
+            --ui-color-4: #1e3a5f;
+            --ui-color-5: #f59e0b;
+        }
+        body {
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 20px;
+            background-color: #FFF8F5;
+        }
+        .container {
+            max-width: 2000px;
+            margin: auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        header h1 {
+            font-size: 36px;
+            color: #333333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        header .date {
+            font-size: 14px;
+            color: #777777;
+        }
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fade-in-scale 0.5s forwards;
+        }
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-top: 10px;
+        }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+        .speech-bubble.variant-1 {
+            background: #EDE9FE;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+        .speech-bubble.variant-2 {
+            background: #FFFBEB;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+        pre {
+            background: #f0f4f8;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+        footer a:hover { text-decoration: underline; }
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(30,64,175,0.2) 60%);
+            font-weight: bold;
+        }
+        @keyframes fade-in-scale {
+            to { opacity: 1; transform: scale(1); }
+        }
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.10s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.20s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.30s; }
+        .section-card:nth-child(7) { animation-delay: 0.35s; }
+        .section-card:nth-child(8) { animation-delay: 0.40s; }
+        .section-card:nth-child(9) { animation-delay: 0.45s; }
+        .section-card:nth-child(10) { animation-delay: 0.50s; }
+        .section-card:nth-child(11) { animation-delay: 0.55s; }
+        .section-card:nth-child(12) { animation-delay: 0.60s; }
+        .section-card:nth-child(13) { animation-delay: 0.65s; }
+        .section-card:nth-child(14) { animation-delay: 0.70s; }
+        .section-card:nth-child(15) { animation-delay: 0.75s; }
+        .section-card:nth-child(16) { animation-delay: 0.80s; }
+        .section-card:nth-child(17) { animation-delay: 0.85s; }
+        .section-card:nth-child(18) { animation-delay: 0.90s; }
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <i class="fa-solid fa-users-gear fa-7x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h1>Claude Code Agent Teams 徹底解説</h1>
+        <p style="font-size: 20px; color: #555;">サブエージェントの発展形 - チームで並列に作業するオーケストレーション機能</p>
+        <p class="date"><i class="fa-solid fa-calendar-day"></i> 2026年2月7日 | <i class="fa-brands fa-youtube" style="color: #ea4335;"></i> まさおAI最新情報ch</p>
+    </header>
+
+    <div class="section-layout">
+
+        <!-- Card 1 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>①エージェントチームとは: Claude Codeの新機能</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-flask" aria-hidden="true"></i>
+                        <span>Claude Codeに新しく導入された<span class="highlight">実験的なチーム機能</span></span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">Opus 4.6</span>と同時に公開された注目の新機能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-users" aria-hidden="true"></i>
+                        <span>複数のAIエージェントがチームとして協調して作業を進める仕組み</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                        <span>1つのリーダーが複数のメンバーに仕事を割り振って並列で処理する</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                        AIエージェントが「チーム」として<br>協力する時代が来た！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-stairs fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>②破壊的な変化ではない: 既存の仕組みの発展系</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i>
+                        <span>AIエージェントの<span class="highlight">オーケストレーションの1つのステップ</span>として位置づけられる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                        <span>既存のサブエージェント機能を拡張した発展形であり、全く新しいものではない</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-road" aria-hidden="true"></i>
+                        <span>今までの仕組みを理解していれば、スムーズに移行できる設計になっている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                        <span>段階的な機能追加であり、急に複雑になるわけではない</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 3 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-4); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>③チームの構成要素: リーダー・メンバー・管理ツール</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-crown" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">リーダー</span>チーム全体を統括し、タスクを割り振る司令塔</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-user" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">メンバー</span>リーダーから割り振られたタスクを実行するエージェント</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">タスクリスト</span>チーム全体で共有される作業一覧</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">メールボックス</span>メンバー間のメッセージ通信を管理する仕組み</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-diagram-project fa-lg" style="color: var(--ui-color-2);"></i>
+                        人間のチーム開発と似た構造で<br>わかりやすい設計になっている！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s;" aria-hidden="true"></i>
+                <h2>④適したユースケース: 並列性の高いタスクに最適</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">調査・レビュー</span>複数の観点から同時に調査やコードレビューを実施</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-cube" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">新モジュール開発</span>独立したモジュールを並行して開発する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>並行して実行できる<span class="highlight">独立性の高いタスク</span>が最も効果を発揮する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        <span>お互いに依存しないタスクを同時に処理することで大幅に時間を短縮できる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        独立したタスクを並列に回すのが<br>Agent Teamsの真骨頂！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bug fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑤競合仮説デバッグ: 複数の仮説を同時に検証</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-flask-vial" aria-hidden="true"></i>
+                        <span>バグの原因について<span class="highlight">複数の仮説を同時に検証</span>できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-laptop-code" aria-hidden="true"></i>
+                        <span>フロントエンドとバックエンドなど<span class="keyword-tag">クロスレイヤー</span>の同時開発が可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrows-split-up-and-left" aria-hidden="true"></i>
+                        <span>仮説Aと仮説Bを別々のメンバーに割り当て、同時並行で調査を進める</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        <span>順番に試すよりもはるかに高速にデバッグが完了する</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 6 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code-compare fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>⑥サブエージェントとの比較: 同期と非同期の違い</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">サブエージェント</span>は親が一方的に呼び出す同期的な仕組み</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                        <span>サブエージェントは<span class="highlight">トークンコストが比較的低い</span>のがメリット</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                        <span>親エージェントが完了を待ってから次の処理に進むため、順次実行になる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                        <span>シンプルなタスクならサブエージェントのほうが効率的な場合もある</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                        サブエージェントは「1対1の依頼」<br>チームは「チーム全体での協力」！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 7 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                <h2>⑦Agent Teamsの仕組み: タスクリストとメールボックスで管理</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-users-rays" aria-hidden="true"></i>
+                        <span>複数のサブエージェントを<span class="highlight">一気に呼び出して並列で実行</span>する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+                        <span>タスクリストでチーム全体の作業を一元管理する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+                        <span>メールボックスでメンバー間のコミュニケーションを実現する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                        <span>リーダーがオーケストレーターとして全体の進捗を管理する</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-diagram-project fa-lg" style="color: var(--ui-color-2);"></i>
+                        タスクリスト + メールボックスで<br>チームワークを実現！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 8 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-dollar-sign fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑧コスト面の違い: トークン消費量に注意</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>Agent Teamsは多数のサブエージェントを呼び出すため<span class="highlight">トークンコストが高い</span></span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                        <span>並列で動くメンバーの数に比例してコストが増加する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                        <span>タスクの複雑さと並列性のメリットを天秤にかけて使い分ける必要がある</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                        <span>シンプルなタスクは通常のサブエージェントで十分な場合が多い</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-coins fa-lg" style="color: var(--ui-color-5);"></i>
+                        速さを取るかコストを取るか<br>タスクに応じて使い分けよう！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 9 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑨関心ごとの分離: より細かい出力が得られるメリット</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-scissors" aria-hidden="true"></i>
+                        <span>各メンバーが<span class="highlight">特定の関心ごとに集中</span>できるため、品質が向上する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-microscope" aria-hidden="true"></i>
+                        <span>より細かく関心ごとを分離できるので、より精緻な出力が得られる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                        <span>1つのエージェントが全てを考えるよりも、分担したほうが精度が上がる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                        <span>各メンバーのコンテキストウィンドウが独立しているため、複雑なタスクでも混乱しにくい</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 10 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-toggle-on fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>⑩環境変数での有効化: 実験版のため手動設定が必要</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-flask" aria-hidden="true"></i>
+                        <span>まだ実験版の機能なので、デフォルトでは無効になっている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">settings.json</span>で環境変数を設定して有効化する必要がある</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                        <span>設定後にClaude Codeを再起動すると、チーム機能が使えるようになる</span>
+                    </li>
+                </ul>
+                <pre>// settings.json に以下を追加
+{
+  "env": {
+    "CLAUDE_CODE_ENABLE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  }
+}</pre>
+                <div class="speech-bubble variant-1 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-screwdriver-wrench fa-lg" style="color: var(--ui-color-2);"></i>
+                        この設定を入れないと<br>チーム機能は使えないので注意！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 11 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-display fa-5x" style="color: var(--ui-color-4); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>⑪表示モード: インプロセスとスプリットペインズ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-window-maximize" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">インプロセス</span>1つのターミナル内でチームの作業を順番に表示する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">スプリットペインズ</span>TMuxやiTermで複数のペインに分割して並列で見渡せる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>スプリットペインズなら<span class="highlight">チーム全体の作業をリアルタイムで監視</span>できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                        <span>TMuxやiTermが利用可能な環境ではスプリットペインズがおすすめ</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 12 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑫デリゲートモード: チームメンバーへの自動権限委任</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-key" aria-hidden="true"></i>
+                        <span>チームメンバーに<span class="highlight">自動で権限を委任</span>するモード</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                        <span>リーダーの許可なしにメンバーが自律的に作業を進められる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                        <span>毎回の承認を待たなくてよいため、作業スピードが大幅に向上する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>権限が広い分、意図しない操作が行われるリスクもある</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--ui-color-5);"></i>
+                        「任せたよ！」と言えば<br>メンバーが自律的に動く！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 13 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-at fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑬@メンションでの指示: 特定のメンバーに直接指示</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+                        <span>チームモード中に<span class="keyword-tag">@メンバー名</span>で特定のエージェントに指示を出せる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bullhorn" aria-hidden="true"></i>
+                        <span>リーダーを経由せずに、直接メンバーに追加の指示や修正依頼ができる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-message" aria-hidden="true"></i>
+                        <span>SlackやTeamsのメンションと似た直感的な操作感</span>
+                    </li>
+                </ul>
+                <pre>// チームモード中の使い方
+@frontend-dev CSSのレイアウトを修正して
+@backend-dev APIのレスポンス形式を変更して
+@reviewer 変更内容をレビューして</pre>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-comments fa-lg" style="color: var(--ui-color-1);"></i>
+                        人間のチーム開発と同じように<br>メンションで指示を飛ばせる！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 14 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-microchip fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>⑭内部の仕組み（TaskTool）: サブエージェントの進化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                        <span>サブエージェントは内部的に<span class="keyword-tag">TaskTool</span>で呼び出される仕組み</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                        <span>Agent Teamsはその上に<span class="highlight">チーム管理レイヤーを追加</span>したもの</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-cubes-stacked" aria-hidden="true"></i>
+                        <span>TaskToolの基盤はそのまま活用し、管理機能を拡張している</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code" aria-hidden="true"></i>
+                        <span>既存のTaskToolの実装を理解していれば、チームの仕組みも理解しやすい</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Card 15 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>⑮チーム作成の流れ: 4つのステップで構成</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-1" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">Team Create</span>チームを作成する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-2" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">Task Create</span>タスクリストを作成する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-3" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">メンバーSpawn</span>TaskToolでサブエージェントを起動する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-4" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">タスク割り当て</span>各メンバーにタスクを割り振る</span>
+                    </li>
+                </ul>
+                <pre>// チーム作成フローの概念図
+Team Create
+  └─&gt; Task Create (タスクリスト)
+       └─&gt; Member Spawn (TaskTool)
+            └─&gt; Task Assign (割り当て)
+                 └─&gt; 並列で実行開始</pre>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-list-ol fa-lg" style="color: var(--ui-color-2);"></i>
+                        この4ステップでチームが<br>立ち上がって作業を開始する！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 16 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-paper-plane fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                <h2>⑯メッセージ通信: SendMessageツールで連携</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-envelope-open-text" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">SendMessage</span>ツールで各メンバー間の通信を実現する</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                        <span>メッセージには<span class="highlight">サマリー・コンテンツ・タイプ</span>を指定できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                        <span>リーダーからメンバーだけでなく、メンバー同士でもメッセージを送り合える</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-circle-nodes" aria-hidden="true"></i>
+                        <span>メールボックスを介して非同期にメッセージを受け取る仕組み</span>
+                    </li>
+                </ul>
+                <pre>// SendMessageの概念
+SendMessage({
+  to: "frontend-dev",
+  summary: "API仕様変更の通知",
+  content: "レスポンス形式がJSONに変更",
+  type: "notification"
+})</pre>
+            </div>
+        </div>
+
+        <!-- Card 17 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-share-nodes fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>⑰タスクの依存関係: DAGによる順序管理</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-project-diagram" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">DAG</span>（有向非巡回グラフ）をサポートしている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                        <span>依存するタスクが完了するまで後続のタスクは<span class="highlight">自動的にブロック</span>される</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                        <span>例: 「API設計が完了 → フロントエンド実装を開始」のような順序を定義できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-diagram-successor" aria-hidden="true"></i>
+                        <span>依存関係のないタスクは自動的に並列で実行される</span>
+                    </li>
+                </ul>
+                <p style="font-size: 15px; text-align: center; margin: 10px 0;">
+                    <span class="keyword-tag">タスクA</span>
+                    <i class="fa-solid fa-arrow-right" style="color: var(--ui-color-1);"></i>
+                    <span class="keyword-tag">タスクB</span>
+                    <i class="fa-solid fa-arrow-right" style="color: var(--ui-color-1);"></i>
+                    <span class="keyword-tag">タスクC</span>
+                </p>
+                <p style="font-size: 13px; text-align: center; color: #777;">（AとBに依存関係がなければ並列、Bが完了してからCを開始）</p>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-sitemap fa-lg" style="color: var(--ui-color-5);"></i>
+                        DAGで依存関係を管理するので<br>順番を間違えることがない！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 18 -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s;" aria-hidden="true"></i>
+                <h2>⑱まとめと今後の展望: サブエージェントの正統進化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                        <span>Agent Teamsはサブエージェントを<span class="highlight">より効率的にした発展形</span>の機能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-forward" aria-hidden="true"></i>
+                        <span>今後の機能拡張の伏線となる重要なステップと位置づけられている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-flask" aria-hidden="true"></i>
+                        <span>現時点では実験的な機能だが、今後正式な機能として統合されていく見込み</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-star" aria-hidden="true"></i>
+                        <span>AIエージェントのオーケストレーションが今後さらに進化していくことを示唆している</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+                        チーム機能はまだ始まったばかり！<br>今後のアップデートに期待しよう！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        <p>出典: <a href="https://www.youtube.com/watch?v=ePdO6lmnYTA" target="_blank"><i class="fa-brands fa-youtube"></i> 【徹底解説】Claude CodeのAgent Team機能が出たので念入りにまとめました！ - まさおAI最新情報ch</a></p>
+        <p>
+            <a href="https://code.claude.com/docs/ja/agent-teams" target="_blank"><i class="fa-solid fa-book"></i> Agent Teams ドキュメント</a> |
+            <a href="https://docs.anthropic.com/ja/docs/claude-code" target="_blank"><i class="fa-solid fa-file-code"></i> Claude Code ドキュメント</a>
+        </p>
+    </footer>
+</div>
+</body>
+</html>

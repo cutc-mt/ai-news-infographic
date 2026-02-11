@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>n8nとUnstractでPDFデータ抽出を完全自動化する方法</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #FF6B35;
+            --ui-color-2: #1B998B;
+            --ui-color-3: #FFF0E5;
+            --ui-color-4: #2D2327;
+            --ui-color-5: #C44536;
+        }
+        body {
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 20px;
+            background-color: #FFF8F5;
+        }
+        .container {
+            max-width: 2000px;
+            margin: auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+        header h1 {
+            font-size: 36px;
+            color: #333333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        header .date {
+            font-size: 14px;
+            color: #777777;
+        }
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fade-in-scale 0.5s forwards;
+        }
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+        .mega-icon-container h2 {
+            font-size: 24px;
+            color: #555555;
+            margin-top: 10px;
+        }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 14px;
+            color: #777;
+        }
+        footer a {
+            color: var(--ui-color-1);
+        }
+        @keyframes fade-in-scale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.15s; }
+        .section-card:nth-child(3) { animation-delay: 0.2s; }
+        .section-card:nth-child(4) { animation-delay: 0.25s; }
+        .section-card:nth-child(5) { animation-delay: 0.3s; }
+        .section-card:nth-child(6) { animation-delay: 0.35s; }
+        .section-card:nth-child(7) { animation-delay: 0.4s; }
+        .section-card:nth-child(8) { animation-delay: 0.45s; }
+        .section-card:nth-child(9) { animation-delay: 0.5s; }
+        .section-card:nth-child(10) { animation-delay: 0.55s; }
+        .section-card:nth-child(11) { animation-delay: 0.6s; }
+        .section-card:nth-child(12) { animation-delay: 0.65s; }
+        .section-card:nth-child(13) { animation-delay: 0.7s; }
+        .section-card:nth-child(14) { animation-delay: 0.75s; }
+        .section-card:nth-child(15) { animation-delay: 0.8s; }
+        .section-card:nth-child(16) { animation-delay: 0.85s; }
+        .section-card:nth-child(17) { animation-delay: 0.9s; }
+        .section-card:nth-child(18) { animation-delay: 0.95s; }
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fa-solid fa-file-pdf fa-6x" style="color: var(--ui-color-1);"></i>n8nとUnstractでPDFデータ抽出を完全自動化する方法</h1>
+            <p class="date">2026年2月9日 ｜ World of AI</p>
+        </header>
+
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>①概要: PDFデータ抽出を完全自動化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot"></i><span><span class="keyword-tag">AIエージェント</span>でデータ抽出を自動化できることは知られているが、構築が難しくコストも高い。</span></li>
+                        <li><i class="fa-solid fa-gift"></i><span><span class="keyword-tag">完全無料</span>かつローカルで動作するソリューションを紹介。</span></li>
+                        <li><i class="fa-solid fa-file-invoice"></i><span>PDFなどの非構造化ドキュメントから構造化データを自動的に抽出するワークフローを構築する。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i> 手作業でPDFからデータを転記する時代は終わり！オープンソースツールで自動化しよう。</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cubes fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;"></i>
+                    <h2>②使用ツール: 2つのオープンソースの組み合わせ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-sitemap"></i><span><span class="keyword-tag">Unstract</span>: 非構造化ドキュメントを構造化データに変換するオープンソースツール。</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span><span class="keyword-tag">n8n</span>: オープンソースのAIワークフロー自動化ツール。マルチステップのエージェント自動化に最適。</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>この2つを組み合わせることで、PDFを受け取り → データを抽出 → Google Sheetsに出力、まで完全に自動化できる。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microchip fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;"></i>
+                    <h2>③Unstractとは: LLM搭載の文書処理エンジン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain"></i><span><span class="keyword-tag">LLMWhisperer</span>がUnstractの中核エンジンとして動作。大規模言語モデルを活用して文書を解析する。</span></li>
+                        <li><i class="fa-solid fa-industry"></i><span>プロダクショングレードのドキュメント処理を実現。正確性、スケール、コンプライアンスに対応。</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>任意のLLMと組み合わせて使用可能。柔軟なカスタマイズが可能。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> 手書き文字や複雑なテーブルも正確に読み取れるのがUnstractの強み！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flask fa-5x" style="color: var(--ui-color-1);"></i>
+                    <h2>④Unstractプレイグラウンド: 無料で即座に試せる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-cloud-arrow-up"></i><span><span class="keyword-tag">サインアップ不要</span>で、ドキュメントをアップロードして即座に試すことができる。</span></li>
+                        <li><i class="fa-solid fa-receipt"></i><span>レシートの例では、名前、電話番号、メールアドレス、金額テーブルなど細かい情報を正確に抽出。</span></li>
+                        <li><i class="fa-solid fa-table"></i><span>数値テーブルの読み取りも高精度。手書き文字が混在するドキュメントにも対応。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-download fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑤n8nのローカルセットアップ: 超簡単に始められる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">npxコマンド</span>一発で起動可能。Node.jsさえあればすぐに使える。</span></li>
+                        <li><i class="fa-brands fa-docker"></i><span><span class="keyword-tag">Docker</span>でのデプロイにも対応。コンテナ化された環境で安全に運用できる。</span></li>
+                        <li><i class="fa-solid fa-laptop"></i><span>完全にローカルで動作するため、データがクラウドに送信されない。プライバシーも安全。</span></li>
+                    </ul>
+                    <pre>npx n8n</pre>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-key fa-5x" style="color: var(--ui-color-1);"></i>
+                    <h2>⑥n8nアカウント設定: 無料ライセンスの取得</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-plus"></i><span>ローカルホストで起動後、まずアカウント作成が必要（無料）。</span></li>
+                        <li><i class="fa-solid fa-envelope"></i><span><span class="keyword-tag">無料ライセンスキー</span>をメールで受け取ることで、高度な機能にアクセスできるようになる。</span></li>
+                        <li><i class="fa-solid fa-unlock"></i><span>有料機能へのアクセスが無料で提供されるため、コスト負担なしで始められる。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-5);"></i> ライセンスキーの取得を忘れずに！高度な機能が使えるようになるよ。</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-grip fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>⑦n8nテンプレート: 7,888種類のワークフロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-layer-group"></i><span>ダッシュボードにはすぐに使えるテンプレートが豊富に用意されている。</span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span><span class="keyword-tag">データ入力</span>、マーケティング、ドキュメント処理など、幅広い分野をカバー。</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span>今回はゼロからワークフローを構築するが、テンプレートを活用すればさらに素早く始められる。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑧Unstractカスタムノード: n8nへの統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-box-open"></i><span><span class="keyword-tag">npm install</span>コマンドでUnstractカスタムノードをn8nにインストール。</span></li>
+                        <li><i class="fa-solid fa-gear"></i><span>設定 → コミュニティノード → インストールの手順で簡単に追加できる。</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>Unstract APIとの接続設定を行い、n8nからUnstractを直接呼び出せるようにする。</span></li>
+                    </ul>
+                    <pre>npm install n8n-nodes-unstract</pre>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-pencil-alt fa-5x" style="color: var(--ui-color-1);"></i>
+                    <h2>⑨ワークフローエディタ: ノードベースの直感的設計</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-object-group"></i><span>n8nのエディタは<span class="keyword-tag">ノードベース</span>で、ドラッグ＆ドロップで自動化ワークフローを構築できる。</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>手動トリガー、アプリイベントトリガーなど複数の起動条件に対応。</span></li>
+                        <li><i class="fa-solid fa-arrows-alt"></i><span>各ノードを線でつないでデータフローを視覚的に設計可能。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-paintbrush fa-lg" style="color: var(--ui-color-1);"></i> プログラミング不要で、ビジュアルにワークフローを組み立てられるのが嬉しい！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-envelope-open-text fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>⑩活用例: Gmailインボイス自動処理</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-envelope"></i><span><span class="keyword-tag">Gmailノード</span>を設定し、メール受信時にワークフローを自動起動。</span></li>
+                        <li><i class="fa-solid fa-file-invoice-dollar"></i><span>メールに添付されたインボイスをUnstractが自動で処理し、構造化データに変換。</span></li>
+                        <li><i class="fa-solid fa-table-cells"></i><span>抽出されたデータをGoogle Sheetsに自動で出力し、スプレッドシートとして整理。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i> 請求書処理を完全自動化できれば、経理作業が劇的に楽になる！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-window-restore fa-5x" style="color: var(--ui-color-5);"></i>
+                    <h2>⑪フォーム送信トリガー: チャットボット風の入力</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-comment-dots"></i><span><span class="keyword-tag">フォーム送信</span>をトリガーにしたチャットボット型ワークフローを構築。</span></li>
+                        <li><i class="fa-solid fa-upload"></i><span>ファイルアップロード要素を追加し、複数のPDFを同時に送信できるようにする。</span></li>
+                        <li><i class="fa-solid fa-users-gear"></i><span>内部チームや個人的なユースケースにそのまま活用可能。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑫条件分岐: バイナリデータの処理フロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-fork"></i><span><span class="keyword-tag">IFトリガー</span>を使い、PDFのバイナリデータを正常に処理できるかを判定。</span></li>
+                        <li><i class="fa-solid fa-check-circle"></i><span>処理可能な場合はUnstractノードへ転送し、非構造化データを構造化。</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>エラーハンドリングにより、不正なファイルや破損データを事前に除外。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-brands fa-google fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>⑬Google Sheets連携: 抽出データの自動出力</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-table"></i><span>Googleアカウントを認証し、<span class="keyword-tag">Google Sheets</span>と直接連携。</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span>インボイスの日付、番号、送信元、送信先、合計金額などのフィールドを事前に定義。</span></li>
+                        <li><i class="fa-solid fa-arrow-right-to-bracket"></i><span>Append Row機能で、処理されたデータをシートに自動追記。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-database fa-lg" style="color: var(--ui-color-5);"></i> Google Sheetsだけでなく、任意のデータベースやCRMにも出力先を変更できる！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-pen-fancy fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑭実演: 手書きインボイスの処理テスト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-pen"></i><span>テストでは<span class="keyword-tag">手書きインボイス</span>という非常に難易度の高いドキュメントを使用。</span></li>
+                        <li><i class="fa-solid fa-hand-pointer"></i><span>ワークフローを実行し、フォームからファイルをアップロードして送信するだけ。</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>数秒でUnstractがドキュメントを処理し、結果を返してくれる。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-column fa-5x" style="color: var(--ui-color-1);"></i>
+                    <h2>⑮抽出結果: 高精度なデータ取得を実現</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hashtag"></i><span><span class="keyword-tag">インボイス番号</span>を正確に抽出。手書きの複雑な番号も問題なく認識。</span></li>
+                        <li><i class="fa-solid fa-building"></i><span>送信元（From）と送信先（To）の情報も正しく構造化。</span></li>
+                        <li><i class="fa-solid fa-calculator"></i><span>$3,000、$4,000、$5,000などの各項目の金額を正確に読み取り、合計も算出。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-1);"></i> 手書きの乱雑なインボイスでもここまで正確に読み取れるのはすごい！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sliders fa-5x" style="color: var(--ui-color-2);"></i>
+                    <h2>⑯カスタマイズ: 抽出フィールドの自由設定</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-pen-to-square"></i><span>抽出するデータのフィールドは<span class="keyword-tag">自由にカスタマイズ</span>可能。</span></li>
+                        <li><i class="fa-solid fa-clipboard-list"></i><span>インボイスに限らず、レポート、契約書、申請書など任意のドキュメント形式に対応。</span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>自動処理のスケジューリングも設定可能で、定期実行にも対応。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-lock-open fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.5s infinite;"></i>
+                    <h2>⑰オープンソースの利点: 無料で始められる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-github"></i><span><span class="keyword-tag">n8n</span>と<span class="keyword-tag">Unstract</span>の両方がオープンソースで、無料で利用可能。</span></li>
+                        <li><i class="fa-solid fa-server"></i><span>ローカル環境で完結するため、機密文書のデータ漏洩リスクがない。</span></li>
+                        <li><i class="fa-solid fa-book-open"></i><span>クイックスタートガイドが用意されており、要件とインストール手順が明確に文書化されている。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-2);"></i> 機密性の高い書類もローカルで安全に処理できるのがオープンソースの最大の魅力！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑱まとめ: 時間とコストを大幅に節約</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i><span><span class="keyword-tag">手作業で数時間</span>かかっていたPDFデータ抽出が、数分で完全自動化される。</span></li>
+                        <li><i class="fa-solid fa-dollar-sign"></i><span>フリーランス、中小企業、経理担当者など、誰でもAI自動化の恩恵を受けられる。</span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>n8n + Unstractの組み合わせにより、ドキュメント処理の自動化が誰にでも手の届くものに。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-5);"></i> 両方ともオープンソースだから、今すぐ無料で始められる。まずはUnstractのプレイグラウンドで試してみよう！</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <p>出典: <a href="https://www.youtube.com/watch?v=7I7CL9iNxS4" target="_blank">Automate PDF Data Extraction with n8n EASILY! (Open source) - World of AI</a></p>
+            <p>関連リンク:
+                <a href="https://github.com/Zipstack/unstract" target="_blank">Unstract GitHub</a> ｜
+                <a href="https://unstract.com/start-for-free/" target="_blank">Unstract 無料開始</a> ｜
+                <a href="https://github.com/n8n-io/n8n" target="_blank">n8n GitHub</a> ｜
+                <a href="https://n8n.io/" target="_blank">n8n 公式サイト</a>
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

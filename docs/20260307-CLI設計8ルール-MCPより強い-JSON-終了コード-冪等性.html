@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI設計8ルール - MCPより強い・JSON・終了コード・冪等性</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-1: #0EA5E9;
+            --color-2: #38BDF8;
+            --color-3: #E0F2FE;
+            --color-4: #0369A1;
+            --color-5: #7DD3FC;
+            --color-accent: #F59E0B;
+            --bg-color: #F0F9FF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--color-1) 0%, var(--color-2) 100%);
+            color: white;
+            border-radius: 30px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 40px rgba(14, 165, 233, 0.3);
+        }
+
+        header h1 {
+            font-size: 36px;
+            margin-bottom: 15px;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        header .subtitle {
+            font-size: 20px;
+            opacity: 0.9;
+        }
+
+        header .date {
+            font-size: 14px;
+            margin-top: 15px;
+            opacity: 0.7;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 25px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 1400px) {
+            .grid-container { grid-template-columns: repeat(3, 1fr); }
+        }
+
+        @media (max-width: 1000px) {
+            .grid-container { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        @media (max-width: 600px) {
+            .grid-container { grid-template-columns: 1fr; }
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--color-1), var(--color-2));
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(14, 165, 233, 0.2);
+        }
+
+        .card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            color: var(--color-1);
+        }
+
+        .card h2 {
+            font-size: 1.2rem;
+            margin-bottom: 12px;
+            font-family: 'Kaisei Decol', serif;
+            color: var(--color-4);
+            font-weight: 700;
+        }
+
+        .card p {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: #555;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: white;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+
+        footer a {
+            color: var(--color-1);
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-terminal"></i> AIエージェントが本当に使えるCLI設計</h1>
+            <p class="subtitle">MCPより強い8ルール・JSON・終了コード・冪等性</p>
+            <p class="date">2026-03-07</p>
+        </header>
+
+        <div class="grid-container">
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                <h2>①CLIの敵対的設計</h2>
+                <p>世の中のCLIは<span class="highlight">エージェントにとって敵対的</span>。次の一手を決める材料を出さない。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-question"></i></div>
+                <h2>②何が問題か</h2>
+                <p>構造化データ・終了コード・再実行可能性が<span class="highlight">曖昧だとエージェントが詰まる</span>。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-coins"></i></div>
+                <h2>③MCPよりCLIが良い理由1</h2>
+                <p><span class="highlight">トークン効率</span>。MCPはツール定義がコンテキストに常駐。CLIは必要な時だけヘルプを読む。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sitemap"></i></div>
+                <h2>④MCPよりCLIが良い理由2</h2>
+                <p><span class="highlight">シンプルさ</span>。ヘルプを読んで実行して検証。この流れが自然。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-check-circle"></i></div>
+                <h2>⑤MCPよりCLIが良い理由3</h2>
+                <p><span class="highlight">信頼性</span>。CLIはステートレス。失敗しても再実行しやすい。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code"></i></div>
+                <h2>⑥ルール1: JSON必須</h2>
+                <p><span class="highlight">stdoutはJSONだけ</span>。進捗はstderrへ。パース可能な契約に固定。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sign-out-alt"></i></div>
+                <h2>⑦ルール2: 終了コード</h2>
+                <p>0=成功・1=失敗・2=使い方エラー・3=未検出・4=権限・5=競合。<span class="highlight">意味のあるコード</span>を。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-redo"></i></div>
+                <h2>⑧ルール3: 冪等性</h2>
+                <p>Createより<span class="highlight">Ensureを優先</span>。同じコマンドを2回叩いても同じ状態に。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-book"></i></div>
+                <h2>⑨ルール4: 自己完結ヘルプ</h2>
+                <p><span class="highlight">ヘルプだけで完結</span>。Examples・よくある失敗・復旧手順を含める。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-puzzle-piece"></i></div>
+                <h2>⑩ルール5: 組み合わせ可能性</h2>
+                <p><span class="highlight">--quietでパイプ向き</span>に。stdin入力も対応。小さいツールを繋げる。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-eye"></i></div>
+                <h2>⑪ルール6: ドライラン</h2>
+                <p><span class="highlight">--dry-runで何を変えるか表示</span>。実際の変更はしない。安全性向上。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-bug"></i></div>
+                <h2>⑫ルール7: アクション可能なエラー</h2>
+                <p>エラーに<span class="highlight">失敗した入力・推奨コマンド・リトライ可否</span>を含める。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-font"></i></div>
+                <h2>⑬ルール8: 一貫した名詞動詞</h2>
+                <p><span class="highlight">リソースと操作を分離</span>。user-list・user-create・user-deleteなど。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-columns"></i></div>
+                <h2>⑭3本の柱</h2>
+                <p><span class="highlight">機械が読める契約・安全な運用・発見可能性</span>。8ルールはこの3つに集約。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-balance-scale"></i></div>
+                <h2>⑮CLI vs MCP判断基準</h2>
+                <p>コマンド数少ない・ステートレスなら<span class="highlight">CLI優先</span>。状態共有必要ならMCP。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-rocket"></i></div>
+                <h2>⑯最小実装3つ</h2>
+                <p><span class="highlight">--json・終了コード整理・--dry-run</span>。これだけで8割の効果。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-play-circle"></i></div>
+                <h2>⑰実践的な進め方</h2>
+                <p>まずMCPで始めて<span class="highlight">パターンが固まったらCLIに落とす</span>。2段階アプローチ。</p>
+            </div>
+
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-star"></i></div>
+                <h2>⑱まとめ</h2>
+                <p><span class="highlight">エージェントが信じられるのは機械が読める契約だけ</span>。JSONと終了コードが鍵。</p>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fas fa-calendar-alt"></i> 作成日: 2026-03-07 | <i class="fas fa-video"></i> 動画: <a href="https://youtu.be/l0YyFf2CQBI" target="_blank">AIエージェントが本当に使えるCLI設計：MCPより強い8ルール</a></p>
+        </footer>
+    </div>
+</body>
+</html>

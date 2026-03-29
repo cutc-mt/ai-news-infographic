@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロダクション対応RAG AIエージェント構築ガイド - Google Cloud Tech</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #1A73E8;
+            --ui-color-2: #E8710A;
+            --ui-color-3: #E8F0FE;
+            --ui-color-4: #1A1A2E;
+            --ui-color-5: #D93025;
+            --background-color: #F8FAFC;
+        }
+
+        body {
+            font-family: 'Kaisei Decol', serif;
+            background-color: var(--background-color);
+            color: #333333;
+            line-height: 1.5;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .main-header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .main-header h1 {
+            font-size: 36px;
+            color: #333333;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .main-header .fa-cloud {
+            font-size: 60px;
+            color: var(--ui-color-1);
+        }
+
+        .main-header p {
+            font-size: 14px;
+            color: #777777;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+
+        .section-card {
+            flex: 1 1 400px;
+            min-width: 350px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 10px 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 22px;
+            color: #555555;
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+            flex-grow: 1;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 16px;
+        }
+
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            padding-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 15px 20px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        .highlight {
+            color: var(--ui-color-5);
+            font-weight: bold;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777777;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.5s ease-out;
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+                max-width: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-header">
+            <h1>
+                <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+                プロダクション対応RAG AIエージェント構築ガイド
+            </h1>
+            <p>2026年3月29日 | Google Cloud Tech</p>
+            <p><span class="keyword-tag">RAG</span> <span class="keyword-tag">検索拡張生成</span> <span class="keyword-tag">ベクトルDB</span> <span class="keyword-tag">Google Cloud</span> <span class="keyword-tag">Vertex AI</span></p>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- カード1: RAGとは何か -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>①RAGとは何か: 基本概念の理解</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">RAG</span>（Retrieval-Augmented Generation）は検索と生成を組み合わせたAIアーキテクチャ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span>外部のナレッジベースから関連情報を検索して、LLMの回答の<span class="highlight">精度と信頼性を向上</span>させる手法</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-link" aria-hidden="true"></i>
+                            <span>ハルシネーション（事実無根の生成）を大幅に軽減できるのが最大の利点</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            <span>社内ドキュメント、FAQ、マニュアルなど企業独自の知識をAIに活用できる</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        RAGは「AIに記憶を与える」<br>
+                        ための強力なアプローチだよ！<br>
+                        単純なFine-tuningとは違うんだ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード2: RAGの仕組み -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>②RAGの仕組み: アーキテクチャの全体像</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">インデキシング</span>: ドキュメントをチャンク分割し、ベクトルデータベースに格納</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">検索（Retrieval）</span>: ユーザー入力に基づいて関連情報をベクトルDBから取得</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">生成（Generation）</span>: 取得したコンテキストをLLMに渡して回答を生成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                            <span>この3ステップを<span class="highlight">高速かつ正確に</span>実行するのがプロダクションRAGの鍵</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-arrows-spin fa-lg" style="color: var(--ui-color-1);"></i>
+                        インデキシング → 検索 → 生成<br>
+                        このパイプラインがRAGの心臓部！<br>
+                        各ステップの最適化が重要だよ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード3: プロダクション環境での要件 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-building-shield fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>③プロダクション環境での要件</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">低レイテンシ</span>: ユーザーが許容する応答時間（通常2〜5秒以内）を実現</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">高可用性</span>: 99.9%以上のSLAを満たすシステム設計</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">セキュリティ</span>: データの暗号化、アクセス制御、コンプライアンス対応</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">監視</span>: システムの健全性、検索品質、コストをリアルタイムで追跡</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                        PoC（概念実証）は簡単だけど、<br>
+                        プロダクション化は別次元の課題！<br>
+                        この要件を最初から意識しよう。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード4: ベクトルデータベースの選択 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-database fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>④ベクトルデータベースの選択肢</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-brands fa-google" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Vertex AI Vector Search</span>: Google Cloudネイティブ、スケーラビリティ重視</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-feather" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Pinecone</span>: マネージドサービス、運用の手間が不要</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Weaviate</span>: ハイブリッド検索、オープンソース対応</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">pgvector</span>: PostgreSQL拡張、既存DBとの統合に最適</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-2);"></i>
+                        選択のポイントは<span class="highlight">スケール</span>、<br>
+                        <span class="highlight">レイテンシ</span>、<span class="highlight">コスト</span>のバランス！<br>
+                        Google CloudならVertex AIが便利だよ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード5: エンベディング戦略 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cube fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑤エンベディング戦略の設計</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-microchip" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Text Embedding</span>: テキストを高次元ベクトル（768〜3072次元）に変換</span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-google" aria-hidden="true"></i>
+                            <span>Googleの<span class="highlight">text-embedding-005</span>は高品質でマルチリンガル対応</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">多段エンベディング</span>: 粗検索と精検索で異なるモデルを使い分けると効果的</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span>モデルのアップデート時は<span class="highlight">既存データの再エンベディング</span>を計画的に実施</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-microchip fa-lg" style="color: var(--ui-color-1);"></i>
+                        エンベディングの品質が<br>
+                        検索精度の8割を決めるよ！<br>
+                        モデル選びは慎重にね。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード6: ドキュメント処理パイプライン -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-lines fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑥ドキュメント処理パイプライン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-scissors" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">チャンク分割</span>: ドキュメントを意味的にまとまりのある単位に分割</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ruler" aria-hidden="true"></i>
+                            <span>チャンクサイズは<span class="highlight">256〜1024トークン</span>が一般的、オーバーラップを5〜20%設定</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                            <span>階層型チャンキングで<span class="keyword-tag">セマンティックな文脈</span>を保持する手法も有効</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-fingerprint" aria-hidden="true"></i>
+                            <span>各チャンクにメタデータ（ソース、日付、権限など）を付与して検索精度を向上</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-scissors fa-lg" style="color: var(--ui-color-5);"></i>
+                        チャンク分割は「大きすぎず<br>
+                        小さすぎず」が正解！<br>
+                        ドメインに合わせて調整しよう。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード7: 検索精度の最適化 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑦検索精度の最適化テクニック</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-shuffle" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ハイブリッド検索</span>: ベクトル検索（意味）＋キーワード検索（精度）の併用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-up-right-dots" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">クエリ変換</span>: ユーザーの自然言語クエリを検索に最適な形に変換</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                            <span><span class="highlight">ハイブリッドリランキング</span>: Cross-Encoderで検索結果を再スコアリング</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">メタデータフィルタリング</span>: 日付、カテゴリ、権限で事前フィルタリング</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bullseye fa-lg" style="color: var(--ui-color-2);"></i>
+                        単純なベクトル検索だけでは不十分！<br>
+                        ハイブリッド検索で<span class="highlight">精度を2〜3倍</span>に<br>
+                        向上させることができるよ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード8: リランキングとフィルタリング -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sort-amount-down fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑧リランキングとコンテキスト管理</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-ranking-star" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">リランカー</span>: 検索結果を関連度で再順位付けし、LLMへの入力を最適化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-window-maximize" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">コンテキストウィンドウ</span>: LLMに渡す情報量を制限し、ノイズを除去</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Agentic RAG</span>: 検索結果が不十分な場合に自動で再検索を実行する手法</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>Googleの<span class="highlight">Grounding API</span>を使うと、検索結果の来源を自動的に追跡可能</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-ranking-star fa-lg" style="color: var(--ui-color-2);"></i>
+                        Agentic RAGは次世代のアプローチ！<br>
+                        AIが自ら「もっと情報が必要だ」<br>
+                        と判断して検索を繰り返すんだ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード9: スケーラビリティ設計 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-expand fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑨スケーラビリティの設計指針</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-server" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">水平スケーリング</span>: マイクロサービスアーキテクチャでコンポーネントを独立拡張</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-memory" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">キャッシュ層</span>: Redisなどで頻繁なクエリ結果をキャッシュし、レイテンシを低減</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">非同期処理</span>: インデキシングと検索を分離し、それぞれの負荷に最適化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+                            <span>Google Cloudの<span class="highlight">Cloud Run</span>や<span class="highlight">GKE</span>で自動スケーリングを活用</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-cloud fa-lg" style="color: var(--ui-color-1);"></i>
+                        ピーク時にダウンしない設計が<br>
+                        プロダクションの命！<br>
+                        自動スケーリングを活用しよう。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード10: エラーハンドリング -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑩堅牢なエラーハンドリング</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">リトライ機構</span>: 指数バックオフでAPI呼び出しの失敗を自動リカバリ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">フォールバック</span>: ベクトルDBが応答しない場合はキーワード検索に切り替え</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">タイムアウト制御</span>: 各コンポーネントに適切なタイムアウトを設定</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-circle-exclamation" aria-hidden="true"></i>
+                            <span>LLMが<span class="highlight">「情報が見つかりません」</span>と適切に応答するガードレールを実装</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                        適当にごまかす回答より、<br>
+                        「わかりません」と正直に言う方が<br>
+                        ユーザーにとって信頼できるんだ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード11: モニタリングとロギング -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-pie fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑪モニタリングとロギング</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gauge" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">検索品質メトリクス</span>: Precision@K、Recall@K、MRRで検索精度を定量的に評価</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">パフォーマンス</span>: E2Eレイテンシ、各コンポーネントの処理時間を監視</span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-google" aria-hidden="true"></i>
+                            <span><span class="highlight">Cloud Logging</span>で全リクエストのトレーサビリティを確保</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cloud Monitoring</span>で異常検知とアラートを自動化</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-chart-line fa-lg" style="color: var(--ui-color-1);"></i>
+                        モニタリングがなければ改善もできない！<br>
+                        データドリブンでRAGを<br>
+                        継続的にブラッシュアップしよう。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード12: コスト最適化 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-dollar-sign fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑫コスト最適化の戦略</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-compress" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">次元削減</span>: PCAや量子化でエンベディングのストレージコストを削減</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-filter-circle-dollar" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">キャッシュ戦略</span>: 類似クエリの結果をキャッシュしてAPI呼び出しを節約</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gem" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">モデル選択</span>: タスクに応じて高性能モデルと軽量モデルを使い分け</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-bar" aria-hidden="true"></i>
+                            <span><span class="highlight">使用量の可視化</span>: トークン消費量、APIコール数をダッシュボードで追跡</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-piggy-bank fa-lg" style="color: var(--ui-color-2);"></i>
+                        RAGはコストがかかりがち！<br>
+                        キャッシュとモデルの使い分けで<br>
+                        <span class="highlight">50〜70%のコスト削減</span>が可能だよ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード13: セキュリティ考慮事項 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-lock fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑬セキュリティの考慮事項</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-user-lock" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">アクセス制御</span>: ユーザーの権限に応じて検索結果をフィルタリング（RBAC）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-mask" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">PII保護</span>: 個人情報の検出とマスキングを自動化してプライバシーを保護</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">プロンプトインジェクション対策</span>: ユーザー入力の検証とサニタイズ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span><span class="highlight">データの暗号化</span>: 保存時と転送時の両方でデータを暗号化</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-5);"></i>
+                        「全社員が全ドキュメントを見れる」<br>
+                        という設計は危険！<br>
+                        アクセス制御は最初から組み込もう。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード14: デプロイメント戦略 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑭デプロイメント戦略</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-vial" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">カナリアリリース</span>: 一部のユーザーに新バージョンを段階的に公開</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-compare" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">A/Bテスト</span>: 検索アルゴリズムの変更による品質変化を定量的に比較</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gears" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">CI/CD</span>: Cloud Buildでインデキシングパイプラインを自動化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                            <span><span class="highlight">ブルーグリーンデプロイ</span>: ダウンタイムなしでインデックスの更新が可能</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+                        インデックス更新時は<br>
+                        ダウンタイムなしで切り替えよう！<br>
+                        ユーザーに影響を与えないのが理想。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード15: Google Cloudでの実装 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-brands fa-google fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑮Google Cloudでの実装構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-cloud-arrow-up" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cloud Storage</span>: ドキュメントの保存と管理に使用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gears" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Dataflow</span>: ドキュメントの処理パイプラインを構築</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span><span class="highlight">Vertex AI Vector Search</span>: マネージドなベクトルデータベース</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-server" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cloud Run</span>: APIサーバーのホスティング、自動スケーリング対応</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-brands fa-google fa-lg" style="color: var(--ui-color-1);"></i>
+                        Google Cloudなら各サービスが<br>
+                        スムーズに連携できるから<br>
+                        構築スピードが格段に上がるよ！
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード16: Vertex AIとの統合 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑯Vertex AIとの強力な統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Gemini API</span>: 高性能なマルチモーダルモデルをネイティブに利用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-earth-americas" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Grounding with Google Search</span>: Web情報で回答を裏付ける機能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Agent Builder</span>: ノーコードでRAGエージェントを構築可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span><span class="highlight">Gemini Embedding</span>: 高品質なテキストエンベディングをAPIで提供</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+                        Agent Builderを使えば<br>
+                        コード不要で基本的なRAGが構築できる！<br>
+                        まずはこれでPoCを作るのもありだよ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード17: 評価と改善 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑰評価と継続的改善のサイクル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-vial" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">RAGAS評価</span>: 忠実性、回答の関連性、コンテキストの精度を自動評価</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ユーザーフィードバック</span>: 信号（👍👎）で回答品質を継続的に収集</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span><span class="highlight">E2Eテスト</span>: 定期的に評価データセットでパイプライン全体の回帰テストを実施</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">データフライホイール</span>: ユーザー利用データから検索品質を継続的に改善</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-clipboard-check fa-lg" style="color: var(--ui-color-1);"></i>
+                        RAGは「構築して終わり」じゃない！<br>
+                        評価 → 改善 → デプロイの<br>
+                        サイクルを回し続けるのが重要だよ。
+                    </span>
+                </div>
+            </div>
+
+            <!-- カード18: ベストプラクティスまとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑱ベストプラクティスまとめ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-shoe-prints" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">段階的アプローチ</span>: MVP → バージョンアップ → プロダクション化の順で進める</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span><span class="highlight">検索品質 > モデル性能</span>: エンベディングと検索パイプラインに最も投資すべき</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ドメインエキスパートとの協業</span>: 検索結果の品質評価に業務知識が不可欠</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-infinity" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Observability第一</span>: 可観測性を最初から組み込み、データドリブンで改善</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i>
+                        プロダクションRAGは<span class="highlight">「検索の質」</span>が全て！<br>
+                        まずはシンプルな構成で始めて、<br>
+                        改善サイクルを回していくのが正解だよ。
+                    </span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            <p>ソース: Google Cloud Tech「How to Build a production-ready RAG AI agent」</p>
+            <p><a href="https://www.youtube.com/@GoogleCloudTech" target="_blank" rel="noopener noreferrer">Google Cloud Tech YouTube Channel</a></p>
+            <p>2026年3月29日 作成</p>
+        </div>
+    </div>
+</body>
+</html>

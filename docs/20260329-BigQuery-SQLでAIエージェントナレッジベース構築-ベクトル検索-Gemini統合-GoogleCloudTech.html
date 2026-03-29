@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigQuery + GeminiでAIエージェントのナレッジベースをSQLで構築 - Google Cloud Tech</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #0288D1;
+            --color-2: #00897B;
+            --color-3: #26C6DA;
+            --color-4: #01579B;
+            --color-5: #E0F7FA;
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+            background: #F0FDFF;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-1), var(--color-2));
+            border-radius: 20px;
+            margin-bottom: 30px;
+            color: white;
+        }
+        header i {
+            font-size: 5rem;
+            margin-bottom: 20px;
+            animation: fa-bounce 2s infinite;
+        }
+        header h1 {
+            font-size: 2.2rem;
+            margin-bottom: 10px;
+            font-family: 'Kaisei Decol', serif;
+        }
+        header .date {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            animation: fade-in-scale 0.5s ease-out;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+        .card-icon {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .card-icon i {
+            font-size: 4rem;
+        }
+        .card h2 {
+            font-size: 1.3rem;
+            color: #333;
+            margin-bottom: 15px;
+            text-align: center;
+            font-family: 'Kaisei Decol', serif;
+        }
+        .card p, .card ul {
+            font-size: 0.95rem;
+            color: #555;
+            line-height: 1.8;
+        }
+        .card ul {
+            list-style: none;
+            padding: 0;
+        }
+        .card ul li {
+            padding: 5px 0;
+            padding-left: 25px;
+            position: relative;
+        }
+        .card ul li::before {
+            content: '\25B6';
+            position: absolute;
+            left: 5px;
+            color: var(--color-1);
+            font-size: 0.7rem;
+        }
+        .highlight {
+            background: linear-gradient(transparent 60%, #B2EBF2 60%);
+            font-weight: bold;
+        }
+        .tag {
+            display: inline-block;
+            background: var(--color-1);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            margin: 3px;
+        }
+        .tag-green {
+            background: var(--color-2);
+        }
+        .tag-cyan {
+            background: var(--color-3);
+            color: #333;
+        }
+        .tag-dark {
+            background: var(--color-4);
+        }
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: #F9A825;
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after {
+            border-color: #F9A825 transparent;
+        }
+        .speech-bubble.variant-2 {
+            background: #E0F2F1;
+            border-color: var(--color-2);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after {
+            border-color: var(--color-2) transparent;
+        }
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #333;
+        }
+        pre {
+            background: #f5f5f5;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--color-1);
+        }
+        .section-title {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(90deg, var(--color-1), var(--color-2));
+            border-radius: 15px;
+            color: white;
+            font-size: 1.5rem;
+            margin: 10px 0;
+            font-family: 'Kaisei Decol', serif;
+        }
+        .intro-card {
+            border-left: 5px solid var(--color-1);
+        }
+        .design-card {
+            border-left: 5px solid var(--color-2);
+            background: linear-gradient(135deg, #fff 0%, #E0F2F1 100%);
+        }
+        .impl-card {
+            border-left: 5px solid var(--color-4);
+            background: linear-gradient(135deg, #fff 0%, #E1F5FE 100%);
+        }
+        .practice-card {
+            border-left: 5px solid #F9A825;
+            background: linear-gradient(135deg, #fff 0%, #FFF8E1 100%);
+        }
+        footer {
+            text-align: center;
+            padding: 30px;
+            margin-top: 30px;
+            color: #777;
+            font-size: 0.9rem;
+        }
+        @keyframes fa-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        @keyframes fade-in-scale {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <i class="fa-solid fa-database"></i>
+            <h1>BigQuery + Gemini でAIエージェントの<br>ナレッジベースをSQLで構築</h1>
+            <p class="date">2026年3月29日 | Google Cloud Tech</p>
+        </header>
+
+        <div class="grid">
+            <!-- イントロセクション -->
+            <div class="section-title">
+                <i class="fa-solid fa-book-open"></i> 概要: AIエージェントとナレッジベース
+            </div>
+
+            <div class="card intro-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-brain fa-bounce" style="color: var(--color-1);"></i>
+                </div>
+                <h2>①AIエージェントのナレッジベースとは</h2>
+                <ul>
+                    <li>AIエージェントが意思決定を行うために<span class="highlight">外部知識を参照</span>する仕組み</li>
+                    <li>RAG（Retrieval-Augmented Generation）の中核を担う</li>
+                    <li>社内文書、FAQ、製品情報などをエージェントに提供</li>
+                    <li>LLM単体では持たない<span class="highlight">正確で最新の情報</span>を補完</li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb"></i> ナレッジベースがエージェントの「記憶」と「知識」になる！</span>
+                </div>
+            </div>
+
+            <div class="card intro-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-server" style="color: var(--color-1);"></i>
+                </div>
+                <h2>②なぜBigQueryを使うのか</h2>
+                <ul>
+                    <li><span class="highlight">サーバーレス</span>でインフラ管理が不要</li>
+                    <li>PB級のデータを扱える<span class="highlight">圧倒的なスケーラビリティ</span></li>
+                    <li>SQLで直接ベクトル検索が可能に</li>
+                    <li>Google Cloudエコシステムとの<span class="highlight">ネイティブ統合</span></li>
+                </ul>
+                <p style="margin-top: 10px;">
+                    <span class="tag">サーバーレス</span>
+                    <span class="tag tag-green">SQLネイティブ</span>
+                    <span class="tag tag-cyan">Google Cloud</span>
+                </p>
+            </div>
+
+            <div class="card intro-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-cogs" style="color: var(--color-2);"></i>
+                </div>
+                <h2>③アーキテクチャの全体像</h2>
+                <ul>
+                    <li><span class="highlight">Gemini</span>: テキストのエンベディング生成</li>
+                    <li><span class="highlight">BigQuery</span>: エンベディングの保存とベクトル検索</li>
+                    <li><span class="highlight">Vertex AI</span>: エージェントの推論エンジン</li>
+                    <li>ユーザークエリ → エンベディング → BigQuery検索 → 回答生成</li>
+                </ul>
+                <pre>
+ユーザー入力
+    ↓
+Geminiでエンベディング生成
+    ↓
+BigQuery VECTOR_SEARCH()
+    ↓
+検索結果をコンテキストとしてGeminiに送信
+    ↓
+AIエージェントが回答を生成</pre>
+            </div>
+
+            <!-- データモデリングセクション -->
+            <div class="section-title">
+                <i class="fa-solid fa-table"></i> ナレッジベースの設計とデータモデリング
+            </div>
+
+            <div class="card design-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-drafting-compass fa-bounce" style="color: var(--color-2);"></i>
+                </div>
+                <h2>④テーブル設計の基本</h2>
+                <ul>
+                    <li>コンテンツ本体と<span class="highlight">エンベディング列</span>を同じテーブルに保存</li>
+                    <li>メタデータ（カテゴリ、更新日、ソース）も併せて管理</li>
+                    <li><span class="highlight">パーティショニング</span>で大規模データに対応</li>
+                    <li>テキストをチャンクに分割してエンベディング化</li>
+                </ul>
+                <pre>
+-- テーブル設計の例
+CREATE TABLE knowledge_base (
+  content_id STRING,
+  content STRING,
+  embedding ARRAY&lt;FLOAT64&gt;,
+  category STRING,
+  source_url STRING,
+  updated_at TIMESTAMP
+)</pre>
+            </div>
+
+            <div class="card design-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-puzzle-piece" style="color: var(--color-2);"></i>
+                </div>
+                <h2>⑤テキストのチャンキング戦略</h2>
+                <ul>
+                    <li>長文を<span class="highlight">適切なサイズのチャンク</span>に分割する</li>
+                    <li>チャンクサイズは<span class="highlight">500〜1000トークン</span>程度が一般的</li>
+                    <li>オーバーラップ（重複）を設定して文脈の途絶を防ぐ</li>
+                    <li>セマンティック境界（段落・セクション）を考慮</li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-scissors"></i> チャンクが大きすぎると検索精度が下がり、小さすぎると文脈が途切れる！<span class="highlight">適切なバランス</span>が重要
+                    </span>
+                </div>
+            </div>
+
+            <div class="card design-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-cubes" style="color: var(--color-2);"></i>
+                </div>
+                <h2>⑥エンベディングの生成と保存</h2>
+                <ul>
+                    <li><span class="highlight">GeminiのエンベディングAPI</span>を使用してベクトル化</li>
+                    <li>BigQuery MLの<span class="highlight">ML.GENERATE_EMBEDDING</span>関数で直接生成可能</li>
+                    <li>生成したエンベディングはARRAY&lt;FLOAT64&gt;型で保存</li>
+                    <li>text-embedding-004モデルが推奨（768次元）</li>
+                </ul>
+                <pre>
+-- BigQuery MLでエンベディング生成
+SELECT *
+FROM ML.GENERATE_EMBEDDING(
+  MODEL `project.ml_model`,
+  (SELECT content FROM docs)
+)</pre>
+            </div>
+
+            <div class="card design-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-layer-group" style="color: var(--color-2);"></i>
+                </div>
+                <h2>⑦メタデータの活用設計</h2>
+                <ul>
+                    <li>エンベディング検索だけでなく<span class="highlight">メタデータフィルタ</span>も活用</li>
+                    <li>カテゴリ、日付、アクセス権などで<span class="highlight">検索範囲を絞り込み</span></li>
+                    <li>ハイブリッド検索で精度を向上させる</li>
+                    <li>ビジネスロジックに応じた<span class="highlight">カスタム列</span>を追加可能</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-filter"></i> 「営業部の資料だけ検索」「直近3ヶ月の情報だけ」といった<span class="highlight">絞り込み</span>がSQLで簡単にできる！</span>
+                </div>
+            </div>
+
+            <!-- ベクトル検索セクション -->
+            <div class="section-title">
+                <i class="fa-solid fa-magnifying-glass"></i> BigQueryのベクトル検索機能
+            </div>
+
+            <div class="card impl-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-vector-square fa-bounce" style="color: var(--color-4);"></i>
+                </div>
+                <h2>⑧VECTOR_SEARCH関数の使い方</h2>
+                <ul>
+                    <li><span class="highlight">VECTOR_SEARCH()</span>: BigQueryのネイティブベクトル検索関数</li>
+                    <li>近似最近傍（ANN）検索をSQLで実行</li>
+                    <li>コサイン類似度、ユークリッド距離などに対応</li>
+                    <li>テーブルを直接検索できる<span class="highlight">宣言的なSQL構文</span></li>
+                </ul>
+                <pre>
+SELECT *
+FROM VECTOR_SEARCH(
+  TABLE knowledge_base,
+  'embedding',
+  (SELECT embedding FROM query_embeddings),
+  top_k => 5
+)</pre>
+            </div>
+
+            <div class="card impl-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-bolt" style="color: var(--color-4);"></i>
+                </div>
+                <h2>⑨リアルタイム検索の実現</h2>
+                <ul>
+                    <li>BigQueryストリーミング挿入で<span class="highlight">リアルタイムデータ反映</span></li>
+                    <li>エンベディング生成は<span class="highlight">Cloud Functions</span>で自動化</li>
+                    <li>新規ドキュメント追加から検索可能になるまで数秒</li>
+                    <li><span class="highlight">BigQuery Materialized Views</span>で事前計算も可能</li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-clock"></i> ストリーミング挿入 + 自動エンベディング生成で<span class="highlight">ほぼリアルタイム</span>の検索が実現！</span>
+                </div>
+            </div>
+
+            <div class="card impl-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-filter" style="color: var(--color-4);"></i>
+                </div>
+                <h2>⑩ハイブリッド検索の実装</h2>
+                <ul>
+                    <li>ベクトル検索 + <span class="highlight">キーワード検索</span>を組み合わせる</li>
+                    <li>SQLのWHERE句でメタデータフィルタを適用</li>
+                    <li>全文検索（FULLTEXT）との併用で精度向上</li>
+                    <li>検索結果の<span class="highlight">スコアの統合</span>がポイント</li>
+                </ul>
+                <pre>
+-- ベクトル検索 + フィルタ
+SELECT *
+FROM VECTOR_SEARCH(
+  TABLE knowledge_base,
+  'embedding',
+  query_embedding,
+  top_k => 10
+)
+WHERE category = 'product'
+  AND updated_at > TIMESTAMP_SUB(
+    CURRENT_TIMESTAMP(), INTERVAL 90 DAY)</pre>
+            </div>
+
+            <!-- Gemini統合セクション -->
+            <div class="section-title">
+                <i class="fa-solid fa-robot"></i> Geminiとの統合
+            </div>
+
+            <div class="card impl-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-link fa-bounce" style="color: var(--color-3);"></i>
+                </div>
+                <h2>⑪Gemini APIとの連携方法</h2>
+                <ul>
+                    <li>BigQuery MLの<span class="highlight">ML.GENERATE_TEXT</span>で直接Geminiを呼び出し</li>
+                    <li>検索結果をコンテキストとしてプロンプトに渡す</li>
+                    <li>Pythonクライアントライブラリからも<span class="highlight">シームレスに統合</span></li>
+                    <li>Vertex AI SDKでエージェントのロジックを構築</li>
+                </ul>
+                <pre>
+-- BigQuery MLでGeminiを呼び出し
+SELECT *
+FROM ML.GENERATE_TEXT(
+  MODEL `project.gemini_model`,
+  CONCAT('検索結果: ', search_result,
+         '\n質問: ', user_question)
+)</pre>
+            </div>
+
+            <div class="card impl-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-comments" style="color: var(--color-1);"></i>
+                </div>
+                <h2>⑫エージェントとのRAGパイプライン</h2>
+                <ul>
+                    <li><span class="highlight">ステップ1</span>: ユーザー入力をエンベディング化</li>
+                    <li><span class="highlight">ステップ2</span>: BigQueryで関連ドキュメントを検索</li>
+                    <li><span class="highlight">ステップ3</span>: 検索結果をプロンプトに挿入</li>
+                    <li><span class="highlight">ステップ4</span>: Geminiがコンテキストに基づいて回答生成</li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-arrows-rotate"></i> このパイプライン全体を<span class="highlight">SQL + BigQuery ML</span>で完結できるのが最大のメリット！
+                    </span>
+                </div>
+            </div>
+
+            <!-- スケーラビリティとコスト -->
+            <div class="section-title">
+                <i class="fa-solid fa-chart-line"></i> スケーラビリティとコスト管理
+            </div>
+
+            <div class="card practice-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-expand-arrows-alt fa-bounce" style="color: #F9A825;"></i>
+                </div>
+                <h2>⑬スケーラビリティの設計</h2>
+                <ul>
+                    <li>BigQueryは<span class="highlight">自動スケーリング</span>でデータ量に対応</li>
+                    <li>数百万件のエンベディングでも高速に検索可能</li>
+                    <li><span class="highlight">パーティショニング</span>でコストとパフォーマンスを最適化</li>
+                    <li>クラスタリングで検索範囲を絞り込み</li>
+                </ul>
+                <p style="margin-top: 10px;">
+                    <span class="tag tag-dark">自動スケーリング</span>
+                    <span class="tag tag-green">パーティショニング</span>
+                    <span class="tag">クラスタリング</span>
+                </p>
+            </div>
+
+            <div class="card practice-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-dollar-sign" style="color: #F9A825;"></i>
+                </div>
+                <h2>⑭コスト管理のベストプラクティス</h2>
+                <ul>
+                    <li><span class="highlight">エンベディング生成</span>: 挿入時の1回のみでコスト抑制</li>
+                    <li><span class="highlight">検索コスト</span>: top_kを適切に設定（5〜10件程度）</li>
+                    <li>定期的に<span class="highlight">不要データのパージ</span>を実施</li>
+                    <li>BigQueryの<span class="highlight">容量ベースの料金</span>モデルを活用</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-piggy-bank"></i> エンベディングの次元数を下げる（256次元）と<span class="highlight">ストレージと検索コストを大幅削減</span>できる！
+                    </span>
+                </div>
+            </div>
+
+            <div class="card practice-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-tachometer-alt" style="color: #F9A825;"></i>
+                </div>
+                <h2>⑮クエリの最適化テクニック</h2>
+                <ul>
+                    <li><span class="highlight">BRIN索引</span>: ベクトル検索のパフォーマンスを向上</li>
+                    <li>検索対象のテーブルを<span class="highlight">事前にフィルタ</span>して範囲を限定</li>
+                    <li>マテリアライズドビューで<span class="highlight">頻繁なクエリを事前計算</span></li>
+                    <li>キャッシュを活用して<span class="highlight">重複クエリのコストを削減</span></li>
+                </ul>
+                <pre>
+-- フィルタ適用で検索範囲を絞り込み
+SELECT *
+FROM VECTOR_SEARCH(
+  (SELECT * FROM kb
+   WHERE department = 'engineering'),
+  'embedding', query_emb,
+  top_k => 5)</pre>
+            </div>
+
+            <!-- 実践とベストプラクティス -->
+            <div class="section-title">
+                <i class="fa-solid fa-rocket"></i> 実践的な実装とベストプラクティス
+            </div>
+
+            <div class="card practice-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-code fa-bounce" style="color: var(--color-1);"></i>
+                </div>
+                <h2>⑯実装例: エンドツーエンドのワークフロー</h2>
+                <ul>
+                    <li><span class="highlight">1. データ取り込み</span>: Cloud StorageからBigQueryにロード</li>
+                    <li><span class="highlight">2. チャンキング</span>: テキストを適切なサイズに分割</li>
+                    <li><span class="highlight">3. エンベディング生成</span>: ML.GENERATE_EMBEDDINGでベクトル化</li>
+                    <li><span class="highlight">4. 検索・回答生成</span>: VECTOR_SEARCH + ML.GENERATE_TEXT</li>
+                </ul>
+                <pre>
+# Pythonでの実装イメージ
+from google.cloud import bigquery
+client = bigquery.Client()
+
+# ベクトル検索の実行
+query = """
+  SELECT content, distance
+  FROM VECTOR_SEARCH(...)
+"""
+results = client.query(query)</pre>
+            </div>
+
+            <div class="card practice-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-cloud-arrow-up" style="color: var(--color-2);"></i>
+                </div>
+                <h2>⑰Google Cloudでのデプロイ</h2>
+                <ul>
+                    <li><span class="highlight">Cloud Run</span>: エージェントのAPIエンドポイントとしてデプロイ</li>
+                    <li><span class="highlight">Eventarc</span>: ドキュメント追加時に自動でエンベディング生成</li>
+                    <li><span class="highlight">Workflows</span>: パイプライン全体のオーケストレーション</li>
+                    <li>IAMで<span class="highlight">BigQueryへのアクセス制御</span>を適切に設定</li>
+                </ul>
+                <p style="margin-top: 10px;">
+                    <span class="tag tag-dark">Cloud Run</span>
+                    <span class="tag tag-green">Eventarc</span>
+                    <span class="tag tag-cyan">Workflows</span>
+                </p>
+            </div>
+
+            <div class="card practice-card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-exclamation-triangle" style="color: #E65100;"></i>
+                </div>
+                <h2>⑱注意点とまとめ</h2>
+                <ul>
+                    <li><span class="highlight">エンベディングの品質</span>が検索精度の要。適切なモデル選択を</li>
+                    <li>チャンクの品質管理と<span class="highlight">定期的な再エンベディング</span>が必要</li>
+                    <li>セキュリティ: 行レベルセキュリティで<span class="highlight">データアクセスを制御</span></li>
+                    <li>SQLだけでAIエージェントのナレッジベースが構築できるのが<span class="highlight">最大の強み</span></li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star"></i> BigQuery + Geminiで<span class="highlight">インフラ管理ゼロのAIナレッジベース</span>を実現！SQLの知識だけで始められるのが魅力
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>
+                <i class="fa-brands fa-youtube" style="color: var(--color-1);"></i>
+                <a href="https://www.youtube.com/@GoogleCloudTech" target="_blank">Build an AI Agent knowledge base using SQL (BigQuery + Gemini)</a>
+            </p>
+            <p style="margin-top: 10px;">
+                <i class="fa-solid fa-user"></i> Google Cloud Tech |
+                <i class="fa-regular fa-calendar"></i> 2026年3月29日
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

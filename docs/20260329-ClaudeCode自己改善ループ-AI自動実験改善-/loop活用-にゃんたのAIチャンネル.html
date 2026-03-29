@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIが自動で実験して改善してくれる！Claude Codeで自己改善ループを作る方法</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=Yomogi&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #0d9488;
+            --color-2: #0f766e;
+            --color-3: #5eead4;
+            --color-4: #134e4a;
+            --color-5: #ccfbf1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #134e4a 50%, #0f172a 100%);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 30px;
+            padding: 50px;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.3);
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 30px;
+            border-bottom: 4px solid var(--color-1);
+        }
+
+        h1 {
+            font-size: 2.4rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, var(--color-1), var(--color-4));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+            line-height: 1.3;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #555;
+            font-weight: 400;
+        }
+
+        .channel-info {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: linear-gradient(135deg, var(--color-5), #f0fdfa);
+            padding: 8px 20px;
+            border-radius: 30px;
+            margin-top: 15px;
+            font-size: 0.95rem;
+            color: var(--color-4);
+            font-weight: 700;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 35px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            border: 2px solid transparent;
+            animation: fadeInUp 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card:nth-child(1) { animation-delay: 0.1s; }
+        .card:nth-child(2) { animation-delay: 0.2s; }
+        .card:nth-child(3) { animation-delay: 0.3s; }
+        .card:nth-child(4) { animation-delay: 0.4s; }
+        .card:nth-child(5) { animation-delay: 0.5s; }
+        .card:nth-child(6) { animation-delay: 0.6s; }
+        .card:nth-child(7) { animation-delay: 0.7s; }
+        .card:nth-child(8) { animation-delay: 0.8s; }
+        .card:nth-child(9) { animation-delay: 0.9s; }
+        .card:nth-child(10) { animation-delay: 1.0s; }
+        .card:nth-child(11) { animation-delay: 1.1s; }
+        .card:nth-child(12) { animation-delay: 1.2s; }
+        .card:nth-child(13) { animation-delay: 1.3s; }
+        .card:nth-child(14) { animation-delay: 1.4s; }
+        .card:nth-child(15) { animation-delay: 1.5s; }
+        .card:nth-child(16) { animation-delay: 1.6s; }
+        .card:nth-child(17) { animation-delay: 1.7s; }
+        .card:nth-child(18) { animation-delay: 1.8s; }
+
+        .card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 20px 60px rgba(13, 148, 136, 0.35);
+            border-color: var(--color-1);
+        }
+
+        .card-icon {
+            font-size: 3rem;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-4));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .card p {
+            color: #4a5568;
+            font-size: 1.05rem;
+            line-height: 1.8;
+        }
+
+        .highlight {
+            background: linear-gradient(120deg, #0d9488 0%, #0f766e 100%);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-weight: 700;
+        }
+
+        .tag {
+            display: inline-block;
+            background: var(--color-5);
+            color: var(--color-4);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin: 3px 4px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 4px solid var(--color-1);
+        }
+
+        footer p {
+            color: #777;
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--color-1);
+            text-decoration: none;
+        }
+
+        .mega-icon {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+
+        .mega-icon i {
+            font-size: 4.5rem;
+            background: linear-gradient(135deg, var(--color-1), var(--color-4));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 4px 8px rgba(13, 148, 136, 0.3));
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #f0fdfa;
+            border: 2px solid var(--color-3);
+            border-radius: 18px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            font-family: 'Yomogi', cursive;
+            font-size: 0.95rem;
+            color: #444;
+            box-shadow: 2px 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #fef3c7;
+            border-color: #f59e0b;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #fce7f3;
+            border-color: #ec4899;
+        }
+
+        .code-block {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            margin: 12px 0;
+            overflow-x: auto;
+            line-height: 1.6;
+        }
+
+        .code-block .comment {
+            color: #64748b;
+        }
+
+        .code-block .keyword {
+            color: #5eead4;
+        }
+
+        .code-block .string {
+            color: #fbbf24;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .spin-slow {
+            animation: spin-slow 8s linear infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="mega-icon">
+                <i class="fas fa-infinity spin-slow" style="font-size: 6rem; color: var(--color-1);"></i>
+            </div>
+            <h1>AIが自動で実験して改善してくれる！<br>Claude Codeで自己改善ループを作る方法</h1>
+            <p class="subtitle">Claude Codeが自律的にコードを修正・改善し続ける仕組みを解説</p>
+            <div class="channel-info">
+                <i class="fab fa-youtube"></i>
+                にゃんたのAIチャンネル
+            </div>
+            <p style="color: #999; font-size: 0.85rem; margin-top: 10px;">2026年3月29日</p>
+        </header>
+
+        <div class="grid">
+            <!-- カード① -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-lightbulb"></i></div>
+                <h2>①自己改善ループとは: AIが自分で自分をよくする仕組み</h2>
+                <p>自己改善ループとは、<span class="highlight">AIが自分でテストを実行して結果を確認し、失敗すれば修正して再度テストする</span>というサイクルを自動で回し続ける仕組みです。人間が手動で修正を繰り返す作業を、Claude Codeに任せることができます。開発者が寝ている間にもコードの改善が進む可能性があります。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-cat" style="color: var(--color-2);"></i> 人間がいなくてもAIが勝手に直してくれる、まるで自律型ロボットみたい！
+                </div>
+            </div>
+
+            <!-- カード② -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-arrows-spin"></i></div>
+                <h2>②基本サイクル: テスト→分析→修正→再テスト</h2>
+                <p>自己改善ループの基本的な流れは4つのステップで構成されます。まず<span class="highlight">テストコードを実行して失敗を検出</span>し、次にエラーメッセージやログを分析します。その後、原因を特定してコードを修正し、最後に再度テストを実行して改善を確認します。このサイクルを繰り返すことで、段階的に品質が向上していきます。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-repeat" style="color: #f59e0b;"></i> テストが通るまでこのループを回し続けるイメージ！
+                </div>
+            </div>
+
+            <!-- カード③ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-terminal"></i></div>
+                <h2>③Claude Codeの基本: CLIツールとしての活用</h2>
+                <p> Claude Codeはターミナルで動くAIコーディングアシスタントです。<span class="highlight">プロンプトで指示を出すと、ファイルの読み書きやコマンド実行を自動で行ってくれます。</span>自己改善ループを実現するには、この自動実行能力が鍵となります。普段の開発作業もClaude Codeで効率化できる強力なツールです。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-keyboard" style="color: #ec4899;"></i> ターミナルでclaudeと打つだけで起動できるよ！
+                </div>
+            </div>
+
+            <!-- カード④ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                <h2>④/loopコマンド: 定期的にプロンプトを実行</h2>
+                <p><span class="highlight">/loopコマンド</span>は、指定したプロンプトを一定間隔で自動的に繰り返し実行する機能です。例えば「/loop 10m テストを実行して失敗を修正して」と設定すれば、10分おきにClaude Codeがテストを実行し、失敗があれば自動的に修正を試みます。バックグラウンドでも動作し続けるため、放置しても自己改善が進みます。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-robot" style="color: var(--color-2);"></i> AIが自律的にループを回して改善を続けてくれる！
+                </div>
+            </div>
+
+            <!-- カード⑤ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code"></i></div>
+                <h2>⑤実践設定: 具体的なコマンド例</h2>
+                <p>/loopコマンドの実践的な使い方です。まず<span class="highlight">間隔は5m（5分）〜30m（30分）</span>が推奨で、短すぎるとAPIクオータを消費しすぎます。プロンプトには「テストを実行して」「失敗していたら修正して」「coverageを確認して」など、具体的な指示を含めると精度が上がります。</p>
+                <div class="code-block">
+<span class="comment"># 基本的な使い方</span>
+/<span class="keyword">loop</span> 10m テストを実行して失敗を修正して
+
+<span class="comment"># 詳細な指示を含める</span>
+/<span class="keyword">loop</span> 15m pytestを実行して、<span class="string">失敗したテストの原因を特定し修正して</span>
+                </div>
+            </div>
+
+            <!-- カード⑥ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sitemap"></i></div>
+                <h2>⑥アーキテクチャ: 自己改善の全体構成</h2>
+                <p>自己改善ループのアーキテクチャは3つの層で構成されます。<span class="highlight">実行層</span>ではテストやビルドなどのコマンドを実行し、<span class="highlight">分析層</span>でエラーログやテスト結果を解析します。そして<span class="highlight">改善層</span>でコードの修正とコミットを行います。この3層構造により、体系的な改善が可能になります。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-layer-group" style="color: #f59e0b;"></i> 実行→分析→改善の3ステップを自動で回すよ！
+                </div>
+            </div>
+
+            <!-- カード⑦ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-flask-vial"></i></div>
+                <h2>⑦テスト駆動の改善: 自動テストとの連携</h2>
+                <p>自己改善ループを効果的に機能させるには、<span class="highlight">事前にテストコードが整備されていること</span>が重要です。pytest、Jest、Vitestなどのテストフレームワークと組み合わせることで、Claude Codeはテスト結果に基づいて的確な修正を行えます。テストカバレッジが高いほど、AIの修正精度も向上します。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-check-double" style="color: var(--color-2);"></i> テストがないとAIも何を直せばいいかわからないよ！
+                </div>
+            </div>
+
+            <!-- カード⑧ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-cogs"></i></div>
+                <h2>⑧Hooks機能: イベント駆動の自動化</h2>
+                <p>Claude Codeには<span class="highlight">Hooks</span>という機能があり、特定のイベント発生時に自動的にシェルコマンドを実行できます。例えばファイル保存時やツール実行前後にリンターやテストを走らせる設定が可能です。Hooksを活用すれば、/loopを使わなくても、開発プロセスの各段階で自動チェックが行えます。</p>
+                <div class="code-block">
+<span class="comment"># hooksの設定例</span>
+{
+  <span class="string">"hooks"</span>: {
+    <span class="string">"PostToolUse"</span>: [{
+      <span class="string">"matcher"</span>: <span class="string">"Write|Edit"</span>,
+      <span class="string">"command"</span>: <span class="string">"pytest --tb=short"</span>
+    }]
+  }
+}
+                </div>
+            </div>
+
+            <!-- カード⑨ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-clipboard-list"></i></div>
+                <h2>⑨CLAUDE.md活用: プロジェクト固有の指示を設定</h2>
+                <p><span class="highlight">CLAUDE.mdファイル</span>にプロジェクト固有の指示を書いておくと、Claude Codeはそれに従って動作します。テストコマンド、コーディング規約、ファイル構造のルールなどを記載しておけば、自己改善ループがそのルールに基づいて修正を行います。これにより、プロジェクトごとに最適化された改善が可能になります。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-file-lines" style="color: #ec4899;"></i> CLAUDE.mdはAIへの「取扱説明書」みたいなもの！
+                </div>
+            </div>
+
+            <!-- カード⑩ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-bug-slash"></i></div>
+                <h2>⑩エラー分析と修正: AIの問題解決プロセス</h2>
+                <p>Claude Codeはテスト失敗時に<span class="highlight">エラーメッセージ、スタックトレース、ログ出力</span>を分析し、原因を特定します。TypeErrorなら型の不一致を、ImportErrorなら依存関係の問題を修正するなど、エラーの種類に応じた適切な対応を行います。人間がコンソールを見ながら原因を探る作業を、AIが自動的に行ってくれるのが強力です。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-magnifying-glass-chart" style="color: var(--color-2);"></i> エラーログを読んで原因を特定するのが得意！
+                </div>
+            </div>
+
+            <!-- カード⑪ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-rocket"></i></div>
+                <h2>⑪活用例1: バグ修正の自動化</h2>
+                <p>バグ報告が入った際に自己改善ループを活用する方法です。<span class="highlight">「Issue #42を修正して」とプロンプトを投げると、Claude Codeが該当コードを解析して修正案を提示</span>し、テストで検証します。テストが通れば自動コミットまで行います。複数のバグを並行して処理することも可能です。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-wand-magic-sparkles" style="color: #f59e0b;"></i> IssueをAIに投げるだけでバグが直る世界が来た！
+                </div>
+            </div>
+
+            <!-- カード⑫ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-paintbrush"></i></div>
+                <h2>⑫活用例2: リファクタリングの自動化</h2>
+                <p>コードの品質改善にも自己改善ループが使えます。「<span class="highlight">重複コードを削除して」「関数を適切に分割して」「型アノテーションを追加して</span>」といった指示で、Claude Codeがリファクタリングを進めます。各ステップでテストが通ることを確認しながら進むため、動作を壊すことなく改善できます。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-broom" style="color: #ec4899;"></i> コードの掃除もAIにお任せ！
+                </div>
+            </div>
+
+            <!-- カード⑬ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-arrow-up-right-dots"></i></div>
+                <h2>⑬活用例3: パフォーマンス最適化</h2>
+                <p>パフォーマンス改善にも自己改善ループが応用できます。<span class="highlight">ベンチマークテストを用意しておけば、Claude Codeが最適化の試行錯誤を自動で行います。</span>アルゴリズムの改善、メモリ使用量の削減、クエリの最適化など、数値目標がある改善に特に有効です。改善前後の比較も自動でレポートしてくれます。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-gauge-high" style="color: var(--color-2);"></i> 速度計測も自動でやってくれるのが便利！
+                </div>
+            </div>
+
+            <!-- カード⑭ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-thumbs-up"></i></div>
+                <h2>⑭メリット: 人間が手動でやっていた作業を自動化</h2>
+                <p>自己改善ループの最大のメリットは<span class="highlight">反復作業の完全な自動化</span>です。人間がテスト実行→エラー確認→修正→再テストを何度も繰り返す手間がなくなります。また、AIが24時間365日改善を続けることができ、人間の認知バイアスに囚われない客観的な改善が期待できます。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-mug-hot" style="color: #f59e0b;"></i> コーヒー飲んでる間にコードが綺麗になってる！
+                </div>
+            </div>
+
+            <!-- カード⑮ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <h2>⑮注意点: APIコストと無限ループのリスク</h2>
+                <p>自己改善ループを使う際の注意点があります。<span class="highlight">APIの利用コストがかさむ点</span>に注意が必要で、長時間のループは予期せぬ請求につながります。また、修正がループして元に戻ってしまう「無限ループ」のリスクもあります。7日間で自動停止するセーフティネットはありますが、コスト管理には気をつけましょう。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-wallet" style="color: #ec4899;"></i> 定期的にコストをチェックして、使いすぎに注意！
+                </div>
+            </div>
+
+            <!-- カード⑯ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-shield-halved"></i></div>
+                <h2>⑯安全対策: 権限設定とレビュー</h2>
+                <p>安全に自己改善ループを運用するには、<span class="highlight">権限設定を適切に行うこと</span>が重要です。危険な操作（git push、本番環境へのデプロイなど）は自動許可せず、手動確認を挟む設定にしましょう。また、Claude Codeの権限モードを活用して、許可する操作を限定することで、思わぬ事故を防げます。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-lock" style="color: var(--color-2);"></i> pushやデプロイは自動許可しないのが鉄則！
+                </div>
+            </div>
+
+            <!-- カード⑰ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-star"></i></div>
+                <h2>⑰ベストプラクティス: 効果的な運用のコツ</h2>
+                <p>効果的な自己改善ループの運用にはいくつかのコツがあります。<span class="highlight">テストを充実させること</span>が最重要で、テストがないとAIは正しい修正ができません。また、ループ間隔は10〜15分がバランスが良く、プロンプトには具体的な成功条件を含めると精度が上がります。CLAUDE.mdにプロジェクトルールを書いておくことも大切です。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-list-check" style="color: #f59e0b;"></i> テスト・間隔・プロンプト・ルールの4つが鍵！
+                </div>
+            </div>
+
+            <!-- カード⑱ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-forward"></i></div>
+                <h2>⑱まとめ: AIによる開発ワークフローの未来</h2>
+                <p>Claude Codeの自己改善ループは、<span class="highlight">AIが自律的にソフトウェアの品質を向上させる</span>新しい開発スタイルです。/loopコマンド一つで始められ、HooksやCLAUDE.mdと組み合わせることでより高度な自動化が実現できます。テスト駆動開発とAIの組み合わせは、今後のソフトウェア開発において主流になっていく可能性があります。まずは小さなプロジェクトで試してみましょう！</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-cat" style="color: #ec4899;"></i> まずは小さなプロジェクトで試して、徐々に拡大していこう！
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p><i class="fas fa-cat" style="color: var(--color-1);"></i> にゃんたのAIチャンネル - Claude Codeで自己改善ループを作る方法</p>
+            <p style="margin-top: 8px; font-size: 0.8rem; color: #aaa;">Generated with Claude Code</p>
+        </footer>
+    </div>
+</body>
+</html>

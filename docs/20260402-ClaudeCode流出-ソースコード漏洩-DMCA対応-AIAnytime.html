@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code ソースコード流出の全真相｜DMCA対応・技術詳細・オープンソースへの影響</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #2C3E6B;
+            --ui-color-2: #C0392B;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #1A1A2E;
+            --ui-color-5: #E74C3C;
+        }
+
+        body {
+            font-family: 'Zen Kurenaido', sans-serif;
+            background-color: #FFF8F5;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 36px;
+            font-weight: bold;
+            color: #333333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        header .header-icon {
+            color: var(--ui-color-2);
+            animation: fa-bounce 2s infinite;
+        }
+
+        header .date {
+            font-size: 16px;
+            color: #777;
+            margin-top: 10px;
+        }
+
+        header .subtitle {
+            font-size: 18px;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: #555;
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .highlight-bar {
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            height: 4px;
+            border-radius: 2px;
+            margin: 10px 0;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <i class="fa-solid fa-user-secret header-icon fa-3x" aria-hidden="true"></i>
+                Claude Code ソースコード流出の全真相
+                <i class="fa-solid fa-user-secret header-icon fa-3x" aria-hidden="true"></i>
+            </h1>
+            <div class="subtitle">DMCA対応・技術スタック詳細・オープンソースへの影響を徹底解説</div>
+            <div class="date"><i class="fa-regular fa-calendar"></i> 2026年4月2日 | チャンネル: AI Anytime</div>
+            <div class="highlight-bar"></div>
+        </header>
+
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bomb fa-5x" style="color: var(--ui-color-2); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>① ソースコード流出の発端</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span>Claude Codeのソースコードが<span class="keyword-tag">npm</span>と<span class="keyword-tag">GitHub</span>に流出・公開された</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user" aria-hidden="true"></i>
+                            <span>Twitterユーザーの「fried rice」が最初に流出を報告した</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span>ソースコードはCI/CDパイプライン経由でnpmとGitHubに誤って配布された</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>AnthropicはDMCAリクエストをGitHubに送付し、ほとんどのリポジトリが削除された</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            一部のリポジトリはまだ残っており、Google Drive経由でも入手可能な状態だった
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gavel fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② AnthropicのDMCA対応</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>Anthropicは<span class="keyword-tag">著作権侵害</span>を理由にDMCAリクエストをGitHubに送付</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                            <span>GitHub上の大部分のミラーリポジトリが削除対象となった</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                            <span>npm上の配布パッケージも削除対応が進められた</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake" aria-hidden="true"></i>
+                            <span>Anthropicは「GitHubおよびnpmと協力して対応中」と公式に発表</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-2);"></i>
+                            動画主は「意図的な流出ではないか？」と推測。大企業のCI/CDプロセスでこのような単純ミスが起きるのか疑問視
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ コードベースの規模</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-file-code" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">50万行以上</span>のTypeScriptコード</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-folder-tree" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">1,900個</span>のソースファイルが含まれている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">40個以上</span>の組み込みツールを内蔵</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">20個</span>のフック機能が実装されている</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-chart-bar fa-lg" style="color: var(--ui-color-1);"></i>
+                            最大ファイルはprint.tsで、ストリーミング表示やレンダリングを担当している
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.4s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 技術スタックの全体像</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                            <span>ランタイム: <span class="keyword-tag">Bun</span>（JavaScript/TypeScriptランタイム、Node.js互換）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>全ソースコードは<span class="keyword-tag">TypeScript strict mode</span>で記述</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-display" aria-hidden="true"></i>
+                            <span>ターミナルUIに<span class="keyword-tag">React Ink</span>を使用してNCurses相当の描画を実現</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>ツール入力の検証に<span class="keyword-tag">Zod v4</span>スキーマバリデーションを採用</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            PythonのPydanticに相当するバリデーションをZodで実装しているよ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.5s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ アーキテクチャ概要</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-door-open" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">エントリーポイント</span>: main.tsx / TSXが起動地点</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ブートストラップ層</span>: 初期化と設定の読み込みを担当</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">会話エンジン</span>: ユーザーのクエリやAPIサービスを管理</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">オーケストレーション</span>: タスクの調整と実行フローを制御</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: var(--ui-color-1);"></i>
+                            ツール層 → サービス層 → ユーティリティ層の順に階層化されている
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.6s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 40+の組み込みツール群</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-search" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Search</span>: ファジーサーチでコードベースを横断検索</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Web</span>: ウェブ検索とウェブページの取得機能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Agents</span>: バックグラウンドエージェントの起動と管理</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-language" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">LSP</span>: Language Server Protocolによるコード解析</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-plug fa-lg" style="color: var(--ui-color-5);"></i>
+                            MCPツールも統合されており、.claude.jsonでMCPクライアントを管理している
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.7s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 内部MCPとオブザーバビリティ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                            <span>Claude Codeは内部で<span class="keyword-tag">MCP</span>（Model Context Protocol）を利用している</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">OpenTelemetry</span>でオブザーバビリティとトレーシングを実装</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-flag" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">GrowthBook</span>でフィーチャーフラグとA/Bテストを管理</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                            <span>MCPクライアントマネージャーが.claude.json経由で設定を読み込む</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            GrowthBookは最近攻撃を受けたことでも話題のフィーチャーフラグサービス
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.8s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ セキュリティ: 防御の多層化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Defense in Depth</span>（多層防御）アプローチを採用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-shield" aria-hidden="true"></i>
+                            <span>権限モジュールによる細かな<span class="keyword-tag">パーミッション制御</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                            <span>データベースの誤削除などを防ぐ安全ガードが実装されている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span>Anthropic APIキーが必須のランタイム依存関係</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            最近Claude Codeがデータベースを削除してしまった事故も話題に。この対策が組み込まれている
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.9s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-database fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ 状態管理とセッション</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">グローバルステート</span>と<span class="keyword-tag">アプリステート</span>の2つの管理システム</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                            <span>セッションは<span class="keyword-tag">JSONLファイル</span>で.claudeディレクトリに永続化される</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-memory" aria-hidden="true"></i>
+                            <span>大きな結果はツール経由でファイルに書き出し、メモリにキープ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                            <span>会話履歴の復元がJSONLベースで実現されている</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            セッション管理にJSONLを採用するのは、ストリーミング書き込みに最適だから
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.0s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users-gear fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ エージェントとスウォーム</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                            <span>スウォーム（群れ）による<span class="keyword-tag">マルチエージェント</span>アーキテクチャ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-envelope" aria-hidden="true"></i>
+                            <span>永続的なバックグラウンドエージェントが<span class="keyword-tag">メールボックス</span>で通信</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">コーディネーターモード</span>でタスクの調整と実行を管理</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span>エージェントのオーケストレーションが全体の処理フローを制御</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                            メールボックス方式は、エージェント同士が非同期でメッセージをやり取りする仕組み
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.1s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ コンパイル時の最適化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-scissors" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">デッドコード除去</span>がBunコンパイル時に実行される</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-cut" aria-hidden="true"></i>
+                            <span>使用されていないコードパス全体がビルド時に削除される</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                            <span>フィーチャーフラグにより不要な機能を<span class="keyword-tag">コンパイル時に排除</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-box" aria-hidden="true"></i>
+                            <span>Bunランタイムの特性を活かしたバンドル最適化</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            フィーチャーフラグの設定に応じて、コードパスごと消し去る高度な最適化が施されている
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.2s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bug fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 改善点: P0〜P3の課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">循環依存</span>が多数存在し、アーキテクチャの分離が必要</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span>Bassパーサー: 50msタイムアウト＋50Kノード予算に制約あり</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                            <span>Rush/Nappyモジュールを<span class="keyword-tag">v8-sworc</span>に置き換えでCPUホットパスを改善</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file" aria-hidden="true"></i>
+                            <span>ファイルインデックスが100ms → Rust化で<span class="keyword-tag">5ms</span>への改善が可能</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            RushのBass実装は10〜50倍遅く、フォールバック処理が複雑すぎるという課題が指摘されている
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.3s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ さらに高い改善効果</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-palette" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Chalk</span>（React Inkの色ライブラリ）をレイジーロード化で改善可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-image" aria-hidden="true"></i>
+                            <span>nc2pngのRust化で画像生成を<span class="keyword-tag">よりクリーンかつ高速</span>に</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-snake" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Pythonツール</span>の解析とサポートの強化が必要</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-cubes" aria-hidden="true"></i>
+                            <span>TypeScriptアーキテクチャの改善による循環依存の解消</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-up fa-lg" style="color: var(--ui-color-1);"></i>
+                            改善優先度はP0〜P3まで明確に分類されており、最優先は循環依存の解消
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.4s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ この流出で「できないこと」</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            <span>ソースコードだけでは<span class="keyword-tag">Claude Codeの代替にはならない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">依存パッケージ</span>、モデル、パイプラインがすべて欠落している</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span>Anthropic APIキーが必要で、モデルへの接続が不可欠</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>
+                            <span>そのままでは実用性が低く、「あってもなくても同じ」状態</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            あくまで「参考実装」としての価値であり、そのまま使える製品ではない
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.5s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ オープンソースへの貢献</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>独自ツールを構築する際の<span class="keyword-tag">設計参照</span>として非常に有用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span>個々のモジュールを抽出して自作ツールに<span class="keyword-tag">再利用可能</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+                            <span>大規模AIツールの<span class="keyword-tag">アーキテクチャ設計</span>を学ぶ絶好の教材</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i>
+                            <span>オープンソースコミュニティがより良いツールを構築するきっかけに</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            検索、エージェント、LSP、MCPなどの各モジュールは独自ツールに転用できる
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.6s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-question-circle fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 意図的な流出説の根拠</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>OpenAI Codexがオープンソース化された流れとの<span class="keyword-tag">類似性</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            <span>大企業のCI/CDプロセスでこのような<span class="keyword-tag">単純ミス</span>が起こるのか疑問</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chess" aria-hidden="true"></i>
+                            <span>複数の承認プロセスを経るはずのリリース工程での「漏洩」</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake" aria-hidden="true"></i>
+                            <span>オープンソースコミュニティへの恩恵という<span class="keyword-tag">戦略的意図</span>の可能性</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i>
+                            動画主は「これほどの企業でこんなミスが起きるのか？信じられない」と明言
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.7s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-left-right fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ OpenAI Codexとの比較</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-right-left" aria-hidden="true"></i>
+                            <span>OpenAIの<span class="keyword-tag">Codex</span>はターミナル動作するコーディングエージェントとして公開済み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-compare" aria-hidden="true"></i>
+                            <span>オープンCodexがGitHubにあり、Claude Codeと<span class="keyword-tag">非常に似た構造</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                            <span>両社ともターミナルネイティブの<span class="keyword-tag">AIコーディングエージェント</span>を展開</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                            <span>競争激化の中、ソース公開が生態系全体に与える影響は大きい</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                            この流出はAI業界のオープン化競争の文脈で理解すべき重要な出来事
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 1.8s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-road fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ フックとプラグイン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">20種類のフック</span>でツールの実行前後にカスタム処理を注入</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>プラグインシステムによる機能の<span class="keyword-tag">拡張性</span>を確保</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-flag" aria-hidden="true"></i>
+                            <span>フィーチャーフラグによる機能の<span class="keyword-tag">段階的ロールアウト</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                            <span>設定ファイルベースでツールの動作をカスタマイズ可能</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-1);"></i>
+                            フック機能により、ユーザーはClaude Codeの動作を柔軟に制御できる
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <p><i class="fa-solid fa-video"></i> 出典: <a href="https://youtu.be/8oKVaJXjJ-U" target="_blank" rel="noopener noreferrer">Claude Code LEAKED — What It Really Means</a> (AI Anytime, 2026/04/01)</p>
+            <p><i class="fa-solid fa-calendar"></i> インフォグラフィック作成日: 2026年4月2日</p>
+        </footer>
+    </div>
+</body>
+</html>

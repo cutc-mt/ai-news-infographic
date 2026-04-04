@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini CLI セキュリティ拡張 - AIでコードの脆弱性を自動検出して修正</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-1: #DC2626;
+            --color-2: #B91C1C;
+            --color-3: #F87171;
+            --color-4: #991B1B;
+            --color-5: #FECACA;
+            --gradient-1: linear-gradient(135deg, #7F1D1D 0%, #DC2626 50%, #F87171 100%);
+            --gradient-2: linear-gradient(45deg, #DC2626, #B91C1C);
+            --bg-canvas: #FFF8F5;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Zen Kurenaido', sans-serif;
+            background-color: var(--bg-canvas);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: var(--gradient-1);
+            border-radius: 25px;
+            color: white;
+            box-shadow: 0 8px 25px rgba(220, 38, 38, 0.3);
+        }
+
+        .header-icon {
+            font-size: 80px;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 8px;
+        }
+
+        .header .tags {
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .header .tag {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        /* Card Style */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        /* Mega Icon */
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container i {
+            animation: fa-beat-fade 3s infinite;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: #555;
+            margin-top: 10px;
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.4;
+        }
+
+        /* Card Content */
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--color-2);
+            min-width: 18px;
+            margin-top: 3px;
+        }
+
+        /* Keyword Tags */
+        .keyword-tag {
+            background-color: var(--color-5);
+            color: var(--color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.code {
+            background-color: #FEE2E2;
+            color: var(--color-1);
+            font-family: monospace;
+        }
+
+        .keyword-tag.highlight {
+            background-color: #FFD700;
+            color: #333;
+        }
+
+        .keyword-tag.danger {
+            background-color: #FFE0E0;
+            color: var(--color-4);
+        }
+
+        /* Speech Bubbles */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--color-3);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--color-3) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #1E293B;
+            color: #E2E8F0;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+
+        code {
+            background: #FEE2E2;
+            color: var(--color-1);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        /* Animations */
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.1s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.2s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.3s; }
+
+        /* Separator */
+        .section-separator {
+            text-align: center;
+            margin: 30px 0 20px;
+            font-size: 24px;
+            color: var(--color-1);
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .section-separator i {
+            margin: 0 10px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            background: var(--gradient-1);
+            border-radius: 25px;
+            color: white;
+        }
+
+        .footer a {
+            color: #FFD700;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon">
+                <i class="fas fa-shield-halved"></i>
+            </div>
+            <h1>Gemini CLI セキュリティ拡張</h1>
+            <p class="subtitle">AIでコードの脆弱性を自動検出して修正</p>
+            <p class="date">2026年4月4日 | Google Cloud Tech</p>
+            <div class="tags">
+                <span class="tag">Gemini CLI</span>
+                <span class="tag">Security</span>
+                <span class="tag">脆弱性スキャン</span>
+                <span class="tag">Google Cloud Tech</span>
+            </div>
+        </div>
+
+        <!-- Section 1: セキュリティ拡張の概要と背景 -->
+        <div class="section-separator">
+            <i class="fas fa-layer-group"></i> セキュリティ拡張の概要と背景 <i class="fas fa-layer-group"></i>
+        </div>
+
+        <div class="section-layout">
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-puzzle-piece fa-5x" style="color: var(--color-1);"></i>
+                    <h2>① セキュリティ拡張とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-code-branch fa-lg"></i>
+                            <span><span class="keyword-tag highlight">オープンソースのGoogle製セキュリティ拡張機能</span>がGemini CLIに登場</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-brain fa-lg"></i>
+                            <span>AIの力でコードのセキュリティレビューを自動化する</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-cloud fa-lg"></i>
+                            <span>Google Cloudと連携して強力なスキャンを実行可能</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-lightbulb" style="color: var(--color-2);"></i>
+                            オープンソースだから誰でも自由に使える！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-robot fa-5x" style="color: var(--color-1);"></i>
+                    <h2>② AI時代のセキュリティ課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-bolt fa-lg"></i>
+                            <span>AIの登場で<span class="keyword-tag highlight">コードのスピードと量が劇的に増加</span>している</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-eye fa-lg"></i>
+                            <span>セキュリティレビューのペースも上げる必要がある</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-triangle-exclamation fa-lg"></i>
+                            <span>手動レビューでは追いつかない速度にAIで対応する</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-star" style="color: var(--color-2);"></i>
+                            AIが書いたコードをAIがチェックする時代が到来！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-list-check fa-5x" style="color: var(--color-1);"></i>
+                    <h2>③ 5つの脆弱性スキャン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-key fa-lg"></i>
+                            <span><span class="keyword-tag code">Secrets Management</span>：シークレットの管理と検出</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-database fa-lg"></i>
+                            <span><span class="keyword-tag code">Insecure Data</span>：安全でないデータ処理の検出</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-syringe fa-lg"></i>
+                            <span><span class="keyword-tag code">Injection</span>：インジェクション脆弱性のスキャン</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-lock fa-lg"></i>
+                            <span><span class="keyword-tag code">Authentication</span>：認証の問題を検出</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-brain fa-lg"></i>
+                            <span><span class="keyword-tag code">LLM Safety</span>：LLMの安全性チェック</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fas fa-shield-halved" style="color: var(--color-1);"></i>
+                            セキュリティの主要な5領域を網羅している！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-box-open fa-5x" style="color: var(--color-1);"></i>
+                    <h2>④ OSVデータベース連携</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-database fa-lg"></i>
+                            <span><span class="keyword-tag highlight">GoogleのOSV（オープンソース脆弱性データベース）</span>を使った依存関係スキャン</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-link fa-lg"></i>
+                            <span>サードパーティライブラリの既知の脆弱性をチェック</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-shield-halved fa-lg"></i>
+                            <span>サプライチェーンの安全性も確保できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-circle-exclamation" style="color: var(--color-3);"></i>
+                            依存関係の脆弱性も見逃さない！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fab fa-google fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑤ Google内部での実績</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-check-double fa-lg"></i>
+                            <span><span class="keyword-tag highlight">多くのGoogle所有リポジトリがセキュリティ拡張を使用</span>している</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-code-pull-request fa-lg"></i>
+                            <span>実際のPull Requestで脆弱性を発見している</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-fire fa-lg"></i>
+                            <span>本番環境のGoogleプロジェクトで信頼性が実証済み</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fas fa-trophy" style="color: var(--color-2);"></i>
+                            Google自身が使っているから安心！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-bug fa-5x" style="color: var(--color-3); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑥ 実際に発見された脆弱性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-explosion fa-lg" style="color: var(--color-1);"></i>
+                            <span>Gemini CLI自身の<span class="keyword-tag danger">任意ファイル読み取り脆弱性</span>を発見</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-unlock fa-lg" style="color: var(--color-1);"></i>
+                            <span>Project Chipの<span class="keyword-tag danger">環境変数リダクション回避</span>の脆弱性を発見</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-triangle-exclamation" style="color: var(--color-1);"></i>
+                            自分自身の脆弱性も発見する威力！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: ローカルでの使い方 -->
+        <div class="section-separator">
+            <i class="fas fa-laptop-code"></i> ローカルでの使い方 <i class="fas fa-laptop-code"></i>
+        </div>
+
+        <div class="section-layout">
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-folder-open fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑦ Flutterのパストラバーサル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-route fa-lg"></i>
+                            <span>Flutterリポジトリの<span class="keyword-tag danger">パストラバーサル脆弱性</span>も発見</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-hashtag fa-lg"></i>
+                            <span>タイムスタンプのハッシュコード使用も指摘されている</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-circle-check fa-lg"></i>
+                            <span>大手オープンソースプロジェクトでも実証されている</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-bug" style="color: var(--color-1);"></i>
+                            Flutterのような有名プロジェクトでも見つかる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-terminal fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑧ ローカルでの使い方</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-download fa-lg"></i>
+                            <span>拡張機能をインストール後、すぐに利用可能</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-keyboard fa-lg"></i>
+                            <span><span class="keyword-tag code">/ash</span>コマンドでセキュリティカスタムコマンドを呼び出す</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-play fa-lg"></i>
+                            <span>コマンド一覧からスキャンを実行できる</span>
+                        </li>
+                    </ul>
+                    <pre>
+# セキュリティコマンドを呼び出し
+&gt; /ash
+
+# スキャンを実行
+&gt; セキュリティスキャンを開始</pre>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-wrench" style="color: var(--color-2);"></i>
+                            コマンド1つでスキャンが始まる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-comment-dots fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑨ 自然言語でカスタマイズ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-language fa-lg"></i>
+                            <span><span class="keyword-tag highlight">自然言語でスキャン対象を指定可能</span></span>
+                        </li>
+                        <li>
+                            <i class="fas fa-file-code fa-lg"></i>
+                            <span>「全てのHTMLファイルをスキャンして」のような指示が使える</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-wand-magic-sparkles fa-lg"></i>
+                            <span>用途に合わせて柔軟にスキャンをカスタマイズ</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-lightbulb" style="color: var(--color-2);"></i>
+                            日本語で指示してもちゃんと動く！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-bolt fa-5x" style="color: var(--color-2); animation: fa-flip 2s infinite;"></i>
+                    <h2>⑩ YOLOモードで効率化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-fire fa-lg"></i>
+                            <span><span class="keyword-tag code">Ctrl+Y</span>でYOLOモードを有効にする</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-eye fa-lg"></i>
+                            <span>セキュリティ拡張は<span class="keyword-tag highlight">読み取り専用の操作</span>なので安心</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-shield-halved fa-lg"></i>
+                            <span>コードを変更せずにスムーズにスキャンを実行</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-check-circle" style="color: var(--color-1);"></i>
+                            読み取り専用だからコードが書き換わる心配なし！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-clipboard-list fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑪ 3ステップの分析フロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-list fa-lg"></i>
+                            <span>まず<span class="keyword-tag highlight">To-Doリストで監査範囲を定義</span>する</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-magnifying-glass fa-lg"></i>
+                            <span>次にファイルを順番に分析していく</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-file-lines fa-lg"></i>
+                            <span>最後に結果のサマリーを出力して完了</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fas fa-map" style="color: var(--color-2);"></i>
+                            計画的にスキャンを進めるから見落としがない！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: GitHub ActionsでのCI/CD統合 -->
+        <div class="section-separator">
+            <i class="fab fa-github"></i> GitHub ActionsでのCI/CD統合 <i class="fab fa-github"></i>
+        </div>
+
+        <div class="section-layout">
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-users fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑫ CI/CDへの統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-people-group fa-lg"></i>
+                            <span>チーム開発では<span class="keyword-tag highlight">GitHub Actionsでセキュリティ拡張をCI/CDに統合</span></span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-double fa-lg"></i>
+                            <span>全員のコントリビューションを同じ基準でチェックできる</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-ban fa-lg"></i>
+                            <span>「ローカルでスキャンし忘れた」という人的ミスを防止</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-people-group" style="color: var(--color-2);"></i>
+                            チーム全員が同じセキュリティ基準をクリア！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-gears fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑬ GitHub Actionsの設定</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-copy fa-lg"></i>
+                            <span>公式リポジトリから<span class="keyword-tag highlight">サンプルワークフローをコピー</span>して簡単に設定</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-key fa-lg"></i>
+                            <span><span class="keyword-tag code">Workload Identity Federation</span>で安全に認証</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-rocket fa-lg"></i>
+                            <span>サービスアカウントキーを使わずに連携を実現</span>
+                        </li>
+                    </ul>
+                    <pre>
+# ワークフローをリポにコピー
+cp security-workflow.yml \
+  .github/workflows/
+
+# Actions変数を設定
+./setup-variables.sh</pre>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-rocket" style="color: var(--color-2);"></i>
+                            テンプレートをコピペするだけ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-code-pull-request fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑭ PRでの自動セキュリティレビュー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-code-branch fa-lg"></i>
+                            <span>新しいPRが作成されると<span class="keyword-tag highlight">自動的にセキュリティ拡張がレビューを実行</span></span>
+                        </li>
+                        <li>
+                            <i class="fas fa-robot fa-lg"></i>
+                            <span>AIがコードを解析して脆弱性を検出</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-ban fa-lg"></i>
+                            <span>人的ミスを防止してセキュリティを担保</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-wand-magic-sparkles" style="color: var(--color-3);"></i>
+                            PRを出すだけで自動でセキュリティチェック！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-at fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑮ 既存PRへのレビュー依頼</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-comment fa-lg"></i>
+                            <span><span class="keyword-tag code">@gemini-cli/review</span>コマンドでレビューを開始</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-clock-rotate-left fa-lg"></i>
+                            <span>既存のPRにもセキュリティレビューを依頼できる</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-arrows-rotate fa-lg"></i>
+                            <span>過去のコードも遡ってチェック可能</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-at" style="color: var(--color-1);"></i>
+                            コマンド1つでいつでもレビューを依頼！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-arrow-left fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑯ セキュリティのシフトレフト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-shield-halved fa-lg"></i>
+                            <span><span class="keyword-tag highlight">セキュリティを開発の初期段階に組み込む</span>（Shift Left）</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-clock fa-lg"></i>
+                            <span>問題が大きくなる前に発見・修正できる</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-chart-line fa-lg"></i>
+                            <span>開発コストの削減と品質の向上を実現</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-arrow-left" style="color: var(--color-2);"></i>
+                            早い段階で見つけるほど修正もラク！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: まとめと展望 -->
+        <div class="section-separator">
+            <i class="fas fa-forward"></i> まとめと今後の展望 <i class="fas fa-forward"></i>
+        </div>
+
+        <div class="section-layout">
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-cubes fa-5x" style="color: var(--color-1);"></i>
+                    <h2>⑰ 拡張可能なアーキテクチャ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-expand fa-lg"></i>
+                            <span><span class="keyword-tag highlight">拡張可能な設計</span>により新しい手法を追加可能</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-wrench fa-lg"></i>
+                            <span>将来の高度なセキュリティ分析手法もツールとして追加できる</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-arrow-up-right-dots fa-lg"></i>
+                            <span>コミュニティの貢献でさらに強力になっていく</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-rocket" style="color: var(--color-2);"></i>
+                            今後もっと強力になっていくのが楽しみ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-gift fa-5x" style="color: var(--color-2); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑱ まとめ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-laptop fa-lg"></i>
+                            <span>Gemini CLIセキュリティ拡張で<span class="keyword-tag highlight">ローカルとGitHubの両方でセキュリティ分析</span>が可能</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-cloud fa-lg"></i>
+                            <span>無料のGoogle Cloudクレジットで今すぐ試せる</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-flask fa-lg"></i>
+                            <span>自分のコードベースでクリエイティブな方法で試してみよう</span>
+                        </li>
+                    </ul>
+                    <pre>
+# 無料クレジットでコードラボを試す
+# Google Cloud Code Lab
+# Gemini CLI Security Extension</pre>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-hand-peace" style="color: var(--color-2);"></i>
+                            無料で始められるから今すぐトライ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p><i class="fab fa-youtube"></i> 動画: Google Cloud Tech | <i class="fas fa-calendar"></i> 2026年4月4日</p>
+            <p style="margin-top: 10px; font-size: 14px; opacity: 0.8;">
+                <i class="fas fa-robot"></i> AIインフォグラフィック生成 | <i class="fas fa-shield-halved"></i> Gemini CLI Security Extension
+            </p>
+        </div>
+    </div>
+</body>
+</html>

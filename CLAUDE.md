@@ -149,6 +149,11 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 - 動画の内容を網羅的にカバー
 - 技術的な正確性を保つ
 - **日本語は自然で読みやすく**（最重要）
+- **フッターにソースURLのリンクを必ず含める**: 出典のチャンネル名やタイトルにYouTube動画のリンクを張る
+  ```html
+  <!-- フッターの例 -->
+  <footer>🎬 動画: <a href="https://youtu.be/VIDEO_ID" target="_blank" style="color: inherit;">チャンネル名</a> | 📅 2026年4月4日</footer>
+  ```
 
 ## 例: 良い日本語表現の実例
 

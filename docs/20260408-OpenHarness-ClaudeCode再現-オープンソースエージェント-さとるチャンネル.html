@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenHarness - Claude Codeの97%を3%のコードで再現</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #0D7377;
+            --ui-color-2: #D4883A;
+            --ui-color-3: #E8F4F0;
+            --ui-color-4: #0A2F33;
+            --ui-color-5: #C45C5C;
+            --bg-canvas: #FFF8F5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 40px 20px 30px;
+            background: linear-gradient(135deg, #0D7377 0%, #14A3A8 50%, #1BC6CB 100%);
+            border-radius: 25px;
+            margin-bottom: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 6s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, -20px); }
+        }
+
+        .header-icon {
+            font-size: 6em;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s infinite;
+            filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-family: 'Kaisei Decol', serif;
+            position: relative;
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        /* セクションレイアウト */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* カード */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container i {
+            filter: drop-shadow(0 3px 6px rgba(13,115,119,0.3));
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .card-content {
+            padding: 0 5px;
+        }
+
+        .keyword-list {
+            margin: 12px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-1);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 10px;
+            border-radius: 5px;
+            margin: 2px 3px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .highlight-tag {
+            background: linear-gradient(135deg, #0D7377, #14A3A8);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 5px;
+            margin: 2px 3px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* 吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 16px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #1a2a2e;
+            color: #a8e6cf;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+
+        code {
+            font-family: 'Courier New', monospace;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            padding: 25px;
+            background: linear-gradient(135deg, var(--ui-color-4) 0%, #145A5E 100%);
+            color: #ccc;
+            border-radius: 20px;
+            margin-top: 30px;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: #7FDBDA;
+            text-decoration: none;
+            border-bottom: 1px dashed #7FDBDA;
+        }
+
+        footer a:hover {
+            color: #fff;
+        }
+
+        /* アニメーション */
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+        }
+
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .pulse-icon {
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+            .header h1 { font-size: 1.6em; }
+        }
+
+        /* 比較テーブル */
+        .compare-box {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .compare-item {
+            flex: 1;
+            min-width: 120px;
+            background: var(--ui-color-3);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .compare-item.active {
+            background: linear-gradient(135deg, var(--ui-color-1), #14A3A8);
+            color: white;
+        }
+
+        .compare-item i {
+            font-size: 1.5em;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .compare-item strong {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 3px;
+        }
+
+        .compare-item span {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <div class="header-icon"><i class="fa-solid fa-horse fa-6x"></i></div>
+        <h1>OpenHarness - Claude Codeの97%を3%のコードで再現</h1>
+        <p class="subtitle">香港大学HKUDSが開発したオープンソースAIエージェントフレームワーク</p>
+        <p class="date"><i class="fa-solid fa-calendar"></i> 2026年4月8日 | <i class="fa-solid fa-code-branch"></i> MIT License</p>
+    </div>
+
+    <!-- Row 1: 概要・コンセプト -->
+    <div class="section-layout">
+        <!-- ① -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-horse fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>① OpenHarnessとは</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                        <span>香港大学データサイエンス研究室（<span class="keyword-tag">HKUDS</span>）が公開したオープンソースのエージェントフレームワーク</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">MITライセンス</span>で完全無料。ソースコードも全部見ることができる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                        <span>普通のLLMを<span class="highlight-tag">Claude Codeのような自立型エージェント</span>に変換できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>Anthropicに依存せず、任意のモデルでエージェント構築が可能</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        ハーネス（Harness）とは馬につける馬具のこと。LLMに「手足」と「記憶」と「ルール」を与えるインフラなんです！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ② -->
+        <div class="section-card fade-in-scale delay-1">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>② LLMの課題と解決アプローチ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                        <span>LLMはそのままだと<span class="keyword-tag">賢いけど何もできない存在</span></span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                        <span>ファイルが読めない、コマンドを実行できない、外部APIも叩けない</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                        <span>OpenHarnessはLLMに<span class="highlight-tag">3つの要素</span>を付与する：</span>
+                    </li>
+                </ul>
+                <div class="compare-box">
+                    <div class="compare-item active">
+                        <i class="fa-solid fa-hand"></i>
+                        <strong>手足（Tools）</strong>
+                        <span>行動能力</span>
+                    </div>
+                    <div class="compare-item">
+                        <i class="fa-solid fa-database"></i>
+                        <strong>記憶（Memory）</strong>
+                        <span>メモリ管理</span>
+                    </div>
+                    <div class="compare-item">
+                        <i class="fa-solid fa-shield-halved"></i>
+                        <strong>ルール（Rules）</strong>
+                        <span>権限制御</span>
+                    </div>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-quote-left fa-lg" style="color: var(--ui-color-2);"></i>
+                        脳みそはあるけど体がない状態 → OpenHarnessがその体を提供する！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ③ -->
+        <div class="section-card fade-in-scale delay-2">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrows-spin fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                <h2>③ 中核機能①：エージェントループ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">思考→実行→結果受信→次の判断</span>のサイクルを自動で繰り返す</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                        <span>例：「このバグ直して」と頼むと → コードを読む → 怪しい箇所を特定 → 修正 → テスト実行 → 報告、まで全部自動</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">指数バックオフ</span>：APIエラー時に1秒→2秒→4秒と待ち時間を増やしてリトライ</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">ストリーミング通信</span>に対応。結果が来るたびにリアルタイムで処理を進められる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                        人間が毎回指示を出さなくても、自分で判断して作業を進めるのがポイント！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ④ -->
+        <div class="section-card fade-in-scale delay-3">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-coins fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>④ 中核機能②：コスト追跡</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                        <span>APIの<span class="highlight-tag">利用量とコストを自動で追跡</span>してくれる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                        <span>課金爆発を防ぐ仕組みが組み込まれている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>リアルタイムでトークン消費量をモニタリング可能</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-1);"></i>
+                        エージェントが自律的に動く分、コスト管理は超重要。安心して使える！
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: ツールキット・メモリ -->
+    <div class="section-layout">
+        <!-- ⑤ -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑤ 中核機能③：43以上のツールキット</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">43以上</span>のツールが最初から組み込まれている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-file-code" aria-hidden="true"></i>
+                        <span>ファイルの読み書き、コードの実行、Web検索など</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">MCP対応</span>（Model Context Protocol）で外部サービス連携を標準化</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>Gitの操作、Slack連携、GitHub連携なども対応</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">オンデマンドローディング</span>：必要な時だけツールを読み込むのでメモリを節約</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-plug fa-lg" style="color: var(--ui-color-2);"></i>
+                        MCP = Model Context Protocol。SlackやGitHubなどのAPIを統一的に扱える仕組みです！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑥ -->
+        <div class="section-card fade-in-scale delay-1">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-memory fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑥ 中核機能④：2種類のメモリ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">① CLAUDE.mdファイル</span>：プロジェクトのルートに置くと自動で読み込まれる（本家Claude Codeと同じ仕組み）</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">② MEMORY.mdファイル</span>：セッションをまたいで保存される永続メモリー</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                        <span>例：「DB接続処理がある」「このプロジェクトの構造」などを記録して、次回から調べ直さずに済む</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-compress" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">コンテキスト窓</span>で自動要約。長くなりすぎたら自動でまとめる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-5);"></i>
+                        メモリがないと毎回0からやり直しに！人間のメモ帳みたいな役割です
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑦ -->
+        <div class="section-card fade-in-scale delay-2">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑦ 中核機能⑤：ガバナンス（権限制御）</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">3段階の権限モード</span>：許可・確認・拒否を操作ごとに設定可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span>ファイル読むのは「許可」、シェルコマンドは「確認」が必要</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                        <span><code>rm -rf</code>などの危険な操作は「拒否」に設定可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                        <span>特定のパス（例：<code>/etc</code>）には触れないというルールも設定できる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-5);"></i>
+                        AIが暴走したら怖い！システムファイルを守れるのは安心ですね
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑧ -->
+        <div class="section-card fade-in-scale delay-3">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-link fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>⑧ プレ／ポストツールフック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">Pre-tool Hook</span>：ツールを呼ぶ前にカスタム処理を挟める</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrow-right-from-bracket" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">Post-tool Hook</span>：ツール実行後にカスタム処理を挟める</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                        <span>例：<code>git push</code>前にメインブランチかどうか確認するチェックを追加</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+                        <span>どのファイルを変更したかを全て記録する監査ログにも活用できる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-building fa-lg" style="color: var(--ui-color-2);"></i>
+                        企業での利用時に監査が必要なケースにも対応！安全性の設計が行き届いています
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: マルチエージェント・モデル対応 -->
+    <div class="section-layout">
+        <!-- ⑨ -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑨ マルチエージェント調整</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">メインエージェント</span>が必要に応じてサブエージェントを自動生成</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                        <span>大きなタスクを専門家に分担。例：フロントエンドはA、バックエンドはB、セキュリティはC</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                        <span>依存関係がなければ<span class="keyword-tag">並列で同時実行</span>可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrows-up-down-left-right" aria-hidden="true"></i>
+                        <span>ツールレベルではなく<span class="keyword-tag">エージェントレベル</span>の並列分散（Claude Codeより上位の機能）</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-building fa-lg" style="color: var(--ui-color-1);"></i>
+                        自分で部下を作るみたい！会社の組織のようにタスクを分担します
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑩ -->
+        <div class="section-card fade-in-scale delay-1">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-clipboard-list fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑩ チームレジストリー</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-registered" aria-hidden="true"></i>
+                        <span>各エージェントの<span class="highlight-tag">役割・タスク・進捗</span>を一元管理する仕組み</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>バックグラウンドで動いているタスクも追跡可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-chart-gantt" aria-hidden="true"></i>
+                        <span>プロジェクトのカンバンボードのように、誰が何をやってどこまで進んでいるかが一目でわかる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                        <span>1人で1時間かかる作業も3人で分担すれば20分で終わるという発想</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-users-gear fa-lg" style="color: var(--ui-color-5);"></i>
+                        複雑なプロジェクトでも破綻しにくい！マネジメント機能が充実しています
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑪ -->
+        <div class="section-card fade-in-scale delay-2">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>⑪ マルチモデル対応（2つの互換レイヤー）</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-a" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">レイヤー①：Anthropic互換</span> → Claude、GLM、MiniMax、Kimiなどが利用可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-b" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">レイヤー②：OpenAI互換</span> → GPT-4.5、o1、オープンソースモデルなどが利用可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                        <span>モデルを自由に切り替えて、用途に合わせて最適なものを選べる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i>
+                        <span>安いモデルでテスト → 本番は高性能モデル、という使い方も可能</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-earth-asia fa-lg" style="color: var(--ui-color-2);"></i>
+                        中国のGLMやKimiなどのモデルでもエージェント構築ができるのが特徴です！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑫ -->
+        <div class="section-card fade-in-scale delay-3">
+            <div class="mega-icon-container">
+                <i class="fa-brands fa-github fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑫ GitHub Copilot OAuth対応</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-brands fa-github" aria-hidden="true"></i>
+                        <span>GitHub Copilotの<span class="highlight-tag">OAuth認証</span>に対応している</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-key" aria-hidden="true"></i>
+                        <span>デバイスフローで認証すれば、Copilotの契約でエージェントを動かせる可能性がある</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                        <span>既存の開発環境と<span class="keyword-tag">シームレスに統合</span>しやすい設計</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-link fa-lg" style="color: var(--ui-color-1);"></i>
+                        既にCopilotを契約しているなら、追加費用なしでエージェントが使えるかも！？
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 4: 技術スタック・まとめ -->
+    <div class="section-layout">
+        <!-- ⑬ -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-brands fa-python fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑬ 技術スタック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-brands fa-python" aria-hidden="true"></i>
+                        <span>ベース言語：<span class="highlight-tag">Python 3.10以上</span>が必要</span>
+                    </li>
+                    <li>
+                        <i class="fa-brands fa-react" aria-hidden="true"></i>
+                        <span>ターミナルUI：<span class="keyword-tag">React</span> + <span class="keyword-tag">Ink</span>ライブラリで構築</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                        <span>Inkを使うとReactのコンポーネントでターミナルUIを描画できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-vial" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">114件のテスト</span>が付属。品質もしっかり担保</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-terminal fa-lg" style="color: var(--ui-color-2);"></i>
+                        ターミナルアプリなのにReactでUI構築！面白い技術アプローチです
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑭ -->
+        <div class="section-card fade-in-scale delay-1">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-file-export fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑭ 出力形式</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-font" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">テキスト</span>：標準的なターミナル出力</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">JSON</span>：構造化データとして他のシステムと連携しやすい</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-stream" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">ストリーミングJSON</span>：リアルタイムで結果を受け取れる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                        <span>CI/CDパイプラインへの組み込みや、別アプリからの呼び出しにも最適</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-1);"></i>
+                        JSON出力があるから自動化パイプラインに組み込みやすい！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑮ -->
+        <div class="section-card fade-in-scale delay-2">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑮ インストールと使い方</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-download" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">たった1行</span>のコマンドでインストール可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-gears" aria-hidden="true"></i>
+                        <span>インストールスクリプトが依存関係を全て自動解決</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        <span><span class="keyword-tag">5分</span>もあれば手元で動かせる</span>
+                    </li>
+                    <li>
+                        <i class="fa-brands fa-github" aria-hidden="true"></i>
+                        <span>GitHubで「OpenHarness」と検索すれば見つかる</span>
+                    </li>
+                </ul>
+                <pre><code># インストール例
+curl -fsSL https://openharness.dev/install | bash
+# または pip で
+pip install openharness</code></pre>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i>
+                        試すハードルが低いのが魅力！すぐに始められます
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑯ -->
+        <div class="section-card fade-in-scale delay-3">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>⑯ MITライセンスの強み</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                        <span><span class="highlight-tag">商用利用</span>も含めて自由に改造・再配布が可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-building" aria-hidden="true"></i>
+                        <span>企業が自社向けにカスタマイズして使うことが想定されている</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-code" aria-hidden="true"></i>
+                        <span>ソースコードが全て公開されているので、セキュリティ監査も可能</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-users" aria-hidden="true"></i>
+                        <span>コミュニティでの共有と発展が期待できる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-2);"></i>
+                        むしろ企業利用が想定されている！安心して導入できます
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 5: 教育・まとめ -->
+    <div class="section-layout">
+        <!-- ⑰ -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑰ 学習教材としての価値</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        <span>ブラックボックスだった<span class="highlight-tag">エージェントの内部構造</span>がコードレベルで全部見える</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                        <span>「エージェントループってこう動くのか」という仕組みを理解できる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                        <span>「権限管理ってこう実装するのか」という設計パターンを学べる</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                        <span>学んで改造して、自分だけのエージェントを作れる</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-book-open fa-lg" style="color: var(--ui-color-1);"></i>
+                        Claude Codeの仕組みを学ぶ最高の教材！コードを読むだけで設計思想がわかります
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑱ -->
+        <div class="section-card fade-in-scale delay-1">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-star fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                <h2>⑱ まとめ：OpenHarnessの全体像</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li>
+                        <i class="fa-solid fa-1" aria-hidden="true" style="min-width: 18px; text-align: center;"></i>
+                        <span><span class="keyword-tag">エージェントループ</span>：思考→実行→判断の自動反復</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-2" aria-hidden="true" style="min-width: 18px; text-align: center;"></i>
+                        <span><span class="keyword-tag">43+ツールキット</span>：MCP対応のオンデマンドローディング</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-3" aria-hidden="true" style="min-width: 18px; text-align: center;"></i>
+                        <span><span class="keyword-tag">2種類のメモリ</span>：CLAUDE.md + MEMORY.mdで文脈を維持</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-4" aria-hidden="true" style="min-width: 18px; text-align: center;"></i>
+                        <span><span class="keyword-tag">ガバナンス</span>：3段階の権限制御 + プレ/ポストフック</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-5" aria-hidden="true" style="min-width: 18px; text-align: center;"></i>
+                        <span><span class="keyword-tag">マルチエージェント</span>：自律的なサブエージェント生成と並列実行</span>
+                    </li>
+                    <li>
+                        <i class="fa-solid fa-6" aria-hidden="true" style="min-width: 18px; text-align: center;"></i>
+                        <span><span class="keyword-tag">マルチモデル</span>：Anthropic + OpenAI互換で自由にモデル選択</span>
+                    </li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                        学んで改造して共有する。オープンソースの良さが詰まったフレームワークです！エージェント開発はこれから盛り上がります！
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- フッター -->
+    <footer>
+        🎬 動画: <a href="https://youtu.be/OostCO7LiFg" target="_blank">さとるチャンネル@毎日AIニュース - Claude Codeの97%を3%のコードで再現？OpenHarnessが凄い</a> | 📅 2026年4月8日
+    </footer>
+
+</div>
+</body>
+</html>

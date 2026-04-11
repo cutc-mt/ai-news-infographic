@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Codeでナレッジ構築 - Karpathy手法を解説</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #6B5B95;
+            --color-2: #4A3F6B;
+            --color-3: #8E7CC3;
+            --color-4: #3D3260;
+            --color-5: #B8A9E8;
+            --bg-canvas: #FFF8F5;
+            --text-main: #333333;
+            --text-sub: #555555;
+            --text-light: #777777;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Yomogi', cursive, sans-serif;
+            color: var(--text-main);
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-3), var(--color-5));
+            border-radius: 20px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 8s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .header .icon-main {
+            font-size: 80px;
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 1200px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 768px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(107, 91, 149, 0.15);
+            border-left: 5px solid var(--color-1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(107, 91, 149, 0.25);
+        }
+
+        .card-icon {
+            text-align: center;
+            margin-bottom: 15px;
+            color: var(--color-1);
+            font-size: 48px;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            color: var(--text-sub);
+            margin-bottom: 12px;
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.4;
+        }
+
+        .card p, .card li {
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text-main);
+        }
+
+        .card ul {
+            list-style: none;
+            padding-left: 5px;
+        }
+
+        .card ul li {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .card ul li::before {
+            content: '\f00c';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            position: absolute;
+            left: 0;
+            color: var(--color-3);
+            font-size: 12px;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(184, 169, 232, 0.4) 60%);
+            font-weight: bold;
+            padding: 0 3px;
+        }
+
+        .tag {
+            display: inline-block;
+            background: var(--color-5);
+            color: var(--color-4);
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin: 3px 2px;
+            font-family: 'Zen Kurenaido', sans-serif;
+        }
+
+        .speech-bubble {
+            background: #F0EBFA;
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-top: 12px;
+            font-size: 13px;
+            position: relative;
+            border: 2px dashed var(--color-3);
+            line-height: 1.6;
+        }
+
+        .speech-bubble::before {
+            content: '💡';
+            position: absolute;
+            top: -12px;
+            left: 15px;
+            font-size: 18px;
+        }
+
+        .code-preview {
+            background: #2D2B3D;
+            color: #E8E6F0;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .code-preview .cmd { color: #B8A9E8; }
+        .code-preview .arg { color: #F2C94C; }
+        .code-preview .comment { color: #8E8EA0; }
+
+        .arrow-flow {
+            text-align: center;
+            color: var(--color-1);
+            font-size: 24px;
+            padding: 5px 0;
+        }
+
+        .section-divider {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(90deg, transparent, var(--color-5), transparent);
+            border-radius: 10px;
+            font-family: 'Kaisei Decol', serif;
+            font-size: 20px;
+            color: var(--color-4);
+        }
+
+        .step-number {
+            display: inline-block;
+            background: var(--color-1);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        .comparison-box {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .comparison-box .vs-left,
+        .comparison-box .vs-right {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .comparison-box .vs-left {
+            background: #E8F5E9;
+            border: 1px solid #4CAF50;
+        }
+
+        .comparison-box .vs-right {
+            background: #FFF3E0;
+            border: 1px solid #FF9800;
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-light);
+            font-size: 14px;
+            border-top: 2px solid var(--color-5);
+            margin-top: 20px;
+        }
+
+        footer a {
+            color: var(--color-1);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card { animation: fadeInUp 0.5s ease-out; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fas fa-brain icon-main"></i>
+            <h1>Claude Codeでナレッジ構築</h1>
+            <div class="subtitle">Karpathy手法 × Obsidian × Claude Codeで自分専用Wikiを作る</div>
+            <div class="date"><i class="far fa-calendar-alt"></i> 2026年4月11日 | にゃんたのAIチャンネル</div>
+        </div>
+
+        <div class="grid">
+            <!-- カード1 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-star"></i></div>
+                <h2>①Karpathyさんの話題の手法</h2>
+                <p>OpenAIの共同設立者である<span class="highlight">Andrej Karpathyさん</span>が、自身のX（旧Twitter）で「個人用ナレッジベースの構築」についてツイートして話題になりました。Karpathyさんの最近のトークン処理量の大部分は、コードの操作ではなく<span class="highlight">知識の操作</span>に費やされているとのことです。</p>
+                <div class="speech-bubble">AIを使ってナレッジを構築する手法が広く注目を集めています</div>
+            </div>
+
+            <!-- カード2 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-book-open"></i></div>
+                <h2>②ナレッジベースとは何か</h2>
+                <p>ナレッジベースとは、自分が調べたいトピックについての<span class="highlight">情報を整理して管理するシステム</span>です。論文、記事、コードなどを集め、AIが自動的にWiki形式でまとめてくれます。</p>
+                <ul>
+                    <li>調べ事や学習に使える自分専用のWiki</li>
+                    <li>ノートアプリの代わりにもなる</li>
+                    <li>使えば使うほどパーソナライズされる</li>
+                </ul>
+            </div>
+
+            <!-- カード3 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-gem"></i></div>
+                <h2>③Obsidian：高機能なメモ帳アプリ</h2>
+                <p><span class="highlight">Obsidian</span>は無料で使える高機能なメモ帳アプリです。マークダウン形式でドキュメントを管理でき、リンク機能で文書同士を繋げられます。</p>
+                <ul>
+                    <li><i class="fas fa-download"></i> 無料でダウンロード可能</li>
+                    <li><i class="fas fa-link"></i> ドキュメント間のリンク機能</li>
+                    <li><i class="fas fa-eye"></i> グラフビューで知識の繋がりを可視化</li>
+                    <li><i class="fas fa-puzzle-piece"></i> 拡張機能が豊富</li>
+                </ul>
+                <div class="speech-bubble">保管庫（Vault）という単位でフォルダーを管理します</div>
+            </div>
+
+            <!-- カード4 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-clipboard"></i></div>
+                <h2>④Web Clipperで簡単データ収集</h2>
+                <p>Obsidianの<span class="highlight">Web Clipper</span>拡張機能を使うと、ネット上の記事をワンクリックで自分のパソコンに保存できます。Chrome拡張機能として追加して利用します。</p>
+                <ul>
+                    <li>記事を一瞬でローカルに保存</li>
+                    <li>rawフォルダーに直接格納可能</li>
+                    <li>設定で保存先フォルダーを指定できる</li>
+                </ul>
+                <div class="code-preview">
+                    <span class="comment"># Web Clipper設定</span><br>
+                    デフォルトのノートの場所 → <span class="cmd">raw</span>
+                </div>
+            </div>
+
+            <!-- セクション区切り -->
+            <div class="section-divider"><i class="fas fa-layer-group"></i> 4ステップでナレッジ構築</div>
+
+            <!-- カード5 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-download"></i></div>
+                <h2>⑤ステップ1：データを集める</h2>
+                <p>調べたいトピックについての情報ソースをパソコン上に集めます。論文、記事、コードなどを<span class="highlight">rawフォルダー</span>に格納します。</p>
+                <ul>
+                    <li><i class="fas fa-file-alt"></i> Web記事をクリップ</li>
+                    <li><i class="fas fa-file-pdf"></i> PDF論文を保存</li>
+                    <li><i class="fas fa-code"></i> コードを配置</li>
+                </ul>
+                <div class="speech-bubble">Web Clipperを使えば一瞬で記事をrawフォルダーに追加できます</div>
+            </div>
+
+            <!-- カード6 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-cogs"></i></div>
+                <h2>⑥ステップ2：データをコンパイル</h2>
+                <p>集めた生データを<span class="highlight">AIを使って要約・整理</span>します。コンパイルとは、生のデータファイルをAIが読みやすい形に変換する処理です。</p>
+                <ul>
+                    <li>AIが記事を要約</li>
+                    <li>エンティティ（ノード）を抽出</li>
+                    <li>リンクグラフを自動生成</li>
+                    <li>index.mdを作成</li>
+                </ul>
+                <div class="code-preview">
+                    <span class="cmd">/ingest</span> <span class="comment">← このコマンドで実行</span>
+                </div>
+            </div>
+
+            <!-- カード7 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-comments"></i></div>
+                <h2>⑦ステップ3：質問して活用する</h2>
+                <p>コンパイルされたWikiに対して<span class="highlight">質問や検索</span>ができます。質問と回答はWikiに保存され、使えば使うほど知識が蓄積されていきます。</p>
+                <div class="code-preview">
+                    <span class="cmd">/query</span> <span class="arg">質問内容</span><br>
+                    <span class="cmd">/query</span> <span class="arg">--save</span> <span class="comment">← 回答を保存</span>
+                </div>
+                <div class="speech-bubble">質問すればするほどコンセプトページが増え、自分専用のシステムに育ちます</div>
+            </div>
+
+            <!-- カード8 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-tools"></i></div>
+                <h2>⑧ステップ4：ドキュメントを保守する</h2>
+                <p>Wikiに矛盾がないかをチェックする<span class="highlight">定期保守コマンド</span>が用意されています。情報が増えてきたら1日1回程度実行するとよいでしょう。</p>
+                <div class="code-preview">
+                    <span class="cmd">/lint</span> <span class="comment">← 品質チェック</span><br>
+                    <span class="cmd">/lint</span> <span class="arg">--fix</span> <span class="comment">← 自動修正</span>
+                </div>
+                <ul>
+                    <li>リンクの整合性チェック</li>
+                    <li>矛盾の検出と修正</li>
+                    <li>1日1回の定期実行がおすすめ</li>
+                </ul>
+            </div>
+
+            <!-- セクション区切り -->
+            <div class="section-divider"><i class="fas fa-rocket"></i> 実際の構築手順</div>
+
+            <!-- カード9 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-terminal"></i></div>
+                <h2>⑨Claude Codeでテンプレート導入</h2>
+                <p>Karpathyさんの<span class="highlight">GitHub Gist</span>にあるマークダウンテンプレートをコピーして、Claude Codeに渡します。Planモード（Shift+Tab×2）で計画を作成させます。</p>
+                <ul>
+                    <li>GistのRawボタンからテキストをコピー</li>
+                    <li>Claude CodeにCtrl+Vで貼り付け</li>
+                    <li>スキルとして定義するよう指示</li>
+                    <li>Planモードで計画を作成・承認</li>
+                </ul>
+                <div class="speech-bubble">計画を承認するだけで、自動的にシステムを構築してくれます</div>
+            </div>
+
+            <!-- カード10 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-folder-open"></i></div>
+                <h2>⑩フォルダー構造の全体像</h2>
+                <p>システム構築後は以下のようなフォルダー構造が作られます。このフォルダーを<span class="highlight">Obsidianの保管庫として開く</span>ことで、見やすく確認できます。</p>
+                <div class="code-preview">
+                    CCナレッジ/<br>
+                    ├── <span class="cmd">raw/</span> <span class="comment">← 生データ</span><br>
+                    ├── <span class="cmd">wiki/</span> <span class="comment">← Wiki化された情報</span><br>
+                    │   ├── concepts/<br>
+                    │   └── entities/<br>
+                    └── <span class="cmd">CLAUDE.md</span> <span class="comment">← 指示書</span>
+                </div>
+            </div>
+
+            <!-- カード11 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-plug"></i></div>
+                <h2>⑪ObsidianとWeb Clipperの連携</h2>
+                <p>Web Clipperの設定で、<span class="highlight">デフォルトのノート保存先をrawフォルダーに指定</span>しておくことで、クリップした記事が直接rawフォルダーに保存されます。</p>
+                <ul>
+                    <li>Chrome拡張機能として追加</li>
+                    <li>宝石マークのアイコンから起動</li>
+                    <li>保存先をrawフォルダーに設定</li>
+                </ul>
+                <div class="speech-bubble">これで情報収集→Wiki化の流れがスムーズになります</div>
+            </div>
+
+            <!-- カード12 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-file-import"></i></div>
+                <h2>⑫/ingestで記事を取り込む</h2>
+                <p>rawフォルダーに記事を入れたら、Claude Codeで<span class="highlight">/ingest</span>コマンドを実行します。AIが自動的に記事を読み込んで、エンティティやコンセプトを抽出し、Wiki化してくれます。</p>
+                <ul>
+                    <li>index.mdが自動生成される</li>
+                    <li>エンティティ（ノード）が抽出される</li>
+                    <li>情報ソースへのリンクが作られる</li>
+                    <li>操作ログが記録される</li>
+                </ul>
+            </div>
+
+            <!-- セクション区切り -->
+            <div class="section-divider"><i class="fas fa-search"></i> ナレッジの活用と仕組み</div>
+
+            <!-- カード13 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-question-circle"></i></div>
+                <h2>⑬/query --saveでQ&Aを知識化</h2>
+                <p>Wikiに対して質問をすると、<span class="highlight">AIがWikiを参照して回答を生成</span>します。--saveオプションを付けると、そのQ&Aがコンセプトページとして保存されます。</p>
+                <div class="code-preview">
+                    <span class="cmd">/query</span> <span class="arg">--save ハーネス設計に必要なスキルは？</span>
+                </div>
+                <ul>
+                    <li>Wikiの内容を参照して回答を生成</li>
+                    <li>回答が新しいコンセプトページとして保存</li>
+                    <li>次回の質問からこの情報も参照される</li>
+                </ul>
+            </div>
+
+            <!-- カード14 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-project-diagram"></i></div>
+                <h2>⑭エンティティとグラフビュー</h2>
+                <p>Wiki化されると<span class="highlight">エンティティ（ノード）</span>が作成されます。グラフビューで確認すると、概念同士の繋がりが視覚的に分かります。</p>
+                <ul>
+                    <li>各概念がドキュメントとして作成</li>
+                    <li>例：「Anthropic」に紐づく機能が一覧できる</li>
+                    <li>新しいことを学ぶ時に関係性が分かりやすい</li>
+                </ul>
+                <div class="speech-bubble">記事をたくさん入れても綺麗なグラフ構造に整理されます</div>
+            </div>
+
+            <!-- カード15 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-exchange-alt"></i></div>
+                <h2>⑮RAGとの違い：シンプルな仕組み</h2>
+                <p>一般的なRAGはベクトルデータベースやエンベディングの前処理が必要ですが、<span class="highlight">この方法はコンテキストウィンドウ内で直接処理</span>します。</p>
+                <div class="comparison-box">
+                    <div class="vs-left">
+                        <strong>✅ この手法</strong><br>
+                        コンテキストで直接処理<br>
+                        設定がシンプル<br>
+                        Claude Codeだけで完結
+                    </div>
+                    <div class="vs-right">
+                        <strong>⚠️ 従来のRAG</strong><br>
+                        ベクトルDBが必要<br>
+                        エンベディング前処理<br>
+                        インフラ構築が必要
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード16 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-database"></i></div>
+                <h2>⑯100万トークンで十分に対応可能</h2>
+                <p>現在のコンテキストウィンドウは<span class="highlight">100万トークン</span>なので、100記事・40万個程度のデータでも普通に使えます。</p>
+                <ul>
+                    <li>エージェントが自動検索してくれる</li>
+                    <li>MAX 20Xプランなら使い放題に近い</li>
+                    <li>Proや5Xプランではトークン上限に注意</li>
+                </ul>
+                <div class="speech-bubble">上限に達する場合はSonnetを使うか、CEXなどの他エージェントでも可能です</div>
+            </div>
+
+            <!-- カード17 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-wrench"></i></div>
+                <h2>⑰/lintでWikiの品質を維持</h2>
+                <p>/lintコマンドを実行すると、<span class="highlight">Wikiの品質チェック</span>を行ってくれます。--fixオプションで自動修正も可能です。</p>
+                <ul>
+                    <li>リンクのエラーを検出</li>
+                    <li>矛盾をチェック</li>
+                    <li>整合性を自動で整える</li>
+                    <li>1日1回の定期実行を推奨</li>
+                </ul>
+                <div class="code-preview">
+                    <span class="cmd">/lint</span> <span class="comment">← チェックのみ</span><br>
+                    <span class="cmd">/lint</span> <span class="arg">--fix</span> <span class="comment">← 自動修正付き</span>
+                </div>
+            </div>
+
+            <!-- カード18 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-lightbulb"></i></div>
+                <h2>⑱コーディング以外のClaude Code活用</h2>
+                <p>Claude Codeはコードを書くだけでなく、<span class="highlight">知識の整理や情報管理</span>にも強力に使えます。質問を重ねるほど自分にパーソナライズされたシステムに成長します。</p>
+                <ul>
+                    <li><i class="fas fa-envelope"></i> メール対応の文章作成</li>
+                    <li><i class="fas fa-search"></i> ログ参照で興味関心を推測</li>
+                    <li><i class="fas fa-user-cog"></i> 自分の書き方を学習して返答文を生成</li>
+                    <li><i class="fas fa-chart-line"></i> 使うほど体験が変わる</li>
+                </ul>
+                <div class="speech-bubble">YouTube制作やメール対応など、日常のタスクにも活用できる可能性があります</div>
+            </div>
+        </div>
+
+        <footer>
+            🎬 動画: <a href="https://youtu.be/INLlUqYJ4vA" target="_blank" style="color: inherit;">にゃんたのAIチャンネル - Claude Codeで知識を整理する！</a> | 📅 2026年4月11日
+        </footer>
+    </div>
+</body>
+</html>

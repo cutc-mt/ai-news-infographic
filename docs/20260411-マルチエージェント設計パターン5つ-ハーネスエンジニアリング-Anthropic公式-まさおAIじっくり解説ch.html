@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anthropic公式 マルチエージェント設計パターン5つの使い分け</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+    --color-1: #2C3E7B;
+    --color-2: #1A2550;
+    --color-3: #E8ECF4;
+    --color-4: #0D1428;
+    --color-5: #5B6EAE;
+    --color-accent: #E8A838;
+    --color-accent2: #D35F5F;
+    --color-success: #3D8B6E;
+    --color-info: #3A7BD5;
+    --bg-canvas: #FFF8F5;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--bg-canvas);
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ヘッダー */
+.header {
+    text-align: center;
+    padding: 40px 20px;
+    background: linear-gradient(135deg, var(--color-1) 0%, var(--color-2) 50%, var(--color-5) 100%);
+    border-radius: 30px;
+    margin-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+}
+
+.header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%);
+    animation: headerGlow 8s ease-in-out infinite;
+}
+
+@keyframes headerGlow {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(30px, 30px); }
+}
+
+.header-icon {
+    font-size: 5em;
+    color: var(--color-accent);
+    margin-bottom: 15px;
+    animation: fa-bounce 2s infinite;
+    text-shadow: 0 0 30px rgba(232,168,56,0.5);
+}
+
+.header h1 {
+    font-size: 2.4em;
+    color: #fff;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    position: relative;
+}
+
+.header .subtitle {
+    font-size: 1.2em;
+    color: var(--color-3);
+    margin-bottom: 8px;
+    position: relative;
+}
+
+.header .date {
+    font-size: 0.95em;
+    color: rgba(255,255,255,0.7);
+    position: relative;
+}
+
+/* カードグリッド */
+.card-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+.card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+    border-left: 5px solid var(--color-1);
+    animation: fadeInScale 0.6s ease-out both;
+}
+
+.card:nth-child(odd) {
+    border-left-color: var(--color-1);
+}
+
+.card:nth-child(even) {
+    border-left-color: var(--color-accent);
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.card-icon {
+    text-align: center;
+    margin: 10px 0 15px;
+}
+
+.card-icon i {
+    font-size: 3.5em;
+    color: var(--color-1);
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.1));
+}
+
+.card:nth-child(even) .card-icon i {
+    color: var(--color-accent);
+}
+
+.card h2 {
+    font-size: 1.2em;
+    color: var(--color-2);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--color-3);
+    line-height: 1.4;
+}
+
+.card p, .card li {
+    font-size: 0.95em;
+    line-height: 1.7;
+    color: #444;
+}
+
+.highlight {
+    background: linear-gradient(transparent 60%, rgba(232,168,56,0.3) 60%);
+    font-weight: bold;
+    padding: 0 3px;
+}
+
+.highlight-blue {
+    background: linear-gradient(transparent 60%, rgba(44,62,123,0.2) 60%);
+    font-weight: bold;
+    padding: 0 3px;
+}
+
+.highlight-green {
+    background: linear-gradient(transparent 60%, rgba(61,139,110,0.25) 60%);
+    font-weight: bold;
+    padding: 0 3px;
+}
+
+.keyword-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+}
+
+.keyword-list li {
+    margin-bottom: 8px;
+    padding-left: 5px;
+    display: flex;
+    align-items: flex-start;
+}
+
+.keyword-list li i {
+    margin-right: 8px;
+    min-width: 16px;
+    color: var(--color-5);
+    margin-top: 4px;
+}
+
+.tag {
+    display: inline-block;
+    background: var(--color-3);
+    color: var(--color-2);
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+    margin: 3px 2px;
+}
+
+.tag-accent {
+    background: rgba(232,168,56,0.2);
+    color: #8B6914;
+}
+
+.tag-success {
+    background: rgba(61,139,110,0.15);
+    color: #2A6B50;
+}
+
+.tag-danger {
+    background: rgba(211,95,95,0.15);
+    color: #9B3535;
+}
+
+.tag-info {
+    background: rgba(58,123,213,0.15);
+    color: #2A5BA0;
+}
+
+/* 吹き出し */
+.speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--color-1);
+    border-radius: 20px;
+    padding: 12px 16px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+    transform: rotate(-1deg);
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 25px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--color-1) transparent;
+    display: block;
+    width: 0;
+}
+
+.speech-bubble.right::after {
+    left: auto;
+    right: 25px;
+}
+
+.speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+}
+
+.speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--color-accent);
+    transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+    border-color: var(--color-accent) transparent;
+}
+
+.speech-bubble.variant-2 {
+    background: #FFE9E9;
+    border-color: var(--color-accent2);
+    transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+    border-color: var(--color-accent2) transparent;
+}
+
+.handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 0.95em;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* セクション区切り */
+.section-divider {
+    text-align: center;
+    margin: 30px 0 20px;
+    padding: 15px;
+    position: relative;
+}
+
+.section-divider h2 {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--color-1), var(--color-5));
+    color: #fff;
+    padding: 10px 30px;
+    border-radius: 30px;
+    font-size: 1.3em;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.15);
+}
+
+.section-divider i {
+    margin-right: 10px;
+}
+
+/* 比較テーブル */
+.comparison-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 10px 0;
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 0.88em;
+}
+
+.comparison-table th {
+    background: var(--color-1);
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: bold;
+}
+
+.comparison-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--color-3);
+    vertical-align: top;
+}
+
+.comparison-table tr:nth-child(even) td {
+    background: rgba(232,236,244,0.5);
+}
+
+/* フロー図 */
+.flow-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+    padding: 10px;
+    background: var(--color-3);
+    border-radius: 12px;
+}
+
+.flow-step {
+    background: #fff;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 0.85em;
+    text-align: center;
+    box-shadow: 1px 1px 4px rgba(0,0,0,0.1);
+}
+
+.flow-arrow {
+    color: var(--color-1);
+    font-size: 1.2em;
+}
+
+/* コードプレビュー */
+pre {
+    background: #2d2d2d;
+    color: #f8f8f2;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 0.82em;
+    margin-top: 10px;
+    overflow-x: auto;
+    line-height: 1.5;
+}
+
+code {
+    font-family: 'Fira Code', 'Consolas', monospace;
+}
+
+/* フッター */
+footer {
+    text-align: center;
+    padding: 25px;
+    margin-top: 30px;
+    background: linear-gradient(135deg, var(--color-2), var(--color-1));
+    color: rgba(255,255,255,0.85);
+    border-radius: 20px;
+    font-size: 0.95em;
+}
+
+footer a {
+    color: var(--color-accent);
+    text-decoration: none;
+    font-weight: bold;
+}
+
+footer a:hover {
+    text-decoration: underline;
+}
+
+/* レスポンシブ */
+@media (max-width: 1600px) {
+    .card { min-width: 300px; }
+}
+
+@media (max-width: 1200px) {
+    .card { min-width: 340px; }
+}
+
+@media (max-width: 768px) {
+    .card-grid { flex-direction: column; }
+    .card { min-width: auto; max-width: 100%; }
+    .header h1 { font-size: 1.6em; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ヘッダー -->
+<div class="header">
+    <div class="header-icon">
+        <i class="fas fa-project-diagram" aria-hidden="true"></i>
+    </div>
+    <h1>Anthropic公式が解説する<br>マルチエージェント設計パターン5つの使い分け</h1>
+    <div class="subtitle">ハーネスエンジニアリングに役立つ本質的な設計思想</div>
+    <div class="date">📅 2026年4月11日</div>
+</div>
+
+<!-- ① イントロダクション -->
+<div class="card-grid">
+
+<div class="card" style="animation-delay: 0.1s;">
+    <div class="card-icon">
+        <i class="fas fa-newspaper fa-beat-fade" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>① Anthropic公式ブログが公開: マルチエージェント設計パターン5つ</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-circle-info" aria-hidden="true"></i><span>Anthropicが公式ブログで<span class="highlight">マルチエージェントの設計パターン5つ</span>を紹介</span></li>
+        <li><i class="fas fa-lightbulb" aria-hidden="true"></i><span>「どのような場面でどのパターンを選ぶべきか」を実践的に解説</span></li>
+        <li><i class="fas fa-link" aria-hidden="true"></i><span>ハーネスエンジニアリングの<span class="highlight-blue">設計に役立つ本質的な内容</span></span></li>
+        <li><i class="fas fa-code-branch" aria-hidden="true"></i><span>Claude Codeの裏側で使われているパターンも明かされている</span></li>
+    </ul>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-star" style="color: var(--color-accent);"></i>
+            設計パターンを知っておくと、ハーネスの最適化に生かせるよ！
+        </span>
+    </div>
+</div>
+
+<!-- ② 5つのパターン概要 -->
+<div class="card" style="animation-delay: 0.15s;">
+    <div class="card-icon">
+        <i class="fas fa-layer-group fa-bounce" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>② 5つの設計パターンの全体像</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-1" style="color: var(--color-info);" aria-hidden="true"></i><span><span class="tag tag-info">Generator-Verifier</span> 品質重視の出力に</span></li>
+        <li><i class="fas fa-2" style="color: var(--color-info);" aria-hidden="true"></i><span><span class="tag tag-info">Orchestrator-Subagent</span> タスク分解が明確な場合に</span></li>
+        <li><i class="fas fa-3" style="color: var(--color-info);" aria-hidden="true"></i><span><span class="tag tag-info">Agent Teams</span> 並列で独立した長期作業に</span></li>
+        <li><i class="fas fa-4" style="color: var(--color-info);" aria-hidden="true"></i><span><span class="tag tag-info">Message Bus</span> エージェント数が増加する場合に</span></li>
+        <li><i class="fas fa-5" style="color: var(--color-info);" aria-hidden="true"></i><span><span class="tag tag-info">Shared State</span> 相互参照が必要な場合に</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fas fa-arrow-up" style="color: var(--color-accent);"></i>
+            上に行くほどシンプル、下に行くほど複雑だよ！
+        </span>
+    </div>
+</div>
+
+<!-- ③ パターン選びの基本原則 -->
+<div class="card" style="animation-delay: 0.2s;">
+    <div class="card-icon">
+        <i class="fas fa-compass fa-spin" style="animation: fa-spin 3s linear infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>③ パターン選びの基本原則: シンプルから始めて進化させる</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-seedling" aria-hidden="true"></i><span><span class="highlight">最もシンプルなパターンから始める</span>のが推奨される</span></li>
+        <li><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span>どこでつまずくかを観察し、必要に応じて進化させる</span></li>
+        <li><i class="fas fa-ban" aria-hidden="true"></i><span>「複雑そうだから」という理由で高度なパターンを選ぶのはNG</span></li>
+        <li><i class="fas fa-thumbs-up" aria-hidden="true"></i><span>まずは<span class="highlight-green">ジェネレーターベリファイヤー</span>から試すのがおすすめ</span></li>
+    </ul>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-lightbulb" style="color: var(--color-accent);"></i>
+            問題に応じて合うパターンは変わるから、まずはシンプルに！
+        </span>
+    </div>
+</div>
+
+<!-- ④ パターン1: ジェネレーターベリファイヤー -->
+<div class="card" style="animation-delay: 0.25s;">
+    <div class="card-icon">
+        <i class="fas fa-clipboard-check fa-bounce" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>④ パターン1: ジェネレーターベリファイヤーの仕組み</h2>
+    <div class="flow-box">
+        <div class="flow-step">📋 タスク入力</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #E3F2FD;">生成</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #FFF9E3;">検証</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #E8F5E9;">✅ 合格</div>
+    </div>
+    <ul class="keyword-list">
+        <li><i class="fas fa-rotate" aria-hidden="true"></i><span>不合格の場合は<span class="highlight">フィードバックを生成者に返してループ</span>を回す</span></li>
+        <li><i class="fas fa-stop" aria-hidden="true"></i><span>最大反復回数（例: 10回）で必ず停止する設計が必須</span></li>
+        <li><i class="fas fa-trophy" aria-hidden="true"></i><span><span class="highlight">最も普及したマルチエージェントパターン</span>の一つ</span></li>
+    </ul>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+            <i class="fas fa-repeat" style="color: var(--color-accent);"></i>
+            生成 → 検証 → フィードバック → 改善のループが基本だよ！
+        </span>
+    </div>
+</div>
+
+<!-- ⑤ パターン1の具体例 -->
+<div class="card" style="animation-delay: 0.3s;">
+    <div class="card-icon">
+        <i class="fas fa-headset fa-beat-fade" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑤ パターン1の具体例: カスタマーサポートでの活用</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-envelope" aria-hidden="true"></i><span>メールチケットに対して、ドキュメントから返信を自動生成</span></li>
+        <li><i class="fas fa-check-double" aria-hidden="true"></i><span>ベリファイアーが<span class="highlight">正確性・トーン・網羅性</span>をチェック</span></li>
+        <li><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span>不合格時は具体的な問題点（価格の誤記など）をフィードバック</span></li>
+        <li><i class="fas fa-code" aria-hidden="true"></i><span>コード生成にも有効: コード書く → テスト書いて実行</span></li>
+    </ul>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-code" style="color: var(--color-5);"></i>
+            Claude Codeの最後に「レビューして」と振るのもこのパターン！
+        </span>
+    </div>
+</div>
+
+<!-- ⑥ ベリファイアーの重要性 -->
+<div class="card" style="animation-delay: 0.35s;">
+    <div class="card-icon">
+        <i class="fas fa-gavel" style="color: var(--color-accent2);" aria-hidden="true"></i>
+    </div>
+    <h2>⑥ ベリファイアーの検証基準が最重要</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>「出力が良いか」だけでは<span class="highlight">ゴム印を押すだけ</span>になる</span></li>
+        <li><i class="fas fa-balance-scale" aria-hidden="true"></i><span>基準が<span class="tag tag-danger">抽象的すぎる</span>とダメ、<span class="tag tag-danger">具体的すぎる</span>と使いにくい</span></li>
+        <li><i class="fas fa-brain" aria-hidden="true"></i><span><span class="highlight">ドメイン知識</span>を評価基準に反映することが鍵</span></li>
+        <li><i class="fas fa-shield-halved" aria-hidden="true"></i><span>フォールバック戦略（人間へのエスカレーション等）も必須</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fas fa-exclamation" style="color: var(--color-accent2);"></i>
+            ループを作っただけでは品質管理の illusion に過ぎない！
+        </span>
+    </div>
+</div>
+
+<!-- ⑦ パターン2: オーケストレーターサブエージェント -->
+<div class="card" style="animation-delay: 0.4s;">
+    <div class="card-icon">
+        <i class="fas fa-sitemap fa-bounce" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑦ パターン2: オーケストレーターサブエージェントの仕組み</h2>
+    <div class="flow-box">
+        <div class="flow-step" style="background: #E3F2FD; font-size: 1em;">👔 リーダー</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step">タスク分解</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #FFF9E3;">🤖 サブエージェント群</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #E8F5E9;">結果統合</div>
+    </div>
+    <ul class="keyword-list">
+        <li><i class="fas fa-crown" aria-hidden="true"></i><span><span class="highlight">階層構造</span>が特徴: リーダーが計画・委託・統合を担当</span></li>
+        <li><i class="fas fa-users" aria-hidden="true"></i><span>サブエージェントがそれぞれ<span class="highlight-blue">関心ごとの分離</span>で特定の責任に集中</span></li>
+        <li><i class="fas fa-database" aria-hidden="true"></i><span>サブエージェントは自分のコンテキストウィンドウ内で完結</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fas fa-crown" style="color: var(--color-accent);"></i>
+            リーダーが全体を見渡し、部下に仕事を振るイメージ！
+        </span>
+    </div>
+</div>
+
+<!-- ⑧ Claude Codeでの実践例 -->
+<div class="card" style="animation-delay: 0.45s;">
+    <div class="card-icon">
+        <i class="fas fa-robot fa-beat-fade" style="animation: fa-beat-fade 2s infinite; color: var(--color-success);" aria-hidden="true"></i>
+    </div>
+    <h2>⑧ Claude Codeが実際に使っているパターン</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-check-circle" aria-hidden="true"></i><span>Claude Codeは<span class="highlight">オーケストレーターサブエージェントパターン</span>を採用</span></li>
+        <li><i class="fas fa-file-code" aria-hidden="true"></i><span>メインエージェントがコードを書き、ファイルを編集、コマンドを実行</span></li>
+        <li><i class="fas fa-search" aria-hidden="true"></i><span>大規模コードベースの検索には<span class="highlight-blue">バックグラウンドでサブエージェントを起動</span></span></li>
+        <li><i class="fas fa-memory" aria-hidden="true"></i><span>100万コンテキストの親を節約しつつ、探索は並列で実行</span></li>
+    </ul>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-wand-magic-sparkles" style="color: var(--color-accent);"></i>
+            意識せずとも Claude Code が自然にサブエージェントを使ってるよ！
+        </span>
+    </div>
+</div>
+
+<!-- ⑨ パターン2の利点と課題 -->
+<div class="card" style="animation-delay: 0.5s;">
+    <div class="card-icon">
+        <i class="fas fa-code-compare" aria-hidden="true"></i>
+    </div>
+    <h2>⑨ パターン2の利点と注意点</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-thumbs-up" style="color: var(--color-success);" aria-hidden="true"></i><span><span class="tag tag-success">利点</span> タスク分解が明確な場合に最適</span></li>
+        <li><i class="fas fa-thumbs-up" style="color: var(--color-success);" aria-hidden="true"></i><span><span class="tag tag-success">利点</span> 関心の分離で各エージェントが特定の責任に集中</span></li>
+        <li><i class="fas fa-exclamation-triangle" style="color: var(--color-accent2);" aria-hidden="true"></i><span><span class="tag tag-danger">注意</span> オーケストレーターが<span class="highlight">情報のボトルネック</span>になる可能性</span></li>
+        <li><i class="fas fa-clock" style="color: var(--color-accent2);" aria-hidden="true"></i><span><span class="tag tag-danger">注意</span> 並列化しなければ<span class="highlight">速度面のメリットがない</span></span></li>
+    </ul>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+            <i class="fas fa-arrows-split-up-and-left" style="color: var(--color-accent2);"></i>
+            情報の中継が増えると、詳細が失われやすい点に注意！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- セクション区切り -->
+<div class="section-divider">
+    <h2><i class="fas fa-arrow-down"></i> より高度なパターン</h2>
+</div>
+
+<div class="card-grid">
+
+<!-- ⑩ パターン3: エージェントチームス -->
+<div class="card" style="animation-delay: 0.55s;">
+    <div class="card-icon">
+        <i class="fas fa-people-group fa-bounce" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑩ パターン3: エージェントチームスの仕組み</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-users-gear" aria-hidden="true"></i><span>コーディネーターが<span class="highlight">独立したワーカープロセスを複数生成</span></span></li>
+        <li><i class="fas fa-list-check" aria-hidden="true"></i><span>チームメイトが<span class="highlight-blue">共有キューから自分でタスクを取得</span>して自律的に作業</span></li>
+        <li><i class="fas fa-infinity" aria-hidden="true"></i><span>オーケストレーターとの違い: <span class="highlight-green">ワーカーが継続的に存続</span>する</span></li>
+        <li><i class="fas fa-graduation-cap" aria-hidden="true"></i><span>コンテキストを蓄積し、ドメイン専門性が向上していく</span></li>
+    </ul>
+    <div class="speech-bubble top">
+        <span class="handwritten">
+            <i class="fas fa-circle-question" style="color: var(--color-info);"></i>
+            サブエージェントは1タスクで終了、チームメイトは継続して働く！
+        </span>
+    </div>
+</div>
+
+<!-- ⑪ チームスの適用場面 -->
+<div class="card" style="animation-delay: 0.6s;">
+    <div class="card-icon">
+        <i class="fas fa-code-merge" aria-hidden="true"></i>
+    </div>
+    <h2>⑪ パターン3の適用場面と課題</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-check" aria-hidden="true"></i><span><span class="tag tag-success">適用</span> 大規模なコードベース移行（各サービスを独立して移行）</span></li>
+        <li><i class="fas fa-check" aria-hidden="true"></i><span><span class="tag tag-success">適用</span> 独立性が高く、長期的なマルチステップ作業</span></li>
+        <li><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><span class="tag tag-danger">課題</span> <span class="highlight">完了検出が難しい</span>（2分で終わるタスクと20分かかるタスクが混在）</span></li>
+        <li><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><span class="tag tag-danger">課題</span> 複数エージェントが同時編集で<span class="highlight">競合が発生</span>する可能性</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fas fa-puzzle-piece" style="color: var(--color-accent);"></i>
+            独立性が高いタスクなら恩恵が大きいけど、管理変数も増えるよ！
+        </span>
+    </div>
+</div>
+
+<!-- ⑫ パターン4: メッセージバス -->
+<div class="card" style="animation-delay: 0.65s;">
+    <div class="card-icon">
+        <i class="fas fa-tower-broadcast fa-beat-fade" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑫ パターン4: メッセージバスの仕組み</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-paper-plane" aria-hidden="true"></i><span><span class="highlight">Publish / Subscribe</span>の2つのプリミティブで通信</span></li>
+        <li><i class="fas fa-route" aria-hidden="true"></i><span>エージェントが関心のあるトピックを購読し、ルーターが配信</span></li>
+        <li><i class="fas fa-plug" aria-hidden="true"></i><span>新しいエージェントの追加時に<span class="highlight-blue">既存の配線を変更する必要がない</span></span></li>
+        <li><i class="fas fa-expand" aria-hidden="true"></i><span><span class="highlight-green">スケーラビリティ</span>に優れ、エージェントエコシステムの成長に対応</span></li>
+    </ul>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-bolt" style="color: var(--color-accent);"></i>
+            疎結合だから、後からエージェントを追加しやすい！
+        </span>
+    </div>
+</div>
+
+<!-- ⑬ メッセージバスの具体例 -->
+<div class="card" style="animation-delay: 0.7s;">
+    <div class="card-icon">
+        <i class="fas fa-shield-halved" aria-hidden="true"></i>
+    </div>
+    <h2>⑬ パターン4の具体例: セキュリティ運用システム</h2>
+    <div class="flow-box">
+        <div class="flow-step" style="background: #FFEBEE;">🚨 アラート</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step">🔍 トリアージ</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #E3F2FD;">調査エージェント</div>
+        <i class="fas fa-arrow-right flow-arrow"></i>
+        <div class="flow-step" style="background: #E8F5E9;">対応決定</div>
+    </div>
+    <ul class="keyword-list">
+        <li><i class="fas fa-filter" aria-hidden="true"></i><span>トリアージエージェントが深刻度と種類で分類・ルーティング</span></li>
+        <li><i class="fas fa-network-wired" aria-hidden="true"></i><span>ネットワーク調査、アイデンティティ分析などの専門エージェントが連携</span></li>
+        <li><i class="fas fa-triangle-exclamation" aria-hidden="true"></i><span><span class="tag tag-danger">課題</span> イベント駆動のため<span class="highlight">トレーサビリティが難しい</span></span></li>
+    </ul>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+            <i class="fas fa-bug" style="color: var(--color-accent2);"></i>
+            ルーターの誤分類はサイレント障害になるから要注意！
+        </span>
+    </div>
+</div>
+
+<!-- ⑭ パターン5: シェアドステート -->
+<div class="card" style="animation-delay: 0.75s;">
+    <div class="card-icon">
+        <i class="fas fa-database fa-bounce" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑭ パターン5: シェアドステートの仕組み</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-database" aria-hidden="true"></i><span>エージェントが<span class="highlight">共有DBやファイルを直接読み書き</span>して協調</span></li>
+        <li><i class="fas fa-user-slash" aria-hidden="true"></i><span><span class="highlight-blue">中央コーディネーターが存在しない</span>完全に自律的な設計</span></li>
+        <li><i class="fas fa-arrows-rotate" aria-hidden="true"></i><span>初期化で質問やデータを作成し、終了条件で完了</span></li>
+        <li><i class="fas fa-heart-pulse" aria-hidden="true"></i><span>1つのエージェントが止まっても<span class="highlight-green">他は継続動作</span>（単一障害点なし）</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fas fa-star" style="color: var(--color-accent);"></i>
+            リアルタイムでエージェント同士が発見を共有できる、お気に入りのパターン！
+        </span>
+    </div>
+</div>
+
+<!-- ⑮ シェアドステートの適用 -->
+<div class="card" style="animation-delay: 0.8s;">
+    <div class="card-icon">
+        <i class="fas fa-flask" aria-hidden="true"></i>
+    </div>
+    <h2>⑮ パターン5の適用例と課題</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-book-open" aria-hidden="true"></i><span><span class="tag tag-success">適用例</span> リサーチ統合システム（学術文献・業界レポート・特許・ニュース）</span></li>
+        <li><i class="fas fa-handshake" aria-hidden="true"></i><span>学術エージェントの発見が、業界エージェントの調査に<span class="highlight">即座に反映</span></span></li>
+        <li><i class="fas fa-copy" aria-hidden="true"></i><span><span class="tag tag-danger">課題</span> 作業の重複や矛盾するアプローチの発生</span></li>
+        <li><i class="fas fa-infinity" style="color: var(--color-accent2);" aria-hidden="true"></i><span><span class="tag tag-danger">課題</span> <span class="highlight">リアクティブループ</span>（エージェント同士が無限に反応し合う）の危険</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fas fa-clock" style="color: var(--color-accent2);"></i>
+            終了条件（時間制限・収束しきい値）の設計が超重要！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- セクション区切り -->
+<div class="section-divider">
+    <h2><i class="fas fa-scale-balanced"></i> パターンの使い分けと組み合わせ</h2>
+</div>
+
+<div class="card-grid">
+
+<!-- ⑯ 使い分けの比較 -->
+<div class="card" style="animation-delay: 0.85s;">
+    <div class="card-icon">
+        <i class="fas fa-scale-balanced fa-beat-fade" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑯ パターン使い分けの判断基準</h2>
+    <table class="comparison-table">
+        <tr><th>判断軸</th><th>選ぶパターン</th></tr>
+        <tr><td>コンテキストを長く保ちたい</td><td><span class="tag tag-info">Agent Teams</span></td></tr>
+        <tr><td>短いタスクで明確な出力</td><td><span class="tag tag-success">Orchestrator-Sub</span></td></tr>
+        <tr><td>ワークフローが事前に予測可能</td><td><span class="tag tag-success">Orchestrator-Sub</span></td></tr>
+        <tr><td>イベント駆動で動的</td><td><span class="tag tag-info">Message Bus</span></td></tr>
+        <tr><td>エージェント間で発見を共有</td><td><span class="tag tag-accent">Shared State</span></td></tr>
+        <tr><td>独立したパーティションで作業</td><td><span class="tag tag-info">Agent Teams</span></td></tr>
+    </table>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-lightbulb" style="color: var(--color-accent);"></i>
+            コンテキストの保持期間・ワークフローの予測性・共有の必要性で決める！
+        </span>
+    </div>
+</div>
+
+<!-- ⑰ パターンの組み合わせ -->
+<div class="card" style="animation-delay: 0.9s;">
+    <div class="card-icon">
+        <i class="fas fa-puzzle-piece fa-bounce" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑰ パターンは組み合わせて使うもの</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-object-group" aria-hidden="true"></i><span>実運用では<span class="highlight">複数パターンの組み合わせ</span>が一般的</span></li>
+        <li><i class="fas fa-layer-group" aria-hidden="true"></i><span>例: 全体はOrchestrator + 一部はShared State</span></li>
+        <li><i class="fas fa-tower-broadcast" aria-hidden="true"></i><span>例: Message Busでイベント配信 + Agent Teamsで処理</span></li>
+        <li><i class="fas fa-people-group" aria-hidden="true"></i><span><span class="highlight-blue">Claude CodeのAgent Teams機能</span>は実は複数パターンの統合</span></li>
+    </ul>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+            <i class="fas fa-wand-magic-sparkles" style="color: var(--color-accent);"></i>
+            Claude Codeのチーム機能 = Agent Teams + Message Bus + Shared State！
+        </span>
+    </div>
+    <pre><code>// Claude CodeのAgent Teams分解
+Agent Teams機能 = {
+  設計パターン: Agent Teams,
+  メンバー間通信: Message Bus,
+  ファイル共有: Shared State,
+}</code></pre>
+</div>
+
+<!-- ⑱ まとめ -->
+<div class="card" style="animation-delay: 0.95s;">
+    <div class="card-icon">
+        <i class="fas fa-flag-checkered fa-beat-fade" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+    </div>
+    <h2>⑱ まとめ: まず押さえるべき2つのパターン</h2>
+    <ul class="keyword-list">
+        <li><i class="fas fa-star" style="color: var(--color-accent);" aria-hidden="true"></i><span><span class="tag tag-accent">優先度高</span> <span class="highlight">ジェネレーターベリファイヤー</span>: 品質ゲート</span></li>
+        <li><i class="fas fa-star" style="color: var(--color-accent);" aria-hidden="true"></i><span><span class="tag tag-accent">優先度高</span> <span class="highlight">オーケストレーターサブエージェント</span>: 関心の分離</span></li>
+        <li><i class="fas fa-arrow-right" aria-hidden="true"></i><span>この2つをハーネスに取り入れるだけで<span class="highlight-green">大きく改善</span></span></li>
+        <li><i class="fas fa-key" aria-hidden="true"></i><span>5つのキーワード: <span class="tag">品質ゲート</span> <span class="tag tag-info">中央分離</span> <span class="tag tag-success">並列自律</span> <span class="tag tag-accent">イベント駆動</span> <span class="tag tag-danger">共有知識</span></span></li>
+    </ul>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fas fa-rocket" style="color: var(--color-accent);"></i>
+            まずはシンプルに始めて、つまずいたら進化させるのがコツ！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- フッター -->
+<footer>
+    🎬 動画: <a href="https://youtu.be/sUyZlUw36io" target="_blank">まさおAIじっくり解説ch</a> |
+    📰 元記事: <a href="https://claude.com/blog/multi-agent-coordination-patterns" target="_blank">Anthropic公式ブログ: Multi-agent coordination patterns</a> |
+    📅 2026年4月11日
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MarkItDown — MicrosoftがRAGパイプラインを変えた</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #334155;
+            --color-2: #64748B;
+            --color-3: #CBD5E1;
+            --color-4: #0F172A;
+            --color-5: #F1F5F9;
+            --gradient-1: linear-gradient(135deg, #0F172A 0%, #334155 50%, #64748B 100%);
+            --gradient-2: linear-gradient(45deg, #334155, #64748B);
+            --accent: #3B82F6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Yomogi', cursive; background: #FFF8F5; min-height: 100vh; padding: 20px; }
+        .container { max-width: 2000px; margin: 0 auto; }
+
+        /* Header */
+        header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: var(--gradient-1); border-radius: 20px; }
+        h1 { font-family: 'Zen Kurenaido', sans-serif; font-size: 2.2em; color: #fff; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); margin-bottom: 15px; }
+        .subtitle { font-family: 'Kaisei Decol', serif; font-size: 1.2em; color: rgba(255,255,255,0.9); }
+
+        /* Tags */
+        .tag { display: inline-block; background: var(--gradient-2); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin: 5px 5px 5px 0; }
+
+        /* Grid */
+        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 20px 0; }
+        @media (max-width: 1600px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 1200px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+        /* Card */
+        .card { background: #fff; border-radius: 20px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.08); transition: transform 0.3s ease, box-shadow 0.3s ease; position: relative; overflow: hidden; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-2); }
+
+        /* Card Icon */
+        .card-icon { text-align: center; margin: 15px 0; }
+        .card-icon i { font-size: 3em; color: var(--color-1); }
+        .card h2 { font-family: 'Kaisei Decol', serif; font-size: 1.1em; color: var(--color-4); margin-bottom: 12px; line-height: 1.6; text-align: center; }
+        .card p, .card .content { font-size: 0.95em; color: #333; line-height: 1.8; }
+
+        /* Highlight */
+        .highlight { background: linear-gradient(120deg, rgba(51,65,85,0.1), rgba(203,213,225,0.2)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--color-4); }
+
+        /* Keyword List */
+        .keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 0.93em; line-height: 1.7; }
+        .keyword-list li i { margin-right: 8px; color: var(--color-2); min-width: 16px; margin-top: 4px; }
+
+        /* Keyword Tag */
+        .keyword-tag { background-color: var(--color-3); color: var(--color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 0.9em; }
+
+        /* Speech Bubble */
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--color-1); border-radius: 20px; padding: 12px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.08); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: #BF8136; transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: #BF8136 transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: #BF5656; transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: #BF5656 transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 0.93em; line-height: 1.6; color: #333; }
+
+        /* Code Preview */
+        pre { background: #f5f5f5; padding: 10px; border-radius: 8px; font-size: 0.85em; margin-top: 10px; overflow-x: auto; line-height: 1.5; font-family: 'Courier New', monospace; }
+
+        /* Step Box */
+        .step-box { background: var(--color-5); border-left: 4px solid var(--color-1); padding: 10px 15px; margin: 10px 0; border-radius: 0 8px 8px 0; font-size: 0.9em; line-height: 1.7; }
+
+        /* Prompt Box */
+        .prompt-box { background: #F0F4FF; border: 2px dashed var(--color-3); padding: 10px 15px; margin: 10px 0; border-radius: 8px; font-size: 0.88em; color: var(--color-4); line-height: 1.7; }
+
+        /* Footer */
+        footer { text-align: center; padding: 30px; color: var(--color-2); font-family: 'Kaisei Decol', serif; margin-top: 20px; background: var(--gradient-1); border-radius: 20px; }
+        footer a { color: #CBD5E1; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        /* Animations */
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-file-arrow-down" style="margin-right: 10px;"></i> MarkItDown — MicrosoftがRAGパイプラインを変えた</h1>
+            <p class="subtitle">GitHubスター30,000超えのPythonライブラリがあらゆるファイルをマークダウンに一発変換</p>
+            <div style="margin-top: 15px;">
+                <span class="tag"><i class="fas fa-star"></i> GitHub 30K Stars</span>
+                <span class="tag"><i class="fas fa-code"></i> Python Library</span>
+                <span class="tag"><i class="fas fa-building"></i> Microsoft</span>
+                <span class="tag"><i class="fas fa-robot"></i> RAG Pipeline</span>
+                <span class="tag"><i class="fas fa-file-alt"></i> Markdown Conversion</span>
+                <span class="tag"><i class="fab fa-microsoft"></i> 2024年12月リリース</span>
+            </div>
+        </header>
+
+        <div class="grid">
+
+            <!-- Card 1: What is MarkItDown -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-file-arrow-down fa-5x" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>①MarkItDownとは：Microsoftが贈る万能コンバーター</h2>
+                <div class="content">
+                    <p>Microsoftが<span class="highlight">2024年12月にリリースしたPythonライブラリ</span>。あらゆるファイル形式をマークダウンに一発変換できる。GitHubではリリース後わずか2週間足らずでスター3万を超え、開発者コミュニティで大きな注目を集めた。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-check-circle"></i><span><span class="keyword-tag">pip install markitdown</span> で即導入可能</span></li>
+                        <li><i class="fas fa-check-circle"></i><span>完全ローカルで動作し、APIキー不要</span></li>
+                        <li><i class="fas fa-check-circle"></i><span>MITライセンスで商用利用も自由</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fas fa-lightbulb fa-lg" style="color: #BF8136;"></i>
+                        PDF、Word、Excel、画像、音声まで<br>すべてマークダウンに変換できる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 2: Supported Formats -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-layer-group fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>②対応ファイル形式：11種類以上を網羅</h2>
+                <div class="content">
+                    <p>MarkItDownは<span class="highlight">非常に幅広いファイル形式に対応</span>している。代表的なフォーマットは以下の通り。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-file-pdf"></i><span><span class="keyword-tag">PDF</span> 文書・レポート</span></li>
+                        <li><i class="fas fa-file-word"></i><span><span class="keyword-tag">Word</span> .docx ドキュメント</span></li>
+                        <li><i class="fas fa-file-excel"></i><span><span class="keyword-tag">Excel</span> .xlsx スプレッドシート</span></li>
+                        <li><i class="fas fa-file-powerpoint"></i><span><span class="keyword-tag">PowerPoint</span> .pptx プレゼン</span></li>
+                        <li><i class="fas fa-image"></i><span><span class="keyword-tag">画像</span> PNG / JPG / 画像全般</span></li>
+                        <li><i class="fas fa-music"></i><span><span class="keyword-tag">音声</span> MP3 / WAV / 音声ファイル</span></li>
+                        <li><i class="fas fa-envelope"></i><span><span class="keyword-tag">Outlook .MSG</span> メールファイル</span></li>
+                        <li><i class="fas fa-file-code"></i><span>HTML、CSV、JSON、XML、ZIP</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 3: Excel Conversion -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-table fa-5x" style="animation: fa-flip 3s;"></i>
+                </div>
+                <h2>③Excel変換：シート単位でマークダウンテーブルに</h2>
+                <div class="content">
+                    <p>Excelファイルは<span class="highlight">シートごとに独立したマークダウンテーブル</span>として出力される。複数シートがある場合でも、すべて自動的に変換される。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-table-cells"></i><span>セルの値がそのままテーブルセルにマッピング</span></li>
+                        <li><i class="fas fa-list-ol"></i><span>シート名が見出しとして保持される</span></li>
+                        <li><i class="fas fa-arrows-alt"></i><span>データの型情報はテキスト表現に変換</span></li>
+                    </ul>
+                    <pre>シート名: 売上データ
+| 月   | 売上   | 前年比 |
+|------|--------|--------|
+| 1月  | 500万  | 105%   |
+| 2月  | 520万  | 108%   |</pre>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fas fa-star fa-lg" style="color: #BF8136;"></i>
+                        表形式のデータがそのまま<br>読めるマークダウンに！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 4: ZIP & Integrated Output -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-file-zipper fa-5x" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>④ZIPファイルの統合出力とURLスクレイピング</h2>
+                <div class="content">
+                    <p>ZIPアーカイブは<span class="highlight">中身を自動展開して一つのマークダウンに統合出力</span>する。複数ファイルがまとまったアーカイブも一発で処理可能。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-box-open"></i><span>ZIP内の各ファイルを個別に変換</span></li>
+                        <li><i class="fas fa-link"></i><span>変換結果を一つのドキュメントに統合</span></li>
+                        <li><i class="fas fa-globe"></i><span><span class="keyword-tag">URL指定</span>でウェブページもスクレイピング変換</span></li>
+                    </ul>
+                    <div class="prompt-box">
+                        <i class="fas fa-terminal"></i> CLIでの利用例:<br>
+                        markitdown report.zip > output.md<br>
+                        markitdown https://example.com > page.md
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 5: Image OCR -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-eye fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑤画像変換：Azure Vision APIでOCR＋自然言語記述</h2>
+                <div class="content">
+                    <p>画像ファイルは<span class="highlight">Azure OpenAI Vision APIと連携</span>することで、単なるOCRだけでなく自然言語での画像記述も出力できる。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-font"></i><span>画像内のテキストをOCRで抽出</span></li>
+                        <li><i class="fas fa-comment-dots"></i><span>画像の内容を自然言語で説明</span></li>
+                        <li><i class="fas fa-cloud"></i><span>Azure OpenAI接続時のみ高度な機能が有効</span></li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fas fa-info-circle fa-lg" style="color: var(--color-2);"></i>
+                            Vision APIなしでも基本の画像→テキスト<br>変換は動作するよ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: Audio Transcription -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-microphone fa-5x" style="animation: fa-flip 3s;"></i>
+                </div>
+                <h2>⑥音声変換：Azure Speechで書き起こし</h2>
+                <div class="content">
+                    <p>音声ファイルも<span class="highlight">Azure Speechサービスと連携して書き起こしが可能</span>。会議録音やポッドキャストをテキスト化してRAGに組み込める。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-headphones"></i><span>MP3、WAVなどの音声ファイルに対応</span></li>
+                        <li><i class="fas fa-language"></i><span>Azure Speech APIで高精度な文字起こし</span></li>
+                        <li><i class="fas fa-clock"></i><span>タイムスタンプ付きの出力も可能</span></li>
+                    </ul>
+                    <pre># 音声ファイルの書き起こし結果
+
+会議は午前10時から始まりました。
+まず、今四半期の売上について報告します... </pre>
+                </div>
+            </div>
+
+            <!-- Card 7: RAG Pipeline Problem -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-triangle-exclamation fa-5x" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>⑦なぜPDFをそのままLLMに渡してはいけないのか</h2>
+                <div class="content">
+                    <p>PDFをそのままLLMに渡すのは<span class="highlight">非効率で精度も下がる</span>。理由は明確だ。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-ban"></i><span>PDFはバイナリ形式で構造情報の解釈が困難</span></li>
+                        <li><i class="fas fa-layer-group"></i><span>見出し階層やテーブル構造が失われる</span></li>
+                        <li><i class="fas fa-puzzle-piece"></i><span>チャンキング（分割）の精度が著しく低下</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-exclamation-triangle fa-lg" style="color: #BF5656;"></i>
+                            PDF → LLM の直渡しは<br>RAGの精度を大きく下げる原因に！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: Markdown Benefits for RAG -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-arrow-up-right-dots fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑧マークダウン変換でチャンキング精度が劇的に向上</h2>
+                <div class="content">
+                    <p>マークダウンに変換することで<span class="highlight">見出し階層、テーブル、書式がプレーンテキストで構造を保持</span>される。これがRAGの精度を大きく引き上げる。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-heading"></i><span>見出し（# ## ###）でセクション分割が正確に</span></li>
+                        <li><i class="fas fa-table"></i><span>テーブル構造がそのまま保持される</span></li>
+                        <li><i class="fas fa-bold"></i><span>太字やリストなどの書式情報が残る</span></li>
+                        <li><i class="fas fa-scissors"></i><span>意味的なチャンキングが容易になる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fas fa-check fa-lg" style="color: #22C55E;"></i>
+                        構造を保ったままテキスト化するのが<br>RAG前処理の正しいアプローチ！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 9: LangChain & LlamaIndex -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-link fa-5x" style="animation: fa-flip 3s;"></i>
+                </div>
+                <h2>⑨LangChain・LlamaIndexもマークダウンをネイティブサポート</h2>
+                <div class="content">
+                    <p><span class="highlight">LangChainとLlamaIndexはマークダウンローダーをネイティブでサポート</span>している。つまり、MarkItDownで変換したマークダウンはそのままRAGフレームワークに流し込める。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-chain"></i><span>LangChainのMarkdownLoaderで直接読み込み可能</span></li>
+                        <li><i class="fas fa-book-open"></i><span>LlamaIndexのMarkdownReaderも標準搭載</span></li>
+                        <li><i class="fas fa-arrows-spin"></i><span>変換→チャンキング→埋め込み→検索のパイプラインがシンプルに</span></li>
+                    </ul>
+                    <pre># パイプラインの流れ
+PDF → MarkItDown → Markdown
+  → LangChain MarkdownLoader
+    → チャンキング → Embedding → 検索</pre>
+                </div>
+            </div>
+
+            <!-- Card 10: Competitor Comparison -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-scale-balanced fa-5x" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>⑩競合比較：MarkItDown vs Docling vs Unstructured</h2>
+                <div class="content">
+                    <p>RAG前処理ツールの<span class="highlight">3強を比較</span>すると、それぞれ特徴が明確に異なる。</p>
+                    <div class="step-box">
+                        <strong><i class="fas fa-trophy"></i> MarkItDown（Microsoft）</strong><br>
+                        ・インストールサイズ：<span class="keyword-tag">数MB</span><br>
+                        ・完全ローカル実行、無料<br>
+                        ・軽量で高速だが複雑なPDFにはやや弱い<br><br>
+                        <strong><i class="fas fa-building"></i> Docling（IBM）</strong><br>
+                        ・高精度なPDF変換<br>
+                        ・インストール：<span class="keyword-tag">数GB</span>と重量級<br>
+                        ・複雑な日本語PDFに強い<br><br>
+                        <strong><i class="fas fa-cloud"></i> Unstructured.IO</strong><br>
+                        ・高機能なドキュメント処理<br>
+                        ・API従量課金が発生<br>
+                        ・エンタープライズ向け
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: Lightweight Advantage -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-feather-pointed fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑪MarkItDownの最大の強み：軽量・ローカル・無料</h2>
+                <div class="content">
+                    <p>MarkItDownが選ばれる最大の理由は<span class="highlight">「軽量・ローカル・無料」の3拍子</span>が揃っていること。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-feather"></i><span><span class="keyword-tag">数MB</span>のインストールサイズで済む</span></li>
+                        <li><i class="fas fa-laptop"></i><span>完全ローカル実行で外部APIへの依存なし</span></li>
+                        <li><i class="fas fa-coins"></i><span>MITライセンスで完全無料</span></li>
+                        <li><i class="fas fa-bolt"></i><span>シンプルなAPIですぐに使い始められる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fas fa-rocket fa-lg" style="color: #BF8136;"></i>
+                            Doclingは数GBもインストールするから<br>手軽さではMarkItDownが圧勝！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: Use Case 1 -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-building-user fa-5x" style="animation: fa-flip 3s;"></i>
+                </div>
+                <h2>⑫活用事例①：社内ドキュメントのRAG前処理</h2>
+                <div class="content">
+                    <p>社内に散在するPDFやWord、PowerPointのドキュメントを<span class="highlight">MarkItDownで一括変換してRAGの知識ベースに組み込む</span>ことができる。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-file-pdf"></i><span>社内規程やマニュアルのPDFをマークダウン化</span></li>
+                        <li><i class="fas fa-file-word"></i><span>Wordの議事録をテキスト化して検索可能に</span></li>
+                        <li><i class="fas fa-robot"></i><span>変換後にLLMで社内AIチャットボットを構築</span></li>
+                    </ul>
+                    <div class="step-box">
+                        <strong>RAG構築の流れ:</strong><br>
+                        社内文書 → MarkItDown変換<br>
+                        → チャンキング → Embedding<br>
+                        → ベクトルDB格納 → AI検索
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13: Use Case 2 -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fab fa-github fa-5x" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>⑬活用事例②：オフィスファイルをGitHubでバージョン管理</h2>
+                <div class="content">
+                    <p>ExcelやPowerPointの仕様書をマークダウンに一括変換することで、<span class="highlight">GitHubでのバージョン管理が可能になる</span>。バイナリファイルはGit管理に向かなかった課題が一発で解決。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-code-branch"></i><span>仕様書の変更差分をGit diffで確認可能</span></li>
+                        <li><i class="fas fa-users"></i><span>チームでのレビューがプルリクエストで行える</span></li>
+                        <li><i class="fas fa-code-compare"></i><span>マークダウンなので差分が人間にも読める</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-check-double fa-lg" style="color: #22C55E;"></i>
+                            バイナリの仕様書が<br>テキストベースで管理できる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: Japanese PDF Limitation -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-language fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑭課題：日本語PDFの精度に課題あり</h2>
+                <div class="content">
+                    <p><span class="highlight">縦書きや複雑なレイアウトの日本語PDFでは文字化けや順序の乱れが発生</span>することがある。これはMarkItDownの現状の大きなトレードオフだ。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-align-right"></i><span>縦書きPDFの読み取り精度が低い</span></li>
+                        <li><i class="fas fa-table-cells-large"></i><span>複雑な表組みでセルの順序が乱れる</span></li>
+                        <li><i class="fas fa-font"></i><span>特殊フォントの文字化けが発生</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-exclamation-circle fa-lg" style="color: #BF5656;"></i>
+                            複雑な日本語PDFには<br>IBM Doclingの使用を検討しよう
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: API Breaking Changes -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-code-branch fa-5x" style="animation: fa-flip 3s;"></i>
+                </div>
+                <h2>⑮課題：バージョン間のAPI破壊的変更</h2>
+                <div class="content">
+                    <p>バージョン0.1.xから0.2.xへの移行で<span class="highlight">APIに破壊的変更</span>が発生している。マイグレーションガイドも不充分で、既存コードの修正が必要な場合がある。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-code"></i><span>関数名や引数の仕様が変更された</span></li>
+                        <li><i class="fas fa-book"></i><span>マイグレーションガイドが不充分</span></li>
+                        <li><i class="fas fa-lock"></i><span>バージョンを固定して運用するのが安全</span></li>
+                    </ul>
+                    <div class="prompt-box">
+                        <i class="fas fa-lock"></i> 推奨: requirements.txtで<br>
+                        バージョンを明示的に指定<br>
+                        markitdown==0.2.x
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16: Plugin Architecture -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-puzzle-piece fa-5x" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>⑯拡張性：コンバータープラグインで独自フォーマット対応</h2>
+                <div class="content">
+                    <p>MarkItDownは<span class="highlight">コンバータープラグイン方式</span>を採用しており、独自のファイル形式にも対応できる。LLMクライアントも依存性注入で差し替え可能。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-plug"></i><span>独自フォーマットのコンバーターを自作可能</span></li>
+                        <li><i class="fas fa-exchange-alt"></i><span>LLMクライアントをOpenAI / Ollamaなどに差し替え</span></li>
+                        <li><i class="fas fa-terminal"></i><span>CLIもあり、パイプラインに直接組み込み可能</span></li>
+                    </ul>
+                    <pre># 拡張のイメージ
+class MyConverter:
+    def convert(self, file):
+        # 独自フォーマットの変換処理
+        return markdown_text</pre>
+                </div>
+            </div>
+
+            <!-- Card 17: CLI Usage -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-terminal fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑰CLI活用：パイプで直接マークダウン出力</h2>
+                <div class="content">
+                    <p>MarkItDownは<span class="highlight">CLIツールとしても利用可能</span>で、パイプを使って他のコマンドと連携できる。</p>
+                    <pre># 基本的な使い方
+markitdown document.pdf > output.md
+
+# 複数ファイルの一括変換
+markitdown *.docx > all_docs.md
+
+# パイプで他ツールと連携
+markitdown data.xlsx | llm summarize
+
+# Python API
+from markitdown import MarkItDown
+md = MarkItDown()
+result = md.convert("report.pdf")
+print(result.text_content)</pre>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fas fa-terminal fa-lg" style="color: #BF8136;"></i>
+                        CLI一発で変換できるから<br>シェルスクリプトにも組み込みやすい！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 18: Conclusion -->
+            <div class="card fade-in-scale">
+                <div class="card-icon">
+                    <i class="fas fa-bullseye fa-5x" style="animation: fa-flip 3s;"></i>
+                </div>
+                <h2>⑱結論：RAG前処理のデファクトになりつつある</h2>
+                <div class="content">
+                    <p>MarkItDownは<span class="highlight">RAG前処理を軽量に実装したい場合に最適な選択肢</span>だ。ただし、用途に応じて使い分けることが重要。</p>
+                    <ul class="keyword-list">
+                        <li><i class="fas fa-check-circle" style="color: #22C55E;"></i><span><strong>MarkItDown:</strong> 軽量・高速・無料で大半のユースケースに対応</span></li>
+                        <li><i class="fas fa-check-circle" style="color: #3B82F6;"></i><span><strong>Docling:</strong> 複雑なレイアウトPDFの高精度変換が必要な場合</span></li>
+                        <li><i class="fas fa-arrow-trend-up"></i><span>マークダウン変換 → LLMに渡すパターンはデファクト化しつつある</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fas fa-lightbulb fa-lg" style="color: #BF8136;"></i>
+                        ファイル → マークダウン → LLM<br>
+                        この流れがこれからの標準になる！
+                    </span>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <span style="color: #CBD5E1;">
+                🎬 動画: <a href="https://www.youtube.com/watch?v=lIjItBdODGo" target="_blank" style="color: inherit;">テック解説</a> | 📅 2026年4月15日
+            </span>
+        </footer>
+    </div>
+</body>
+</html>

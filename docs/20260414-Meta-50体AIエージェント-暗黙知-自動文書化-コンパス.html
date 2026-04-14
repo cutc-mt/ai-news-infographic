@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meta流 50体のAIエージェントで暗黙知を自動文書化する仕組み</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+:root {
+    --ui-color-1: #1E40AF;
+    --ui-color-2: #3B82F6;
+    --ui-color-3: #93C5FD;
+    --ui-color-4: #0C1B33;
+    --ui-color-5: #DBEAFE;
+    --bg-color: #FFF8F5;
+    --text-color: #333333;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background-color: var(--bg-color); font-family: 'Zen Kurenaido', sans-serif; color: var(--text-color); line-height: 1.5; }
+.container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+.header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1), var(--ui-color-2)); border-radius: 25px; color: white; position: relative; overflow: hidden; }
+.header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%); animation: rotate 20s linear infinite; }
+@keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.header h1 { font-size: 34px; font-family: 'Kaisei Decol', serif; margin-bottom: 10px; position: relative; z-index: 1; }
+.header .date { font-size: 16px; opacity: 0.8; position: relative; z-index: 1; }
+.header .header-icon { font-size: 80px; margin-bottom: 15px; position: relative; z-index: 1; animation: fa-bounce 2s infinite; }
+.section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 30px; }
+.section-title { text-align: center; font-size: 28px; font-family: 'Kaisei Decol', serif; color: var(--ui-color-1); margin: 30px 0 15px; padding: 10px; border-bottom: 3px dashed var(--ui-color-2); }
+.section-card { flex: 1; min-width: 220px; max-width: 450px; background-color: white; border-radius: 20px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; transition: transform 0.3s, box-shadow 0.3s; }
+.section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+.section-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2), var(--ui-color-3)); }
+.mega-icon-container { text-align: center; margin: 15px 0; }
+.mega-icon-container i { color: var(--ui-color-1); }
+.mega-icon-container h2 { font-size: 20px; color: var(--ui-color-4); margin-top: 10px; font-family: 'Kaisei Decol', serif; }
+.card-content { padding: 0 10px 15px; }
+.keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+.keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+.keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+.keyword-tag { background-color: var(--ui-color-5); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+.speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+.speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+.speech-bubble.right::after { left: auto; right: 20px; }
+.speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+.speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+.speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+.speech-bubble.variant-2 { background: #FFE9E9; border-color: #BF5656; transform: rotate(-2deg); }
+.speech-bubble.variant-2::after { border-color: #BF5656 transparent; }
+.handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+pre { background: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; overflow-x: auto; border-left: 3px solid var(--ui-color-2); }
+@keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+.fade-in-scale { animation: fadeInScale 0.6s ease-out forwards; }
+.footer { text-align: center; padding: 20px; margin-top: 30px; background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1)); border-radius: 20px; color: white; font-size: 14px; }
+.footer a { color: var(--ui-color-3); text-decoration: none; font-weight: bold; }
+.footer a:hover { text-decoration: underline; }
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px) { .section-card { min-width: 380px; } }
+@media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+    <div class="header-icon"><i class="fa-solid fa-people-group" aria-hidden="true"></i></div>
+    <h1>Meta流 50体のAIエージェントで暗黙知を自動文書化</h1>
+    <p class="date"><i class="fa-solid fa-calendar"></i> 2026年4月14日</p>
+</div>
+
+<div class="section-title"><i class="fa-solid fa-circle-exclamation"></i> 問題: AIが役に立たなかった理由</div>
+<div class="section-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-database fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>① Metaの巨大データパイプライン</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-server" aria-hidden="true"></i><span>4つのリポジトリ、3つのプログラミング言語、<span class="keyword-tag">4100以上のファイル</span></span></li>
+            <li><i class="fa-solid fa-globe" aria-hidden="true"></i><span>Facebookのユーザーデータや広告配信システムを処理する<span class="keyword-tag">会社の心臓部</span></span></li>
+            <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>最新のAIならこの量のファイルを全て読み込める（コンテキストウィンドウが広い）</span></li>
+            <li><i class="fa-solid fa-xmark" aria-hidden="true"></i><span>読めるのに出てくるコードが<span class="keyword-tag">ことごとく的が外れ</span>だった</span></li>
+        </ul>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i> Metaほどの技術力があっても、AIエージェントは役に立たなかったのです</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="animation: fa-bounce 2s infinite; color: #BF5656;" aria-hidden="true"></i>
+        <h2>② 原因は「暗黙知」の欠如</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user-secret" aria-hidden="true"></i><span>コードには書いていないが、<span class="keyword-tag">ベテランの頭の中にだけある</span>お約束ごと</span></li>
+            <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>「ここはこうするもんだ」みたいな<span class="keyword-tag">誰も教えてくれないルール</span></span></li>
+            <li><i class="fa-solid fa-book-open" aria-hidden="true"></i><span>AIはコードしか見ていないので、文脈がなくて<span class="keyword-tag">別物と認識</span>してしまう</span></li>
+            <li><i class="fa-solid fa-mountain" aria-hidden="true"></i><span>氷山に例えると: 水面上がドキュメント、水面下が暗黙知</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+            <span class="handwritten"><i class="fa-solid fa-exclamation-triangle fa-lg" style="color: #BF5656;"></i> 読める量の問題ではなく「読み方」の問題だったのです！</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-bug fa-5x" style="animation: fa-flip 2s infinite; color: #BF5656;" aria-hidden="true"></i>
+        <h2>③ フィールド名の罠</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-shuffle" aria-hidden="true"></i><span>同じ「ユーザーを削除」でも<span class="keyword-tag">モードによって名前が違う</span></span></li>
+            <li><i class="fa-solid fa-list" aria-hidden="true"></i><span>通常モード: <span class="keyword-tag">userId</span></span></li>
+            <li><i class="fa-solid fa-list" aria-hidden="true"></i><span>バッチモード: <span class="keyword-tag">batchUserId</span></span></li>
+            <li><i class="fa-solid fa-list" aria-hidden="true"></i><span>リアルタイムモード: <span class="keyword-tag">rtu</span></span></li>
+            <li><i class="fa-solid fa-ghost" aria-hidden="true"></i><span>見た目は全然違うのに<span class="keyword-tag">意味は同じ</span> — これが歴史的経緯で散在</span></li>
+        </ul>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-skull-crossbones fa-5x" style="animation: fa-bounce 2s infinite; color: #BF5656;" aria-hidden="true"></i>
+        <h2>④ サイレントバグの恐怖</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-ghost" aria-hidden="true"></i><span><span class="keyword-tag">エラーは出ない</span>のに動作が意図と違う「サイレントバグ」</span></li>
+            <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>本番環境でデータがおかしいと気づいたら、<span class="keyword-tag">3週間前のAI生成コード</span>が原因</span></li>
+            <li><i class="fa-solid fa-user-slash" aria-hidden="true"></i><span>人間のエンジニアは経験でわかるが、AIは<span class="keyword-tag">文脈がない</span>ので間違える</span></li>
+            <li><i class="fa-solid fa-file-circle-xmark" aria-hidden="true"></i><span>文書化された非自明パターンは<span class="keyword-tag">ゼロ</span>だった</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+            <span class="handwritten"><i class="fa-solid fa-skull fa-lg" style="color: #BF5656;"></i> 暗黙知を書類化するのは後回しになりがち…できる人ほど忙しくて共有できないのです</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<div class="section-title"><i class="fa-solid fa-gears"></i> 解決策: Pre-computeエンジン</div>
+<div class="section-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-utensils fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑤ 料理の比喩で理解する仕組み</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-hat-chef fa-5x" aria-hidden="true" style="color: var(--ui-color-2); font-size: 30px;"></i><span>シェフ（コーディングAI）が料理を始める<span class="keyword-tag">前に</span>、アシスタントが準備</span></li>
+            <li><i class="fa-solid fa-book" aria-hidden="true"></i><span>材料の特性や調理の注意点を<span class="keyword-tag">レシピ（下準備）</span>としてまとめる</span></li>
+            <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>「このモジュールは名前規則が違うから気をつけて」という情報を事前に用意</span></li>
+        </ul>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> AIが作業する前に、別のAIが下ごしらえをする。これがPre-computeエンジンです！</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑥ Explorer（エクスプローラー）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-map" aria-hidden="true"></i><span>コードベースを<span class="keyword-tag">探索</span>してモジュールの地図を作る係</span></li>
+            <li><i class="fa-solid fa-folder-tree" aria-hidden="true"></i><span>4100ファイル全体をスキャンして<span class="keyword-tag">全体像を把握</span></span></li>
+            <li><i class="fa-solid fa-compass" aria-hidden="true"></i><span>どのモジュールがどこにあるかをマッピング</span></li>
+        </ul>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microscope fa-5x" style="animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+        <h2>⑦ Analyst（アナリスト）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-search" aria-hidden="true"></i><span>各モジュールを<span class="keyword-tag">深掘り</span>して分析する係</span></li>
+            <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>モジュール担当のエージェントに<span class="keyword-tag">質問を投げる</span></span></li>
+            <li><i class="fa-solid fa-question" aria-hidden="true"></i><span>「このモジュールは何をするものか？よくある失敗は何か？」などを分析</span></li>
+        </ul>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-pen-fancy fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑧ Writer + Critic（ライターとクリティック）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span><span class="keyword-tag">Writer</span>: アナリストの回答をドキュメントにまとめる</span></li>
+            <li><i class="fa-solid fa-user-check" aria-hidden="true"></i><span><span class="keyword-tag">Critic</span>: ドキュメントの正確性を検証する（ハルシネーション対策）</span></li>
+            <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span><span class="keyword-tag">3ラウンド</span>のレビュー: Critic指摘 → Writer修正 → Upgrader磨き上げ</span></li>
+            <li><i class="fa-solid fa-shield" aria-hidden="true"></i><span>AIがAIのプルリクにAIがコメントしてAIがマージする世界</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> 気評価（クリティック）がいるのが良い！AIの回答はたまに嘘をつきますからね</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<div class="section-title"><i class="fa-solid fa-compass"></i> 5つの質問フレームワークとコンパス</div>
+<div class="section-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-list-ol fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑨ 5つの質問フレームワーク</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-1" aria-hidden="true"></i><span>この<span class="keyword-tag">モジュールは何か</span>？</span></li>
+            <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="keyword-tag">重要なファイル</span>はどれか？</span></li>
+            <li><i class="fa-solid fa-3" aria-hidden="true"></i><span><span class="keyword-tag">非自明なパターン</span>は何か？</span></li>
+            <li><i class="fa-solid fa-4" aria-hidden="true"></i><span>他のモジュールと<span class="keyword-tag">どう繋がる</span>か？</span></li>
+            <li><i class="fa-solid fa-5" aria-hidden="true"></i><span><span class="keyword-tag">よくある落とし穴</span>は何か？</span></li>
+        </ul>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 特に3番と5番がキモ！ベテランの頭の中にしかない情報を言語化します</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-compass fa-5x" style="animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+        <h2>⑩ 百科事典ではなく「コンパス」</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-book" aria-hidden="true"></i><span>百科事典は何でも載っているが<span class="keyword-tag">分厚すぎて使いにくい</span></span></li>
+            <li><i class="fa-solid fa-compass" aria-hidden="true"></i><span>コンパスは<span class="keyword-tag">今どっちに進むべきかだけ</span>を教えてくれる</span></li>
+            <li><i class="fa-solid fa-ruler" aria-hidden="true"></i><span>モジュールごとに<span class="keyword-tag">25〜35行</span>に圧縮</span></li>
+            <li><i class="fa-solid fa-scissors" aria-hidden="true"></i><span>無駄な文章はゼロ。「あったらいいかも」は<span class="keyword-tag">全部削る</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 100ページのマニュアルより1ページのチートシートの方が使いやすい！</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-table-columns fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑪ コンパスの4つの固定セクション</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span><span class="keyword-tag">Quick Commands</span>: よく使うコマンド一覧</span></li>
+            <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span><span class="keyword-tag">Important Files</span>: 重要ファイルのリスト</span></li>
+            <li><i class="fa-solid fa-exclamation" aria-hidden="true"></i><span><span class="keyword-tag">Non-obvious Patterns</span>: 非自明なパターンの解説</span></li>
+            <li><i class="fa-solid fa-link" aria-hidden="true"></i><span><span class="keyword-tag">Related Modules</span>: 関連モジュールへのリンク</span></li>
+        </ul>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> 「このコマンド叩いて、このファイル見て、この罠に気をつけて」が一目で分かります！</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-eye-slash fa-5x" style="animation: fa-bounce 2s infinite; color: #BF5656;" aria-hidden="true"></i>
+        <h2>⑫ Lost in the Middle問題</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-align-center" aria-hidden="true"></i><span>長いコンテキストの<span class="keyword-tag">真ん中ら辺</span>の情報はAIが見落としやすい</span></li>
+            <li><i class="fa-solid fa-compress" aria-hidden="true"></i><span>情報が多すぎると<span class="keyword-tag">かえって混乱</span>する（人間も同じ）</span></li>
+            <li><i class="fa-solid fa-check" aria-hidden="true"></i><span>25行のコンパスなら<span class="keyword-tag">全部を確実に読める</span></span></li>
+            <li><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>「ないと確実に間違える情報だけ残す」がコツ</span></li>
+        </ul>
+    </div>
+</div>
+
+</div>
+
+<div class="section-title"><i class="fa-solid fa-chart-line"></i> 驚異の結果</div>
+<div class="section-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-up-right-dots fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑬ カバレッジ: 5% → 100%</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-chart-pie" aria-hidden="true"></i><span>導入前: 4100ファイル中わずか<span class="keyword-tag">5%</span>しかナビゲーション情報なし</span></li>
+            <li><i class="fa-solid fa-chart-pie" aria-hidden="true"></i><span>導入後: <span class="keyword-tag">100%</span>のファイルにナビゲーション情報が付与された</span></li>
+            <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>人間なら何年かかるかわからない作業を<span class="keyword-tag">AIが数週間</span>で完了</span></li>
+        </ul>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i> スケールの暴力！5%から100%は「倍」じゃなくて桁違いの改善です</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-stopwatch fa-5x" style="animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+        <h2>⑭ 調査時間: 20日 → 30分</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-hourglass" aria-hidden="true"></i><span>導入前: 新しいワークフローを理解するのに<span class="keyword-tag">20日</span>かかっていた</span></li>
+            <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>導入後: コンパスがあれば<span class="keyword-tag">30分</span>で理解可能</span></li>
+            <li><i class="fa-solid fa-percent" aria-hidden="true"></i><span><span class="keyword-tag">96%の時間削減</span>を実現</span></li>
+            <li><i class="fa-solid fa-route" aria-hidden="true"></i><span>「まずここを見ろ。この罠に気をつけろ」がすぐ分かるから</span></li>
+        </ul>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑮ ハルシネーション率: 0%</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-check-double" aria-hidden="true"></i><span>AIが作ったドキュメントの<span class="keyword-tag">ハルシネーション率は0%</span></span></li>
+            <li><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>Criticエージェントによる<span class="keyword-tag">3ラウンド検証</span>のおかげ</span></li>
+            <li><i class="fa-solid fa-arrow-up" aria-hidden="true"></i><span>品質スコア: 3.65点 → <span class="keyword-tag">4.5点</span>（5点満点）に改善</span></li>
+            <li><i class="fa-solid fa-award" aria-hidden="true"></i><span>ベテランエンジニアが書いたドキュメントに近い品質</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+            <span class="handwritten"><i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i> AIなのに嘘なし！Criticエージェントの3ラウンド検証が効いています</span>
+        </div>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑯ 5つの導入ステップ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-1" aria-hidden="true"></i><span><span class="keyword-tag">ギャップの特定</span>: 新人がつまずく場所、AIがポンコツ回答する場所を見つける</span></li>
+            <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="keyword-tag">5つの質問</span>: つまずきポイントに対して5つの質問フレームワークで言語化</span></li>
+            <li><i class="fa-solid fa-3" aria-hidden="true"></i><span><span class="keyword-tag">25〜35行</span>: 情報を削って削って本当に必要なことだけ残す</span></li>
+            <li><i class="fa-solid fa-4" aria-hidden="true"></i><span><span class="keyword-tag">品質ゲート</span>: 内容を検証するステップ（AIでも人間でも可）</span></li>
+            <li><i class="fa-solid fa-5" aria-hidden="true"></i><span><span class="keyword-tag">自動化</span>: 定期的に情報を更新する仕組みを構築</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 「ないと死ぬ情報だけ」と考えると、25行に絞りやすくなります</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<div class="section-title"><i class="fa-solid fa-repeat"></i> 自己メンテナンスとまとめ</div>
+<div class="section-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x" style="animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+        <h2>⑰ 自己メンテナンスシステム</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-calendar-check" aria-hidden="true"></i><span>数週間ごとにファイルパスを検証して<span class="keyword-tag">リンク切れ</span>をチェック</span></li>
+            <li><i class="fa-solid fa-plus" aria-hidden="true"></i><span>新しいモジュールの追加を<span class="keyword-tag">自動で検出</span></span></li>
+            <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>ドキュメントも<span class="keyword-tag">自動で更新</span></span></li>
+            <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>AIが作ってAIが維持する — 人間はほぼノータッチ</span></li>
+            <li><i class="fa-solid fa-user" aria-hidden="true"></i><span>人間の仕事は大きな方針を決めることと最終チェックくらいに</span></li>
+        </ul>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-bullseye fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑱ まとめ: AIには文脈が必要</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-quote-left" aria-hidden="true"></i><span>「<span class="keyword-tag">AIには文脈が必要。その文脈はAIが作れる</span>」</span></li>
+            <li><i class="fa-solid fa-right-left" aria-hidden="true"></i><span>パラダイムシフト: 人間が書く → AIがAIのために書く</span></li>
+            <li><i class="fa-solid fa-toolbox" aria-hidden="true"></i><span>Claude Code、GitHub Copilot、Cursorなど<span class="keyword-tag">ツールに依存しない</span>考え方</span></li>
+            <li><i class="fa-solid fa-play" aria-hidden="true"></i><span>まずは自チームの暗黙知をリストアップして、25行以内でまとめてみよう</span></li>
+            <li><i class="fa-solid fa-arrow-up" aria-hidden="true"></i><span>コンパスをAIツールに渡すだけで<span class="keyword-tag">精度がグッと上がる</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> AIエージェントが使えなくても、この考え方は真似できます！まずは試してみましょう</span>
+        </div>
+    </div>
+</div>
+
+</div>
+
+<div class="footer">
+    <p>🎬 動画: <a href="https://youtu.be/yate8bMrdsg" target="_blank">AI解説チャンネル</a> | 📅 2026年4月14日</p>
+    <p style="margin-top: 5px; font-size: 12px; opacity: 0.7;">Meta流 50体のAIエージェントで暗黙知を自動文書化する仕組みを徹底解説</p>
+</div>
+</div>
+</body>
+</html>

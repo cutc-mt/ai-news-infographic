@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ParseBench — AIエージェントのための初のドキュメントOCRベンチマック</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #2D6A4F;
+            --color-2: #D4A373;
+            --color-3: #FEFAE0;
+            --color-4: #1B4332;
+            --color-5: #E76F51;
+            --gradient-1: linear-gradient(135deg, #1B4332 0%, #2D6A4F 50%, #40916C 100%);
+            --gradient-2: linear-gradient(45deg, #2D6A4F, #D4A373);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Yomogi', cursive; background: #FFF8F5; min-height: 100vh; }
+        .container { max-width: 2000px; margin: 0 auto; }
+
+        /* Header */
+        header {
+            text-align: center;
+            padding: 50px 20px 40px;
+            background: var(--gradient-1);
+            border-radius: 0 0 30px 30px;
+            margin-bottom: 30px;
+        }
+        header .header-icon { font-size: 5em; color: #D4A373; margin-bottom: 15px; animation: fa-bounce 2s infinite; }
+        h1 {
+            font-family: 'Zen Kurenaido', sans-serif;
+            font-size: 2.4em;
+            color: #fff;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+        .subtitle {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 1.15em;
+            color: rgba(255,255,255,0.9);
+            margin-bottom: 20px;
+        }
+        .header-tags { margin-top: 15px; }
+        .tag {
+            display: inline-block;
+            background: var(--gradient-2);
+            color: #fff;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            margin: 4px;
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            padding: 20px 25px;
+        }
+        @media (max-width: 1600px) {
+            .grid { grid-template-columns: repeat(3, 1fr); }
+        }
+        @media (max-width: 1200px) {
+            .grid { grid-template-columns: repeat(2, 1fr); }
+        }
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        /* Card */
+        .card {
+            background: rgba(255,255,255,0.97);
+            border-radius: 20px;
+            padding: 25px 20px;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.08);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        .card.visible {
+            opacity: 1;
+            transform: translateY(0);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 4px;
+            background: var(--gradient-2);
+        }
+
+        /* Card Icon */
+        .card-icon {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+        .card-icon i {
+            font-size: 3.5em;
+            color: var(--color-1);
+            animation: fa-beat-fade 3s infinite;
+        }
+
+        /* Card Title */
+        .card h2 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 1.1em;
+            color: var(--color-4);
+            margin-bottom: 12px;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        /* Card Body */
+        .card p {
+            font-size: 0.92em;
+            color: #333;
+            line-height: 1.85;
+            text-align: left;
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(120deg, rgba(45,106,79,0.10), rgba(212,163,115,0.12));
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: var(--color-4);
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 18px;
+            padding: 10px 14px;
+            margin: 15px 5px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+            transform: rotate(-1deg);
+            font-size: 0.88em;
+            line-height: 1.6;
+            color: #333;
+        }
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 20px;
+            border-width: 11px 7px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+        }
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -12px;
+            border-width: 0 7px 11px;
+        }
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-2);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-2) transparent;
+        }
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--color-5);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after {
+            border-color: var(--color-5) transparent;
+        }
+
+        /* Keyword Tags inside cards */
+        .keyword-tag {
+            display: inline-block;
+            background-color: var(--color-3);
+            color: var(--color-4);
+            padding: 3px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.85em;
+            margin: 3px 4px 3px 0;
+        }
+
+        /* Code Preview */
+        .code-preview {
+            background: #1E293B;
+            color: #E2E8F0;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.82em;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+
+        /* Inline icon */
+        .inline-icon {
+            margin-right: 6px;
+            color: var(--color-2);
+        }
+
+        /* List inside card */
+        .card-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        .card-list li {
+            margin-bottom: 6px;
+            font-size: 0.9em;
+            color: #333;
+            line-height: 1.7;
+            display: flex;
+            align-items: flex-start;
+        }
+        .card-list li i {
+            margin-right: 8px;
+            color: var(--color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            background: var(--gradient-1);
+            border-radius: 30px 30px 0 0;
+            margin-top: 40px;
+            color: rgba(255,255,255,0.85);
+            font-family: 'Kaisei Decol', serif;
+            font-size: 0.95em;
+        }
+        footer a {
+            color: #D4A373;
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Section Divider */
+        .section-divider {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .section-divider h3 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 1.3em;
+            color: var(--color-1);
+            display: inline-block;
+            border-bottom: 3px solid var(--color-2);
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-icon">
+                <i class="fas fa-file-lines" aria-hidden="true"></i>
+            </div>
+            <h1>ParseBench — AIエージェントのための初のドキュメントOCRベンチマーク</h1>
+            <p class="subtitle">コンテンツ忠実性（Content Faithfulness）を深掘り — テキスト精度を保証する新しいメトリクス</p>
+            <div class="header-tags">
+                <span class="tag">ParseBench</span>
+                <span class="tag">LlamaIndex</span>
+                <span class="tag">OCR</span>
+                <span class="tag">Content Faithfulness</span>
+                <span class="tag">ドキュメント解析</span>
+                <span class="tag">AIエージェント</span>
+            </div>
+        </header>
+
+        <div class="grid">
+
+            <!-- Card 1 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-triangle-exclamation fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>① 95%の類似性でも致命的な問題が起きる</h2>
+                <p>パーサーの出力が元の文書と95%似ていると聞けば素晴らしいように思える。しかし、<span class="highlight">欠落した5%が法的契約の責任条項だったらどうだろうか</span>。見落とされた条項一つで、ビジネスに甚大な被害をもたらす可能性がある。「大体合っている」ではAIエージェントには不十分なのだ。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-exclamation-circle inline-icon" aria-hidden="true"></i>
+                    残り5%が契約の重要条項だったら...<br>大惨事になる可能性がある！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">95%の罠</span>
+                    <span class="keyword-tag">責任条項の欠落</span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-flask fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>② ParseBenchとは何か</h2>
+                <p><span class="highlight">ParseBenchはAIエージェントのための初のドキュメントOCRベンチマーク</span>だ。約2,000ページの人間が検証したエンタープライズ文書と167,000以上のテストルールで構成されている。テーブル、チャート、コンテンツ忠実性、セマンティック書式、ビジュアルグラウンディングの5つの能力軸で評価を行う。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-check-circle" aria-hidden="true"></i><span>約2,000ページの人間検証済みデータ</span></li>
+                    <li><i class="fas fa-check-circle" aria-hidden="true"></i><span>167,000以上のテストルール</span></li>
+                    <li><i class="fas fa-check-circle" aria-hidden="true"></i><span>5つの能力軸で総合評価</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">LlamaIndex</span>
+                    <span class="keyword-tag">オープンソース</span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-shield-halved fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>③ コンテンツ忠実性が最も重要な理由</h2>
+                <p>ParseBenchの5つの評価軸の中で、<span class="highlight">コンテンツ忠実性（Content Faithfulness）は最も基本的かつ重要な次元</span>だ。パーサーがテキストを正しく、正しい順序で、捏造せずにキャプチャできているかを検証する。エージェントのコンテキストが不完全または偽造されていれば、下流のすべての判断が危険に晒される。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-brain inline-icon" aria-hidden="true"></i>
+                    コンテキストが間違っていれば、<br>エージェントは「誤った現実」で判断することに！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">Content Faithfulness</span>
+                    <span class="keyword-tag">最も重要な次元</span>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-eye-slash fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>④ 欠落（Omissions）の3つのレベル</h2>
+                <p>パーサーがテキストを取りこぼす「欠落」には3つのレベルがある。<span class="highlight">単語レベル、文レベル、数字レベル</span>でそれぞれテキストが欠落する。契約書で金額の桁が一つ抜けるだけで、意味が全く変わってしまう。数字の欠落は特にビジネス上の重大なリスクを伴う。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-font" aria-hidden="true"></i><span><strong>単語レベル</strong>: キーワードが抜け落ちる</span></li>
+                    <li><i class="fas fa-paragraph" aria-hidden="true"></i><span><strong>文レベル</strong>: 文全体が消える</span></li>
+                    <li><i class="fas fa-hashtag" aria-hidden="true"></i><span><strong>数字レベル</strong>: 金額や数値が欠落</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">Omissions</span>
+                    <span class="keyword-tag">単語・文・数字</span>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-ghost fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑤ ハルシネーション（幻覚）の危険性</h2>
+                <p>OCRパーサーが<span class="highlight">原文書に存在しないコンテンツを勝手にでっち上げる現象</span>を「ハルシネーション」と呼ぶ。LLMと同様に、パーサーも幻覚を起こすことがある。存在しない条項や金額を追加してしまえば、エージェントは事実に基づかない判断を下すことになる。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-ghost inline-icon" aria-hidden="true"></i>
+                    パーサーが勝手に文をでっち上げたら...<br>エージェントは「偽の現実」で動くことに！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">Hallucinations</span>
+                    <span class="keyword-tag">捏造コンテンツ</span>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-arrows-turn-to-dots fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑥ 読み順序違反（Reading Order Violations）</h2>
+                <p>多段組レイアウトの文書では、パーサーが正しくない順序でテキストを線形化してしまうことがある。<span class="highlight">脚注が本文より前に来たり、段をまたぐ順序が崩れたりする</span>。これにより意味が全く変わってしまい、エージェントは誤った文脈で判断を下す。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-columns" aria-hidden="true"></i><span>多段組レイアウトで発生しやすい</span></li>
+                    <li><i class="fas fa-arrow-down" aria-hidden="true"></i><span>脚注が本文より先に出力される</span></li>
+                    <li><i class="fas fa-shuffle" aria-hidden="true"></i><span>段をまたぐ順序が崩壊する</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">Reading Order</span>
+                    <span class="keyword-tag">多段組レイアウト</span>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-ruler-combined fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑦ 従来のメトリクスの限界</h2>
+                <p><span class="highlight">BLEUやROUGEなどの従来のテキスト類似性メトリクス</span>は、タイポや小さな差異を検出するのは得意だが、エージェントにとって実際に重要な欠陥を見逃してしまう。文全体の欠落、存在しないコンテンツの幻覚、読み順序の崩れなどは、類似性スコアでは「良い」評価が出てしまう。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-lightbulb inline-icon" aria-hidden="true"></i>
+                    テキスト類似性が95%でも、<br>重要な文が欠けているかも！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">BLEU</span>
+                    <span class="keyword-tag">ROUGE</span>
+                    <span class="keyword-tag">テキスト類似性の罠</span>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-gears fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑧ ルールベース評価の仕組み</h2>
+                <p>コンテンツ忠実性スコア（CFS）は、<span class="highlight">147,000以上の個別テストルールによるルールベースの評価システム</span>を採用している。あいまいなテキスト類似性ではなく、人間が検証したMarkdownトランスクリプションから導き出された緻密なルールで厳密に評価する。エージェントのワークフローに適した堅牢なテスト基盤だ。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-list-check" aria-hidden="true"></i><span>147,000以上の個別テストルール</span></li>
+                    <li><i class="fas fa-user-check" aria-hidden="true"></i><span>人間が検証したMarkdownベース</span></li>
+                    <li><i class="fas fa-robot" aria-hidden="true"></i><span>エージェントワークフロー向けに設計</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">CFS</span>
+                    <span class="keyword-tag">ルールベース評価</span>
+                </div>
+            </div>
+
+            <!-- Section Divider -->
+            <div class="section-divider">
+                <h3><i class="fas fa-chart-bar inline-icon"></i> ParseBenchの5つの評価軸</h3>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-table fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑨ テーブル（Tables）の評価</h2>
+                <p>エンタープライズ文書にはテーブルが頻繁に登場するが、<span class="highlight">実際のテーブルは単純なグリッドではなく、結合セルや階層ヘッダー、複数ページにまたがる構造</span>を持つ。TableRecordMatchという新しいメトリクスで、列の並べ替えなどの無害な違いにはペナルティを与えず、ヘッダーの転置や列名の欠落などの重大なエラーには厳しく評価する。</p>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">TableRecordMatch</span>
+                    <span class="keyword-tag">結合セル</span>
+                    <span class="keyword-tag">階層ヘッダー</span>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-pie fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑩ チャート（Charts）の評価</h2>
+                <p>多くのパーサーはチャートをスキップするか、生のOCRテキストとして出力する。<span class="highlight">チャート評価では1チャートあたり最大10個のスポットチェックデータポイント</span>を注釈し、数値・ラベル・許容誤差を検証する。明示的な値ラベルのあるチャートは完全一致を求め、軸から読み取る場合は1%の許容誤差を適用する。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-chart-line inline-icon" aria-hidden="true"></i>
+                    チャートで50%を超えるのは<br>たった4社のみという厳しい結果！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">スポットチェック</span>
+                    <span class="keyword-tag">1%許容誤差</span>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-text-width fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑪ セマンティック書式（Semantic Formatting）</h2>
+                <p>ほとんどのパーサーは書式を装飾として扱い、削除してしまう。しかし書式には意味がある。<span class="highlight">取り消し線の価格は現行価格ではなく、上付き文字の「1」は脚注参照であって数字の1ではない</span>。エージェントが「$49.99 $39.99」を区別できなければ、旧価格を提示してしまうリスクがある。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-strikethrough" aria-hidden="true"></i><span>取り消し線 = 無効な価格</span></li>
+                    <li><i class="fas fa-superscript" aria-hidden="true"></i><span>上付き文字 = 脚注参照</span></li>
+                    <li><i class="fas fa-bold" aria-hidden="true"></i><span>太字 = 重要な集計値</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">Semantic Formatting</span>
+                    <span class="keyword-tag">書式の意味</span>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-crosshairs fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑫ ビジュアルグラウンディング（Visual Grounding）</h2>
+                <p><span class="highlight">抽出した全要素を元のページ上の位置に追溯到できるか</span>を評価する。規制業界での監査可能性に不可欠だ。保険フォームから補償限度額を抽出した場合、その数値がページのどの位置から来たのかを正確に示す必要がある。局所化・分類・属性付けの3つを統合して評価する。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-search inline-icon" aria-hidden="true"></i>
+                    この数字はどこから来たの？<br>という問いに答えるのがグラウンディング！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">Visual Grounding</span>
+                    <span class="keyword-tag">監査可能性</span>
+                </div>
+            </div>
+
+            <!-- Section Divider -->
+            <div class="section-divider">
+                <h3><i class="fas fa-ranking-star inline-icon"></i> ベンチマーク結果と分析</h3>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-trophy fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑬ LlamaParse Agenticが84.9%で総合首位</h2>
+                <p><span class="highlight">14の手法を3つのカテゴリ（汎用VLM、専門パーサー、LlamaParse）で評価</span>した結果、LlamaParse Agenticが84.9%で唯一5つの全次元で競争力のあるスコアを記録した。GPT-5 Mini、Haiku 4.5、Gemini 3 Flash、Qwen 3 VL、Textract、Azure Document AIなど強豪が揃う中での成果だ。</p>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">14手法</span>
+                    <span class="keyword-tag">84.9%</span>
+                    <span class="keyword-tag">LlamaParse Agentic</span>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-column fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑭ コンテンツ忠実性はほぼ解決済み、しかし...</h2>
+                <p>最良の手法は<span class="highlight">約90%の忠実性スコアに到達している</span>。素晴らしいように聞こえるが、これは10ページ中1ページで意味のある欠落やハルシネーションが発生することを意味する。リスクの高いワークフローでは許容できない水準だ。ParseBenchはどの種類の文書に注意が必要かを理解するのに役立つ。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-percent inline-icon" aria-hidden="true"></i>
+                    90%でも10ページに1回は<br>エラーが出るということ！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">90%の壁</span>
+                    <span class="keyword-tag">10ページに1回のリスク</span>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-chart-area fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑮ チャートと書式で明暗が分かれる結果</h2>
+                <p><span class="highlight">チャートは大きな差別化要因だ。50%を超えるのはわずか4社のみ</span>で、ほとんどの専門パーサーは6%以下。書式についても、ほとんどのパーサーが取り消し線や上付き文字を装飾として扱い削除する。Doclingは1.0%、LlamaParse Agenticは85.2%と大きな開きがある。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-chart-bar" aria-hidden="true"></i><span>チャート: 50%超えはわずか4社</span></li>
+                    <li><i class="fas fa-text-slash" aria-hidden="true"></i><span>書式: Docling 1.0% vs LlamaParse 85.2%</span></li>
+                    <li><i class="fas fa-eye" aria-hidden="true"></i><span>グラウンディング: GPT-5 Mini & Haiku は8%未満</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">チャートの差別化</span>
+                    <span class="keyword-tag">書式の軽視</span>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-scale-balanced fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑯ 品質とコストのトレードオフ</h2>
+                <p><span class="highlight">VLMにより多くの計算リソースを投入しても、利益は逓減する</span>。Geminiは最小思考から高思考に4倍のコストをかけても約5ポイントの向上に留まる。一方、LlamaParse Agenticは約1.2¢/ページで全プロバイダーを凌駕し、Cost Effectiveモードは0.4¢/ページ未満で競争力を維持している。</p>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-coins inline-icon" aria-hidden="true"></i>
+                    コストを4倍にしても+5ポイント...<br>コスパを考えるとLlamaParseが最強！
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">1.2¢/ページ</span>
+                    <span class="keyword-tag">コスパ最強</span>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-database fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑰ データセットの構築方法</h2>
+                <p>約2,000ページはすべて<span class="highlight">実際の公開エンタープライズ文書</span>（保険のSERFF申請、財務報告、政府文書など）から収集。簡単なものから意図的に難しいものまで幅広くサンプリングした。グランドトゥルースは2段階のパイプラインで生成: VLMによる自動ラベリング → 人間による全ページ検証と修正。</p>
+                <ul class="card-list">
+                    <li><i class="fas fa-building-columns" aria-hidden="true"></i><span>保険・金融・政府の実際の文書</span></li>
+                    <li><i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i><span>VLMによる自動ラベリング</span></li>
+                    <li><i class="fas fa-user-pen" aria-hidden="true"></i><span>人間による全ページ検証・修正</span></li>
+                </ul>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">2段階パイプライン</span>
+                    <span class="keyword-tag">人間検証</span>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fas fa-terminal fa-5x" aria-hidden="true"></i>
+                </div>
+                <h2>⑱ オープンソースで自分でも試せる</h2>
+                <p>ParseBenchは完全にオープンソースで、誰でもベンチマークを実行できる。<span class="highlight">90以上の事前設定パイプラインと全評価コードが含まれている</span>。データセットはHuggingFace、コードはGitHub、論文はarXivで公開中。独自のOCRモデルの追加も簡単にできる。</p>
+                <div class="code-preview">
+git clone https://github.com/run-llama/ParseBench<br>
+cd ParseBench<br>
+uv sync --extra runners<br>
+uv run parse-bench run &lt;pipeline_name&gt;<br>
+uv run parse-bench serve &lt;pipeline_name&gt;
+                </div>
+                <div style="margin-top: 8px;">
+                    <span class="keyword-tag">HuggingFace</span>
+                    <span class="keyword-tag">GitHub</span>
+                    <span class="keyword-tag">arXiv</span>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <p>🎬 動画: <a href="https://youtu.be/QC-3mZIhw3I" target="_blank" style="color: inherit;">LlamaIndex — Deep Dive into Content Faithfulness</a> | 📅 2026年4月16日</p>
+            <p style="margin-top: 8px;">📄 ブログ: <a href="https://www.llamaindex.ai/blog/parsebench" target="_blank" style="color: inherit;">ParseBench: The First Document Parsing Benchmark for AI Agents</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Intersection Observer for card animations
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry, index) => {
+                if (entry.isIntersecting) {
+                    setTimeout(() => {
+                        entry.target.classList.add('visible');
+                    }, index * 80);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.card').forEach(card => {
+            observer.observe(card);
+        });
+    </script>
+</body>
+</html>

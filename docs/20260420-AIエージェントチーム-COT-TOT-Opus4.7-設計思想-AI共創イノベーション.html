@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIエージェントチーム設計 - COT・TOT・Opus 4.7の設計思想</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --color-1: #795548;
+    --color-2: #5D4037;
+    --color-3: #EFEBE9;
+    --color-4: #3E2723;
+    --color-5: #8D6E63;
+    --color-6: #D7CCC8;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background-color: #FFF8F5;
+    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+    color: #333;
+    line-height: 1.6;
+  }
+  .container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 40px 20px;
+    margin-bottom: 30px;
+    background: linear-gradient(135deg, var(--color-2) 0%, var(--color-4) 100%);
+    border-radius: 30px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(141,110,99,0.2) 0%, transparent 70%);
+    animation: rotate 20s linear infinite;
+  }
+  @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .header-icon {
+    font-size: 80px;
+    margin-bottom: 15px;
+    color: var(--color-5);
+    animation: fa-bounce 2s infinite;
+    position: relative;
+    z-index: 1;
+  }
+  .header h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+  }
+  .header .subtitle {
+    font-size: 18px;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+  }
+  .header .date {
+    font-size: 14px;
+    margin-top: 10px;
+    opacity: 0.7;
+    position: relative;
+    z-index: 1;
+  }
+  /* Section Layout */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 30px;
+  }
+  /* Section Title */
+  .section-title-bar {
+    text-align: center;
+    margin: 30px 0 15px;
+    padding: 15px 30px;
+    background: linear-gradient(90deg, var(--color-1), var(--color-5));
+    border-radius: 50px;
+    color: #fff;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    box-shadow: 0 4px 15px rgba(121,85,72,0.3);
+  }
+  .section-title-bar i { font-size: 26px; }
+  /* Card */
+  .section-card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 450px;
+    background-color: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  .section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+  }
+  /* Mega Icon */
+  .mega-icon-container {
+    text-align: center;
+    margin: 10px 0 15px;
+  }
+  .mega-icon-container i {
+    color: var(--color-1);
+  }
+  .mega-icon-container h2 {
+    font-size: 20px;
+    color: var(--color-2);
+    margin-top: 10px;
+    font-family: 'Kaisei Decol', serif;
+  }
+  /* Card Content */
+  .card-content { padding: 0 5px 15px; }
+  /* Keyword List */
+  .keyword-list {
+    margin: 10px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+  .keyword-list li {
+    margin-bottom: 10px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .keyword-list li i {
+    margin-right: 10px;
+    color: var(--color-5);
+    min-width: 18px;
+    margin-top: 4px;
+  }
+  /* Keyword Tag */
+  .keyword-tag {
+    background-color: var(--color-3);
+    color: var(--color-4);
+    padding: 2px 8px;
+    border-radius: 5px;
+    margin-right: 4px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 14px;
+  }
+  .keyword-tag.accent {
+    background-color: #FBE9E7;
+    color: #BF360C;
+  }
+  .keyword-tag.green {
+    background-color: #E0F0E8;
+    color: #2D6B4F;
+  }
+  .keyword-tag.blue {
+    background-color: #E0E8F0;
+    color: #2D4F6B;
+  }
+  .keyword-tag.purple {
+    background-color: #EDE7F6;
+    color: #4A148C;
+  }
+  /* Speech Bubble */
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--color-1);
+    border-radius: 20px;
+    padding: 12px 16px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+    transform: rotate(-1deg);
+  }
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 25px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--color-1) transparent;
+    display: block;
+    width: 0;
+  }
+  .speech-bubble.right::after {
+    left: auto;
+    right: 25px;
+  }
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+  }
+  .speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--color-5);
+    transform: rotate(1deg);
+  }
+  .speech-bubble.variant-1::after { border-color: var(--color-5) transparent; }
+  .speech-bubble.variant-2 {
+    background: #FFE9E9;
+    border-color: var(--color-1);
+    transform: rotate(-2deg);
+  }
+  .speech-bubble.variant-2::after { border-color: var(--color-1) transparent; }
+  .speech-bubble.variant-3 {
+    background: #E8F5E9;
+    border-color: #66BB6A;
+    transform: rotate(0.5deg);
+  }
+  .speech-bubble.variant-3::after { border-color: #66BB6A transparent; }
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333;
+  }
+  /* Highlight */
+  .highlight {
+    background: linear-gradient(transparent 60%, rgba(121,85,72,0.25) 60%);
+    font-weight: bold;
+  }
+  .highlight-green {
+    background: linear-gradient(transparent 60%, rgba(102,187,106,0.25) 60%);
+    font-weight: bold;
+  }
+  /* Comparison Box */
+  .comparison-box {
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+  }
+  .comparison-item {
+    flex: 1;
+    padding: 12px;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 14px;
+  }
+  .comparison-item.left {
+    background: #E0F0E8;
+    border: 2px solid #66BB6A;
+  }
+  .comparison-item.right {
+    background: #FBE9E7;
+    border: 2px solid var(--color-1);
+  }
+  .comparison-item h4 {
+    font-size: 15px;
+    margin-bottom: 6px;
+  }
+  /* Code Preview */
+  pre {
+    background: #2B2D42;
+    color: #EFEBE9;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    margin-top: 10px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    line-height: 1.5;
+  }
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 25px;
+    margin-top: 20px;
+    background: var(--color-2);
+    color: #ddd;
+    border-radius: 20px;
+    font-size: 14px;
+  }
+  footer a { color: var(--color-6); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  /* Animations */
+  .fade-in-scale {
+    animation: fadeInScale 0.6s ease-out both;
+  }
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .section-card:nth-child(1) { animation-delay: 0.05s; }
+  .section-card:nth-child(2) { animation-delay: 0.1s; }
+  .section-card:nth-child(3) { animation-delay: 0.15s; }
+  .section-card:nth-child(4) { animation-delay: 0.2s; }
+  .section-card:nth-child(5) { animation-delay: 0.25s; }
+  .section-card:nth-child(6) { animation-delay: 0.3s; }
+  /* Responsive */
+  @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+  @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+  @media (max-width: 900px) { .section-card { min-width: 380px; } }
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon"><i class="fa-solid fa-users-gear"></i></div>
+    <h1>AIエージェントチーム設計の極意</h1>
+    <div class="subtitle">COT・TOTで学ぶOpus 4.7のエージェントチーム設計思想</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年4月20日 | <i class="fa-brands fa-youtube"></i> AI共創イノベーション</div>
+  </div>
+
+  <!-- ===== セクション1: エージェントチームの基礎 ===== -->
+  <div class="section-title-bar">
+    <i class="fa-solid fa-layer-group"></i>
+    エージェントチーム設計の基礎
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード1: エージェントチーム設計の重要性 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users-gear fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>①エージェントチーム設計の重要性</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-arrow-up"></i>
+            <span><span class="keyword-tag">Opus 4.7</span>で指示追従性が劇的に向上した</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>制御しないと<span class="highlight">アテンションバジェットを消費</span>してしまう</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-coins"></i>
+            <span>トークンを浪費してコンテキストが汚れる危険がある</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-key"></i>
+            <span>エージェントチームをどう<span class="keyword-tag accent">マネジメント</span>するかが成功の鍵</span>
+          </li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: var(--color-5);"></i>
+            モデルが賢くなったからこそ、制御の設計がより重要になっているんです！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2: COTとTOTで考える設計 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>②COTとTOTで考える設計</h2>
+      </div>
+      <div class="card-content">
+        <div class="comparison-box">
+          <div class="comparison-item left">
+            <h4><i class="fa-solid fa-link"></i> COT</h4>
+            <span class="keyword-tag green">Chain of Thought</span><br>
+            既知タスクの逐次推論<br>
+            エージェント1体で深掘り
+          </div>
+          <div class="comparison-item right">
+            <h4><i class="fa-solid fa-code-branch"></i> TOT</h4>
+            <span class="keyword-tag accent">Tree of Thoughts</span><br>
+            未知タスクの探索<br>
+            並列で枝を伸ばす
+          </div>
+        </div>
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-handshake"></i>
+            <span>この2つを<span class="highlight">組み合わせる</span>のがエージェントチーム設計の基本</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: var(--color-5);"></i>
+            COTは深さ、TOTは広さ。この2つの使い分けが設計のキモです！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3: 並列タスク vs 逐次タスク -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-branch fa-5x" style="animation: fa-flip 2s infinite;"></i>
+        <h2>③並列タスク vs 逐次タスク</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-book"></i>
+            <span><span class="keyword-tag">Googleの論文</span>に基づくタスク分類の考え方</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-chart-line"></i>
+            <span>金融分析のような<span class="highlight">並列処理</span>では精度が最大80.8%向上</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-arrow-down"></i>
+            <span>逐次的な計画立案では<span class="keyword-tag accent">逆に最大70%も性能低下</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-bullseye"></i>
+            <span>タスクの性質を<span class="highlight">見極めること</span>が第一歩</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-1);"></i>
+            並列にすべきタスクを逐次でやると逆効果。まずはタスクの性質を見極めましょう！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード4: エージェント数の黄金比 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-group fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>④エージェント数の黄金比</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-star"></i>
+            <span>実務の<span class="keyword-tag accent">スイートスポット</span>は<span class="highlight">3体〜5体</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-code-branch"></i>
+            <span>TOT論文の<span class="keyword-tag">最適分岐数</span>（branching factor=5）と一致</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-explosion"></i>
+            <span>6体以上になるとコミュニケーションが<span class="keyword-tag accent">非線形に爆発</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-arrow-down"></i>
+            <span>精度も効率も<span class="highlight">両方とも低下</span>してしまう</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: #66BB6A;"></i>
+            多ければいいというわけじゃない。3〜5体が黄金比なんです！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション2: エージェントの編成パターン ===== -->
+  <div class="section-title-bar">
+    <i class="fa-solid fa-people-roof"></i>
+    エージェントの編成パターン
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード5: 1体〜2体の編成 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑤1体〜2体の編成</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-user"></i>
+            <span><span class="keyword-tag">1体</span>の場合は通常のAIエージェント</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-pen"></i>
+            <span>ブログ執筆やファイル単位のコード修正に適している</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-user-group"></i>
+            <span><span class="keyword-tag">2体</span>の場合は実装役と確認役の組み合わせ</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-arrows-left-right"></i>
+            <span>例: <span class="keyword-tag green">リサーチ→執筆</span>や<span class="keyword-tag blue">実装→単体テスト</span></span>
+          </li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: var(--color-5);"></i>
+            2体なら「作る人」と「確認する人」の役割分担がシンプルで強力です！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード6: 3体編成が黄金比 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-arrows fa-5x" style="animation: fa-flip 2s infinite;"></i>
+        <h2>⑥3体編成が黄金比</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-pen-nib"></i>
+            <span>ライティング: <span class="keyword-tag green">リサーチャー</span> ＋ <span class="keyword-tag">ライター</span> ＋ <span class="keyword-tag blue">レビューアー</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-code"></i>
+            <span>コーディング: <span class="keyword-tag green">アーキテクト</span> ＋ <span class="keyword-tag">インプレメンター</span> ＋ <span class="keyword-tag blue">テスター</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-circle-check"></i>
+            <span>迷ったら<span class="highlight">3体にするのが基本</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-robot"></i>
+            <span><span class="keyword-tag accent">Grok</span>も3体を推奨している</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-star" style="color: var(--color-5);"></i>
+            3体は自然な役割分担ができる最もバランスの良い編成です！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード7: 4体〜5体の編成 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sitemap fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑦4体〜5体の編成</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-building"></i>
+            <span>中規模から大規模の<span class="keyword-tag">リファクタリング</span>に適する</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-file-magnifying-glass"></i>
+            <span>横断的な<span class="keyword-tag green">調査レポート</span>の作成に有効</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-bug"></i>
+            <span>複雑な<span class="keyword-tag accent">バグハント</span>など探索を要求されるタスク</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>5体を超えると<span class="highlight">指数関数的にトークン消費が増える</span>ので注意</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-triangle-exclamation" style="color: var(--color-1);"></i>
+            5体は上限。それ以上はコストが跳ね上がるので慎重に！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード8: 無駄なトークン消費の問題 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-money-bill-wave fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑧無駄なトークン消費の問題</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-comments"></i>
+            <span>エージェント同士の<span class="highlight">無駄話</span>や過剰な確認ループ</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-fire"></i>
+            <span>計算コストを<span class="keyword-tag accent">劇的に浪費</span>してしまう</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-rotate"></i>
+            <span>長文を読み込んでもう1回長文を読み込み直すこともある</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-file-lines"></i>
+            <span>禁止させるには<span class="keyword-tag">プロンプト</span>や<span class="keyword-tag">MDファイル</span>での制御が必要</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: #66BB6A;"></i>
+            エージェント同士が雑談し始めるとトークンが溶けていきます。ルールで防ぎましょう！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション3: 設計の実践方法 ===== -->
+  <div class="section-title-bar">
+    <i class="fa-solid fa-gears"></i>
+    設計の実践方法
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード9: 人間が判断すべき最初のステップ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb fa-5x" style="animation: fa-flip 2s infinite;"></i>
+        <h2>⑨人間が判断すべき最初のステップ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-user-check"></i>
+            <span>タスクが<span class="keyword-tag">逐次（COT）</span>か<span class="keyword-tag accent">並列（TOT）</span>かを人間が判断</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-question"></i>
+            <span>未知のタスクやAIがやったことがないものは<span class="highlight">エージェントチームで並列探索</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-list-check"></i>
+            <span>明らかに必要なタスクが分かれている場合は並列で役割分担</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: var(--color-5);"></i>
+            人間が戦略を決めて、AIが戦術を実行する。この分担が一番うまくいきます！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード10: コミュニケーションMDの作成 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-lines fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑩コミュニケーションMDの作成</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-scroll"></i>
+            <span>エージェント同士の<span class="keyword-tag">コミュニケーションルール</span>を定義するMDファイル</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-simplify"></i>
+            <span>役割の<span class="highlight">シンプル化</span>とメンションルールの徹底</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-ban"></i>
+            <span>無駄な確認の<span class="keyword-tag accent">禁止</span>と明確な引き継ぎタイミングを定義</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-stop"></i>
+            <span>終了したエージェントは<span class="highlight">速やかに停止</span>（待機時間もトークンの無駄）</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-file-code" style="color: var(--color-1);"></i>
+            MDファイルでルールを明文化すると、Opus 4.7の指示追従性が生きてきます！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード11: 実演1 宇宙の存在理由 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flask fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑪実演1: 宇宙の存在理由を並列リサーチ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-circle-question"></i>
+            <span>お題: <span class="keyword-tag">「宇宙と人間が存在する理由」</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-users"></i>
+            <span><span class="highlight">5つのエージェント</span>で並列リサーチを実行</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-masks-theater"></i>
+            <span>役割: 哲学・科学・宗教・スピリチュアル等で分担</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-crown"></i>
+            <span>リーダーが1人で結論を統合して最終回答を生成</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-stop-circle"></i>
+            <span>リサーチ終了したエージェントは速やかに停止</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <span class="handwritten">
+            <i class="fa-solid fa-rocket" style="color: #66BB6A;"></i>
+            5エージェントが同時に別角度からリサーチする様子は圧巻でした！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード12: 並列リサーチの結果 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x" style="animation: fa-flip 2s infinite;"></i>
+        <h2>⑫並列リサーチの結果</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-flask"></i>
+            <span>第1層: <span class="keyword-tag blue">科学はいかにを語る</span>（ビッグバンから）</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-microchip"></i>
+            <span>第2層: <span class="keyword-tag">情報理論的宇宙</span>（計算・エントロピー）</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-yin-yang"></i>
+            <span>第3層: <span class="keyword-tag green">宗教・仏教</span>の意味論的アプローチ</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-star"></i>
+            <span>結論: <span class="highlight">宇宙は自己組織化する情報過程であり、人間はその過程が自己反省的に意識に到達した局面</span></span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-brain" style="color: var(--color-5);"></i>
+            並列リサーチから深い哲学的結論が導き出された。TOTの威力を体感できる実演です！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション4: 応用と実践 ===== -->
+  <div class="section-title-bar">
+    <i class="fa-solid fa-wand-magic-sparkles"></i>
+    応用とスキル化
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード13: ルーター機能の設計 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-route fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑬ルーター機能の設計</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-signs-post"></i>
+            <span>タスクが<span class="keyword-tag">逐次</span>か<span class="keyword-tag accent">並列</span>かを判定するルーターを組み込む</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-file-alt"></i>
+            <span>論文の内容を<span class="highlight">システムプロンプト</span>として読み込ませる</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-wand-magic"></i>
+            <span>エージェント数を<span class="keyword-tag green">自動判定</span>する仕組み</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-database"></i>
+            <span><span class="keyword-tag">RAG</span>を使うことでトークン消費を抑える</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-gears" style="color: var(--color-1);"></i>
+            ルーターが自動判定してくれると、人間の判断負担がグッと減ります！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14: スキル化で汎用化 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑭スキル化で汎用化</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-puzzle-piece"></i>
+            <span>ルーターを<span class="keyword-tag">スキル化</span>して汎用的に使えるようにする</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-vial"></i>
+            <span>プロジェクトで<span class="highlight">試行錯誤</span>した後にエッセンシャルな内容に絞り込む</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-recycle"></i>
+            <span>スキル化により<span class="keyword-tag green">他のタスクでも再利用可能</span></span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: #66BB6A;"></i>
+            自分で使ってみてからスキル化するのがコツ。泥臭い試行錯誤が大事です！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード15: 実演2 ブログ執筆で3体編成 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-pen-nib fa-5x" style="animation: fa-flip 2s infinite;"></i>
+        <h2>⑮実演2: ブログ執筆で3体編成</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span>お題: <span class="keyword-tag">「Claude Opus 4.7を検索してブログを書く」</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-brain"></i>
+            <span>分析の結果、<span class="highlight">「情報収集と執筆の両方が必要」</span>と判定</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-users"></i>
+            <span>3体編成を提案: <span class="keyword-tag green">公式情報収集</span> ＋ <span class="keyword-tag blue">ベンチマーク収集</span> ＋ <span class="keyword-tag">統合</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-robot"></i>
+            <span><span class="keyword-tag accent">Grok</span>のスタイルも再現してブログを生成</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-pen-fancy" style="color: var(--color-5);"></i>
+            ルーターがタスクを分析して最適な編成を自動で提案してくれるのが便利！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード16: Claude Codeでもエージェントチーム実行 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑯Claude Codeでもエージェントチーム実行</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-desktop"></i>
+            <span>通常のClaudeでも<span class="keyword-tag">Claude Code</span>でも同じエージェントチームが動作</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-arrows-split-up-and-left"></i>
+            <span>Claude Code側では<span class="highlight">完全に並列で3人が同時実行</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-code"></i>
+            <span>コーディングだけでなく<span class="keyword-tag green">AIライティング</span>もこなせる</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-terminal" style="color: var(--color-1);"></i>
+            Claude Codeなら並列実行が可視化されて、チームの動きがよくわかります！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション5: まとめ ===== -->
+  <div class="section-title-bar">
+    <i class="fa-solid fa-flag-checkered"></i>
+    TOTからCOTへの移行とまとめ
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード17: TOTからCOTへの移行パターン -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-right-arrow-left fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑰TOTからCOTへの移行パターン</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-code-branch"></i>
+            <span>最初は<span class="keyword-tag accent">TOT的（並列探索）</span>に動き出す</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-filter"></i>
+            <span>ある程度絞り込めたら<span class="highlight">COT的（逐次実行）</span>に移行</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-shuffle"></i>
+            <span><span class="keyword-tag green">探索から活用</span>への切り替えが自然に起きる</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb" style="color: #66BB6A;"></i>
+            広く探してから深く掘る。人間の思考プロセスと同じですね！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18: まとめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-flip 2s infinite;"></i>
+        <h2>⑱まとめ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li>
+            <i class="fa-solid fa-user"></i>
+            <span><span class="keyword-tag">人間</span>が戦略とルールを描き、<span class="keyword-tag accent">Claudeチーム</span>が戦術と実行を担う</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-vial"></i>
+            <span>まず自分が使ってみてから<span class="highlight">スキル化</span>する</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-hashtag"></i>
+            <span>エージェント数は<span class="keyword-tag green">3〜5体</span>が目安</span>
+          </li>
+          <li>
+            <i class="fa-solid fa-file-lines"></i>
+            <span>コミュニケーションMDで<span class="highlight">無駄を防ぐ</span></span>
+          </li>
+          <li>
+            <i class="fa-solid fa-rocket"></i>
+            <span><span class="keyword-tag">Opus 4.7</span>の指示追従性向上がチーム制御を可能にしている</span>
+          </li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-heart" style="color: var(--color-5);"></i>
+            人間とAIの協働が一番強い。Opus 4.7がその可能性を大きく広げてくれました！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    🎬 動画: <a href="https://youtu.be/Q4MJVaO5VR8" target="_blank" style="color: inherit;">AI共創イノベーション</a> | 📅 2026年4月20日
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Design検証 — プロトタイプからエクスポート、コード品質まで徹底解説</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        :root {
+            --color-1: #283593;
+            --color-2: #1A237E;
+            --color-3: #E8EAF6;
+            --color-4: #0D1042;
+            --color-5: #3F51B5;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #FFF8F5; font-family: 'Segoe UI', sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 40px 20px; background: linear-gradient(135deg, var(--color-1), var(--color-2)); border-radius: 30px; color: white; margin-bottom: 30px; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%); animation: rotate 20s linear infinite; }
+        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .header h1 { font-size: 36px; margin-bottom: 10px; position: relative; z-index: 1; }
+        .header .subtitle { font-size: 18px; opacity: 0.9; position: relative; z-index: 1; }
+        .header .date { font-size: 14px; opacity: 0.7; margin-top: 10px; position: relative; z-index: 1; }
+        .header .mega-icon { font-size: 80px; margin-bottom: 15px; position: relative; z-index: 1; animation: fa-bounce 3s ease-in-out infinite; }
+        .grid { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; }
+        .section-card { flex: 1; min-width: 220px; max-width: 450px; background-color: white; border-radius: 20px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; border-top: 4px solid var(--color-1); }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); transition: all 0.3s ease; }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 20px; color: var(--color-2); margin-top: 10px; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--color-1); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--color-3); color: var(--color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: #BF8136; transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: #BF8136 transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: #BF5656; transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: #BF5656 transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        pre { background: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; overflow-x: auto; }
+        .fade-in-scale { opacity: 0; transform: scale(0.9); transition: opacity 0.6s ease, transform 0.6s ease; }
+        .fade-in-scale.visible { opacity: 1; transform: scale(1); }
+        footer { text-align: center; padding: 30px; margin-top: 30px; color: #777; font-size: 14px; }
+        footer a { color: var(--color-1); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .grid { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <i class="fa-solid fa-paint-brush mega-icon" aria-hidden="true"></i>
+            <h1>Claude Design検証 — プロトタイプからエクスポート、コード品質まで</h1>
+            <p class="subtitle">AnthropicのAIデザインツールを実戦投入して分かった真実</p>
+            <p class="date">📅 2026年4月20日 | 🎬 Coding Crash Courses</p>
+        </div>
+
+        <div class="grid">
+
+            <!-- ①Claude Designとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-paint-brush fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>①Claude Designとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>Anthropicが公開した<span class="keyword-tag">AIデザインツール</span>。デザインの知識がなくても会話するだけで本格的なデザインが作れる</span></li>
+                        <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>アクセスURLは <span class="keyword-tag">claude.ai/design</span></span></li>
+                        <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>プロトタイプ、スライドデッキ、デザインシステムなど多彩な形式に対応</span></li>
+                        <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>プロンプトと対話を通じて、アイデアを視覚的なデザインに変換する仕組み</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-5);"></i>
+                            デザイン経験ゼロでも、会話だけでプロ品質のレイアウトが生成される！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ②プロジェクト作成の流れ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-folder-plus fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>②プロジェクト作成の流れ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bars fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">左サイドバー</span>で作成するものを選択する</span></li>
+                        <li><i class="fa-solid fa-object-group fa-lg" aria-hidden="true"></i><span>プロトタイプ（ワイヤーフレーム or 高精細モックアップ）が選べる</span></li>
+                        <li><i class="fa-solid fa-file-powerpoint fa-lg" aria-hidden="true"></i><span>スライドデッキやフォルダーからも作成可能</span></li>
+                        <li><i class="fa-solid fa-file fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">白紙テンプレート</span>から自由にスタートすることもできる</span></li>
+                        <li><i class="fa-solid fa-pen fa-lg" aria-hidden="true"></i><span>プロジェクト名を入力して「Create」をクリックするだけ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: #BF8136;"></i>
+                            プロトタイプの精密度をワイヤーフレームと高精細から選べるのが便利！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ③デザインシステム機能 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-palette fa-5x" style="color: var(--color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>③デザインシステム機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-swatchbook fa-lg" aria-hidden="true"></i><span>独自の<span class="keyword-tag">デザインシステム</span>を作成してブランド統一が可能</span></li>
+                        <li><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span>GitHubリポジトリを連携して、CSSファイルやアイコンを再利用できる</span></li>
+                        <li><i class="fa-brands fa-figma fa-lg" aria-hidden="true"></i><span>Figmaファイル、フォント、ロゴなどのアセットも登録できる</span></li>
+                        <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>今回は<span class="keyword-tag">デザインシステムなし</span>で実践検証を行った</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--color-5);"></i>
+                            GitHubやFigmaと連携すれば、チームのデザイン資産をそのまま活用できる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ④プロンプト入力 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-keyboard fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>④プロンプト入力</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-image fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">スクリーンショット</span>をアップロードして参考画像として使用可能</span></li>
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>「modern, more hacky design」と指示してハッカー風のテーマを指定</span></li>
+                        <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>Claudeがプロンプトに基づいて質問を返してくる（例：「ハッカー風のフレーバーは？」）</span></li>
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>全ての質問を<span class="keyword-tag">「Decide for me」</span>で自動判定することも可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-magic fa-lg" style="color: #BF5656;"></i>
+                            参考画像を添付すれば、好みの方向性がもっと伝わりやすくなるよ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑤Claudeからの質問 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑤Claudeからの質問</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>「ターミナル風の<span class="keyword-tag">モノスペース</span>、黒背景に緑文字」など具体的な方向性を質問される</span></li>
+                        <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>全ての質問に丁寧に答えるか、「Decide for me」でClaudeに任せることも可能</span></li>
+                        <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i><span>自分の好みを反映したい場合は、質問に丁寧に答えるのがコツ</span></li>
+                        <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>質問の数が多いほど、より<span class="keyword-tag">カスタマイズ</span>された結果になる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-smile fa-lg" style="color: #BF8136;"></i>
+                            全部自動に任せるのもありだけど、こだわりたい部分はちゃんと答えよう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑥生成結果の確認 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye fa-5x" style="color: var(--color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑥生成結果の確認</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>約<span class="keyword-tag">10分</span>でデザインが完成する</span></li>
+                        <li><i class="fa-solid fa-home fa-lg" aria-hidden="true"></i><span>ホームページ、コースカタログ、Tweaksパネルが含まれる</span></li>
+                        <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>結果は「really good」と高評価。クオリティが期待以上</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">密なレイアウト</span>と<span class="keyword-tag">余白のあるレイアウト</span>を切り替えて比較可能</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--color-5);"></i>
+                            10分待つだけで、想像以上に完成度の高いデザインが出来上がる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑦Tweaksパネルで調整 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sliders fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑦Tweaksパネルで調整</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">密度スライダー</span>でdense（密）とairy（ゆったり）を調整可能</span></li>
+                        <li><i class="fa-solid fa-image fa-lg" aria-hidden="true"></i><span>背景画像の変更がスライダー1つで完了する</span></li>
+                        <li><i class="fa-solid fa-font fa-lg" aria-hidden="true"></i><span>フォントの変更にも対応している</span></li>
+                        <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>コンポーネントごとに<span class="keyword-tag">色や高さのCSS編集</span>もできる</span></li>
+                        <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i><span>デザインの微調整が直感的に行える</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-sliders fa-lg" style="color: #BF5656;"></i>
+                            CSSを直接いじらなくてもスライダーでサクサク調整できるのが嬉しい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑧コメント機能で修正 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑧コメント機能で修正</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-pin fa-lg" aria-hidden="true"></i><span>デザイン上の要素に<span class="keyword-tag">ピン留めコメント</span>を追加できる</span></li>
+                        <li><i class="fa-solid fa-pen-to-square fa-lg" aria-hidden="true"></i><span>「この色を青に」「幅を50%に」など複数のコメントをまとめて送信</span></li>
+                        <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>Claudeが<span class="keyword-tag">一括で修正</span>を適用してくれる</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>ただし必ずしも意図通りに動くとは限らない点に注意</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: #BF8136;"></i>
+                            まとめ指示は便利だけど、全部が思い通りになるわけではないので要注意！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑨エクスポート機能 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-export fa-5x" style="color: var(--color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑨エクスポート機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-zipper fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ZIP</span>形式でまとめてダウンロード可能</span></li>
+                        <li><i class="fa-solid fa-file-pdf fa-lg" aria-hidden="true"></i><span>PDFや<span class="keyword-tag">PowerPoint</span>形式での出力にも対応</span></li>
+                        <li><i class="fa-brands fa-canva fa-lg" aria-hidden="true"></i><span>Canvaへの<span class="keyword-tag">直接エクスポート</span>も可能。YouTubeサムネイルなどに活用できる</span></li>
+                        <li><i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i><span>スタンドアロンHTMLやClaude Codeへのハンドオフも選択可能</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-gift fa-lg" style="color: var(--color-5);"></i>
+                            Canvaに直接送れるのは超便利！サムネイル作成も一瞬で終わる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑩Claude Codeへの連携 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑩Claude Codeへの連携</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-handshake fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">「Handoff to Claude Code」</span>を選択するとAPI URL付きのプロンプトが生成される</span></li>
+                        <li><i class="fa-solid fa-paste fa-lg" aria-hidden="true"></i><span>VSCodeのClaude Codeに貼り付けるだけでローカル環境にデザインが展開される</span></li>
+                        <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Bypass permissions</span>で自動実行も可能に</span></li>
+                        <li><i class="fa-solid fa-laptop-code fa-lg" aria-hidden="true"></i><span>デザインから実装へのシームレスな移行を実現する機能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: #BF5656;"></i>
+                            デザインをそのままコードに落とせるのは、プロトタイプ→実装の流れがスムーズ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑪ローカル展開の結果 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bug fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑪ローカル展開の結果</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>Claude Codeで実行すると約<span class="keyword-tag">10分</span>で完了する</span></li>
+                        <li><i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i><span>index.html、style.css、2つのJSXファイルが生成される</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>しかし<span class="keyword-tag">コンソールにエラー</span>が表示される</span></li>
+                        <li><i class="fa-solid fa-xmark fa-lg" aria-hidden="true"></i><span>そのままでは動かない場合があるのが現実</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: #BF8136;"></i>
+                            ファイルは生成されるけど、エラーが出てそのままでは動かない…ここが課題。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑫エラー修正 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wrench fa-5x" style="color: var(--color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑫エラー修正</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>Claude Codeに修正を指示すると、コードの再構成が始まる</span></li>
+                        <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>最終的に<span class="keyword-tag">単一のHTMLファイル</span>とCSSファイルに統合される</span></li>
+                        <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>動作確認はクリアして、デザインが正しく表示される</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>ただし<span class="keyword-tag">コードの品質</span>は別問題として残る</span></li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-check fa-lg" style="color: var(--color-5);"></i>
+                            動くようにはなるけど、中身のコードはちょっと…というのが本音。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑬コード品質の問題 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑬コード品質の問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ruler fa-lg" aria-hidden="true"></i><span>HTMLファイルは<span class="keyword-tag">700行以上</span>の単一ファイルになってしまう</span></li>
+                        <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>HTMLとCSSが混在していて、インラインスタイルが多用されている</span></li>
+                        <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>定数は使っているものの、<span class="keyword-tag">プロダクション品質</span>ではない</span></li>
+                        <li><i class="fa-brands fa-react fa-lg" aria-hidden="true"></i><span>ReactJS等でリライトしないと実運用には耐えない</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-dizzy fa-lg" style="color: #BF5656;"></i>
+                            700行の1ファイル…これをメンテナンスするのは人間にもAIにも辛い。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑭スパゲッティコードの実態 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-branch fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑭スパゲッティコードの実態</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">バイブコーディング</span>（vibe coding）で生成されたコードは動くが構造が悪い</span></li>
+                        <li><i class="fa-solid fa-compress fa-lg" aria-hidden="true"></i><span>インラインに全て詰め込まれていて、可読性が非常に低い</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">コンポーネント分割</span>やモジュール化がされていない</span></li>
+                        <li><i class="fa-solid fa-skull-crossbones fa-lg" aria-hidden="true"></i><span>プロダクション環境では危険な状態。バグの温床になる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: #BF8136;"></i>
+                            「動けばOK」の精神で作られたコードは、後で必ず技術的負債になる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑮Reactリライトの必要性 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-atom fa-5x" style="color: var(--color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑮Reactリライトの必要性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-react fa-lg" aria-hidden="true"></i><span>Claude Codeに<span class="keyword-tag">ReactJSでのリライト</span>を指示することが可能</span></li>
+                        <li><i class="fa-solid fa-cubes fa-lg" aria-hidden="true"></i><span>コンポーネント化してインライン記述を解消する</span></li>
+                        <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">プロダクション品質</span>のコードに昇華できる可能性がある</span></li>
+                        <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>ただし追加の作業と時間が必要になる</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrows-rotate fa-lg" style="color: var(--color-5);"></i>
+                            プロトタイプをReactにリライトすれば、実務レベルに持っていける！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑯プロトタイピングとしては優秀 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-lightbulb fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑯プロトタイピングとしては優秀</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>アイデアを<span class="keyword-tag">素早く形にする</span>用途としては非常に便利</span></li>
+                        <li><i class="fa-solid fa-users fa-lg" aria-hidden="true"></i><span>デザインの方向性を確認したり、ステークホルダーに見せたりする用途に最適</span></li>
+                        <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>あくまで<span class="keyword-tag">「プロトタイプ」ツール</span>として使うのが正解</span></li>
+                        <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>早期のフィードバック収集やコンセプト確認には高い効果を発揮する</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: #BF5656;"></i>
+                            プロトタイプとしては最高！でもそれ以上を期待するのは禁物。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑰ハプvs現実 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑰ハプ vs 現実</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bullhorn fa-lg" aria-hidden="true"></i><span>SNSでは「<span class="keyword-tag">デザイナーの仕事が奪われる</span>」「フロントエンドエンジニアは終わり」と騒がれている</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>実際にコードを見ると、プロダクション品質ではないことが分かる</span></li>
+                        <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span>エンジニアの仕事は<span class="keyword-tag">なくならない</span>。むしろコード品質の担保がより重要に</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>過度な期待は禁物。冷静に評価することが大切</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-meh fa-lg" style="color: #BF8136;"></i>
+                            SNSのバズを信じると痛い目を見る。実際のコードを確認するのが大事！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑱TL;DR - 結論 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>⑱TL;DR — 結論</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check-circle fa-lg" aria-hidden="true"></i><span>Claude Designは<span class="keyword-tag">プロトタイピング</span>には便利なツール</span></li>
+                        <li><i class="fa-solid fa-xmark fa-lg" aria-hidden="true"></i><span>ハプが主張するほど<span class="keyword-tag">画期的ではない</span></span></li>
+                        <li><i class="fa-solid fa-user-shield fa-lg" aria-hidden="true"></i><span>フロントエンドエンジニアが仕事を失うことはない</span></li>
+                        <li><i class="fa-solid fa-bridge fa-lg" aria-hidden="true"></i><span>デザインから実装への<span class="keyword-tag">橋渡し</span>としては有用だが、過信は禁物</span></li>
+                        <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>適切な用途で使えば、開発ワークフローを加速できる優秀なツール</span></li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--color-5);"></i>
+                            プロトタイプ作成には最高だけど、過度な期待はNG。正しい使い方が大事！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            🎬 動画: <a href="https://youtu.be/IPqfdT4oLZE" target="_blank" style="color: inherit;">Coding Crash Courses</a> | 📅 2026年4月20日
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, { threshold: 0.1 });
+            document.querySelectorAll('.fade-in-scale').forEach(card => {
+                observer.observe(card);
+            });
+        });
+    </script>
+</body>
+</html>

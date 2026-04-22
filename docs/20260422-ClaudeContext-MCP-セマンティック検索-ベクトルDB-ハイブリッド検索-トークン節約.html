@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Context - セマンティックコード検索でトークン40%削減するMCPプラグイン</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #1565C0;
+            --ui-color-2: #0D47A1;
+            --ui-color-3: #E3F2FD;
+            --ui-color-4: #0A1929;
+            --ui-color-5: #42A5F5;
+            --bg-canvas: #F5F9FF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            color: #333;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            color: #777;
+            margin-top: 10px;
+        }
+
+        .header .date {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .mega-icon {
+            font-size: 80px;
+            color: var(--ui-color-1);
+            animation: fa-bounce 3s infinite;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container i {
+            font-size: 60px;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 22px;
+            color: #555;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-5);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #E57373;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #E57373 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            border-top: 2px solid #eee;
+            color: #777;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--ui-color-3), #BBDEFB);
+            border-left: 4px solid var(--ui-color-1);
+            padding: 10px 15px;
+            border-radius: 0 10px 10px 0;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .stat-box {
+            display: inline-block;
+            background: var(--ui-color-1);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 3px;
+        }
+
+        .tool-badge {
+            display: inline-block;
+            background: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin: 2px;
+            border: 1px solid var(--ui-color-5);
+        }
+
+        .arrow-connector {
+            text-align: center;
+            font-size: 24px;
+            color: var(--ui-color-5);
+            margin: 5px 0;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <i class="fa-solid fa-plug mega-icon" aria-hidden="true"></i>
+            <h1>Claude Context - セマンティックコード検索MCPプラグイン</h1>
+            <p class="subtitle">Zilliz Techのオープンソースが、コードベース全体の意味検索をClaude Codeにもたらす</p>
+            <p class="date">📅 2026年4月22日</p>
+        </div>
+
+        <!-- カード1: Claude Contextとは -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>①Claude Contextとは: セマンティックコード検索のMCPプラグイン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Zilliz Tech</span>が開発したオープンソースの<span class="keyword-tag">MCPプラグイン</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <span>GitHubで<span class="keyword-tag">6000+スコア</span>を獲得するほどの人気プラグイン</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-search" aria-hidden="true"></i>
+                            <span>コードベース全体を<span class="keyword-tag">ベクトルDB</span>にインデックスして、質問に関連するコードだけを取得</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span>つまり「<span class="keyword-tag">RAG for your codebase</span>」というコンセプトで動作する</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            コードを全部コンテキストに詰め込むのはもう不要！<br>
+                            必要な部分だけを自動で見つけてくれる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2: コアコンセプト -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>②コアコンセプト: RAGをコードベースに適用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span>リポジトリ全体を<span class="keyword-tag">ベクトルデータベース</span>にインデックスする</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span>質問を投げると、<span class="keyword-tag">意味的に関連するコード</span>だけを自動で取得</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-turn-to-dots" aria-hidden="true"></i>
+                            <span>LLMのコンテキストウィンドウに、<span class="keyword-tag">必要最小限のコード</span>だけを渡す仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                            <span>結果として<span class="keyword-tag">約40%のトークン削減</span>を達成できると主張</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-1);"></i>
+                            大規模リポジトリほど効果的！<br>
+                            全部を読み込む必要がなくなるのでコストも下がる
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3: ハイブリッド検索 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ハイブリッド検索: 意味とキーワードの両方をカバー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-vector-square" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">密なベクトル検索</span>（Dense Vector）で意味的な理解を実現</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-font" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">BM25キーワード検索</span>で正確な文字列マッチを確保</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-merge" aria-hidden="true"></i>
+                            <span>2つの検索結果を<span class="keyword-tag">統合（ハイブリッド）</span>して高精度な結果を返す</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>意味的理解と正確なマッチの<span class="keyword-tag">両方</span>に対応できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-scale-balanced fa-lg" style="color: #E57373;"></i>
+                            ベクトルだけじゃなくて<br>
+                            キーワード検索も組み合わせるから精度が高い！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード4-6 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>④ASTベースのチャンキング: コードを意味的に分割</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-scissors" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">AST（抽象構文木）</span>を使ってコードを意味的な単位に分割</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>関数やクラスなどの<span class="keyword-tag">論理的なまとまり</span>を保持したままチャンク化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                            <span>単純な文字数分割ではなく、<span class="keyword-tag">コードの構造</span>を理解して分割する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                            <span>そのおかげで検索結果の<span class="keyword-tag">精度と関連性が向上</span>する</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-code fa-lg" style="color: var(--ui-color-2);"></i>
+                            関数の途中でぶった切らないから、<br>
+                            検索結果がちゃんと意味をなす！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑤対応言語: 12以上の主要言語をサポート</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-brands fa-js" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">TypeScript</span> / <span class="keyword-tag">JavaScript</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-python" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Python</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-java" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Java</span> / <span class="keyword-tag">Kotlin</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-golang" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Go</span> / <span class="keyword-tag">Rust</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-c" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">C++</span> / <span class="keyword-tag">C#</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-php" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">PHP</span> / <span class="keyword-tag">Ruby</span> / <span class="keyword-tag">Swift</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-globe fa-lg" style="color: var(--ui-color-5);"></i>
+                            主要な言語はほぼ網羅！<br>
+                            どんなプロジェクトでも使えるのが嬉しい
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑥Merkle tree差分インデックス: 変更分だけ再インデックス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Merkle tree（マークルツリー）</span>でファイルの変更を追跡</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span>コードが変更されたら、<span class="keyword-tag">変更されたファイルだけ</span>を再インデックス</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span>リポジトリ全体の再インデックスが不要になるので<span class="keyword-tag">高速に更新</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                            <span>継続的な開発でも<span class="keyword-tag">パフォーマンスを維持</span>できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: #E57373;"></i>
+                            Gitみたいに差分だけ処理するから<br>
+                            大きなリポジトリでもサクサク！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7-9 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wrench fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑦4つのMCPツール: シンプルなAPI構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">index_codebase</span> - リポジトリをベクトルDBにインデックスする</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">search_code</span> - セマンティック検索で関連コードを取得する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-spinner" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">get_indexing_status</span> - インデックスの進行状況を確認する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">clear_index</span> - 既存のインデックスをクリアする</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i>
+                            たった4つのツールで完結！<br>
+                            シンプルなのが良いね
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑧対応クライアント: 幅広いツールと連携</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Claude Code</span> - Anthropic公式のCLIツール</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Codex CLI</span> - OpenAIのコーディングCLI</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gem" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Gemini CLI</span> - GoogleのCLIツール</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-pen-nib" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cursor</span> / <span class="keyword-tag">Windsurf</span> - AIコードエディタ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cline</span> など、MCPに対応するクライアントなら何でもOK</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-5);"></i>
+                            MCP対応なら何でも使える！<br>
+                            特定のツールに縛られないのが嬉しい
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨セットアップ: Zilliz Cloud + OpenAI Embedding</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Zilliz Cloud</span>（マネージドMilvus）をベクトルDBとして使用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">OpenAI Embedding</span>でテキストのベクトル化を実行</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                            <span>MCPクライアントの設定ファイルに<span class="keyword-tag">数行追加</span>するだけで完了</span>
+                        </li>
+                    </ul>
+                    <pre>
+// Claude Codeの設定例
+{
+  "mcpServers": {
+    "claude-context": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/claude-context"]
+    }
+  }
+}</pre>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-clock fa-lg" style="color: #E57373;"></i>
+                            設定はシンプル！<br>
+                            数分で使い始められる
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10-12 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ローカル構成も可能: Milvus + Ollama</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Milvus</span>をローカルで立ち上げてクラウド不要で利用可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Ollama</span>を使えばEmbeddingもローカルで実行できる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            <span>コードを<span class="keyword-tag">外部に送信しない</span>のでセキュリティ面でも安心</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>企業の社内プロジェクトでも<span class="keyword-tag">安心して導入</span>できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);"></i>
+                            セキュリティ厳しい企業でも<br>
+                            ローカルで全部完結するから安心！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-pie fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪トークン削減効果: 約40%のコストダウン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                            <span>リポジトリ全体ではなく、<span class="keyword-tag">関連コードだけ</span>をコンテキストに渡す</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-percent" aria-hidden="true"></i>
+                            <span>結果として<span class="keyword-tag">約40%のトークン削減</span>を達成すると主張</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-dollar-sign" aria-hidden="true"></i>
+                            <span>トークン消費が減るので<span class="keyword-tag">APIコストも大幅に削減</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span>コンテキストが絞られるため、<span class="keyword-tag">レスポンスの精度も向上</span>する可能性</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-piggy-bank fa-lg" style="color: var(--ui-color-5);"></i>
+                            40%削減は大きい！<br>
+                            大きなリポジトリだと節約額もバカにならない
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑫MITライセンス: 完全なオープンソース</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-scale-unbalanced" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">MITライセンス</span>で公開されていて自由に利用可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span>商用利用、改変、再配布が<span class="keyword-tag">すべて自由</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            <span>コミュニティ主導で<span class="keyword-tag">活発に開発</span>されている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>ソースコードが公開されているので<span class="keyword-tag">透明性も高い</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-heart fa-lg" style="color: #E57373;"></i>
+                            MITだから企業でも個人でも<br>
+                            安心して使えるね！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13-15 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-building fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s infinite;" aria-hidden="true"></i>
+                    <h2>⑬適用規模: 中〜大規模リポジトリ向け</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-up-right-and-down-left-from-center" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">中〜大規模リポジトリ</span>で最大の効果を発揮する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                            <span>ファイル数が多くて<span class="keyword-tag">コンテキストに収まらない</span>プロジェクトに最適</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-down-left-and-up-right-to-center" aria-hidden="true"></i>
+                            <span>小規模プロジェクトなら<span class="keyword-tag">ファイルを全部渡せる</span>ので不要</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>目安として<span class="keyword-tag">数十ファイル以上</span>のプロジェクトで導入を検討</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-2);"></i>
+                            小さいプロジェクトなら<br>
+                            逆にオーバーヘッドになるかも…
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rotate fa-5x" style="color: var(--ui-color-2); animation: fa-spin 3s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑭インデックスの仕組み: 初回は全体、以降は差分のみ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-play" aria-hidden="true"></i>
+                            <span>初回はリポジトリ全体を<span class="keyword-tag">フルインデックス</span>する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-compare" aria-hidden="true"></i>
+                            <span>2回目以降は<span class="keyword-tag">Merkle tree</span>で差分を検出して変更分だけ更新</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                            <span>ASTベースでコードを<span class="keyword-tag">チャンクに分割</span>してからベクトル化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-warehouse" aria-hidden="true"></i>
+                            <span>ベクトル化されたチャンクを<span class="keyword-tag">Zilliz/Milvus</span>に保存</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrows-rotate fa-lg" style="color: var(--ui-color-5);"></i>
+                            初回だけちょっと時間がかかるけど<br>
+                            2回目からは爆速で更新される！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑮検索の流れ: 質問からコード取得まで</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1" aria-hidden="true"></i>
+                            <span>ユーザーが<span class="keyword-tag">質問やタスク</span>を入力する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2" aria-hidden="true"></i>
+                            <span>質問を<span class="keyword-tag">ベクトル化</span>してベクトルDBを検索</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ハイブリッド検索</span>（意味検索＋キーワード検索）を実行</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-4" aria-hidden="true"></i>
+                            <span>関連する<span class="keyword-tag">コードチャンクだけ</span>をコンテキストに追加</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-5" aria-hidden="true"></i>
+                            <span>LLMが<span class="keyword-tag">精度の高い回答</span>を生成する</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: #E57373;"></i>
+                            たった5ステップで<br>
+                            ピンポイントなコードを見つけ出す！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード16-18 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯注意点: セッション横断の長期記憶ではない</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-xmark" aria-hidden="true"></i>
+                            <span>Claude Contextは<span class="keyword-tag">セッション横断の長期記憶</span>を提供するものではない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                            <span>あくまで<span class="keyword-tag">現在のセッション内</span>でコードを検索するためのツール</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                            <span>セッションをまたいだ<span class="keyword-tag">会話の記憶</span>が必要なら別のツールを検討</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>目的は「<span class="keyword-tag">コードの検索と取得</span>」に特化している点を理解しておこう</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-2);"></i>
+                            記憶ツールじゃないよ！<br>
+                            検索ツールとして割り切って使おう
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-split-up-and-left fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑰他のツールとの違い: 独自の強み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ASTベースチャンキング</span>でコード構造を保持したまま分割</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ハイブリッド検索</span>で意味とキーワードの両方に対応</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Merkle tree</span>で差分インデックスを実現して高速更新</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">MCP標準</span>に対応しているので様々なクライアントで使える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">MITライセンス</span>で商用利用も自由</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-5);"></i>
+                            他の検索ツールと比べても<br>
+                            差分インデックスが強力な差別化ポイント！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱まとめ: 中〜大規模プロジェクトの強い味方</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <span>Claude Contextは<span class="keyword-tag">セマンティックコード検索</span>をMCPで実現するプラグイン</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                            <span>ハイブリッド検索と差分インデックスで<span class="keyword-tag">約40%のトークン削減</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            <span>Claude Code、Cursor、Codex CLIなど<span class="keyword-tag">多彩なクライアント</span>に対応</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>ローカル構成も可能なので<span class="keyword-tag">セキュリティも安心</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span>中〜大規模リポジトリでコスト削減と精度向上を<span class="keyword-tag">同時に実現</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: #E57373;"></i>
+                            大きなコードベースを扱うなら<br>
+                            試さない手はない！！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="footer">
+            <p>🎬 動画: <a href="https://youtu.be/L1wdmlGJkKE" target="_blank" style="color: inherit;">Alvin the Devs</a> | 📅 2026年4月22日</p>
+            <p style="margin-top: 8px; font-size: 13px; color: #999;">Claude Context MCP - セマンティックコード検索でトークン40%削減</p>
+        </div>
+    </div>
+</body>
+</html>

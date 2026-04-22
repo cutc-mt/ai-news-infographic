@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini CanvasでAI議事録を自作 - APIキー不要で音声解析</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #FF8F00;
+            --ui-color-2: #F57C00;
+            --ui-color-3: #FFF3E0;
+            --ui-color-4: #E65100;
+            --ui-color-5: #FFB74D;
+            --bg-canvas: #FFFAF5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            color: #333;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            color: #777;
+            margin-top: 10px;
+        }
+
+        .header .date {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .mega-icon {
+            font-size: 80px;
+            color: var(--ui-color-1);
+            animation: fa-bounce 3s infinite;
+        }
+
+        /* セクションレイアウト */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        /* カードスタイル */
+        .section-card {
+            flex: 1 1 22%;
+            min-width: 300px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fade-in 0.6s forwards;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+
+        @keyframes fade-in {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 22px;
+            color: #555;
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+            flex-grow: 1;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+        }
+
+        .keyword-list li i {
+            margin-right: 10px;
+            color: var(--ui-color-2);
+            min-width: 18px;
+            padding-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px 5px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #BF5656;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #BF5656 transparent;
+        }
+
+        .speech-bubble.variant-3 {
+            background: #E8F5E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(1.5deg);
+        }
+
+        .speech-bubble.variant-3::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .handwritten i {
+            color: var(--ui-color-2);
+            margin-right: 5px;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 14px;
+            color: #777;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+                max-width: 100%;
+            }
+        }
+
+        /* アニメーション */
+        @keyframes fa-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 5px rgba(255,143,0,0.3); }
+            50% { box-shadow: 0 0 20px rgba(255,143,0,0.6); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header class="header">
+            <i class="fa-solid fa-scroll mega-icon" aria-hidden="true"></i>
+            <h1>Gemini CanvasでAI議事録を自作しよう</h1>
+            <p class="subtitle">APIキー不要！無料のGeminiで音声解析からリアルタイム議事録作成まで</p>
+            <p class="date"><i class="fa-solid fa-calendar"></i> 2026年4月22日</p>
+        </header>
+
+        <div class="section-layout">
+
+            <!-- カード1: Canvasとは -->
+            <div class="section-card" style="animation-delay: 0.05s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>①Gemini Canvasとは：プロンプトから広がる創作空間</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-toggle-on"></i><span>Geminiのプロンプトバーから<span class="keyword-tag">CanvasをON</span>にするだけで、強力な創作環境が起動する。</span></li>
+                        <li><i class="fa-solid fa-file-lines"></i><span><span class="keyword-tag">ドキュメント機能</span>でレポートや記事の作成がリアルタイムでできる。</span></li>
+                        <li><i class="fa-solid fa-code"></i><span><span class="keyword-tag">コード機能</span>を使えば、HTMLやJavaScriptのアプリをその場で作成・実行できる。</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>プレビュー領域が用意されていて、作成したコードの動作をすぐに確認できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb"></i>チャットだけでなく、本格的なコンテンツ制作環境がGeminiの中にある！</span>
+                </div>
+            </div>
+
+            <!-- カード2: PDF分割ツール -->
+            <div class="section-card" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scissors fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>②PDF分割ツールを1分で作成する驚きの速度</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i><span>Canvasに「PDF分割ツールを作って」と指示するだけで、<span class="keyword-tag">リアルタイムで1分以内</span>に完成する。</span></li>
+                        <li><i class="fa-solid fa-file-pdf"></i><span>PDFファイルを読み込ませて、ページ単位で分割・抽出ができる。</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>複雑なプログラミング知識がなくても、プロンプトだけで実用的なツールが作れる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-stopwatch"></i>わずか1分！手作業で何時間もかかる作業が瞬時に完了する！</span>
+                </div>
+            </div>
+
+            <!-- カード3: APIキー不要でモデルアクセス -->
+            <div class="section-card" style="animation-delay: 0.15s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-key fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>③APIキー不要でGeminiの各種モデルにアクセス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-unlock"></i><span>Canvasのプレビュー領域から<span class="keyword-tag">Geminiの各種モデルにAPIキーなし</span>でアクセス可能。</span></li>
+                        <li><i class="fa-solid fa-gift"></i><span><span class="keyword-tag">無償提供モデル</span>に限られるが、十分に実用的な性能を発揮する。</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>作成したアプリ内から直接Geminiモデルを呼び出して活用できる。</span></li>
+                        <li><i class="fa-solid fa-circle-dollar-to-slot"></i><span>API利用料がかからないので、コストを気にせずにAIアプリを試作できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-exclamation-triangle"></i>APIキーの設定が不要！誰でもすぐにAI機能をアプリに組み込める！</span>
+                </div>
+            </div>
+
+            <!-- カード4: AI OCR -->
+            <div class="section-card" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-font fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>④AI OCRアプリ：画像からテキストを抽出</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-image"></i><span>画像ファイルをアップロードするだけで、<span class="keyword-tag">AIがテキストを読み取って抽出</span>する。</span></li>
+                        <li><i class="fa-solid fa-language"></i><span>日本語・英語など多言語に対応して、高精度な文字認識を実現。</span></li>
+                        <li><i class="fa-solid fa-table-cells"></i><span>表やレイアウトを維持したままテキストを抽出する高度な機能も備える。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-camera"></i>写真を撮るだけ！紙の書類がデジタルテキストに変わる！</span>
+                </div>
+            </div>
+
+            <!-- カード5: Magic PDF -->
+            <div class="section-card" style="animation-delay: 0.25s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hat-wizard fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑤マジックPDF：画像から多要素を一括抽出</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-text-width"></i><span>画像から<span class="keyword-tag">テキストとアイコンを同時に抽出</span>する高度なアプリ。</span></li>
+                        <li><i class="fa-solid fa-layer-group"></i><span><span class="keyword-tag">背景の分離</span>も自動で行い、要素ごとに切り出して再利用できる。</span></li>
+                        <li><i class="fa-solid fa-object-ungroup"></i><span>デザインアセットの抽出や、プレゼン資料の再構築にも応用可能。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-3">
+                    <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles"></i>画像を投げるだけでテキスト・アイコン・背景が自動分離される！</span>
+                </div>
+            </div>
+
+            <!-- カード6: ミルクボーイクリエイター -->
+            <div class="section-card" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-masks-theater fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ミルクボーイクリエイター：Canvasで遊ぶ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-face-laugh-beam"></i><span>お笑いコンビ「ミルクボーイ」のネタ風に<span class="keyword-tag">AIが自動で漫才を生成</span>するアプリ。</span></li>
+                        <li><i class="fa-solid fa-comments"></i><span>テーマを入力すると、ボケとツッコミの掛け合いを自動で作成する。</span></li>
+                        <li><i class="fa-solid fa-gamepad"></i><span>Canvasでエンタメ系アプリも簡単に作れてしまうという実証例。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-face-grin-tears"></i>実用ツールだけでなく、遊び心のあるアプリも作れるのがCanvasの魅力！</span>
+                </div>
+            </div>
+
+            <!-- カード7: 音声解析の新検証 -->
+            <div class="section-card" style="animation-delay: 0.35s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microphone-lines fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑦Geminiによる音声解析：新たな検証結果</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-waveform-lines"></i><span>Geminiモデルが<span class="keyword-tag">音声データを直接解析</span>できることを新たに検証。</span></li>
+                        <li><i class="fa-solid fa-ear-listen"></i><span>音声ファイルをGeminiに送信すると、内容を理解してテキストに変換する。</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span>この機能を使えば、議事録以外にも音声ベースのAIアプリが構築可能。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-rocket"></i>テキストだけでなく音声も理解できる！Geminiの可能性が大きく広がる！</span>
+                </div>
+            </div>
+
+            <!-- カード8: 疑似議事録アプリの仕組み -->
+            <div class="section-card" style="animation-delay: 0.4s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑧疑似議事録アプリの仕組みを解明</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-play"></i><span><span class="keyword-tag">録音開始ボタン</span>を押すと、ブラウザのマイクから音声をキャプチャする。</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left"></i><span><span class="keyword-tag">30秒ごと</span>に音声データを区切ってGeminiに送信する仕組み。</span></li>
+                        <li><i class="fa-solid fa-pen-to-square"></i><span>Geminiが音声を文字起こしして、結果をリアルタイムで議事録に反映する。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-arrow-right-arrow-left"></i>録音→30秒区切り→Gemini送信→文字起こし→議事録更新のループ！</span>
+                </div>
+            </div>
+
+            <!-- カード9: 30秒区切りの理由 -->
+            <div class="section-card" style="animation-delay: 0.45s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-stopwatch fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨30秒区切りで送信する理由とメリット</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database"></i><span>音声データを<span class="keyword-tag">小刻みに分割</span>することで、Geminiの処理負荷を抑える。</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>長時間の録音を一括送信するとタイムアウトやエラーが発生するリスクがある。</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate"></i><span>30秒間隔であれば、<span class="keyword-tag">リアルタイム性</span>を保ちつつ安定して処理できる。</span></li>
+                        <li><i class="fa-solid fa-chart-line"></i><span>少しずつ議事録が更新されていく様子をリアルタイムで確認できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-balance-scale"></i>リアルタイム性と安定性のバランスをとるための最適な間隔！</span>
+                </div>
+            </div>
+
+            <!-- カード10: Google Meetとの比較 -->
+            <div class="section-card" style="animation-delay: 0.5s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-video fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑩Google Meetの議事録機能と同等を自作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>Google Meetに標準搭載されている<span class="keyword-tag">議事録自動作成</span>と同等の仕組みを自作できる。</span></li>
+                        <li><i class="fa-solid fa-sliders"></i><span>自作なら<span class="keyword-tag">出力形式やフォーマットを自由にカスタマイズ</span>可能。</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>Meetの機能に依存せず、自分のワークフローに合わせた議事録ツールを構築。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-3">
+                    <span class="handwritten"><i class="fa-solid fa-trophy"></i>有料サービスに頼らなくても、無料のGeminiで同等品が作れる！</span>
+                </div>
+            </div>
+
+            <!-- カード11: ファイル読み込み対応 -->
+            <div class="section-card" style="animation-delay: 0.55s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-folder-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑪過去の音声データも一括で議事録化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-upload"></i><span><span class="keyword-tag">ファイル読み込み</span>にも対応して、過去に録音した音声データをアップロードできる。</span></li>
+                        <li><i class="fa-solid fa-list-ol"></i><span>複数の音声ファイルを一括でGeminiに送信して、順次文字起こしを実行。</span></li>
+                        <li><i class="fa-solid fa-file-export"></i><span>過去の会議録やインタビュー音声も、あとから<span class="keyword-tag">議事録に変換</span>できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-box-archive"></i>「昔録音したあの会議の内容、どうなったっけ？」もこれで解決！</span>
+                </div>
+            </div>
+
+            <!-- カード12: リアルタイム議事録更新 -->
+            <div class="section-card" style="animation-delay: 0.6s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-rotate fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑫リアルタイムで議事録が更新される仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-satellite-dish"></i><span>音声データを送信するたびに、<span class="keyword-tag">Geminiが文字起こしを行って議事録を更新</span>する。</span></li>
+                        <li><i class="fa-solid fa-plus"></i><span>既存の議事録に新しい内容が追記されていくので、文脈を保ったまま成長する。</span></li>
+                        <li><i class="fa-solid fa-desktop"></i><span>画面上で議事録がリアルタイムに書き変わっていく様子を確認できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-eye"></i>会議中に議事録が目の前で作られていく感動を体験！</span>
+                </div>
+            </div>
+
+            <!-- カード13: 無料ユーザーでも可能 -->
+            <div class="section-card" style="animation-delay: 0.65s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hand-holding-heart fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑬無料のGeminiユーザーでも全部使える</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-check"></i><span><span class="keyword-tag">無料のGeminiアカウント</span>でこの仕組みをそのまま利用できる。</span></li>
+                        <li><i class="fa-solid fa-ban"></i><span>有料プランに加入する必要がなく、APIキーの取得も不要。</span></li>
+                        <li><i class="fa-solid fa-users"></i><span>個人でもチームでも、コストゼロでリアルタイム議事録ツールを運用可能。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-money-bill-wave"></i>課金する必要なし！無料のGeminiでここまでできるのが驚き！</span>
+                </div>
+            </div>
+
+            <!-- カード14: 議事録以外の活用 -->
+            <div class="section-card" style="animation-delay: 0.7s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑭議事録以外にもメモ・要約など幅広く活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-note-sticky"></i><span>音声から<span class="keyword-tag">メモ</span>を自動作成して、重要なポイントを箇条書きで整理。</span></li>
+                        <li><i class="fa-solid fa-compress"></i><span>長い会議の内容を<span class="keyword-tag">要約</span>して、エグゼクティブサマリーを自動生成。</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span>アクションアイテムやタスクリストも音声から自動で抽出可能。</span></li>
+                        <li><i class="fa-solid fa-tags"></i><span>議論のテーマごとにタグ付けして、後から検索しやすい形で保存できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-3">
+                    <span class="handwritten"><i class="fa-solid fa-expand"></i>議事録だけでなく、メモ・要約・タスク管理にも応用できる！</span>
+                </div>
+            </div>
+
+            <!-- カード15: Canvasアプリ大会 -->
+            <div class="section-card" style="animation-delay: 0.75s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮Canvasアプリ大会の開催が検討中</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-award"></i><span>Canvasで作成したアプリを競い合う<span class="keyword-tag">アプリ大会</span>の開催が検討されている。</span></li>
+                        <li><i class="fa-solid fa-people-group"></i><span>コミュニティの参加者がそれぞれ独自のアプリを作って発表し合う形式。</span></li>
+                        <li><i class="fa-solid fa-lightbulb"></i><span>アイデアの共有と切磋琢磨で、Canvasの活用範囲がさらに広がる期待。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-fire"></i>自分だけのオリジナルアプリでコンテストに参加できるかも！</span>
+                </div>
+            </div>
+
+            <!-- カード16: 必要な技術スキル -->
+            <div class="section-card" style="animation-delay: 0.8s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑯必要なスキルはプロンプトを書くだけ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-keyboard"></i><span>プログラミングの知識は<span class="keyword-tag">ほとんど不要</span>で、日本語で指示を書くだけで完成する。</span></li>
+                        <li><i class="fa-solid fa-comment-dots"></i><span>「音声を録音して30秒ごとに文字起こしするアプリを作って」のような指示で十分。</span></li>
+                        <li><i class="fa-solid fa-laptop-code"></i><span>Canvasがコードを生成してプレビューするので、結果を確認しながら修正できる。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-face-smile"></i>AIに「こういうのを作って」と伝えるだけでアプリが出来上がる！</span>
+                </div>
+            </div>
+
+            <!-- カード17: まとめ：有料級ツールを自作 -->
+            <div class="section-card" style="animation-delay: 0.85s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-star fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑰まとめ：有料級のAI議事録に課金するな！</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-coins"></i><span><span class="keyword-tag">有料のAI議事録サービス</span>に課金する前に、Gemini Canvasで自作を検討しよう。</span></li>
+                        <li><i class="fa-solid fa-infinity"></i><span>無料で使えて、カスタマイズ自由で、APIキーも不要という三拍子揃った環境。</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>自作ならデータの取り扱いも自分で管理できるので、セキュリティ面でも安心。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-hand-holding-dollar"></i>月額数千円のサービスが無料で自作できる時代が来た！</span>
+                </div>
+            </div>
+
+            <!-- カード18: 今後の展望 -->
+            <div class="section-card" style="animation-delay: 0.9s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-road fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱今後の展望：Canvasが拓くAIアプリの未来</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-chart-line"></i><span>Geminiのモデルが進化すれば、<span class="keyword-tag">より高精度な音声解析</span>が可能になる。</span></li>
+                        <li><i class="fa-solid fa-network-wired"></i><span>APIキー不要でモデルにアクセスできる仕組みは、他のAIサービスにも波及するかも。</span></li>
+                        <li><i class="fa-solid fa-users-gear"></i><span>コミュニティ主導の<span class="keyword-tag">Canvasアプリ大会</span>で、次々と革新的なツールが生まれる期待。</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>「プログラミング不要でAIアプリを作る」というパラダイムが一般化していく。</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-3">
+                    <span class="handwritten"><i class="fa-solid fa-rocket"></i>Canvasはまだ進化の途中！これからさらに便利になっていく！</span>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            🎬 動画: <a href="https://youtu.be/Cg0GzdnQTYA" target="_blank" style="color: inherit;">こ先生チャンネル</a> | 📅 2026年4月22日
+        </footer>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anthropic公式「本番AIエージェントはMCP本命」— 3方式比較と設計パターン5選</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #3A6B8C;
+            --ui-color-2: #D4853A;
+            --ui-color-3: #E8F0F5;
+            --ui-color-4: #1A2A35;
+            --ui-color-5: #7BA5B5;
+            --bg-canvas: #F5F8FB;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            color: #333;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            color: #777;
+            margin-top: 10px;
+        }
+
+        .header .date {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .mega-icon {
+            font-size: 80px;
+            color: var(--ui-color-1);
+            animation: fa-bounce 3s infinite;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container i {
+            font-size: 60px;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 22px;
+            color: #555;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #C05050;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #C05050 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .compare-box {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .compare-item {
+            flex: 1;
+            padding: 8px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .compare-item.neutral {
+            background: #f0f0f0;
+            border: 2px solid #bbb;
+        }
+
+        .compare-item.good {
+            background: var(--ui-color-3);
+            border: 2px solid var(--ui-color-1);
+        }
+
+        .compare-item .label {
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 4px;
+        }
+
+        .winner-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--ui-color-2), var(--ui-color-1));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            margin: 5px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            border-top: 2px solid #eee;
+            color: #777;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out;
+        }
+
+        .stats-box {
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-5));
+            color: white;
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        .stats-box .number {
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .stats-box .desc {
+            font-size: 13px;
+            opacity: 0.9;
+        }
+
+        .flow-arrow {
+            text-align: center;
+            font-size: 24px;
+            color: var(--ui-color-1);
+            margin: 10px 0;
+        }
+
+        .pros-cons {
+            display: flex;
+            gap: 8px;
+            margin: 8px 0;
+        }
+
+        .pros-cons .pro {
+            flex: 1;
+            background: #E8F8E8;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .pros-cons .con {
+            flex: 1;
+            background: #FFE8E8;
+            border-radius: 8px;
+            padding: 6px 8px;
+            font-size: 13px;
+        }
+
+        .pros-cons .label {
+            font-weight: bold;
+            margin-bottom: 3px;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <i class="fa-solid fa-network-wired mega-icon" aria-hidden="true"></i>
+            <h1>Anthropic公式「本番AIエージェントはMCP本命」</h1>
+            <p class="subtitle">3方式比較と効果的な設計パターン5選を徹底解説</p>
+            <p class="date"><i class="fa-regular fa-calendar"></i> 2026年4月23日</p>
+        </div>
+
+        <!-- ① MCPとは：モデルコンテキストプロトコルの概要 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>① MCPとは何か</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">MCP</span>（Model Context Protocol）は、AIエージェントと外部システムを接続するための<span class="keyword-tag">オープン標準</span>プロトコル。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                            <span>従来はAIとツールごとに個別の統合が必要で、<span class="keyword-tag">断片化と重複</span>が発生していた。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-universal-access" aria-hidden="true"></i>
+                            <span>MCPを一度実装すれば、エコシステム全体の<span class="keyword-tag">統合が解放</span>される仕組み。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            つまり「万能アダプター」のような存在！一度の実装で何でも繋がる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ② Anthropic公式の宣言 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullhorn fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>② Anthropic公式の宣言</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            <span>Anthropicが公式ブログで<span class="keyword-tag">「本番環境のAIエージェントはMCP中心で考えるのが合理的」</span>と明言。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>3つの接続方式（API直叩き、CLI、MCP）を比較検証した結果、<span class="keyword-tag">クラウド本番環境ではMCPが最適</span>と結論付けた。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                            <span>2024年11月のローンチ以来、急速に業界標準として採用が進んでいる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            Anthropic自身が推奨する公式アプローチだから<span class="keyword-tag">信頼性は抜群</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ③ MCPの普及状況 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ MCPの急速な普及</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-server" aria-hidden="true"></i>
+                            <span>コミュニティが構築した<span class="keyword-tag">数千のMCPサーバー</span>が存在。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">全主要言語</span>向けのSDKが提供されている（Python、TypeScript、Go、Java等）。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-industry" aria-hidden="true"></i>
+                            <span>業界全体で<span class="keyword-tag">事実上の標準</span>として定着しつつある。</span>
+                        </li>
+                    </ul>
+                    <div class="stats-box">
+                        <div class="number">10,000+</div>
+                        <div class="desc">構築されたMCPサーバー数（推定）</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ④ 3つの接続方式の比較概要 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 3つの接続方式を比較</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">API直叩き</span>：エージェントが直接REST APIを呼び出す方式。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">CLI</span>：コマンドラインツール経由で外部システムと通信する方式。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-network-wired" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">MCP</span>：標準化されたプロトコルでツールやデータに接続する方式。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-1);"></i>
+                            それぞれ特徴があるので、一つずつ詳しく見ていきましょう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑤ 方式1：API直叩き -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 方式1：API直叩き</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                            <span>素早く実装できて<span class="keyword-tag">シンプル</span>。少ないツール数なら十分に機能する。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>しかし接続先が増えると、<span class="keyword-tag">統合コードが膨張</span>して保守が困難に。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            <span>各サービスごとに認証やエラーハンドリングを<span class="keyword-tag">個別に実装</span>する必要がある。</span>
+                        </li>
+                    </ul>
+                    <div class="pros-cons">
+                        <div class="pro">
+                            <div class="label"><i class="fa-solid fa-check"></i> メリット</div>
+                            実装が素早い
+                        </div>
+                        <div class="con">
+                            <div class="label"><i class="fa-solid fa-xmark"></i> デメリット</div>
+                            スケールしない
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑥ 方式2：CLI -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 方式2：CLI経由の接続</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                            <span>エージェントが<span class="keyword-tag">シェルコマンド</span>を実行して外部システムにアクセス。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tools" aria-hidden="true"></i>
+                            <span>ローカル環境では柔軟に使えるが、<span class="keyword-tag">クラウド本番環境には不向き</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>セキュリティ面での懸念や、<span class="keyword-tag">実行環境の依存性</span>が問題になる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation-triangle fa-lg" style="color: #C05050;"></i>
+                            開発時は便利だけど、本番投入には<span class="keyword-tag">注意が必要</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑦ 方式3：MCPの強み -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-star fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 方式3：MCPの強み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-cubes" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">一度の実装</span>で全ツールにアクセス可能。統合コードの重複を排除。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">双方向通信</span>をサポートし、リアルタイムなデータのやり取りが可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+                            <span>クラウド本番環境での<span class="keyword-tag">スケーラビリティ</span>に優れている。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users-gear" aria-hidden="true"></i>
+                            <span>標準化により、<span class="keyword-tag">コミュニティ全体</span>でサーバーを共有できる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i>
+                            本番環境で最もバランスが良いのが<span class="keyword-tag">MCP</span>なんです！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑧ なぜクラウド本番でMCPが選ばれるのか -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cloud-arrow-up fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ クラウド本番でMCPが選ばれる理由</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                            <span>数百〜数千のツールに接続する場合、<span class="keyword-tag">標準プロトコル</span>が不可欠。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-alt" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">セキュリティ</span>と<span class="keyword-tag">監査ログ</span>の管理が一元化できる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                            <span>マイクロサービスアーキテクチャとの<span class="keyword-tag">親和性が高い</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span>ツールやデータの変更が頻繁な環境でも<span class="keyword-tag">柔軟に対応</span>できる。</span>
+                        </li>
+                    </ul>
+                    <div class="compare-box">
+                        <div class="compare-item neutral">
+                            <div class="label">API直叩き</div>
+                            <div>小規模向け</div>
+                        </div>
+                        <div class="compare-item neutral">
+                            <div class="label">CLI</div>
+                            <div>ローカル向け</div>
+                        </div>
+                        <div class="compare-item good">
+                            <div class="label">MCP <i class="fa-solid fa-crown"></i></div>
+                            <div>本番向け</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑨ 課題：ツール定義のコンテキスト過負荷 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-weight-hanging fa-5x" style="color: #C05050; animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ 課題：ツール定義のコンテキスト過負荷</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span>MCPクライアントはすべてのツール定義を<span class="keyword-tag">事前にコンテキストに読み込む</span>仕様。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                            <span>数千のツールがあると、<span class="keyword-tag">数十万トークン</span>をリクエスト前に処理することに。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span>応答時間の増加と<span class="keyword-tag">コストの増大</span>という二重の課題が発生。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: #C05050;"></i>
+                            ツール数が増えるほど<span class="keyword-tag">エージェントが重く</span>なるジレンマ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑩ 課題：中間結果のトークン消費 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-recycle fa-5x" style="color: #C05050; animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 課題：中間結果がトークンを圧迫</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i>
+                            <span>ツール呼び出しの中間結果がすべて<span class="keyword-tag">モデルのコンテキストを経由</span>する。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                            <span>2時間の会議録だと<span class="keyword-tag">約50,000トークン</span>が二重に消費される。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                            <span>大きなデータをツール間でコピーする際に<span class="keyword-tag">ミスが発生しやすく</span>なる。</span>
+                        </li>
+                    </ul>
+                    <div class="stats-box" style="background: linear-gradient(135deg, #C05050, #E07070);">
+                        <div class="number">50,000+</div>
+                        <div class="desc">2時間の会議録で追加消費されるトークン数</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑪ 解決策：コード実行でMCPを効率化 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ 解決策：コード実行でMCPを効率化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>MCPサーバーを<span class="keyword-tag">コードAPI</span>として扱い、エージェントにコードを書かせるアプローチ。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-folder-tree" aria-hidden="true"></i>
+                            <span>ツール定義を<span class="keyword-tag">ファイルシステム</span>上に配置し、必要なものだけ読み込む。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <span>実行環境でデータを<span class="keyword-tag">事前にフィルタリング</span>してからモデルに返す。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            「LLMはコードを書くのが得意」— この強みを活かす発想の転換！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑫ 設計パターン①：段階的開示 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ パターン①：段階的開示（Progressive Disclosure）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span>ツール定義をファイルシステム上に配置し、<span class="keyword-tag">必要なものだけオンデマンドで読み込む</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-search" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">search_tools</span>ツールで関連するツールだけを検索・取得。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                            <span>詳細レベルパラメータで、名前だけ／説明付き／フル定義から<span class="keyword-tag">選択可能</span>。</span>
+                        </li>
+                    </ul>
+                    <pre>
+// ツールのファイルツリー構造
+servers/
+├── google-drive/
+│   ├── getDocument.ts
+│   └── index.ts
+├── salesforce/
+│   ├── updateRecord.ts
+│   └── index.ts
+└── ...</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑬ 設計パターン②：コンテキスト効率の良いツール結果 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-filter-circle-xmark fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ パターン②：コンテキスト効率の良いツール結果</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-table" aria-hidden="true"></i>
+                            <span>10,000行のスプレッドシートを取得する際、<span class="keyword-tag">実行環境でフィルタリング</span>してから返す。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-bar" aria-hidden="true"></i>
+                            <span>集計や結合、特定フィールドの抽出も<span class="keyword-tag">コンテキストを汚さず</span>に実行可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-compress" aria-hidden="true"></i>
+                            <span>エージェントが見るのは5行だけ — <span class="keyword-tag">10,000行をそのまま読む必要がない</span>。</span>
+                        </li>
+                    </ul>
+                    <pre>
+// コード実行でフィルタリング
+const allRows = await gdrive.getSheet({sheetId: 'abc123'});
+const pending = allRows.filter(
+  row => row["Status"] === 'pending'
+);
+console.log(pending.slice(0, 5));</pre>
+                </div>
+            </div>
+
+            <!-- ⑭ 設計パターン③：強力な制御フロー -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ パターン③：強力な制御フロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-repeat" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ループ・条件分岐・エラーハンドリング</span>をコードで直接記述可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                            <span>モデルがif文を評価するのを待つ必要がなく、<span class="keyword-tag">レイテンシを削減</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-link" aria-hidden="true"></i>
+                            <span>個別のツール呼び出しをチェーンする代わりに、<span class="keyword-tag">一つのステップで複雑な処理</span>を実行。</span>
+                        </li>
+                    </ul>
+                    <pre>
+// デプロイ通知をポーリング
+let found = false;
+while (!found) {
+  const msgs = await slack.getChannelHistory(
+    {channel: 'C123456'}
+  );
+  found = msgs.some(m =>
+    m.text.includes('deployment complete')
+  );
+  if (!found) await sleep(5000);
+}</pre>
+                </div>
+            </div>
+
+            <!-- ⑮ 設計パターン④：プライバシー保護 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-shield fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ パターン④：プライバシー保護操作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                            <span>中間結果は<span class="keyword-tag">実行環境に留まり</span>、モデルには明示的にログ出力したものだけが渡る。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-mask" aria-hidden="true"></i>
+                            <span>機密データは<span class="keyword-tag">自動的にトークン化</span>されてモデルに送られる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-route" aria-hidden="true"></i>
+                            <span>データの流れる方向を<span class="keyword-tag">決定論的に制御</span>できるセキュリティルールを定義可能。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);"></i>
+                            顧客データがモデルを<span class="keyword-tag">一切通過しない</span>設計が可能に！
+                        </span>
+                    </div>
+                    <pre>
+// モデルが見るのはトークン化されたデータ
+[
+  {email: '[EMAIL_1]', name: '[NAME_1]'},
+  {email: '[EMAIL_2]', name: '[NAME_2]'},
+]</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⑯ 設計パターン⑤：状態の永続化とスキル -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-floppy-disk fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ パターン⑤：状態の永続化とスキル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-file-export" aria-hidden="true"></i>
+                            <span>エージェントが中間結果を<span class="keyword-tag">ファイルに保存</span>して、後で再開できる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>一度動いたコードを<span class="keyword-tag">再利用可能なスキル</span>として保存・蓄積。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-graduation-cap" aria-hidden="true"></i>
+                            <span>SKILL.mdファイルで構造化されたスキルを定義し、<span class="keyword-tag">タスク特化型のツールボックス</span>を構築。</span>
+                        </li>
+                    </ul>
+                    <pre>
+// 再利用可能なスキルとして保存
+// ./skills/save-sheet-as-csv.ts
+export async function saveSheetAsCsv(
+  sheetId: string
+) {
+  const data = await gdrive.getSheet({sheetId});
+  const csv = data.map(r => r.join(','))
+    .join('\n');
+  await fs.writeFile(
+    `./workspace/sheet-${sheetId}.csv`, csv
+  );
+}</pre>
+                </div>
+            </div>
+
+            <!-- ⑰ トークン消費98.7%削減の衝撃 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-percent fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ トークン消費98.7%削減の衝撃</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                            <span>従来のツール定義一括読み込み：<span class="keyword-tag">150,000トークン</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-down-long" aria-hidden="true"></i>
+                            <span>コード実行によるオンデマンド読み込み：<span class="keyword-tag">わずか2,000トークン</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-fire" aria-hidden="true"></i>
+                            <span>Cloudflareも同様の結果を<span class="keyword-tag">「Code Mode」</span>として発表している。</span>
+                        </li>
+                    </ul>
+                    <div class="stats-box">
+                        <div class="number">98.7%</div>
+                        <div class="desc">トークン消費量の削減率 — 150K → 2Kトークン</div>
+                    </div>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-sack-dollar fa-lg" style="color: var(--ui-color-2);"></i>
+                            コストもレイテンシも<span class="keyword-tag">劇的に改善</span>！これは凄い。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ⑱ まとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ：MCPで次世代エージェントを構築</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">MCPは本番AIエージェントの接続標準</span>として最も合理的な選択肢。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>コード実行との組み合わせで<span class="keyword-tag">トークン消費を98.7%削減</span>可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>5つの設計パターン（段階的開示、効率化、制御フロー、プライバシー、スキル）が<span class="keyword-tag">実用的な指針</span>となる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-forward" aria-hidden="true"></i>
+                            <span>ただしコード実行には<span class="keyword-tag">サンドボックスやセキュリティ</span>の考慮も必要。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+                            ソフトウェア工学の既知のパターンをAIエージェントに応用する — これが<span class="keyword-tag">次世代の設計アプローチ</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="footer">
+            🎬 動画: <a href="https://youtu.be/bekMZyjlre0" target="_blank" style="color: inherit;">まさおAIじっくり解説ch</a> | 📅 2026年4月23日<br>
+            📰 参考記事: <a href="https://www.anthropic.com/engineering/code-execution-with-mcp" target="_blank" style="color: inherit;">Anthropic Engineering Blog — Code execution with MCP</a>
+        </div>
+    </div>
+</body>
+</html>

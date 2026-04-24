@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Context - コード理解の摩擦を消す設計</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #2D5F6B;
+            --ui-color-2: #234D58;
+            --ui-color-3: #E0F0F4;
+            --ui-color-4: #1A3D48;
+            --ui-color-5: #4FA0B5;
+            --bg-canvas: #F2F9FA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            color: #333;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            color: #777;
+            margin-top: 10px;
+        }
+
+        .header .date {
+            font-size: 14px;
+            color: #999;
+            margin-top: 5px;
+        }
+
+        .mega-icon {
+            font-size: 80px;
+            color: var(--ui-color-1);
+            animation: fa-bounce 3s infinite;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container i {
+            font-size: 60px;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 22px;
+            color: #555;
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-5);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #E57373;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #E57373 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            border-top: 2px solid #eee;
+            color: #777;
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--ui-color-3), #C8E6EC);
+            border-left: 4px solid var(--ui-color-1);
+            padding: 10px 15px;
+            border-radius: 0 10px 10px 0;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .stat-box {
+            display: inline-block;
+            background: var(--ui-color-1);
+            color: white;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin: 3px;
+        }
+
+        .tool-badge {
+            display: inline-block;
+            background: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 13px;
+            margin: 2px;
+            border: 1px solid var(--ui-color-5);
+        }
+
+        .arrow-connector {
+            text-align: center;
+            font-size: 24px;
+            color: var(--ui-color-5);
+            margin: 5px 0;
+        }
+
+        .section-divider {
+            text-align: center;
+            margin: 30px 0;
+            padding: 10px;
+        }
+
+        .section-divider h3 {
+            font-size: 20px;
+            color: var(--ui-color-1);
+            display: inline-block;
+            border-bottom: 3px solid var(--ui-color-5);
+            padding-bottom: 5px;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <i class="fa-solid fa-layer-group mega-icon" aria-hidden="true"></i>
+            <h1>Claude Context でコード理解の摩擦を消す設計</h1>
+            <p class="subtitle">ハイブリッド検索 + ASTチャンキング + Merkle Tree が実現する次世代のコンテキスト管理</p>
+            <p class="date"><i class="fa-solid fa-calendar-alt"></i> 2026年4月24日</p>
+        </div>
+
+        <!-- セクション1: 問題提起 -->
+        <div class="section-divider">
+            <h3><i class="fa-solid fa-triangle-exclamation"></i> 問題提起: コードをLLMに渡す3つの失敗パターン</h3>
+        </div>
+
+        <!-- カード①: 手動ペーストの失敗 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-paste fa-5x" style="color: var(--ui-color-1); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>① 手動ペーストの罠</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                            <span>ファイルの内容をコピペしてLLMに投げる方法は、最初は手軽に思える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                            <span>しかし<span class="keyword-tag">更新のたびに貼り直し</span>が必要で、すぐに継続コストが膨らむ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span>数ファイルなら耐えられても、プロジェクト全体をカバーするのは現実的ではない</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-tired fa-lg" style="color: #E57373;"></i>
+                            コピペ地獄に陥ると、更新頻度が下がってLLMの回答も古くなっていく…
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード②: エージェント探索ループ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-infinity fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>② エージェント探索ループの無限地獄</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">grep → read → grep → read</span>の無限ループに陥る</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shuffle" aria-hidden="true"></i>
+                            <span>命名揺れ（同じ概念なのに名前が違う）で検索が的外れになる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span>実装が複数ファイルに分散していると、関連箇所の特定が困難</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                            <span>古いコードが残存していると、LLMが間違った実装を参照してしまう</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            ツールコールを大量に消費して、トークンも無駄に増えるのが最大の問題
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード③: ディレクトリ丸投入 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-folder-tree fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ ディレクトリ丸投入のノイズ問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+                            <span>プロジェクト全体をそのままLLMに投げる「全部入り」アプローチ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">node_modules</span>などのノイズが大量に混入する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                            <span>本当に重要なファイルがノイズに埋もれて、LLMの精度が下がる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-5);"></i>
+                            「渡してから選ぶ」ではなく「選んでから渡す」のが正しいアプローチ
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード④: 根本原因 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 3つの失敗に共通する根本原因</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>どの失敗パターンにも<span class="keyword-tag">関連性のフィルターが後付け</span>という共通点がある</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <span>「全部渡してからLLMに選ばせる」→ 本当に必要な情報が埋もれる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                            <span>正しい設計は「<span class="keyword-tag">選んでから渡す</span>」→ 関連性を事前に判定して必要な分だけ提供</span>
+                        </li>
+                    </ul>
+                    <div class="highlight-box">
+                        <i class="fa-solid fa-arrow-right" style="color: var(--ui-color-1);"></i>
+                        この「選んでから渡す」を実現するのが <strong>Claude Context</strong> の設計思想
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑤: Claude Contextとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ Claude Context とは何か</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-building" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Zilliz</span>（Milvus開発元）が開発したオープンソースMCPプラグイン</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <span>MilvusはGitHubスター<span class="keyword-tag">4万超</span>のベクトルデータベース</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-calendar" aria-hidden="true"></i>
+                            <span>2025年8月リリース、わずか8ヶ月で<span class="keyword-tag">7000スター</span>を獲得</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">15以上のクライアント</span>に対応（Claude Code / Cursor / Windsurf / Cline 等）</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            役割は「インデックス作成＋検索」のみ。生成は呼び出し元のLLMが担当する賢い設計
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑥: 3本の技術柱 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-columns fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ Claude Context の3本の技術柱</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">柱1: ハイブリッド検索</span>（BM25＋ベクトル検索）+ RRF統合</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">柱2: ASTチャンキング</span>（Tree-sitterで関数・クラス単位に分割）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">柱3: Merkle Tree</span>による増分インデックスで変更分のみ再計算</span>
+                        </li>
+                    </ul>
+                    <div class="arrow-connector">
+                        <i class="fa-solid fa-arrow-down"></i>
+                    </div>
+                    <div class="highlight-box">
+                        この3つが連携して「必要なコードだけを必要な分だけ」LLMに渡す仕組みを実現
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション2: 技術解説 -->
+        <div class="section-divider">
+            <h3><i class="fa-solid fa-gear"></i> 技術解説: 3本の柱を深掘り</h3>
+        </div>
+
+        <!-- カード⑦: BM25検索 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-spell-check fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 柱1-A: BM25 キーワード検索</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">キーワードの完全一致</span>に強い古典的な検索アルゴリズム</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                            <span>関数名やエラー文字列など、<span class="keyword-tag">正確な文字列</span>を探す場面で威力を発揮</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span>「getUserById」という関数名を検索すると、確実にその関数を特定できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                            BM25単体だと表記揺れに弱いのが弱点。だからベクトル検索と組み合わせる
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑧: ベクトル検索 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-pulse 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 柱1-B: ベクトル意味検索</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-vector-square" aria-hidden="true"></i>
+                            <span>テキストをベクトル（数値の配列）に変換して<span class="keyword-tag">意味の近さ</span>で検索</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-exchange-alt" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">表記揺れに強い</span>のが最大の強み（「ユーザー取得」≠「getUser」でも意味でHit）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-language" aria-hidden="true"></i>
+                            <span>「ログイン処理」というクエリで、signin()やauthenticate()も見つけられる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            ベクトル検索単体だとキーワード完全一致に弱い。だからBM25と組み合わせる
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑨: RRF -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-merge fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ 柱1-C: RRF で2つの検索を統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-ranking-star" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Reciprocal Rank Fusion</span>（逆順位融合）でBM25とベクトル検索の結果を統合</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-calculator" aria-hidden="true"></i>
+                            <span>各検索結果の順位の逆数を足し合わせて、統合スコアを算出</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">スケール差を吸収</span>して、どちらの検索の良さも活かせる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            RRFのおかげで「キーワード完全一致」と「意味的近さ」の両方をカバーできる
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード⑩: ASTチャンキング -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scissors fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 柱2: ASTチャンキング（意味的分割）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-tree" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Tree-sitter</span>を使ってコードの構文木（AST）を解析</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">関数単位・クラス単位</span>でチャンクを切り出す（文字数分割ではない）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>対応言語: Python / JavaScript / TypeScript / Java / C++ / Rust 等</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-fallback" aria-hidden="true"></i>
+                            <span>未対応言語は<span class="keyword-tag">LangChainのCharacterTextSplitter</span>にフォールバック</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-5);"></i>
+                            文字数で分割すると関数の途中で切れる→ASTなら意味のまとまりが保たれる
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑪: Merkle Tree -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-network-wired fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ 柱3: Merkle Tree による増分インデックス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-fingerprint" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ファイルハッシュ</span>で変更を高速に検出</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span>変更があったファイルだけ再計算するので、<span class="keyword-tag">差分更新が超高速</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hard-drive" aria-hidden="true"></i>
+                            <span>スナップショットを永続化するので、PCを再起動しても整合性を維持</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i>
+                            Gitがコミットの差分を管理するのと同じ仕組みをインデックスに応用したイメージ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑫: 効果 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-1); animation: fa-pulse 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ 導入効果: トークンとツールコールを大幅削減</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">トークン約39.4%削減</span>を達成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-phone-volume" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ツールコール約36.3%削減</span>を達成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-flask" aria-hidden="true"></i>
+                            <span>計測ベンチマーク: <span class="keyword-tag">SWE-bench Lite</span>の30サブセットで検証</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-trend-down" aria-hidden="true"></i>
+                            <span>探索ループの発生率が下がり、コストも回答精度も改善</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-5);"></i>
+                            トークン約40%削減＝コストも速度も大きく改善する実用的な効果
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション3: セットアップと比較 -->
+        <div class="section-divider">
+            <h3><i class="fa-solid fa-wrench"></i> セットアップと他ツールとの比較</h3>
+        </div>
+
+        <!-- カード⑬: クラウド構成 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cloud fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ セットアップ: クラウド構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Zilliz Cloud</span> + <span class="keyword-tag">OpenAI埋め込み</span>を組み合わせた構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                            <span>コマンド1発でベクトルDBと埋め込みモデルの登録が完了</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                            <span>自前でインフラを構築しなくていいので、<span class="keyword-tag">最速で使い始められる</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+                            クラウド構成なら数分でスタート。コードに外部APIを送っていいプロジェクトに最適
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑭: ローカル構成 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-1); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ セットアップ: ローカル構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-docker" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Milvus Docker</span> + <span class="keyword-tag">Ollama</span>を使った完全ローカル構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            <span>コードを外部APIに送りたくない場合は、この構成が必須</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-microchip" aria-hidden="true"></i>
+                            <span>埋め込みモデルには<span class="keyword-tag">NOMIC Embed Text</span>を使用</span>
+                        </li>
+                    </ul>
+                    <div class="highlight-box">
+                        <i class="fa-solid fa-triangle-exclamation" style="color: var(--ui-color-1);"></i>
+                        <strong>注意点:</strong> Node.js v22推奨 / Milvusアドレスは明示指定 / .gitignoreの確認が必須
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑮: Context7との関係 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-handshake fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 他ツールとの関係: Context7</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Context7</span>（Upstash開発）は外部OSSドキュメントの参照に特化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                            <span>Claude Context → <span class="keyword-tag">自分のプロジェクト内</span>のコード検索</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                            <span>Context7 → <span class="keyword-tag">外部ライブラリのドキュメント</span>を検索</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i>
+                            両方を併用すると「自前コード＋外部ドキュメント」の両方を最強にカバーできる
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード⑯: Serena と Cursor内蔵 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 他ツールとの関係: Serena / Cursor内蔵</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Serena</span>: LSPベースのシンボル参照。リファクタリングに最適</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-desktop" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cursor内蔵検索</span>: 個人でCursorを使うならClaude Contextは不要な場合も</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            <span>Claude Contextの価値は<span class="keyword-tag">チーム統一基盤</span>としてIDEを問わず同じ検索を提供できる点</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                            個人開発ならCursor内蔵で十分。チームで横断的に使いたい時にClaude Contextが輝く
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑰: 導入判断 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-question fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 導入判断: 3つの質問で決める</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Q1: コードを外部APIに送ってOK？</span> → YESなら選択肢が広い</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Q2: 10万行以上の横断検索が必要？</span> → YESなら導入価値あり</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Q3: IDEを問わず同じ検索が欲しい？</span> → YESなら統一基盤の価値あり</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-thinking fa-lg" style="color: #E57373;"></i>
+                            3つともNOなら無理に導入しなくてOK。小規模プロジェクトは他の手段でも十分
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑱: まとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-pulse 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ: コード理解の摩擦をゼロに</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ハイブリッド検索</span>でキーワードも意味も両方カバー</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ASTチャンキング</span>でコードの意味を保ったまま分割</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Merkle Tree</span>でインデックス更新を最小限に維持</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                            <span>結果として<span class="keyword-tag">トークン約40%削減・ツールコール約36%削減</span>を達成</span>
+                        </li>
+                    </ul>
+                    <div class="highlight-box">
+                        <i class="fa-solid fa-lightbulb" style="color: var(--ui-color-1);"></i>
+                        <strong>核心:</strong> 「渡してから選ぶ」を「選んでから渡す」に変える設計転換こそが、LLMコーディングの効率を根本から改善する
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="footer">
+            <p>
+                🎬 動画: <a href="https://youtu.be/2ijFq0CQamc" target="_blank" style="color: inherit;">Claude Contextでコード理解の摩擦を消す設計</a> | 📅 2026年4月24日
+            </p>
+            <p style="margin-top: 10px; font-size: 12px; color: #aaa;">
+                Claude Context | Zilliz | Milvus | MCP | BM25 + Vector Search | RRF | AST Chunking | Tree-sitter | Merkle Tree
+            </p>
+        </div>
+    </div>
+</body>
+</html>

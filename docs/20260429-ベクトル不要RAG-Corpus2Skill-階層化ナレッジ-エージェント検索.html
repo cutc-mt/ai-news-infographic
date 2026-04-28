@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ベクトルを使わないRAG ─ Corpus2Skill: 全てのナレッジを階層化する手法</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #0E7490;
+            --color-2: #155E75;
+            --color-3: #06B6D4;
+            --color-4: #164E63;
+            --color-5: #CFFAFE;
+            --gradient-1: linear-gradient(135deg, #042F2E 0%, #0F3D3E 30%, #0A2F2F 60%, #042F2E 100%);
+            --gradient-2: linear-gradient(45deg, #0E7490, #155E75);
+            --gradient-3: linear-gradient(135deg, #155E75, #0E7490, #06B6D4);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Yomogi', cursive; background: var(--gradient-1); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1600px; margin: 0 auto; }
+        header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: rgba(255,255,255,0.05); border-radius: 20px; backdrop-filter: blur(10px); border: 1px solid rgba(14,116,144,0.3); }
+        h1 { font-family: 'Zen Kurenaido', sans-serif; font-size: 2.2em; color: #06B6D4; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; }
+        .subtitle { font-family: 'Kaisei Decol', serif; font-size: 1.15em; color: rgba(255,255,255,0.75); line-height: 1.6; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; padding: 20px 0; }
+        .card { background: rgba(255,255,255,0.95); border-radius: 16px; padding: 25px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); transition: transform 0.3s ease; position: relative; overflow: hidden; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(14,116,144,0.2); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-3); }
+        .card-icon { width: 50px; height: 50px; background: var(--gradient-2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+        .card-icon i { font-size: 1.5em; color: #fff; }
+        .card h2 { font-family: 'Kaisei Decol', serif; font-size: 1.1em; color: var(--color-2); margin-bottom: 12px; line-height: 1.5; }
+        .card p { font-size: 0.93em; color: #333; line-height: 1.8; }
+        .highlight { background: linear-gradient(120deg, rgba(14,116,144,0.1), rgba(6,182,212,0.15)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--color-1); }
+        .highlight-red { background: linear-gradient(120deg, rgba(220,38,38,0.1), rgba(239,68,68,0.15)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #991B1B; }
+        .highlight-green { background: linear-gradient(120deg, rgba(22,163,74,0.1), rgba(34,197,94,0.15)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #166534; }
+        .highlight-blue { background: linear-gradient(120deg, rgba(37,99,235,0.1), rgba(59,130,246,0.15)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #1E40AF; }
+        .highlight-purple { background: linear-gradient(120deg, rgba(168,85,247,0.1), rgba(192,132,252,0.15)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: #6B21A8; }
+        .tag { display: inline-block; background: var(--gradient-2); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin: 5px 5px 5px 0; }
+        .tag-dark { display: inline-block; background: #333; color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin: 5px 5px 5px 0; }
+        .tag-green { display: inline-block; background: linear-gradient(45deg, #059669, #10B981); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin: 5px 5px 5px 0; }
+        .stat-box { background: linear-gradient(135deg, rgba(14,116,144,0.05), rgba(6,182,212,0.08)); border: 1px solid rgba(14,116,144,0.2); border-radius: 10px; padding: 12px; margin: 10px 0; text-align: center; }
+        .stat-number { font-family: 'Zen Kurenaido', sans-serif; font-size: 1.8em; color: var(--color-1); font-weight: bold; }
+        .stat-label { font-size: 0.85em; color: #666; margin-top: 4px; }
+        .info-box { background: linear-gradient(135deg, rgba(14,116,144,0.05), rgba(6,182,212,0.08)); border-left: 4px solid var(--color-1); border-radius: 0 10px 10px 0; padding: 12px; margin-top: 12px; }
+        .info-box .label { font-size: 0.8em; color: var(--color-1); font-weight: bold; margin-bottom: 4px; }
+        .info-box p { font-size: 0.9em; color: #333; line-height: 1.7; }
+        .warn-box { background: linear-gradient(135deg, rgba(220,38,38,0.05), rgba(239,68,68,0.08)); border-left: 4px solid #DC2626; border-radius: 0 10px 10px 0; padding: 12px; margin-top: 12px; }
+        .warn-box .label { font-size: 0.8em; color: #DC2626; font-weight: bold; margin-bottom: 4px; }
+        .warn-box p { font-size: 0.9em; color: #333; line-height: 1.7; }
+        .vs-box { display: flex; gap: 10px; margin-top: 12px; align-items: stretch; }
+        .vs-side { flex: 1; background: linear-gradient(135deg, rgba(14,116,144,0.05), rgba(6,182,212,0.08)); border-radius: 10px; padding: 12px; text-align: center; }
+        .vs-side h3 { font-family: 'Kaisei Decol', serif; font-size: 0.95em; color: var(--color-2); margin-bottom: 6px; }
+        .vs-side p { font-size: 0.85em; color: #555; line-height: 1.6; }
+        .vs-center { display: flex; align-items: center; font-family: 'Zen Kurenaido', sans-serif; font-size: 1.2em; color: var(--color-1); font-weight: bold; }
+        .step-flow { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+        .step-item { display: flex; align-items: center; gap: 10px; }
+        .step-num { width: 28px; height: 28px; background: var(--gradient-2); color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; flex-shrink: 0; }
+        .step-text { font-size: 0.9em; color: #333; line-height: 1.5; }
+        .step-arrow { text-align: center; color: var(--color-1); font-size: 0.9em; margin-left: 8px; }
+        footer { text-align: center; padding: 30px; color: rgba(255,255,255,0.7); font-family: 'Kaisei Decol', serif; }
+        footer a { color: #06B6D4; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        .tree-box { background: #F0FDFA; border: 1px solid rgba(14,116,144,0.2); border-radius: 10px; padding: 12px; margin-top: 10px; font-family: monospace; font-size: 0.82em; color: #334155; line-height: 1.6; white-space: pre-wrap; }
+        .code-box { background: #1E293B; color: #E2E8F0; border-radius: 8px; padding: 12px; margin-top: 10px; font-family: monospace; font-size: 0.82em; line-height: 1.5; overflow-x: auto; }
+        .code-keyword { color: #7DD3FC; }
+        .code-string { color: #86EFAC; }
+        .code-comment { color: #94A3B8; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-layer-group" style="margin-right: 10px;"></i>ベクトルを使わないRAG</h1>
+            <p class="subtitle">Corpus2Skill: 全てのナレッジを階層化し、エージェントが検索する新しいRAG手法／MTRI研究チームが2026年4月に提案</p>
+            <div style="margin-top: 15px;">
+                <span class="tag">Corpus2Skill</span>
+                <span class="tag">ベクトルDB不要</span>
+                <span class="tag">階層化ナレッジ</span>
+                <span class="tag-dark">エージェント検索</span>
+            </div>
+        </header>
+        <div class="grid">
+
+            <!-- カード1: 概要 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-flask"></i></div>
+                <h2>① Corpus2Skillとは: ベクトルDBを使わないRAGの新手法</h2>
+                <p>MTRIの研究者らが2026年4月に提案した<span class="highlight">Corpus2Skill</span>は、ベクトルデータベースに依存しない全く新しいRAGのアプローチだ。従来のベクトル検索の限界を打ち破り、<span class="highlight">ナレッジ全体を階層構造に整理</span>して、LLMエージェントがその階層を辿りながら検索する仕組みを実現している。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-lightbulb"></i> 核心アイデア</div>
+                    <p>膨大な文書をピラミッド状の階層に整理し、エージェントが「どこに何があるか」を俯瞰しながら的確に探せるようにする。</p>
+                </div>
+            </div>
+
+            <!-- カード2: 従来RAGの問題 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <h2>② 従来RAGの根本的な問題: 「木を見て森を見ず」</h2>
+                <p>従来のベクトル検索は、質問と似たベクトルを持つ文書を<span class="highlight-red">上位X件だけ取得する</span>仕組みだ。つまり「答えがありそうな断片」をいくつか拾ってくるだけで、<span class="highlight-red">全体像を把握してから答えを探す</span>ことはしない。これが「木を見て森を見ず」の問題と呼ばれている。</p>
+                <div class="warn-box">
+                    <div class="label"><i class="fas fa-exclamation-circle"></i> 何がまずいのか</div>
+                    <p>取得したX件が十分な情報量かどうかを誰も判定しない。必要な文書が上位X件に入っていなければ、永遠に見つからない。</p>
+                </div>
+            </div>
+
+            <!-- カード3: 網羅的検索への弱さ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-magnifying-glass-minus"></i></div>
+                <h2>③ ベクトル検索が苦手な「網羅的検索」</h2>
+                <p><span class="highlight-red">「過去の〇〇に関する案件を全部検索して」</span>といった網羅的な検索は、ベクトル検索と非常に相性が悪い。ベクトル検索は「意味が似ているもの」を探すのが得意だが、<span class="highlight-red">「特定カテゴリに属するものを全件取得する」</span>という要求には応えられない。カテゴリ分けや分類の概念がそもそもないからだ。</p>
+                <div class="vs-box">
+                    <div class="vs-side">
+                        <h3><i class="fas fa-check" style="color: #059669;"></i> 得意なこと</h3>
+                        <p>意味的に類似する文書を検索する</p>
+                    </div>
+                    <div class="vs-center">vs</div>
+                    <div class="vs-side">
+                        <h3><i class="fas fa-xmark" style="color: #DC2626;"></i> 苦手なこと</h3>
+                        <p>カテゴリ別に全件を網羅的に取得する</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード4: Corpus2Skillの全体像 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sitemap"></i></div>
+                <h2>④ Corpus2Skillの全体像: 2つのフェーズ</h2>
+                <p>Corpus2Skillは大きく2つのフェーズに分かれる。<span class="highlight">事前準備フェーズ</span>では、全文書を階層構造に整理してナレッジベースを構築する。<span class="highlight">検索フェーズ</span>では、LLMエージェントがその階層を辿って必要な文書を的確に見つけ出す。つまり、検索の「勘」をあらかじめ構造化して与えるアプローチだ。</p>
+                <div class="step-flow">
+                    <div class="step-item">
+                        <div class="step-num">1</div>
+                        <div class="step-text"><span class="highlight">事前準備</span>: 文書をクラスタリング → 階層構造を構築</div>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-item">
+                        <div class="step-num">2</div>
+                        <div class="step-text"><span class="highlight">検索時</span>: エージェントが階層を辿って文書を特定</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード5: 事前準備ステップ1 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-vector-square"></i></div>
+                <h2>⑤ 事前準備①: 文書のベクトル化とクラスタリング</h2>
+                <p>まず、全文書を<span class="highlight">埋め込みモデルでベクトル化</span>する。ただし、ここでベクトルを使うのは分類のためだけで、検索時には使わない。次に、<span class="highlight">k-means法で文書をグループ分け</span>（クラスタリング）する。意味的に似た文書が同じグループに集まる仕組みだ。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-circle-info"></i> 補足</div>
+                    <p>ベクトル化は「事前の整理」にだけ使う。検索時には一切使わないのが従来RAGとの大きな違い。</p>
+                </div>
+            </div>
+
+            <!-- カード6: 事前準備ステップ2 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-file-lines"></i></div>
+                <h2>⑥ 事前準備②: LLMによるクラスタ要約</h2>
+                <p>クラスタリングされた各グループに対して、<span class="highlight">LLMが要約を作成</span>する。要約の内容は「このグループは何についての文書か」「どんな質問に答えられるか」の2点だ。これにより、各グループの「中身の概要」が分かるようになる。</p>
+                <div class="step-flow">
+                    <div class="step-item">
+                        <div class="step-num">1</div>
+                        <div class="step-text">k-meansで文書をグループ分け</div>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-item">
+                        <div class="step-num">2</div>
+                        <div class="step-text">各グループをLLMが要約</div>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-item">
+                        <div class="step-num">3</div>
+                        <div class="step-text">「何についての文書か」「どんな質問に答えられるか」を記録</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード7: ピラミッド構造 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-layer-group"></i></div>
+                <h2>⑦ 事前準備③: 要約のクラスタリングでピラミッド構造を構築</h2>
+                <p>要約自体をさらにクラスタリングして、その上の階層の要約を作る。これを繰り返すことで、<span class="highlight">ピラミッド状の階層構造</span>が出来上がる。一番上にはナレッジ全体の概要があり、下に降りるほど具体的な文書に近づいていく。文書数が<span class="highlight">10万件でも階層が1段増えるだけ</span>で済む（O(log N)）。</p>
+                <div class="tree-box">
+ナレッジ全体の要約（トップ階層）
+├── カテゴリAの要約
+│   ├── サブカテゴリA-1の要約
+│   │   ├── 文書ID: doc_001
+│   │   └── 文書ID: doc_002
+│   └── サブカテゴリA-2の要約
+│       └── 文書ID: doc_003
+├── カテゴリBの要約
+│   └── ...
+└── カテゴリCの要約
+    └── ...</div>
+            </div>
+
+            <!-- カード8: ディレクトリ構造 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-folder-tree"></i></div>
+                <h2>⑧ 事前準備④: ディレクトリ構造で保管 ─ SKILL.mdとINDEX.md</h2>
+                <p>構築した階層は、<span class="highlight">ディレクトリ構造としてファイルシステムに保管</span>される。各階層のディレクトリには2種類のファイルが含まれる。<span class="highlight">SKILL.md</span>には「このディレクトリ以下で何ができるか」を記述し、<span class="highlight">INDEX.md</span>には「下位ディレクトリの概要一覧」を記述する。一番下の階層には文書IDだけが並ぶ。</p>
+                <div class="code-box">
+<span class="code-keyword">knowledge_base/</span>
+├── <span class="code-string">SKILL.md</span>      <span class="code-comment"># 全体で何ができるか</span>
+├── <span class="code-string">INDEX.md</span>      <span class="code-comment"># 下位カテゴリ一覧</span>
+├── <span class="code-keyword">category_A/</span>
+│   ├── <span class="code-string">SKILL.md</span>  <span class="code-comment"># カテゴリAの能力</span>
+│   ├── <span class="code-string">INDEX.md</span>  <span class="code-comment"># サブカテゴリ一覧</span>
+│   └── <span class="code-keyword">sub_A1/</span>
+│       ├── <span class="code-string">SKILL.md</span>
+│       └── <span class="code-string">docs.txt</span>  <span class="code-comment"># doc_id一覧</span></div>
+            </div>
+
+            <!-- カード9: 検索フェーズ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-robot"></i></div>
+                <h2>⑨ 検索フェーズ: エージェントがトップから降りていく</h2>
+                <p>検索時は、<span class="highlight">LLMエージェントがトップ階層の要約を見て全体を俯瞰</span>する。そこから「この質問に関係ありそうなディレクトリ」を判断して、一段ずつ降りていく。SKILL.mdで「ここで何ができるか」を確認し、INDEX.mdで「どの下位ディレクトリに行くべきか」を判断する。</p>
+                <div class="step-flow">
+                    <div class="step-item">
+                        <div class="step-num">1</div>
+                        <div class="step-text">トップの<span class="highlight">SKILL.md</span>を読んで全体を俯瞰</div>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-item">
+                        <div class="step-num">2</div>
+                        <div class="step-text"><span class="highlight">INDEX.md</span>から関連ディレクトリを特定</div>
+                    </div>
+                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-item">
+                        <div class="step-num">3</div>
+                        <div class="step-text">末端の文書IDに到達するまで繰り返す</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード10: get_document -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-file-export"></i></div>
+                <h2>⑩ 文書の取得: get_document(doc_id)でピンポイントに取り出す</h2>
+                <p>エージェントが末端の文書IDまで辿り着いたら、<span class="highlight">get_document(doc_id)</span>という関数を呼び出して、その文書の全文を取得する。不要な文書は一切読み込まないため、<span class="highlight">無駄なコンテキスト消費を抑えられる</span>。必要な文書だけをピンポイントで取り出す仕組みだ。</p>
+                <div class="code-box">
+<span class="code-comment"># エージェントの検索フロー</span>
+<span class="code-keyword">skill</span> = read_file(<span class="code-string">"SKILL.md"</span>)      <span class="code-comment"># 全体俯瞰</span>
+<span class="code-keyword">index</span> = read_file(<span class="code-string">"INDEX.md"</span>)    <span class="code-comment"># 下位一覧</span>
+<span class="code-keyword">sub</span> = navigate_to(<span class="code-string">"category_A/"</span>) <span class="code-comment"># 関連ディレクトリへ</span>
+<span class="code-keyword">doc</span> = get_document(<span class="code-string">"doc_003"</span>)    <span class="code-comment"># 文書を取得</span>
+<span class="code-keyword">answer</span> = generate(doc)              <span class="code-comment"># 回答生成</span></div>
+            </div>
+
+            <!-- カード11: キモ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-key"></i></div>
+                <h2>⑪ Corpus2Skillのキモ: 検索の「勘」を構造化して与える</h2>
+                <p>この手法の本質は、<span class="highlight">膨大なナレッジを捉えるための「勘」を階層構造で与えている</span>点にある。「このカテゴリの文書はこのあたりにまとまっている」という直感的なナビゲーションをAIが行える。人間が図書館で「棚の分類を見て本を探す」のと同じ感覚だ。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-brain"></i> 重要な洞察</div>
+                    <p>ベクトル検索は「意味の近さ」だけを頼りにするが、Corpus2Skillは「どこに何があるか」の地図を提供する。検索の質が根本から変わる。</p>
+                </div>
+            </div>
+
+            <!-- カード12: Claude Codeとの類推 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code"></i></div>
+                <h2>⑫ コーディングエージェントと同じ発想</h2>
+                <p><span class="highlight">Claude Codeなどのコーディングエージェント</span>が、プロジェクトのディレクトリ構造を辿りながらgrepでファイルを探すのと<span class="highlight">全く同じ発想</span>だ。まずディレクトリ構造を把握し、関連しそうなディレクトリに降りて、ファイルの中身を確認する。この自然な探索パターンをRAGに応用したのがCorpus2Skillだ。</p>
+                <div class="vs-box">
+                    <div class="vs-side">
+                        <h3><i class="fas fa-laptop-code" style="color: var(--color-1);"></i> コーディングエージェント</h3>
+                        <p>ディレクトリ構造 → grep → ファイル閲覧</p>
+                    </div>
+                    <div class="vs-center"><i class="fas fa-equals"></i></div>
+                    <div class="vs-side">
+                        <h3><i class="fas fa-sitemap" style="color: var(--color-1);"></i> Corpus2Skill</h3>
+                        <p>階層構造 → INDEX → 文書ID → 取得</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード13: WixQAベンチマーク -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-trophy"></i></div>
+                <h2>⑬ WixQAベンチマークで既存手法を全指標で上回る</h2>
+                <p><span class="highlight-green">WixQA</span>は、エンタープライズ顧客サポート向けのRAGベンチマークだ。Corpus2Skillは、このベンチマークにおいて<span class="highlight-green">全ての評価指標で既存手法を上回る</span>成績を収めた。ベクトルDBを使わないという「制約」があるにもかかわらず、検索精度と回答品質の両方で優れた結果を達成している。</p>
+                <div class="stat-box">
+                    <div class="stat-number">全指標で優越</div>
+                    <div class="stat-label">WixQAベンチマークにおける既存手法との比較結果</div>
+                </div>
+            </div>
+
+            <!-- カード14: ベクトルDB不要 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-database"></i></div>
+                <h2>⑭ ベクトルDBが不要 ─ 必要なのはLLMだけ</h2>
+                <p>Corpus2Skillの大きな利点の一つは、<span class="highlight">検索時にベクトルデータベースが不要</span>なことだ。必要なのはLLMだけ。階層構造のテキストファイル（SKILL.mdとINDEX.md）を読みながらナビゲートするだけで検索が完結する。インフラのシンプルさとコスト削減にもつながる。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-coins"></i> コスト面のメリット</div>
+                    <p>ベクトルDBの運用・保守コストがゼロに。階層構造はプレーンテキストで管理できる。</p>
+                </div>
+            </div>
+
+            <!-- カード15: スケーラビリティ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-chart-line"></i></div>
+                <h2>⑮ O(log N)のスケーラビリティ: 文書が増えても階層が1段増えるだけ</h2>
+                <p>階層の深さは<span class="highlight">O(log N)</span>で増加する。つまり文書数が10倍になっても、<span class="highlight">階層が1段増えるだけ</span>で済む。10万件の文書があっても、エージェントは数回のステップで目的の文書に到達できる。この対数的なスケーリングが、大規模ナレッジベースでの実用性を支えている。</p>
+                <div class="stat-box">
+                    <div class="stat-number">O(log N)</div>
+                    <div class="stat-label">階層の深さ ─ 文書数が増えても探索ステップは最小限</div>
+                </div>
+            </div>
+
+            <!-- カード16: PageIndexとの比較 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-scale-balanced"></i></div>
+                <h2>⑯ PageIndexとの比較: 文書の読み方の違い</h2>
+                <p><span class="highlight-purple">PageIndex</span>は、単一の長い文書を「人間が目次を辿るように読む」手法だ。一方、Corpus2Skillは<span class="highlight">ナレッジ全体を「ファイルシステムを辿るように探索する」</span>手法。PageIndexが「1冊の本を読む」イメージなら、Corpus2Skillは「図書館の中から本を探す」イメージだ。</p>
+                <div class="vs-box">
+                    <div class="vs-side">
+                        <h3><i class="fas fa-book" style="color: #6B21A8;"></i> PageIndex</h3>
+                        <p>1冊の本を目次から辿って読む</p>
+                    </div>
+                    <div class="vs-center">vs</div>
+                    <div class="vs-side">
+                        <h3><i class="fas fa-building" style="color: var(--color-1);"></i> Corpus2Skill</h3>
+                        <p>図書館の棚を階層から辿って探す</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17: 検索品質の理由 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-microscope"></i></div>
+                <h2>⑰ なぜCorpus2Skillが優れているのか: 検索の質が違う</h2>
+                <p>従来のベクトル検索は「質問に似ている文書」を探すだけだが、Corpus2Skillは<span class="highlight">「どこに何があるか」を理解した上で検索</span>する。網羅的な検索にも強く、「〇〇カテゴリの案件を全部出して」という要求にも正確に応えられる。これは<span class="highlight">地図を持った検索</span>と<span class="highlight-red">手探りの検索</span>の違いだ。</p>
+                <div class="warn-box">
+                    <div class="label"><i class="fas fa-arrow-up-right-dots"></i> 格差の理由</div>
+                    <p>ベクトル検索は「推測」、Corpus2Skillは「構造化された知識に基づく判断」。情報の網羅性が根本的に違う。</p>
+                </div>
+            </div>
+
+            <!-- カード18: まとめ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-flag-checkered"></i></div>
+                <h2>⑱ まとめ: RAGのパラダイムシフト</h2>
+                <p>Corpus2Skillは、RAGのあり方を根本から見直す手法だ。<span class="highlight">ベクトルDBへの依存を脱却</span>し、ナレッジを階層構造に整理することで、エージェントによる高精度な検索を実現する。WixQAでの全指標優越は、この手法の有効性を強く示唆している。</p>
+                <div style="margin-top: 12px;">
+                    <span class="tag">ベクトルDB不要</span>
+                    <span class="tag-green">全指標で優越</span>
+                    <span class="tag">O(log N)スケーリング</span>
+                    <span class="tag-dark">エージェント検索</span>
+                </div>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-rocket"></i> 今後の展望</div>
+                    <p>エージェントベースの検索が主流になる中、ナレッジの階層化はRAGだけでなくAIシステム全体の設計にも影響を与える可能性がある。</p>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            <i class="fas fa-book-open" style="margin-right: 8px;"></i> 記事: <a href="https://zenn.dev/knowledgesense/articles/7dddae04a7d828" target="_blank">ベクトルを使わないRAG。全てのナレッジを階層化する手法 ─ Zenn / KnowledgeSense</a> | <i class="fas fa-calendar" style="margin-right: 4px;"></i> 2026年4月29日
+        </footer>
+    </div>
+</body>
+</html>

@@ -3,19 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tool Attentionが暴くMCP税の正体と設計必然</title>
+    <title>Tool Attention Is All You Need ─ MCP税の正体と設計必然</title>
     <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
         :root {
             --color-1: #D97706;
-            --color-2: #92400E;
+            --color-2: #B45309;
             --color-3: #F59E0B;
             --color-4: #78350F;
             --color-5: #FEF3C7;
             --gradient-1: linear-gradient(135deg, #1C1917 0%, #292524 30%, #1C1917 60%, #0C0A09 100%);
-            --gradient-2: linear-gradient(45deg, #D97706, #92400E);
-            --gradient-3: linear-gradient(135deg, #92400E, #D97706, #F59E0B);
+            --gradient-2: linear-gradient(45deg, #D97706, #B45309);
+            --gradient-3: linear-gradient(135deg, #B45309, #D97706, #F59E0B);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Yomogi', cursive; background: var(--gradient-1); min-height: 100vh; padding: 20px; }
@@ -61,6 +61,7 @@
         footer { text-align: center; padding: 30px; color: rgba(255,255,255,0.7); font-family: 'Kaisei Decol', serif; }
         footer a { color: #F59E0B; text-decoration: none; }
         footer a:hover { text-decoration: underline; }
+        .tree-box { background: #FFFBEB; border: 1px solid rgba(217,119,6,0.2); border-radius: 10px; padding: 12px; margin-top: 10px; font-family: monospace; font-size: 0.82em; color: #334155; line-height: 1.6; white-space: pre-wrap; }
         .code-box { background: #1E293B; color: #E2E8F0; border-radius: 8px; padding: 12px; margin-top: 10px; font-family: monospace; font-size: 0.82em; line-height: 1.5; overflow-x: auto; }
         .code-keyword { color: #FCD34D; }
         .code-string { color: #86EFAC; }
@@ -70,302 +71,266 @@
 <body>
     <div class="container">
         <header>
-            <h1><i class="fas fa-screwdriver-wrench" style="margin-right: 10px;"></i>Tool Attentionが暴くMCP税の正体</h1>
-            <p class="subtitle">Tool Attention Is All You Need ─ MCPサーバーのツール定義が引き起こすコンテキスト圧迫問題と、その画期的な解決策を論文から読み解く</p>
+            <h1><i class="fas fa-fire" style="margin-right: 10px;"></i>Tool Attention Is All You Need</h1>
+            <p class="subtitle">MCP税の正体を暴き、Transformerオマージュの「Tool Attention」で解決する最新論文を徹底解説<br>arXiv:2604.21816 / Sadani &amp; Kumar (2026年4月)</p>
             <div style="margin-top: 15px;">
                 <span class="tag">MCP税</span>
                 <span class="tag">Tool Attention</span>
                 <span class="tag">ISOスコア</span>
-                <span class="tag-dark">二段階遅延ローダー</span>
+                <span class="tag-dark">遅延スキーマローダー</span>
             </div>
         </header>
         <div class="grid">
 
-            <!-- カード1: 200kコンテキストでも破綻する問題 -->
+            <!-- カード1: 200kコンテキストの限界 -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-bomb"></i></div>
-                <h2>① 200kコンテキストでも破綻する: ツールを増やすと壊れる</h2>
-                <p>フロンティアモデルであるGPT-4oやClaudeなどは、<span class="highlight">200kトークンのコンテキスト</span>を持っている。そのため「MCPサーバーのツールを全部入れても余裕だろう」と思われがちだ。しかし現実は厳しく、<span class="highlight-red">ツールを増やすほどモデルの性能は壊れていく</span>という結論に至る。</p>
+                <div class="card-icon"><i class="fas fa-expand"></i></div>
+                <h2>① 200kコンテキストでも破綻する理由</h2>
+                <p>LLMのコンテキストウィンドウは200kトークンに拡大されたが、MCP（Model Context Protocol）でツールを接続すると<span class="highlight-red">あっという間に上限に達する</span>。ツールのスキーマ定義だけで膨大なトークンが消費され、本来のタスクに使えるコンテキストが圧迫される。</p>
                 <div class="warn-box">
-                    <div class="label"><i class="fas fa-exclamation-circle"></i> 直感に反する事実</div>
-                    <p>コンテキストに余裕があっても、ツール定義が増えるとツール選択の精度が下がり、回答品質が悪化する。</p>
+                    <div class="label"><i class="fas fa-exclamation-circle"></i> 根本的な矛盾</div>
+                    <p>ツールをたくさん繋ぐほど便利になるはずが、逆にコンテキストが足りなくて賢く動けなくなるというジレンマ。</p>
                 </div>
             </div>
 
-            <!-- カード2: MCP税とは何か -->
+            <!-- カード2: MCP税とは -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-receipt"></i></div>
-                <h2>② MCP税とは何か: ツール定義がコンテキストを食いつぶす</h2>
-                <p>MCP（Model Context Protocol）でツールを接続すると、各ツールの定義（JSON Schema）をシステムプロンプトに含める必要がある。これが<span class="highlight">「MCP税」</span>と呼ばれる問題の正体だ。ツールが増えるほど、そのスキーマ情報がコンテキストを圧迫していく。</p>
-                <div class="step-flow">
-                    <div class="step-item">
-                        <span class="step-num">1</span>
-                        <span class="step-text">MCPサーバーにツールを接続する</span>
-                    </div>
-                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
-                    <div class="step-item">
-                        <span class="step-num">2</span>
-                        <span class="step-text">各ツールのJSON Schemaがシステムプロンプトに追加される</span>
-                    </div>
-                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
-                    <div class="step-item">
-                        <span class="step-num">3</span>
-                        <span class="step-text">コンテキストがツール定義で埋め尽くされる</span>
-                    </div>
+                <div class="card-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <h2>② MCP税が燃える: 1.42Mトークン消費の衝撃</h2>
+                <p>論文が実測した「MCP税」の正体は<span class="highlight-red">1.42Mトークンの消費</span>だ。ツールのスキーマを全てコンテキストに読み込むと、タスクに関係のないツール定義まで毎回送信される。結果として<span class="highlight-red">コストが17倍</span>に跳ね上がる。</p>
+                <div class="stat-box">
+                    <div class="stat-number">17×</div>
+                    <div class="stat-label">通常タスク比でコストが17倍に膨張</div>
                 </div>
             </div>
 
-            <!-- カード3: MCP税の実態 — 1.42Mトークン消費 -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-fire-flame-curved"></i></div>
-                <h2>③ MCP税の実態: ツール定義だけで1.42Mトークンを消費</h2>
-                <p>複数のMCPサーバーを接続した環境での実測値が衝撃的だ。ツール定義だけで<span class="highlight-red">1.42Mトークン</span>を消費し、コストが<span class="highlight-red">通常の17倍</span>に膨れ上がる。コンテキストの大部分がツール定義で埋まり、ユーザーの実際の質問に使える余裕がほとんど残らない。</p>
-                <div class="stat-box">
-                    <div class="stat-number">1.42M</div>
-                    <div class="stat-label">ツール定義だけで消費されるトークン数</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number">17倍</div>
-                    <div class="stat-label">通常のコストと比較した倍率</div>
-                </div>
-            </div>
-
-            <!-- カード4: 70%のラインで崩壊 -->
+            <!-- カード3: 70%で崩壊 -->
             <div class="card">
                 <div class="card-icon"><i class="fas fa-chart-line"></i></div>
-                <h2>④ 70%のラインで崩壊: コンテキストが限界を超える瞬間</h2>
-                <p>コンテキストの約<span class="highlight-red">70%</span>がツール定義で占められると、エージェントの性能が急激に低下する。ユーザーの実際の質問に割けるコンテキストが不足し、ツール選択の精度も大幅に下がる。この70%というラインが、<span class="highlight">MCP運用における実質的な限界点</span>として示されている。</p>
-                <div class="warn-box">
-                    <div class="label"><i class="fas fa-triangle-exclamation"></i> 急激な劣化</div>
-                    <p>70%を超えたあたりから性能が急カーブで落ち込む。緩やかな低下ではなく、閾値をまたいだ瞬間に崩壊が起きる。</p>
+                <h2>③ ツール数が70%を超えると崩壊する</h2>
+                <p>実験で判明した臨界点がある。利用可能なツール数が<span class="highlight-red">70%を超えたあたり</span>から、エージェントの成功率が急激に低下し始める。コンテキストがノイズで溢れ、LLMが正しいツールを選択できなくなるのだ。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-lightbulb"></i> なぜ70%なのか</div>
+                    <p>ツールのスキーマがコンテキストの大部分を占めると、LLMの「注意力」が分散してしまい、本来のユーザーの意図を正確に把握できなくなる。</p>
+                </div>
+            </div>
+
+            <!-- カード4: 論文の概要 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-scroll"></i></div>
+                <h2>④ 論文「Tool Attention Is All You Need」の全体像</h2>
+                <p>SadaniとKumarが2026年4月に発表したこの論文は、<span class="highlight">MCP税を排除するためのTool Attentionアーキテクチャ</span>を提案している。タイトルはTransformerの有名論文「Attention Is All You Need」へのオマージュであり、構造にも深い類比がある。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-graduation-cap"></i> 論文情報</div>
+                    <p>arXiv:2604.21816 / 「Dynamic Tool Gating and Lazy Schema Loading for Eliminating the MCP/Tools Tax」</p>
                 </div>
             </div>
 
             <!-- カード5: ISOスコア -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-bullseye"></i></div>
-                <h2>⑤ ISOスコア: ユーザーの意図とツールの関連性を定量化</h2>
-                <p><span class="highlight">ISO（Intent-Schema Overlap）スコア</span>は、ユーザーの意図（Intent）とツールスキーマの重なり度を定量化する指標だ。各ツールが現在のユーザー要求にどれだけ関連しているかをスコア化し、<span class="highlight">ISOスコアが高いツールだけをコンテキストに残す</span>ことで、無駄なツール定義を排除できる。</p>
-                <div class="info-box">
-                    <div class="label"><i class="fas fa-lightbulb"></i> ISOスコアの役割</div>
-                    <p>「このツールは今の質問に関係あるか？」を数値で判定し、関係のないツールをコンテキストから追い出すガードレールとして機能する。</p>
-                </div>
-            </div>
-
-            <!-- カード6: 状態認識ゲーティング関数 -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-sliders"></i></div>
-                <h2>⑥ 状態認識ゲーティング: エージェントの状態でツールを動的に切り替え</h2>
-                <p>エージェントの現在の状態（思考中・実行中・完了など）を認識し、<span class="highlight">状態に応じて必要なツールを動的に切り替える</span>仕組みだ。たとえば思考フェーズでは検索ツールを外し、実行フェーズではコード実行ツールを有効にする。不要なツールを積極的に排除することで、コンテキストを節約する。</p>
+                <div class="card-icon"><i class="fas fa-ruler-combined"></i></div>
+                <h2>⑤ ISOスコアで意図を測る: Intent-Schema Overlap</h2>
+                <p>論文が導入した<span class="highlight">ISO（Intent-Schema Overlap）スコア</span>は、ユーザーの意図とツールのスキーマがどれだけ重なっているかを定量化する指標だ。このスコアが高いツールだけを優先的に読み込み、低いツールは遅延させる。</p>
                 <div class="step-flow">
                     <div class="step-item">
-                        <span class="step-num">思考</span>
-                        <span class="step-text">→ 分析・計画に必要なツールのみ有効化</span>
+                        <div class="step-num">1</div>
+                        <span class="step-text">ユーザーのクエリから意図ベクトルを抽出</span>
                     </div>
-                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-arrow">↓</div>
                     <div class="step-item">
-                        <span class="step-num">実行</span>
-                        <span class="step-text">→ アクション実行用のツールに切り替え</span>
+                        <div class="step-num">2</div>
+                        <span class="step-text">各ツールのスキーマから特徴ベクトルを計算</span>
                     </div>
-                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
+                    <div class="step-arrow">↓</div>
                     <div class="step-item">
-                        <span class="step-num">完了</span>
-                        <span class="step-text">→ ツール定義を最小限に圧縮</span>
+                        <div class="step-num">3</div>
+                        <span class="step-text">両者の重なりをISOスコアとして算出</span>
                     </div>
                 </div>
             </div>
 
-            <!-- カード7: Summary Pool -->
+            <!-- カード6: 状態認識ゲーティング -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-compress"></i></div>
-                <h2>⑦ Summary Pool: 全ツールのスキーマを要約で保持</h2>
-                <p><span class="highlight">Summary Pool</span>は、全ツールのスキーマを短い要約に圧縮して保持する仕組みだ。詳細なJSON Schema全体をコンテキストに置くのではなく、各ツールの「名前と概要」だけを軽量に保持する。詳細なスキーマは必要になったタイミングで後から遅延読み込みするため、コンテキストを大幅に節約できる。</p>
+                <div class="card-icon"><i class="fas fa-door-open"></i></div>
+                <h2>⑥ 状態認識ゲーティング関数の必然性</h2>
+                <p>ISOスコアだけでは不十分だ。論文は<span class="highlight">状態認識ゲーティング関数</span>を導入し、現在のタスクの進行状況に応じてツールの有効・無効を動的に切り替える。これにより「今の状態で本当に必要なツールだけ」をコンテキストに乗せる。</p>
+                <div class="warn-box">
+                    <div class="label"><i class="fas fa-key"></i> ゲーティングの本質</div>
+                    <p>単なるフィルタリングではなく、状態遷移に連動した動的な開閉が重要。これがTransformerのアテンション重みとの構造的類比になる。</p>
+                </div>
+            </div>
+
+            <!-- カード7: 二段階遅延スキーマローダー -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-layer-group"></i></div>
+                <h2>⑦ 二段階で遅延する: Summary PoolとSchema Promotion</h2>
+                <p>Tool Attentionの中核を担うのが<span class="highlight">二段階遅延スキーマローダー</span>だ。第一段階の「Summary Pool」でツールの要約だけをコンテキストに置き、第二段階の「Schema Promotion」で必要なツールの完全なスキーマだけを遅延読み込みする。</p>
                 <div class="vs-box">
                     <div class="vs-side">
-                        <h3><i class="fas fa-times" style="color: #DC2626;"></i> 従来</h3>
-                        <p>全ツールのフルスキーマを常にコンテキストに展開</p>
+                        <h3><i class="fas fa-file-lines" style="color: #D97706;"></i> Stage 1</h3>
+                        <p>Summary Pool<br>ツールの要約のみをコンテキストに配置</p>
+                    </div>
+                    <div class="vs-center"><i class="fas fa-arrow-right"></i></div>
+                    <div class="vs-side">
+                        <h3><i class="fas fa-file-code" style="color: #059669;"></i> Stage 2</h3>
+                        <p>Schema Promotion<br>必要なツールだけ完全スキーマを読み込む</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード8: トークン95%削減 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-scissors"></i></div>
+                <h2>⑧ 実験結果: トークン消費を95%削減</h2>
+                <p>Tool Attentionを適用した結果、<span class="highlight-green">トークン消費が95%削減</span>された。全ツールのスキーマを毎回読み込む従来手法に対し、必要なツールだけを動的に選択する手法が圧倒的な効率性を示した。</p>
+                <div class="stat-box">
+                    <div class="stat-number">95%</div>
+                    <div class="stat-label">トークン消費量の削減率</div>
+                </div>
+            </div>
+
+            <!-- カード9: 成功率+22pp -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-bullseye"></i></div>
+                <h2>⑨ 成功率が+22ポイント向上</h2>
+                <p>効率だけでなく精度も向上した。<span class="highlight-green">タスク成功率が+22ポイント</span>改善されている。コンテキストからノイズが排除されることで、LLMが本来のタスクに集中でき、的確なツール選択と実行が可能になった。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-chart-bar"></i> 精度と効率の両立</div>
+                    <p>通常はコスト削減と精度向上はトレードオフだが、Tool Attentionは両方を同時に達成する珍しい手法。</p>
+                </div>
+            </div>
+
+            <!-- カード10: コスト86%削減 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-piggy-bank"></i></div>
+                <h2>⑩ コストも86%削減: ビジネスへのインパクト</h2>
+                <p><span class="highlight-green">ランニングコストが86%削減</span>されたことは、ビジネス上の意義も大きい。17倍に膨張していたMCP税をほぼ解消し、エージェントをスケールしてもコストが線形に増加しない設計を実現している。</p>
+                <div class="vs-box">
+                    <div class="vs-side">
+                        <h3><i class="fas fa-xmark" style="color: #DC2626;"></i> 従来</h3>
+                        <p>コスト17倍<br>ツール増で指数的に増大</p>
                     </div>
                     <div class="vs-center">→</div>
                     <div class="vs-side">
-                        <h3><i class="fas fa-check" style="color: #059669;"></i> Summary Pool</h3>
-                        <p>要約だけを保持し、必要なものだけ詳細を展開</p>
+                        <h3><i class="fas fa-check" style="color: #059669;"></i> Tool Attention</h3>
+                        <p>コスト86%削減<br>ツール増でも安定</p>
                     </div>
-                </div>
-            </div>
-
-            <!-- カード8: Schema Promotion -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-arrow-up-right-dots"></i></div>
-                <h2>⑧ Schema Promotion: 必要なツールだけを要約からフルスキーマへ昇格</h2>
-                <p><span class="highlight">Schema Promotion</span>は、実際に使用される可能性が高いツールだけをSummary Poolからフルスキーマへ昇格させる仕組みだ。ISOスコアに基づいて「今の質問に関係のありそうなツール」を判定し、そのツールだけ詳細なスキーマを読み込む。これが二段階遅延ローダーの核となる機能だ。</p>
-                <div class="info-box">
-                    <div class="label"><i class="fas fa-lightbulb"></i> 昇格の判断基準</div>
-                    <p>ISOスコアが閾値θを超えたツールが昇格の対象になる。スコアが低いツールは要約のまま残り、コンテキストを圧迫しない。</p>
-                </div>
-            </div>
-
-            <!-- カード9: 二段階遅延スキーマローダー -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-layer-group"></i></div>
-                <h2>⑨ 二段階遅延スキーマローダーの仕組み</h2>
-                <p>Summary PoolとSchema Promotionを組み合わせた<span class="highlight">二段階遅延ローダー</span>が、MCP税の解決の中核を担う。第1段階では全ツールの要約のみを保持し、第2段階でISOスコアに基づいて必要なツールだけフルスキーマへ昇格する。これによりコンテキスト消費を最小限に抑える。</p>
-                <div class="step-flow">
-                    <div class="step-item">
-                        <span class="step-num">1</span>
-                        <span class="step-text"><strong>第1段階:</strong> Summary Poolで全ツールの要約のみを保持</span>
-                    </div>
-                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
-                    <div class="step-item">
-                        <span class="step-num">2</span>
-                        <span class="step-text">ISOスコアで関連ツールを特定</span>
-                    </div>
-                    <div class="step-arrow"><i class="fas fa-arrow-down"></i></div>
-                    <div class="step-item">
-                        <span class="step-num">3</span>
-                        <span class="step-text"><strong>第2段階:</strong> 必要なツールだけSchema Promotionで昇格</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- カード10: Tool Attentionアーキテクチャ -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-brain"></i></div>
-                <h2>⑩ Tool Attentionアーキテクチャ: Attentionをツール選択に応用</h2>
-                <p><span class="highlight">Tool Attention</span>は、TransformerのAttentionメカニズムをツール選択に応用したアーキテクチャだ。「どのツールに注意を向けるべきか」を動的に決定する。論文タイトル「<span class="highlight">Tool Attention Is All You Need</span>」は、あの有名な「Attention Is All You Need」へのオマージュとなっている。</p>
-                <div class="info-box">
-                    <div class="label"><i class="fas fa-lightbulb"></i> Attentionの応用先</div>
-                    <p>トークン間の関係性ではなく、ツールとユーザー意図の関係性にAttentionを向けるという発想の転換。</p>
                 </div>
             </div>
 
             <!-- カード11: Transformerとの構造的類比 -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-right-left"></i></div>
-                <h2>⑪ Transformerとの構造的類比: 同じ原理を別の対象に適用</h2>
-                <p>TransformerとTool Attentionの間には明確な構造的類比がある。<span class="highlight">Transformerはトークン間のAttention</span>を計算し、<span class="highlight">Tool Attentionはツール間のAttention</span>を計算する。両者とも「関連性の高いものに注目し、低いものを無視する」という同じ原理で動作している。</p>
-                <div class="vs-box">
-                    <div class="vs-side">
-                        <h3><i class="fas fa-font" style="color: var(--color-1);"></i> Transformer</h3>
-                        <p>トークン間のAttentionで重要な単語に注目</p>
-                    </div>
-                    <div class="vs-center">≡</div>
-                    <div class="vs-side">
-                        <h3><i class="fas fa-screwdriver-wrench" style="color: #D97706;"></i> Tool Attention</h3>
-                        <p>ツール間のAttentionで関連ツールを特定</p>
-                    </div>
-                </div>
-                <p style="margin-top: 10px;">両者とも<span class="highlight">「関連性の高いものに注目し、低いものを無視する」</span>という同じ原理で動作する。対象がトークンからツールに変わっただけだ。</p>
-            </div>
-
-            <!-- カード12: トークン95%削減 -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-percent"></i></div>
-                <h2>⑫ 実験結果: ツール定義のトークン消費を95%削減</h2>
-                <p>Tool Attentionを適用した結果、ツール定義のトークン消費を<span class="highlight-green">95%削減</span>することに成功した。従来は1.42Mトークンを消費していたツール定義が、二段階遅延ロードにより大幅に圧縮される。<span class="highlight">コンテキストをユーザーの実際の会話に解放</span>できるようになる。</p>
-                <div class="stat-box">
-                    <div class="stat-number">95%</div>
-                    <div class="stat-label">ツール定義トークン消費の削減率</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-number">1.42M → 大幅圧縮</div>
-                    <div class="stat-label">従来の消費量から劇的な削減を実現</div>
+                <div class="card-icon"><i class="fas fa-bezier-curve"></i></div>
+                <h2>⑪ Transformerとの構造的類比で腹落ちさせる</h2>
+                <p>論文タイトルの「Attention Is All You Need」は単なるオマージュではない。<span class="highlight-blue">Tool AttentionはTransformerのセルフアテンションと構造的に対応</span>している。ツールの選択が「どのトークンに注目するか」の決定と同じ仕組みで動く。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-link"></i> 対応関係</div>
+                    <p>クエリ＝ユーザーの意図、キー＝ツールのスキーマ要約、バリュー＝完全なスキーマ。QKVアテンションそのもの。</p>
                 </div>
             </div>
 
-            <!-- カード13: 成功率+22pp -->
+            <!-- カード12: QKVアナロジー -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-arrow-trend-up"></i></div>
-                <h2>⑬ 実験結果: ツール選択の成功率が22ポイント向上</h2>
-                <p>ツール選択の成功率が<span class="highlight-green">22ポイント（percentage point）向上</span>した。特に多数のツールが存在する環境で効果が顕著に表れている。ユーザー要求の正確な理解と、それに基づくツール選択が大幅に改善されたことを意味する。</p>
+                <div class="card-icon"><i class="fas fa-diagram-project"></i></div>
+                <h2>⑫ QKVアナロジー: Tool Attentionの中身</h2>
+                <p>TransformerのQ（Query）、K（Key）、V（Value）をツール選択に当てはめると明確になる。<span class="highlight">Q=ユーザーの意図ベクトル、K=ツールの要約ベクトル、V=完全なスキーマ</span>。QとKの内積がISOスコアに相当し、閾値を超えたVだけが読み込まれる。</p>
+                <div class="code-box">
+<span class="code-comment">// Tool AttentionのQKV対応</span>
+<span class="code-keyword">Q</span> = <span class="code-string">ユーザーの意図ベクトル</span>
+<span class="code-keyword">K</span> = <span class="code-string">ツールの要約ベクトル (Summary Pool)</span>
+<span class="code-keyword">V</span> = <span class="code-string">完全なスキーマ (Schema Promotion)</span>
+
+<span class="code-comment">// ISOスコア = Q・K^T (内積)</span>
+<span class="code-keyword">if</span> ISO(user_intent, tool_summary) > θ:
+    <span class="code-keyword">load</span>(full_schema)  <span class="code-comment">// Schema Promotion</span>
+                </div>
+            </div>
+
+            <!-- カード13: 失敗ケース -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-bug"></i></div>
+                <h2>⑬ 限界も直視する: 失敗ケースの分析</h2>
+                <p>論文は成功だけでなく<span class="highlight-red">失敗ケースも正直に報告</span>している。ISOスコアの閾値設定が難しいケースや、ユーザーの意図が曖昧な場合にゲーティングが誤動作する場面がある。特に複数ツールの組み合わせが必要な状況では、単一ツールの選択だけでは対応できない。</p>
+                <div class="warn-box">
+                    <div class="label"><i class="fas fa-triangle-exclamation"></i> 既知の弱点</div>
+                    <p>意図が曖昧なクエリではISOスコアが分散し、正しいツールを特定できない場合がある。</p>
+                </div>
+            </div>
+
+            <!-- カード14: 敵対的パラフレーズ脅威 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-skull-crossbones"></i></div>
+                <h2>⑭ 敵対的パラフレーズ脅威: セキュリティの課題</h2>
+                <p><span class="highlight-red">敵対的パラフレーズ攻撃</span>のリスクも指摘されている。ユーザーのクエリを意図的に変換してISOスコアを操作し、不要なツールを強制的に読み込ませたり、必要なツールを除外したりする攻撃が理論上可能だ。</p>
+                <div class="warn-box">
+                    <div class="label"><i class="fas fa-shield-halved"></i> セキュリティへの示唆</div>
+                    <p>ゲーティング機構は新しい攻撃面を生む可能性があり、ISOスコアのロバスト性が課題。</p>
+                </div>
+            </div>
+
+            <!-- カード15: 実装パラメータ -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sliders"></i></div>
+                <h2>⑮ 明日から実装できるパラメータ: θ=0.28、k=10</h2>
+                <p>論文は<span class="highlight">すぐに使える具体的なパラメータ</span>を提示している。ゲーティングの閾値<span class="highlight">θ=0.28</span>、Summary Poolのサイズ<span class="highlight">k=10</span>が最適値として実験で導出された。これらを既存のMCP実装に組み込むだけで効果が得られる。</p>
+                <div class="code-box">
+<span class="code-comment">// 明日から使える設定</span>
+<span class="code-keyword">const</span> config = {
+  <span class="code-string">gating_threshold</span>: <span class="code-keyword">0.28</span>,  <span class="code-comment">// θ: ISO閾値</span>
+  <span class="code-string">summary_pool_size</span>: <span class="code-keyword">10</span>,     <span class="code-comment">// k: 要約プール上限</span>
+};
+                </div>
+            </div>
+
+            <!-- カード16: MCPの未来 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-road"></i></div>
+                <h2>⑯ MCPの未来: スケーラブルなエージェントへ</h2>
+                <p>Tool Attentionが示したのは、<span class="highlight">MCPがスケールするための道筋</span>だ。ツール数が数十から数百に増えてもコストが線形に増加しない設計により、エージェントが多様なツールを組み合わせて複雑なタスクをこなす未来が現実味を帯びる。</p>
+                <div class="info-box">
+                    <div class="label"><i class="fas fa-rocket"></i> スケールの鍵</div>
+                    <p>遅延読み込み＋動的ゲーティングの組み合わせが、ツール数に依存しないコスト設計を実現する。</p>
+                </div>
+            </div>
+
+            <!-- カード17: 既存手法との比較 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-scale-balanced"></i></div>
+                <h2>⑰ 既存手法との比較: なぜTool Attentionが違うのか</h2>
+                <p>従来のツール選択手法は、ツールの説明文をベクトル化してコサイン類似度で選ぶシンプルなものが多かった。Tool Attentionはそれを<span class="highlight">状態認識＋二段階遅延</span>で大幅に進化させている。単なる類似度判定ではなく、タスクの進行状況に応じた動的な切り替えが決定的な違いだ。</p>
                 <div class="vs-box">
                     <div class="vs-side">
-                        <h3><i class="fas fa-times" style="color: #DC2626;"></i> 従来手法</h3>
-                        <p>ツールが増えると選択精度が急激に悪化</p>
+                        <h3><i class="fas fa-minus" style="color: #999;"></i> 従来</h3>
+                        <p>静的ベクトル類似度のみ<br>全スキーマを常にロード</p>
                     </div>
                     <div class="vs-center">→</div>
                     <div class="vs-side">
-                        <h3><i class="fas fa-check" style="color: #059669;"></i> Tool Attention</h3>
-                        <p>ツールが増えても高い選択精度を維持</p>
+                        <h3><i class="fas fa-bolt" style="color: #D97706;"></i> Tool Attention</h3>
+                        <p>状態認識ゲーティング<br>二段階遅延ローダー</p>
                     </div>
-                </div>
-            </div>
-
-            <!-- カード14: コスト86%削減 -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-coins"></i></div>
-                <h2>⑭ 実験結果: APIコストが86%削減</h2>
-                <p>APIコストが<span class="highlight-green">86%削減</span>された。これはトークン消費の減少に直接連動する成果だ。特にエンタープライズでの運用において、多数のMCPサーバーを常時接続する環境でのコスト改善効果は絶大で、<span class="highlight">実用的なMCP運用の障壁を大きく下げる</span>結果となっている。</p>
-                <div class="stat-box">
-                    <div class="stat-number">86%</div>
-                    <div class="stat-label">APIコストの削減率</div>
-                </div>
-                <div class="info-box">
-                    <div class="label"><i class="fas fa-building"></i> エンタープライズへの影響</div>
-                    <p>多ツール環境での運用コストが現実的な水準になり、MCPのスケーラビリティが飛躍的に向上する。</p>
-                </div>
-            </div>
-
-            <!-- カード15: 失敗ケース — 敵対的パラフレーズ -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-mask"></i></div>
-                <h2>⑮ 失敗ケース: 敵対的パラフレーズに弱い</h2>
-                <p>ユーザーが意図を回りくどく表現すると、<span class="highlight-red">ISOスコアが正しく機能しなくなる</span>。敵対的なパラフレーズ（間接的な表現）に対して、ツールの関連性判定が不正確になるリスクがある。たとえば「データを永遠に消し去って」と言われた場合、削除ツールとの関連性を正しく判定できるかが課題だ。</p>
-                <div class="warn-box">
-                    <div class="label"><i class="fas fa-triangle-exclamation"></i> 弱点の本質</div>
-                    <p>ISOスコアはユーザーの意図を直接表現に依存するため、暗喩や比喩が入ると精度が落ちる。</p>
-                </div>
-            </div>
-
-            <!-- カード16: 限界と課題 -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-road-barrier"></i></div>
-                <h2>⑯ 限界と課題: 今後の改善ポイント</h2>
-                <p>Tool Attentionにもいくつかの限界がある。ISOスコアの精度向上が引き続き必要で、<span class="highlight-blue">1階層あたりのファイル数が多い場合</span>の対応や、リアルタイムなスキーマ更新への対応が今後の課題として挙げられている。また、複雑なマルチステップワークフローでの検証も不足している。</p>
-                <div class="info-box">
-                    <div class="label"><i class="fas fa-list-check"></i> 今後の課題</div>
-                    <p>ISOスコアの精度向上／大規模ディレクトリ対応／リアルタイムスキーマ更新／マルチステップワークフローの検証</p>
-                </div>
-            </div>
-
-            <!-- カード17: 明日から実装できるパラメータ -->
-            <div class="card">
-                <div class="card-icon"><i class="fas fa-wrench"></i></div>
-                <h2>⑰ 明日から実装できる最適化パラメータ</h2>
-                <p>論文の実験で最適化されたパラメータが示されており、<span class="highlight">すぐに実装に活用できる</span>。ゲーティング閾値θ=0.28は、ISOスコアが0.28以上のツールだけを有効化する値だ。Schema Promotionで同時に昇格させる最大ツール数は<span class="highlight">k=10</span>に設定するのが最適とされている。</p>
-                <div class="code-box">
-                    <span class="code-comment">// 論文で最適化されたパラメータ</span><br>
-                    <span class="code-keyword">const</span> θ = <span class="code-string">0.28</span>;  <span class="code-comment">// ゲーティング閾値</span><br>
-                    <span class="code-keyword">const</span> k = <span class="code-string">10</span>;    <span class="code-comment">// Schema Promotionの最大ツール数</span><br>
-                    <br>
-                    <span class="code-comment">// ISOスコア >= θ のツールだけを有効化</span><br>
-                    <span class="code-keyword">if</span> (isoScore >= θ && promoted < k) {<br>
-                    &nbsp;&nbsp;promoteSchema(tool);<br>
-                    }
                 </div>
             </div>
 
             <!-- カード18: まとめ -->
             <div class="card">
-                <div class="card-icon"><i class="fas fa-medal"></i></div>
-                <h2>⑱ まとめ: MCP税は払わなくてよくなる</h2>
-                <p>Tool AttentionはMCP税問題の<span class="highlight">画期的な解決策</span>だ。二段階遅延ロードと状態認識ゲーティングの組み合わせにより、コンテキストを圧迫せずに多数のツールを扱えるようになる。実用的なパラメータ（θ=0.28, k=10）で即導入可能であり、<span class="highlight">MCPエコシステムのスケーラビリティを根本から改善</span>する。</p>
-                <div style="margin-top: 12px;">
-                    <span class="tag-green">95% トークン削減</span>
-                    <span class="tag-green">+22pp 成功率向上</span>
-                    <span class="tag-green">86% コスト削減</span>
-                </div>
-                <div class="info-box">
-                    <div class="label"><i class="fas fa-rocket"></i> エコシステムへの影響</div>
-                    <p>MCPサーバーを安心して増やせるようになり、ツールのエコシステムが健全にスケールする未来が見えてくる。</p>
+                <div class="card-icon"><i class="fas fa-star"></i></div>
+                <h2>⑱ まとめ: MCP税をなくすための設計の必然</h2>
+                <p>Tool Attentionは、Transformerの構造をツール選択に転用した<span class="highlight">シンプルで強力な設計</span>だ。ISOスコアによる意図測定、状態認識ゲーティングによる動的切り替え、二段階遅延ローダーによるコスト抑制。これら3つの要素が組み合わさることで、<span class="highlight-green">95%のトークン削減、+22ppの成功率向上、86%のコスト削減</span>を同時に達成している。</p>
+                <div class="tree-box">
+🔧 Tool Attention = 3つの柱
+├── 📏 ISOスコア（意図とスキーマの重なりを定量化）
+├── 🚪 状態認識ゲーティング（タスク状態に連動した動的開閉）
+└── 📦 二段階遅延ローダー（Summary Pool → Schema Promotion）
+
+📊 実験結果: トークン95%↓ / 成功率+22pp / コスト86%↓
+⚙️ 即実装可能: θ=0.28 / k=10
                 </div>
             </div>
 
         </div>
 
         <footer>
-            🎬 動画: <a href="https://youtu.be/2xXjykLF_pE" target="_blank" style="color: inherit;">さとるちゃんのAI論文徹底解説</a> |
-            📄 論文: Sadani & Kumar (2026). <em>Tool Attention Is All You Need.</em> arXiv:2604.21816 |
-            📅 2026年4月29日
+            🎬 動画: <a href="https://youtu.be/2xXjykLF_pE" target="_blank">さとるちゃんのAI論文徹底解説</a> | 📅 2026年4月29日 | 📄 論文: Sadani &amp; Kumar (2026) arXiv:2604.21816
         </footer>
     </div>
 </body>

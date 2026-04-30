@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BitNet — GPUなしで100Bモデルを動かす1-bit LLM推論フレームワーク</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+:root {
+    --color-1: #0078D4;
+    --color-2: #005A9E;
+    --color-3: #E3F2FD;
+    --color-4: #003F72;
+    --color-5: #00BCF2;
+    --ui-color-1: #0078D4;
+    --ui-color-2: #FF6B35;
+    --ui-color-3: #E3F2FD;
+    --ui-color-4: #003F72;
+    --ui-color-5: #00BCF2;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+    background: linear-gradient(135deg, #001A33 0%, #003F72 40%, #0078D4 100%);
+    color: #333;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+.container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center;
+    padding: 40px 20px;
+    color: white;
+    position: relative;
+}
+
+.header h1 {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.header .subtitle {
+    font-size: 18px;
+    opacity: 0.9;
+    margin-bottom: 15px;
+}
+
+.header .date {
+    font-size: 14px;
+    color: #00BCF2;
+}
+
+.header .mega-icon {
+    font-size: 80px;
+    margin-bottom: 20px;
+    animation: fa-bounce 2s infinite;
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+}
+
+.grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    padding: 10px;
+}
+
+.section-card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.15);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 8px 25px rgba(0,0,0,0.2);
+}
+
+.section-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--color-1), var(--color-5));
+}
+
+.mega-icon-container {
+    text-align: center;
+    margin: 10px 0;
+}
+
+.mega-icon-container i {
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.mega-icon-container h2 {
+    font-size: 20px;
+    color: #333;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+.card-content {
+    padding: 5px 10px 15px;
+}
+
+.keyword-list {
+    margin: 10px 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+.keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 16px;
+    margin-top: 4px;
+}
+
+.keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 2px 8px;
+    border-radius: 5px;
+    margin-right: 3px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.highlight {
+    color: var(--color-2);
+    font-weight: bold;
+}
+
+.speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 12px 15px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+    transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+}
+
+.speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+}
+
+.speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+}
+
+.speech-bubble.variant-1 {
+    background: #FFF3E0;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+    border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+    background: #E3F2FD;
+    border-color: #0078D4;
+    transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+    border-color: #0078D4 transparent;
+}
+
+.handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+}
+
+pre {
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 10px;
+    overflow-x: auto;
+    border-left: 3px solid var(--color-1);
+}
+
+.code-tag {
+    background: #2D3436;
+    color: #00BCF2;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 13px;
+}
+
+.tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 8px 0;
+}
+
+.mini-tag {
+    background: linear-gradient(135deg, var(--color-3), #BBDEFB);
+    color: var(--color-4);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: bold;
+    border: 1px solid #90CAF9;
+}
+
+.stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 10px 0;
+}
+
+.stat-box {
+    background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+    border-radius: 10px;
+    padding: 10px;
+    text-align: center;
+}
+
+.stat-box .stat-value {
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--color-2);
+}
+
+.stat-box .stat-label {
+    font-size: 12px;
+    color: #555;
+}
+
+.footer {
+    text-align: center;
+    padding: 30px 20px;
+    color: #00BCF2;
+    font-size: 14px;
+}
+
+.footer a {
+    color: #00BCF2;
+    text-decoration: none;
+}
+
+.footer a:hover {
+    text-decoration: underline;
+}
+
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.fade-in-scale {
+    animation: fadeInScale 0.6s ease-out forwards;
+}
+
+@media (max-width: 1600px) {
+    .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+    .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+    .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+    .grid { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; }
+    .header h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ヘッダー -->
+<div class="header">
+    <div class="mega-icon">
+        <i class="fa-solid fa-microchip" style="color: #00BCF2;"></i>
+    </div>
+    <h1>BitNet — GPUなしで100Bモデルを動かす1-bit LLM推論フレームワーク</h1>
+    <div class="subtitle">Microsoftが開発した、重みを3値で表現する画期的なLLM推論エンジン</div>
+    <div class="date"><i class="fa-solid fa-calendar"></i> 2026年4月30日 | GitHub: microsoft/BitNet</div>
+</div>
+
+<!-- カードグリッド -->
+<div class="grid">
+
+<!-- ① -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s infinite;"></i>
+        <h2>① BitNet b1.58とは: 重みをたった3値で表現するLLM</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-circle-info"></i><span>BitNet b1.58は、<span class="keyword-tag">Microsoft Research</span>が開発した1-bit量子化LLMです。</span></li>
+            <li><i class="fa-solid fa-calculator"></i><span>モデルの重みを<span class="highlight">{-1, 0, 1}の3値</span>だけで表現します。</span></li>
+            <li><i class="fa-solid fa-compress"></i><span>情報量は<span class="keyword-tag">1.58 bit</span>（log₂3 ≒ 1.58）で、名前の由来になっています。</span></li>
+            <li><i class="fa-solid fa-bolt"></i><span>従来の16bit浮動小数点と比べて<span class="highlight">劇的なメモリ削減と高速化</span>を実現します。</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+            <span class="handwritten">
+                <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                -1, 0, 1だけなのに精度が落ちない。<br>シンプル イズ ベスト！✨
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ② -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="color: #FF6B35; animation: fa-flip 3s infinite;"></i>
+        <h2>② なぜ1-bitなのか: 従来LLMのボトルネックを打破する</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-memory"></i><span>従来のLLMは<span class="keyword-tag">FP16/BF16</span>で重みを保持するため、メモリと計算量が膨大です。</span></li>
+            <li><i class="fa-solid fa-server"></i><span>大規模モデルの推論には<span class="highlight">GPUが必須</span>で、コストも電力もかさみます。</span></li>
+            <li><i class="fa-solid fa-bolt"></i><span>1-bit化により、乗算が<span class="keyword-tag">加減算に置き換え可能</span>になり、CPUでも高速推論が可能に。</span></li>
+            <li><i class="fa-solid fa-leaf"></i><span>マトリックス乗算を<span class="highlight">ルックアップテーブル</span>で代用するのが核心技術です。</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten">
+                <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i>
+                乗算が不要になる = CPUだけで<br>ガンガン推論できる！🔥
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ③ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x" style="color: #00C853; animation: fa-pulse 2s infinite;"></i>
+        <h2>③ ARM CPUパフォーマンス: モバイル・エッジでも爆速</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-mobile-screen"></i><span>ARM CPU環境での推論速度が<span class="highlight">1.37倍〜5.07倍に高速化</span>されます。</span></li>
+            <li><i class="fa-solid fa-battery-full"></i><span>消費電力は<span class="keyword-tag">55.4%〜70.0%を削減</span>でき、バッテリー寿命が大幅に延びます。</span></li>
+            <li><i class="fa-solid fa-tablet-screen-button"></i><span>スマートフォンやタブレットなど、<span class="highlight">エッジデバイスでのLLM実行</span>が現実的に。</span></li>
+            <li><i class="fa-solid fa-temperature-low"></i><span>発熱も大幅に抑えられ、ファンレスデバイスでも安定動作が期待できます。</span></li>
+        </ul>
+        <div class="stat-grid">
+            <div class="stat-box">
+                <div class="stat-value">5.07x</div>
+                <div class="stat-label">最大速度向上</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">-70%</div>
+                <div class="stat-label">最大電力削減</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ④ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-desktop fa-5x" style="color: #7C4DFF; animation: fa-bounce 2s infinite;"></i>
+        <h2>④ x86 CPUパフォーマンス: サーバーでも劇的な改善</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-server"></i><span>x86 CPU環境では<span class="highlight">2.37倍〜6.17倍の高速化</span>を実現しています。</span></li>
+            <li><i class="fa-solid fa-plug-circle-bolt"></i><span>消費電力は<span class="keyword-tag">71.9%〜82.2%を削減</span>し、運用コストを大幅に下げます。</span></li>
+            <li><i class="fa-solid fa-gauge-high"></i><span>GPUがなくても、<span class="highlight">一般的なCPU搭載サーバー</span>で大規模LLMが動きます。</span></li>
+            <li><i class="fa-solid fa-coins"></i><span>GPUサーバーのレンタルコストが不要になり、<span class="keyword-tag">TCOが劇的に低下</span>します。</span></li>
+        </ul>
+        <div class="stat-grid">
+            <div class="stat-box">
+                <div class="stat-value">6.17x</div>
+                <div class="stat-label">最大速度向上</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">-82.2%</div>
+                <div class="stat-label">最大電力削減</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ⑤ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-dragon fa-5x" style="color: #E91E63; animation: fa-beat 2s infinite;"></i>
+        <h2>⑤ 100BモデルがCPU1台で動く: 人間の読書速度と同等</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-expand"></i><span><span class="keyword-tag">1000億パラメータ</span>の超大規模モデルが、<span class="highlight">CPU 1台で動作</span>します。</span></li>
+            <li><i class="fa-solid fa-tachometer-alt"></i><span>推論速度は<span class="highlight">5〜7 トークン/秒</span>で、人間の読書速度とほぼ同等です。</span></li>
+            <li><i class="fa-solid fa-dollar-sign"></i><span>これまではGPUクラスタが必要だった規模のモデルが、<span class="keyword-tag">1台のPCで実行可能</span>に。</span></li>
+            <li><i class="fa-solid fa-globe"></i><span>ローカル環境で100Bクラスのモデルを動かせることで、<span class="highlight">プライバシーとセキュリティ</span>も確保できます。</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten">
+                <i class="fa-solid fa-mind-blowing fa-lg" style="color: var(--ui-color-2);"></i>
+                100BモデルがCPU1台...<br>これ、マジで時代が変わるレベル！🤯
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ⑥ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: #00BCF2; animation: fa-spin 3s infinite;"></i>
+        <h2>⑥ ロスレス量子化: 品質を犠牲にしない圧縮技術</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-check-double"></i><span>1.58bitへの量子化を行っても、<span class="highlight">モデルの品質低下がほぼなし</span>です。</span></li>
+            <li><i class="fa-solid fa-scale-balanced"></i><span>従来のINT8やINT4量子化とは異なり、<span class="keyword-tag">完全にロスレス</span>な性能を維持します。</span></li>
+            <li><i class="fa-solid fa-flask"></i><span>これはBitNetが<span class="highlight">最初から1-bit用に設計・学習</span>されているからです。</span></li>
+            <li><i class="fa-solid fa-bullseye"></i><span>事後量子化（Post-training Quantization）ではなく、<span class="keyword-tag">学習時から3値化</span>するアプローチが鍵です。</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+            <span class="handwritten">
+                <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                圧縮したのに劣化しない。<br>量子化の常識が覆った！⭐
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ⑦ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-table fa-5x" style="color: #4CAF50; animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑦ Lookup Table手法: 乗算をテーブル参照で置き換え</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-database"></i><span><span class="keyword-tag">T-MAC</span>論文で提案されたLookup Table（LUT）手法を採用しています。</span></li>
+            <li><i class="fa-solid fa-arrows-rotate"></i><span>重みが3値 {-1, 0, 1} なので、<span class="highlight">行列の乗算をテーブル参照に変換</span>できます。</span></li>
+            <li><i class="fa-solid fa-gauge"></i><span>乗算演算が不要になることで、<span class="keyword-tag">CPUの計算ユニットを効率的に活用</span>できます。</span></li>
+            <li><i class="fa-solid fa-cogs"></i><span>llama.cppベースの実装で、<span class="highlight">既存のエコシステム</span>とも互換性があります。</span></li>
+        </ul>
+        <pre>/* 通常の行列積: O(n²) の乗算 */
+C[i][j] += A[i][k] * B[k][j]
+
+/* BitNetのLUT: テーブル参照で置き換え */
+C[i][j] += LUT[A[i][k]][B[k][j]]</pre>
+    </div>
+</div>
+
+<!-- ⑧ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color: #FF5722; animation: fa-bounce 2s infinite;"></i>
+        <h2>⑧ 並列カーネル最適化: さらに1.15x〜2.1xの追加高速化</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-layer-group"></i><span>最新の並列カーネル実装により、<span class="highlight">さらに1.15倍〜2.1倍の速度向上</span>を達成。</span></li>
+            <li><i class="fa-solid fa-code"></i><span>マルチスレッド最適化とSIMD命令の活用で、<span class="keyword-tag">CPUの全コアを効率的に使用</span>。</span></li>
+            <li><i class="fa-solid fa-arrows-split-up-and-left"></i><span>計算を細かく分割して並列実行することで、<span class="highlight">レイテンシを大幅に削減</span>します。</span></li>
+            <li><i class="fa-solid fa-chart-bar"></i><span>ベースの高速化（最大6.17x）と組み合わせると、<span class="keyword-tag">最大約13倍の総合高速化</span>が可能に。</span></li>
+        </ul>
+        <div class="stat-grid">
+            <div class="stat-box">
+                <div class="stat-value">2.1x</div>
+                <div class="stat-label">追加高速化</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value">~13x</div>
+                <div class="stat-label">総合速度向上</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ⑨ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-display fa-5x" style="color: #9C27B0; animation: fa-pulse 2s infinite;"></i>
+        <h2>⑨ GPU対応も追加: 2025年5月からハードウェアアクセラレーション対応</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-gpu-card"></i><span>2025年5月に<span class="highlight">GPU推論カーネル</span>が公式リポジトリに追加されました。</span></li>
+            <li><i class="fa-solid fa-forward"></i><span>CUDAを利用したGPU推論で、<span class="keyword-tag">さらに高速な処理</span>が可能に。</span></li>
+            <li><i class="fa-solid fa-microchip"></i><span>NPU（Neural Processing Unit）対応も<span class="highlight">今後のロードマップ</span>に含まれています。</span></li>
+            <li><i class="fa-solid fa-arrows-left-right"></i><span>CPUとGPUを用途に応じて使い分ける<span class="keyword-tag">ハイブリッド推論</span>の道が開けました。</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten">
+                <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i>
+                CPUでもGPUでも選べる。<br>柔軟性が最高！👏
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ⑩ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-cubes fa-5x" style="color: #FF9800; animation: fa-flip 3s infinite;"></i>
+        <h2>⑩ 対応モデル: 公式モデルからコミュニティ変換まで豊富に</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-building"></i><span><span class="keyword-tag">BitNet b1.58-2B-4T</span>がMicrosoft公式モデルとして提供されています。</span></li>
+            <li><i class="fa-solid fa-fire"></i><span><span class="highlight">Llama3-8B-1.58bit</span>はコミュニティで変換された大人気モデルです。</span></li>
+            <li><i class="fa-solid fa-feather"></i><span><span class="keyword-tag">Falcon3/Edge</span>シリーズ（1B〜10B）も1-bit化で利用可能。</span></li>
+            <li><i class="fa-solid fa-boxes-stacked"></i><span>HuggingFaceで<span class="highlight">GGUF形式の公式モデル</span>が配布されており、すぐに試せます。</span></li>
+        </ul>
+        <div class="tag-row">
+            <span class="mini-tag">BitNet-2B-4T（公式）</span>
+            <span class="mini-tag">Llama3-8B-1.58bit</span>
+            <span class="mini-tag">Falcon3-1B</span>
+            <span class="mini-tag">Falcon3-10B</span>
+            <span class="mini-tag">Falcon Edge</span>
+        </div>
+    </div>
+</div>
+
+<!-- ⑪ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-gears fa-5x" style="color: #607D8B; animation: fa-spin 3s infinite;"></i>
+        <h2>⑪ 技術スタック: llama.cppベースの実装</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">llama.cpp</span>をベースに構築されており、成熟した推論エンジンを利用しています。</span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>llama.cppの<span class="highlight">GGUFフォーマット</span>に対応しているため、互換性が高いです。</span></li>
+            <li><i class="fa-solid fa-layer-group"></i><span>C++で書かれた<span class="keyword-tag">高性能なカーネル実装</span>で、低レベルの最適化が施されています。</span></li>
+            <li><i class="fa-solid fa-terminal"></i><span>コマンドラインツールとしても<span class="highlight">Pythonバインディング</span>としても利用可能です。</span></li>
+        </ul>
+        <pre>$ ./main -m bitnet-b1.58-2B-4T.gguf \
+  -p "Hello, how are you?" \
+  -n 128 -t 8</pre>
+    </div>
+</div>
+
+<!-- ⑫ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-download fa-5x" style="color: #2196F3; animation: fa-bounce 2s infinite;"></i>
+        <h2>⑫ セットアップ方法: 3ステップですぐに始められる</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">Step 1:</span> リポジトリをクローンします。</span></li>
+            <li><i class="fa-solid fa-2"></i><span><span class="keyword-tag">Step 2:</span> 依存パッケージをインストールします。</span></li>
+            <li><i class="fa-solid fa-3"></i><span><span class="keyword-tag">Step 3:</span> 環境セットアップスクリプトを実行します。</span></li>
+        </ul>
+        <pre># リポジトリのクローン
+git clone https://github.com/microsoft/BitNet.git
+cd BitNet
+
+# 依存パッケージのインストール
+pip install -r requirements.txt
+
+# 環境セットアップ
+python setup_env.py</pre>
+        <div class="speech-bubble variant-2">
+            <span class="handwritten">
+                <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                たった3コマンドで準備完了！<br>お手軽さ最高！🚀
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- ⑬ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-face-smile fa-5x" style="color: #FFC107; animation: fa-beat 2s infinite;"></i>
+        <h2>⑬ HuggingFace連携: GGUF形式で公式モデルを取得</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-cloud-arrow-down"></i><span><span class="keyword-tag">HuggingFace Hub</span>から公式モデルを直接ダウンロードできます。</span></li>
+            <li><i class="fa-solid fa-file-code"></i><span>GGUF形式なので、<span class="highlight">追加の変換作業なし</span>ですぐに推論が可能です。</span></li>
+            <li><i class="fa-solid fa-magnifying-glass"></i><span>HuggingFaceで「<span class="keyword-tag">BitNet</span>」を検索すれば、各種1-bitモデルが見つかります。</span></li>
+            <li><i class="fa-solid fa-users"></i><span>コミュニティにより変換された<span class="highlight">Llama3やFalcon</span>などのモデルも多数公開中。</span></li>
+        </ul>
+        <pre>from huggingface_hub import hf_hub_download
+
+hf_hub_download(
+  repo_id="microsoft/BitNet-b1.58-2B-4T-GGUF",
+  filename="bitnet-b1.58-2B-4T.Q4_K_M.gguf"
+)</pre>
+    </div>
+</div>
+
+<!-- ⑭ -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-clock-rotate-left fa-5x" style="color: #009688; animation: fa-spin 3s infinite;"></i>
+        <h2>⑭ 研究の歩み: 2年半にわたる継続的な進化</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-calendar-day"></i><span><span class="keyword-tag">2023年10月:</span> BitNetの基礎論文を公開。1-bit量

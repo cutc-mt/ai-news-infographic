@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Open Design — Claude Designのオープンソース代替ローカルファースト設計ツール</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --color-1: #3F51B5;
+            --color-2: #1A237E;
+            --color-3: #E8EAF6;
+            --color-4: #0D1442;
+            --color-5: #7986CB;
+            --gradient-1: linear-gradient(135deg, #0D1442 0%, #1A237E 30%, #283593 60%, #3F51B5 100%);
+            --gradient-2: linear-gradient(45deg, #3F51B5, #1A237E);
+            --highlight-bg: rgba(63,81,181,0.15);
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Yomogi', cursive; background: var(--gradient-1); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1600px; margin: 0 auto; }
+        header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: rgba(121,134,203,0.08); border-radius: 20px; backdrop-filter: blur(10px); border: 1px solid rgba(121,134,203,0.15); }
+        h1 { font-family: 'Zen Kurenaido', sans-serif; font-size: 2.2em; color: #7986CB; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin-bottom: 15px; }
+        .subtitle { font-family: 'Kaisei Decol', serif; font-size: 1.2em; color: rgba(121,134,203,0.85); }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; padding: 20px 0; }
+        .card { background: rgba(255,255,255,0.95); border-radius: 16px; padding: 25px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); transition: transform 0.3s ease; position: relative; overflow: hidden; }
+        .card:hover { transform: translateY(-5px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: var(--gradient-2); }
+        .card-icon { width: 50px; height: 50px; background: var(--gradient-2); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+        .card-icon i { font-size: 1.5em; color: #fff; }
+        .card h2 { font-family: 'Kaisei Decol', serif; font-size: 1.15em; color: var(--color-4); margin-bottom: 12px; line-height: 1.5; }
+        .card p { font-size: 0.95em; color: #333; line-height: 1.8; }
+        .highlight { background: linear-gradient(120deg, rgba(63,81,181,0.15), rgba(232,234,246,0.25)); padding: 2px 6px; border-radius: 4px; font-weight: bold; color: var(--color-4); }
+        .tag { display: inline-block; background: var(--gradient-2); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 0.85em; margin: 5px 5px 5px 0; }
+        footer { text-align: center; padding: 30px; color: rgba(121,134,203,0.7); font-family: 'Kaisei Decol', serif; }
+        footer a { color: var(--color-5); text-decoration: none; }
+        .comparison-box { display: flex; gap: 10px; margin: 10px 0; }
+        .comparison-box .left { flex: 1; background: #E8EAF6; border-radius: 10px; padding: 10px; }
+        .comparison-box .right { flex: 1; background: #E3F2FD; border-radius: 10px; padding: 10px; }
+        .comparison-box .label { font-size: 0.8em; color: #888; font-weight: bold; }
+        .comparison-box .desc { font-size: 0.9em; color: #333; margin-top: 4px; }
+        .step-list { counter-reset: step; list-style: none; padding: 0; margin: 10px 0; }
+        .step-list li { counter-increment: step; padding: 8px 0 8px 35px; position: relative; border-bottom: 1px dashed #eee; }
+        .step-list li:last-child { border-bottom: none; }
+        .step-list li::before { content: counter(step); position: absolute; left: 0; top: 8px; width: 24px; height: 24px; background: var(--gradient-2); color: #fff; border-radius: 50%; text-align: center; line-height: 24px; font-size: 0.85em; font-family: 'Kaisei Decol', serif; }
+        .arrow-flow { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 12px 0; flex-wrap: wrap; }
+        .arrow-flow .flow-item { background: var(--color-3); color: var(--color-4); padding: 6px 14px; border-radius: 20px; font-size: 0.9em; font-weight: bold; }
+        .arrow-flow .flow-arrow { color: var(--color-1); font-size: 1.2em; }
+        .stat-row { display: flex; justify-content: space-around; margin: 12px 0; text-align: center; }
+        .stat-item .stat-value { font-family: 'Zen Kurenaido', sans-serif; font-size: 1.8em; color: var(--color-1); }
+        .stat-item .stat-label { font-size: 0.85em; color: #777; }
+        .speech-bubble { position: relative; background: #FFF9E3; border: 2px solid var(--color-1); border-radius: 16px; padding: 10px 15px; margin: 12px 0; font-family: 'Yomogi', cursive; box-shadow: 2px 2px 8px rgba(0,0,0,0.08); transform: rotate(-0.5deg); }
+        .speech-bubble i { color: var(--color-2); }
+        .speech-bubble.variant-1 { background: #E8EAF6; border-color: var(--color-5); transform: rotate(0.5deg); }
+        .speech-bubble.variant-2 { background: #E3F2FD; border-color: #90CAF9; transform: rotate(-1deg); }
+        .keyword-tag { background-color: var(--color-3); color: var(--color-4); padding: 2px 8px; border-radius: 5px; margin-right: 4px; display: inline-block; font-weight: bold; font-size: 0.9em; }
+        pre { background: #F5F0F0; padding: 10px; border-radius: 8px; font-size: 0.85em; margin: 10px 0; overflow-x: auto; border-left: 4px solid var(--color-1); line-height: 1.6; }
+        code { font-family: 'Courier New', monospace; color: var(--color-4); }
+        .prompt-box { background: linear-gradient(135deg, #E8EAF6, #E3F2FD); border-radius: 12px; padding: 12px 16px; margin: 10px 0; border: 1px dashed var(--color-5); }
+        .prompt-box .prompt-label { font-size: 0.8em; color: var(--color-2); font-weight: bold; margin-bottom: 6px; }
+        .prompt-box .prompt-text { font-family: 'Courier New', monospace; font-size: 0.9em; color: #333; }
+        @keyframes fadeInScale { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .card { animation: fadeInScale 0.5s ease forwards; opacity: 0; }
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.3s; }
+        .card:nth-child(7) { animation-delay: 0.35s; }
+        .card:nth-child(8) { animation-delay: 0.4s; }
+        .card:nth-child(9) { animation-delay: 0.45s; }
+        .card:nth-child(10) { animation-delay: 0.5s; }
+        .card:nth-child(11) { animation-delay: 0.55s; }
+        .card:nth-child(12) { animation-delay: 0.6s; }
+        .card:nth-child(13) { animation-delay: 0.65s; }
+        .card:nth-child(14) { animation-delay: 0.7s; }
+        .card:nth-child(15) { animation-delay: 0.75s; }
+        .card:nth-child(16) { animation-delay: 0.8s; }
+        .card:nth-child(17) { animation-delay: 0.85s; }
+        .card:nth-child(18) { animation-delay: 0.9s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-palette" style="margin-right: 10px;"></i>Open Design — Claude Designの<br>オープンソース代替がついに登場</h1>
+            <p class="subtitle">ローカルファーストで動く設計ツール／既存のコーディングエージェントと連携する新しいアプローチ</p>
+            <div style="margin-top: 15px;">
+                <span class="tag">Open Design</span>
+                <span class="tag">オープンソース</span>
+                <span class="tag">ローカルファースト</span>
+                <span class="tag">Claude Design代替</span>
+                <span class="tag">Free APIs</span>
+                <span class="tag">World of AI</span>
+            </div>
+        </header>
+        <div class="grid">
+
+            <!-- Card 1 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+                <h2>① Open Designとは: Claude Designのオープンソース代替</h2>
+                <p><span class="highlight">Open Design</span>は、AnthropicのClaude Designに代わる<span class="highlight">ローカルファーストのオープンソース</span>プロジェクトです。クラウド上のサブスクリプションに頼らず、自分の環境で設計ワークフローを構築できるのが最大の特徴です。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-lightbulb fa-lg"></i>
+                    Claude Designと同じような設計体験を、無料で手元の環境で実現できるのがポイントです。
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-plug"></i></div>
+                <h2>② 対応するコーディングエージェント: 既存ツールと連携</h2>
+                <p>Open Designは、以下の<span class="highlight">主要なコーディングエージェント</span>と連携して動作します。</p>
+                <div class="arrow-flow">
+                    <span class="flow-item">Claude Code</span>
+                    <span class="flow-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                    <span class="flow-item">Codex CLI</span>
+                    <span class="flow-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                    <span class="flow-item">Cursor Agent</span>
+                </div>
+                <div class="arrow-flow">
+                    <span class="flow-item">Gemini CLI</span>
+                    <span class="flow-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                    <span class="flow-item">OpenCode</span>
+                    <span class="flow-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                    <span class="flow-item">Qwen Code</span>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-circle-check fa-lg"></i>
+                    すでにコーディングエージェントを使っているなら、追加のサブスクリプションなしで設計機能を使えます。
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-dollar-sign"></i></div>
+                <h2>③ コストゼロで使える: 追加費用なしの設計ワークフロー</h2>
+                <p>Claude Designのような<span class="highlight">別の設計サブスクリプションに支払う必要がありません</span>。すでにコーディングエージェントを利用している環境があれば、Open Designをそのまま使えます。</p>
+                <div class="comparison-box">
+                    <div class="left">
+                        <div class="label">Claude Design</div>
+                        <div class="desc">サブスクリプションが別途必要</div>
+                    </div>
+                    <div class="right">
+                        <div class="label">Open Design</div>
+                        <div class="desc">既存エージェントで無料利用可能</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-puzzle-piece"></i></div>
+                <h2>④ 19個のコンポーザブルスキル: 組み合わせて使える設計機能</h2>
+                <p>プロジェクトには<span class="highlight">19個のコンポーザブルスキル</span>が含まれています。これらのスキルは組み合わせて使えるため、目的に応じた設計ワークフローを柔軟に構築できます。</p>
+                <div class="stat-row">
+                    <div class="stat-item">
+                        <div class="stat-value">19</div>
+                        <div class="stat-label">コンポーザブルスキル</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value">71</div>
+                        <div class="stat-label">デザインシステム</div>
+                    </div>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-layer-group fa-lg"></i>
+                    スキルを自由に組み合わせることで、さまざまな種類のアーティファクトを生成できます。
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-swatchbook"></i></div>
+                <h2>⑤ 71のデザインシステム: 多様なアーティファクトに対応</h2>
+                <p><span class="highlight">71種類のデザインシステム</span>が用意されており、ランディングページ、ダッシュボード、フォームなど、さまざまなタイプのアーティファクトに対応しています。</p>
+                <ul class="step-list">
+                    <li>ランディングページのデザインシステム</li>
+                    <li>ダッシュボードUIのデザインシステム</li>
+                    <li>フォームやインタラクティブ要素のシステム</li>
+                    <li>その他、多様なアーティファクトタイプに対応</li>
+                </ul>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-file-lines"></i></div>
+                <h2>⑥ DESIGN.mdファイル: ビジュアル方向を定義</h2>
+                <p><span class="highlight">DESIGN.md</span>ファイルを使って、プロジェクトのビジュアル方向性を定義します。これにより、生成されるデザインの一貫性が保たれます。</p>
+                <div class="prompt-box">
+                    <div class="prompt-label"><i class="fas fa-file-code"></i> DESIGN.mdで定義できる内容</div>
+                    <div class="prompt-text">
+                        ・ビジュアルの方向性（Visual Direction）<br>
+                        ・ブランドの雰囲気（Brand Feel）<br>
+                        ・タイポグラフィの指定（Typography）<br>
+                        ・スペーシングのルール（Spacing）<br>
+                        ・やってはいけないパターン（Anti-patterns）
+                    </div>
+                </div>
+                <div class="speech-bubble">
+                    <i class="fas fa-exclamation-circle fa-lg"></i>
+                    Anti-patternsを定義できるのが特徴的です。「このパターンは避ける」と指定しておくことで、意図しないデザインを防止します。
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-magnifying-glass-chart"></i></div>
+                <h2>⑦ ディスカバリーフォーム: 生成前にコンテキストを把握</h2>
+                <p>Open Designは<span class="highlight">ディスカバリーフォーム</span>からスタートします。生成前にモデルがプロジェクトの背景を理解するための仕組みです。</p>
+                <ul class="step-list">
+                    <li>ターゲットオーディエンスは誰なのか</li>
+                    <li>どのようなトーンで表現するのか</li>
+                    <li>どんなコンテキストで使われるのか</li>
+                    <li>どんな制約条件があるのか</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-clipboard-question fa-lg"></i>
+                    最初に質問に答えることで、モデルが文脈を理解してから生成を始めるため、精度が向上します。
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-server"></i></div>
+                <h2>⑧ ローカルアーキテクチャ: Vite + Node/Express + SQLite</h2>
+                <p>Open Designは<span class="highlight">すべてローカルで動作</span>します。クラウドへの依存がなく、データが手元に残る設計です。</p>
+                <div class="arrow-flow">
+                    <span class="flow-item"><i class="fas fa-bolt"></i> Vite</span>
+                    <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
+                    <span class="flow-item"><i class="fas fa-server"></i> Node/Express</span>
+                    <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
+                    <span class="flow-item"><i class="fas fa-database"></i> SQLite</span>
+                </div>
+                <ul class="step-list">
+                    <li>フロントエンドはViteで高速に動作</li>
+                    <li>バックエンドデーモンはNode/Express</li>
+                    <li>プロジェクトの保存にはSQLiteを使用</li>
+                </ul>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-shield-halved"></i></div>
+                <h2>⑨ サンドボックスiframe: 安全にプレビューをレンダリング</h2>
+                <p>生成された出力は<span class="highlight">サンドボックス化されたiframe</span>内でレンダリングされます。これにより、安全にプレビューを確認できます。</p>
+                <div class="comparison-box">
+                    <div class="left">
+                        <div class="label"><i class="fas fa-lock"></i> サンドボックス環境</div>
+                        <div class="desc">外部への影響を遮断して安全にレンダリング</div>
+                    </div>
+                    <div class="right">
+                        <div class="label"><i class="fas fa-eye"></i> リアルタイムプレビュー</div>
+                        <div class="desc">生成直後に結果をその場で確認可能</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-file-export"></i></div>
+                <h2>⑩ 豊富なエクスポート形式: HTML・PDF・ZIP・Markdownなど</h2>
+                <p>生成されたデザインは<span class="highlight">複数の形式でエクスポート</span>できます。用途に合わせて最適な形式を選べます。</p>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0;">
+                    <span class="keyword-tag"><i class="fas fa-code"></i> HTML</span>
+                    <span class="keyword-tag"><i class="fas fa-file-pdf"></i> PDF</span>
+                    <span class="keyword-tag"><i class="fas fa-file-zipper"></i> ZIP</span>
+                    <span class="keyword-tag"><i class="fas fa-file-alt"></i> Markdown</span>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-download fa-lg"></i>
+                    HTML形式ならそのままWeb公開に使えます。ZIPならアセットごとまとめてダウンロード可能です。
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-laptop-code"></i></div>
+                <h2>⑪ ローカルファーストの利点: データは手元に残る</h2>
+                <p>Open Designの最大の強みは<span class="highlight">データがローカルに保存される</span>ことです。クラウドにデータを送る必要がありません。</p>
+                <ul class="step-list">
+                    <li>プライバシーの確保 — 設計データが外部に漏れない</li>
+                    <li>オフラインでも動作可能な場面がある</li>
+                    <li>外部サービスの障害に影響されない</li>
+                    <li>自分の好みのエージェントとモデルを選べる</li>
+                </ul>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-code-branch"></i></div>
+                <h2>⑫ オープンソースの強み: コミュニティで進化する設計ツール</h2>
+                <p><span class="highlight">オープンソースプロジェクト</span>として公開されているため、誰でもコードを確認・改善できます。コミュニティの貢献によって継続的に進化していく可能性があります。</p>
+                <div class="speech-bubble">
+                    <i class="fas fa-users fa-lg"></i>
+                    Claude Designのようなプロプライエタリなツールとは異なり、中身が見える安心感があります。バグ修正や機能追加もコミュニティ主導で進みます。
+                </div>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-diagram-project"></i></div>
+                <h2>⑬ スキルの組み合わせ: コンポーザブルな設計ワークフロー</h2>
+                <p>19個のスキルは<span class="highlight">組み合わせて使うことを前提に設計</span>されています。レイアウト、カラー、タイポグラフィなどの要素を独立したスキルとして扱い、プロジェクトに必要なものだけを選んで使います。</p>
+                <div class="prompt-box">
+                    <div class="prompt-label"><i class="fas fa-puzzle-piece"></i> スキルの組み合わせ例</div>
+                    <div class="prompt-text">
+                        レイアウトスキル + カラースキル + タイポグラフィスキル<br>
+                        → 統一感のあるランディングページを生成
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-sliders"></i></div>
+                <h2>⑭ DESIGN.mdで制御する Anti-patterns: やってはいけないことを定義</h2>
+                <p>DESIGN.mdの特徴的な機能が<span class="highlight">Anti-patternsの定義</span>です。「この色は使わない」「このフォントは避ける」など、ネガティブな指示も与えられます。</p>
+                <div class="prompt-box">
+                    <div class="prompt-label"><i class="fas fa-ban"></i> Anti-patternsの例</div>
+                    <div class="prompt-text">
+                        ・ネオンカラーは使用しない<br>
+                        ・モーダルダイアログは避ける<br>
+                        ・大きなヒーロー画像は使わない<br>
+                        ・アニメーションは最小限に
+                    </div>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-triangle-exclamation fa-lg"></i>
+                    「やってほしいこと」だけでなく「やってほしくないこと」も明示できるのが、Open Designのユニークな点です。
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-gears"></i></div>
+                <h2>⑮ Free APIsとの組み合わせ: コストを抑えた設計ワークフロー</h2>
+                <p>動画タイトルにある「Free APIs」との組み合わせで、<span class="highlight">追加コストなしで設計ワークフローを構築</span>できます。無料で使えるAPIとOpen Designを組み合わせることで、サブスクリプション費用を大幅に削減できます。</p>
+                <div class="speech-bubble variant-2">
+                    <i class="fas fa-coins fa-lg"></i>
+                    既存の無料APIエコシステムを活用すれば、プロ品質のデザインツールをゼロ円で運用できます。
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-triangle-exclamation"></i></div>
+                <h2>⑯ まだ初期段階: エージェントとモデルに品質が依存</h2>
+                <p>現時点では<span class="highlight">まだ開発の初期段階</span>であり、出力品質は使用するエージェントとモデルに大きく依存します。</p>
+                <ul class="step-list">
+                    <li>優秀なモデルを使えば高品質な出力が得られる</li>
+                    <li>逆にモデルの能力が低いと品質も下がる</li>
+                    <li>今後の改善で安定性が向上する見込み</li>
+                </ul>
+                <div class="speech-bubble">
+                    <i class="fas fa-clock fa-lg"></i>
+                    オープンソースなので、コミュニティのフィードバックによって品質は急速に改善されるはずです。
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-compass"></i></div>
+                <h2>⑰ 構造化されたローカルAI設計ワークフロー: 強い方向性</h2>
+                <p>Open Designは<span class="highlight">構造化されたローカルAI設計ワークフロー</span>として、非常に有望な方向性を示しています。デザインファイル（DESIGN.md）とディスカバリーフォームによる構造化アプローチが、AI生成の品質を安定させる基盤となります。</p>
+                <div class="arrow-flow">
+                    <span class="flow-item">DESIGN.md</span>
+                    <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
+                    <span class="flow-item">ディスカバリー</span>
+                    <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
+                    <span class="flow-item">スキル実行</span>
+                    <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
+                    <span class="flow-item">サンドボックス</span>
+                    <span class="flow-arrow"><i class="fas fa-arrow-right"></i></span>
+                    <span class="flow-item">エクスポート</span>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="card">
+                <div class="card-icon"><i class="fas fa-rocket"></i></div>
+                <h2>⑱ まとめ: ローカル設計ツールの新しい選択肢</h2>
+                <p>Open Designは、Claude Designの<span class="highlight">実用的なオープンソース代替</span>として注目に値するプロジェクトです。</p>
+                <ul class="step-list">
+                    <li>ローカルファーストでプライバシーを確保</li>
+                    <li>19スキルと71デザインシステムで多様な出力に対応</li>
+                    <li>DESIGN.mdとディスカバリーフォームで構造化された生成</li>
+                    <li>HTML、PDF、ZIP、Markdownなど多彩なエクスポート</li>
+                    <li>既存のコーディングエージェントとシームレスに連携</li>
+                    <li>オープンソースでコミュニティ主導の進化が期待できる</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <i class="fas fa-star fa-lg"></i>
+                    「Claude Designが良いけど、ローカルでやりたい」「サブスクリプションを増やしたくない」という人にぴったりの選択肢です。
+                </div>
+            </div>
+
+        </div>
+        <footer>
+            🎬 動画: <a href="https://www.youtube.com/watch?v=w2_ZwhzB1g4" target="_blank" style="color: inherit;">World of AI</a> | 📅 2026年4月30日
+        </footer>
+    </div>
+</body>
+</html>

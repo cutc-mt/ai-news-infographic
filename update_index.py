@@ -55,10 +55,42 @@ def update_index_html(index_file_path, docs_folder):
         flags=re.DOTALL
     )
 
+    # --- Add nav link after <h1> if not already present ---
+    nav_html = '<nav style="margin-bottom:2em;">\n  <a href="#knowledge-graph">🧠 ナレッジグラフ</a>\n</nav>'
+    if 'id="knowledge-graph"' not in updated_index_content:
+        # Insert nav after <h1>
+        updated_index_content = updated_index_content.replace(
+            '<h1>AI News Infographics</h1>',
+            '<h1>AI News Infographics</h1>\n' + nav_html
+        )
+
+        # --- Add knowledge graph section after </ul> ---
+        graph_section = """
+<hr id="knowledge-graph">
+<h2>🧠 AIニュースナレッジグラフ</h2>
+<p>全インフォグラフィックをグラフ化したナレッジベース（Graphify）</p>
+<ul>
+  <li><a href="docs/graph/merged-graph.html">統合グラフ（4,331 nodes、〜2026年4月まで）</a></li>
+  <li><a href="docs/graph/202509.html">2025年9月</a></li>
+  <li><a href="docs/graph/202510.html">2025年10月</a></li>
+  <li><a href="docs/graph/202511.html">2025年11月</a></li>
+  <li><a href="docs/graph/202512.html">2025年12月</a></li>
+  <li><a href="docs/graph/202601.html">2026年1月</a></li>
+  <li><a href="docs/graph/202602.html">2026年2月</a></li>
+  <li><a href="docs/graph/202603.html">2026年3月</a></li>
+  <li><a href="docs/graph/202604.html">2026年4月</a></li>
+  <li><a href="docs/graph/202605-wip.html">🔄 2026年5月（暫定版）</a></li>
+</ul>
+"""
+        updated_index_content = updated_index_content.replace(
+            '</ul>\n</body>',
+            '</ul>\n' + graph_section + '</body>'
+        )
+
     # Write the updated index.html
     with open(index_file_path, 'w', encoding='utf-8') as f:
         f.write(updated_index_content)
-    
+
     print(f"Successfully updated {index_file_path}")
 
 if __name__ == "__main__":

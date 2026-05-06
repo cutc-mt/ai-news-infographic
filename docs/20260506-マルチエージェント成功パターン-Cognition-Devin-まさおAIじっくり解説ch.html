@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチエージェントが上手く動く3つのパターン - Cognition/Devin最新ブログを徹底解説</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --ui-color-1: #3D5A80;
+            --ui-color-2: #E07A2F;
+            --ui-color-3: #EEEADE;
+            --ui-color-4: #1B1B2F;
+            --ui-color-5: #C1502E;
+            --bg-canvas: #FFF8F5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Zen Kurenaido', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px 30px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), #5A7FAA, var(--ui-color-2));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 6s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(5%, 5%); }
+        }
+
+        .header-icon {
+            font-size: 5rem;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .header .date {
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .section-title-bar {
+            width: 100%;
+            text-align: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            font-size: 1.4rem;
+            font-weight: bold;
+            color: var(--ui-color-1);
+            border-bottom: 3px solid var(--ui-color-2);
+        }
+
+        .section-title-bar i {
+            margin-right: 10px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 460px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3rem;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .keyword-tag.highlight {
+            background-color: #FFE0B2;
+            color: #E65100;
+        }
+
+        .keyword-tag.danger {
+            background-color: #FFCDD2;
+            color: #C62828;
+        }
+
+        .keyword-tag.success {
+            background-color: #C8E6C9;
+            color: #2E7D32;
+        }
+
+        .keyword-tag.info {
+            background-color: #BBDEFB;
+            color: #1565C0;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            border-radius: 20px;
+            color: white;
+            font-size: 0.95rem;
+        }
+
+        footer a {
+            color: inherit;
+            text-decoration: underline;
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+            .header h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <div class="header-icon"><i class="fa-solid fa-network-wired"></i></div>
+            <h1>マルチエージェントが上手く動く3つのパターン</h1>
+            <div class="subtitle">Cognition/Devinの最新ブログを徹底解説 / ハーネスエンジニアリングの視点</div>
+            <div class="date"><i class="fa-regular fa-calendar"></i> 2026年5月4日</div>
+        </div>
+
+        <!-- セクション1: 背景・前提 -->
+        <div class="section-title-bar"><i class="fa-solid fa-book-open"></i> 背景・前提知識</div>
+
+        <div class="section-layout">
+            <!-- カード1: イントロ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Cognitionが語るマルチエージェントの現在地</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span>Devin開発元の<span class="keyword-tag highlight">Cognition社</span>が「マルチエージェントが上手く動く条件」に関する最新ブログを公開</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                            <span>約10ヶ月前に「<span class="keyword-tag danger">マルチエージェントを作るな</span>」という有名な記事を発表していたが、今回はその<span class="keyword-tag">対比</span>として位置づけられている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                            <span>Claude Codeを中心とするマルチエージェント・オーケストレーションが<span class="keyword-tag success">実は上手く回り始めている</span>現状を報告</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>ハーネスエンジニアリングの視点から、<span class="keyword-tag highlight">本気で自律エージェントを設計したい人</span>に向けた内容</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            「作るな」から「上手く動く条件」へ。<br>
+                            モデルの進化が設計思想を変えた！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2: モデル性能の進化 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>② モデル性能の劇的進化と前提の変化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-up-right-dots" aria-hidden="true"></i>
+                            <span>10ヶ月前に比べて<span class="keyword-tag highlight">モデルの性能が爆上がり</span>している。Claude Sonnet 3.7などの高性能モデルが登場</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-search" aria-hidden="true"></i>
+                            <span>以前はAgenticなサーチやターミナルベンチマークが注目されていなかったが、今では<span class="keyword-tag info">ファイルサーチ</span>も軽量モデルでこなせるように</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                            <span>複数エージェント間で情報をやり取りする精度が向上し、<span class="keyword-tag success">100回中100回に近い精度</span>で欲しい情報を取りに行けるように進化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span>モデルの性能が上がったことで、マルチエージェント構成の前提そのものが<span class="keyword-tag highlight">根本的に変わった</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            昔は「壊れやすい」だった。<br>
+                            今は「使える」に変わった！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3: マルチエージェントに向かう2つの力学 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnet fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ マルチエージェントに向かう2つの力学</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-people-group" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">力学1: 人間の限界</span> - AIエージェントの活用が進むと、人間が計画・管理・レビューするのが追いつかなくなる。DevinがDevinを監督する構成が自然と求められる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-coins" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">力学2: コスト最適化</span> - フロンティアモデル（OpusやGemini OS）は値上がり傾向。性能は取りたいがコストは抑えたいというジレンマ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                            <span>Cognitionも<span class="keyword-tag info">SWE 1.5とSonnetを組み合わせる</span>方法を採用。フロンティア性能を安く引き出す手段としてのマルチエージェント構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>どちらの力学も、結果的に<span class="keyword-tag success">マルチエージェント構成</span>に向かう方向にある</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            人間が追いつけない ＋ コストを抑えたい<br>
+                            ＝ マルチエージェントが必要！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード4: 前回の原則 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scroll fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 前回「マルチエージェントを作るな」の原則を振り返る</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-share-nodes" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">原則1: コンテキストの共有</span> - 目指すToDo、計画、必要に応じた介入などをエージェント間でちゃんと共有する。この原則は<span class="keyword-tag success">今でも有効</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">原則2: 暗黙の判断の意識</span> - サブエージェントが返す結果の中には暗黙の判断が含まれており、それを意識して設計する必要がある</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>現在でもマルチエージェントの多くは<span class="keyword-tag info">Read-Only（読み取り専用）</span>の構成が基本。コード検索、Web検索、レビュー、視点注入など</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                            <span>これらが<span class="keyword-tag success">うまく回っているパターン</span>であることは、現在でも前提として共有されている</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bookmark fa-lg" style="color: var(--ui-color-2);"></i>
+                            コンテキストの共有は超重要。<br>
+                            これは絶対に忘れないで！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション2: パターン1 コードレビューループ -->
+        <div class="section-title-bar"><i class="fa-solid fa-code-branch"></i> パターン1: コードレビューループ（実装者 × レビュアー）</div>
+
+        <div class="section-layout">
+            <!-- カード5: 結論 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 結論: 書き手は1本に絞るのが成功の鍵</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-pen-nib" aria-hidden="true"></i>
+                            <span>現在うまくいっているパターンは、<span class="keyword-tag highlight">書き込みが1本に絞られている</span>構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span>複数のエージェントは<span class="keyword-tag info">判断や検討だけを行う</span>役割。Claude CodeのExplorerエージェントがまさにこの構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users-gear" aria-hidden="true"></i>
+                            <span>同時にファイルを書き込むと<span class="keyword-tag danger">ぶつかって壊れやすく</span>なるため、書き手を一本化するのが安全</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span>この構成はDevinのチームが実際に検証し、<span class="keyword-tag success">3つの成功パターン</span>として共有している</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-key fa-lg" style="color: var(--ui-color-1);"></i>
+                            書き手は1人。知性を足すのは複数。<br>
+                            これが基本原則！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6: パターン1概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ パターン1: コードレビューループの仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-user-pen" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">実装者（Coder）</span>と<span class="keyword-tag highlight">評価者（Reviewer）</span>を分ける設計パターン</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clone" aria-hidden="true"></i>
+                            <span>同じ<span class="keyword-tag info">Claude Opusモデル</span>が実装したとしても、レビューさせると抜け漏れを発見できる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                            <span>Devinは「Devinレビュー」のループを回しており、<span class="keyword-tag success">プルリクエスト時には多くのバグが解消</span>されている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-thumbs-up" aria-hidden="true"></i>
+                            <span>このパターンは<span class="keyword-tag success">絶対にやった方がいい</span>と強く推奨。実際に有効であることが検証済み</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-repeat fa-lg" style="color: var(--ui-color-2);"></i>
+                            実装 → レビュー → 修正 のループで<br>
+                            バグを大幅に減らせる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード7: コンテキストロード -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-weight-hanging fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ コンテキストロード: フレッシュな視点の重要性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span>LLMの注意力は<span class="keyword-tag highlight">有限</span>。長い文脈になるほど<span class="keyword-tag danger">重要な細部に注意が届かなくなる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                            <span>コーディング側は作業を続けて<span class="keyword-tag danger">膨らんだコンテキスト</span>を抱えており、気づけない部分が出てくる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wind" aria-hidden="true"></i>
+                            <span>レビュアーには<span class="keyword-tag success">事前のコンテキストを共有しない</span>のが重要。レビューして欲しいことだけを伝えて、鮮度の高い視点を維持する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                            <span><span class="keyword-tag danger">コンテキストロード現象</span>: コンテキストが長くなるほどモデルの判断力が落ちる。これは超重要な真実</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            コンテキストが長い ＝ 判断力が下がる<br>
+                            フレッシュな視点がバグを見つける！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード8: 改善ループの設計 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 改善ループの設計: レビュー指摘をどう扱うか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <span>コーディング側がレビューから戻ってきた指摘を<span class="keyword-tag highlight">適切に選択できるか</span>が重要</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            <span>言われた通りにそのままやると、<span class="keyword-tag danger">無駄な修正</span>をしたりユーザーの指示と矛盾したりして<span class="keyword-tag danger">無限ループ</span>に陥る危険がある</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>この設計をきれいにすれば、<span class="keyword-tag success">現状のモデルでもかなり妥当な判断</span>が可能になる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                            <span>改善ループをどう設計するかは<span class="keyword-tag highlight">ハーネスエンジニアリングの見せどころ</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            レビュー指摘をそのまま実行しない！<br>
+                            適切にフィルタリングする設計が鍵。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション3: パターン2 スマートフレンド -->
+        <div class="section-title-bar"><i class="fa-solid fa-handshake"></i> パターン2: スマートフレンドと大きいモデルの組み合わせ</div>
+
+        <div class="section-layout">
+            <!-- カード9: パターン2概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-arrows fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ スマートフレンド: モデルを使い分ける設計パターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-person" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">プライマリー（軽量モデル）</span>を中心に使いながら、<span class="keyword-tag highlight">スマートフレンド（大型モデル）</span>に助けてもらう構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span>SWE 1.5（軽量・高速）をプライマリーとし、<span class="keyword-tag info">Claude Sonnet</span>をアドバイザーとして組み合わせる設計</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wallet" aria-hidden="true"></i>
+                            <span>OpusやGemini OSのような最強クラスのモデルは<span class="keyword-tag danger">日常使いには高すぎる</span>ため、安いモデルで回して要所だけ大型モデルを呼ぶ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                            <span>フロンティア性能を<span class="keyword-tag success">安く引き出す手段</span>として、マルチエージェント構成が需要を増している</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-hand-holding-dollar fa-lg" style="color: var(--ui-color-2);"></i>
+                            普段は軽量モデル、困ったら大型モデル。<br>
+                            コストと性能のバランスが取れる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード10: 課題 - 限界に気づくには -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-question fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 最大の課題: 小さいモデルが自分の限界に気づけるか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                            <span>通常は<span class="keyword-tag highlight">賢い方が仕事を振る</span>のが自然。しかしプライマリー構成では<span class="keyword-tag danger">逆方向</span>になる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>小さいモデルが「ここで詰まった」「ここは相談すべきだ」と<span class="keyword-tag danger">自分で気づけるか</span>が最大の課題</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-route" aria-hidden="true"></i>
+                            <span>軽量モデル（SWE 1.5）は<span class="keyword-tag info">判断する側が賢くない</span>ため、いつ助けを求めるべきかの判断自体が難しい</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>この「<span class="keyword-tag highlight">限界への気づき</span>」をどう設計に組み込むかが鍵になる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-thinking fa-lg" style="color: var(--ui-color-5);"></i>
+                            弱いモデルが「自分はここが分からない」<br>
+                            と気づくのって難しいんだよね…。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11: 3つの解決策 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ 限界への気づきを促す3つの解決策</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1 fa-lg" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">強制相談</span> - 毎回必ず1回はClaude Sonnetなどの大型モデルに相談して見落としを潰す方法</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2 fa-lg" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">判断の学習</span> - プロンプトの書き方を改善したり追加学習をして、迷うべき場面をモデルに覚えさせる。かなり強力なやり方</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3 fa-lg" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">ルールベースの条件設定</span> - マージは必ず相談するなど、決定論的に処理するフックスのような仕組み</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-1);"></i>
+                            強制・学習・ルールの3本柱で<br>
+                            「気づき」を仕組み化する！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12: コンテキストの抜け漏れ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-link-slash fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ 賢い側へのコンテキスト共有という課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-right-left" aria-hidden="true"></i>
+                            <span>軽量モデルが相談しても、<span class="keyword-tag danger">相談を受ける側もコンテキストを完璧に把握しているわけではない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span>基本的には<span class="keyword-tag info">コンテキストを全部丸ごと</span>スマートモデルに渡して、何が重要かを賢い方に選ばせる方法を採用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield" aria-hidden="true"></i>
+                            <span><span class="keyword-tag success">工夫1</span>: 分からない時に推測して適当なことをさせずに、安全に切り替える仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-forward" aria-hidden="true"></i>
+                            <span><span class="keyword-tag success">工夫2</span>: 聞かれていないことにも答えて、質問の意図を超えて回答するように工夫</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-up-from-bracket fa-lg" style="color: var(--ui-color-2);"></i>
+                            相談先も完璧ではない。だからこそ<br>
+                            工夫が必要なんだ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション4: パターン3 と総括 -->
+        <div class="section-title-bar"><i class="fa-solid fa-sitemap"></i> パターン3: 書き手を増やす ＋ 総括</div>
+
+        <div class="section-layout">
+            <!-- カード13: パターン3概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ パターン3: マネージャー＋子エージェントで書き手を増やす</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">マネージャーDevin</span>がタスクを分解して、<span class="keyword-tag highlight">子Devin</span>を生成し、進捗を調整する構成</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                            <span>これまでのパターンは1つのメインエージェントに周辺エージェントが知性を足す構造だったが、パターン3は<span class="keyword-tag info">書き手そのものを増やす</span>試み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>ただし、この構成では<span class="keyword-tag danger">3つの落とし穴</span>に直面することが分かった</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-to-circle" aria-hidden="true"></i>
+                            <span>成功にはマネージャーが判断を分裂させずに、子のスコープをまとめる<span class="keyword-tag">共通の考え方</span>が必要</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-children fa-lg" style="color: var(--ui-color-5);"></i>
+                            書き手を増やすのは難しい。<br>
+                            でも挑戦する価値はある！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード14: 3つの落とし穴 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 書き手を増やす際の3つの落とし穴</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1 fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag danger">過剰指示の罠</span> - マネージャーが子に細かく指示しすぎると、目的からずれた指示になり逆効果になる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2 fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag danger">状態共有の不足</span> - 複数の子エージェント間で状態を適切に共有できているかが常に課題になる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3 fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag danger">発見の共有欠如</span> - ある子が発見したことを他の子に共有する仕組みがデフォルトでは存在しない</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            過剰指示・状態共有・発見の共有<br>
+                            この3つに注意して設計しよう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15: 総括 成功パターン -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 総括: マルチエージェントが一番うまく動く構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">書き手が1本</span>で、知性を足す構造が一番うまく動く。クリーンなコンテキストを持つレビュアーが見落としを発見する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i>
+                            <span><span class="keyword-tag highlight">ジェネレーターとレビュアーの分割</span>パターンが最も確実な成功パターンとして挙げられている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>フロンティア級のOpusやSonnetが、軽量モデルの<span class="keyword-tag success">見落しの判断を補う</span>構成が効果的</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake-angle" aria-hidden="true"></i>
+                            <span>GPT 5.5とGeminiなどの<span class="keyword-tag success">補い合い</span>もかなりはまる。LLMディベートのような手法も有効</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-crown fa-lg" style="color: var(--ui-color-1);"></i>
+                            書き手1本 ＋ 知性を足す構造<br>
+                            これが現状のベストプラクティス！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード16: コンテキストエンジニアリング -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-successor fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ コンテキストエンジニアリング: 残る最大の課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                            <span>残る問題は<span class="keyword-tag highlight">コンテキストのやり取り</span>、つまり全ての通信問題。いつ相談するべきか、どう反映させるか</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-share-from-square" aria-hidden="true"></i>
+                            <span>子エージェントが見つけたことを他の子にどう反映させるかの設計が<span class="keyword-tag danger">デフォルトでは存在しない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                            <span>どういうコンテキストをどういうサブエージェントに渡していくかは<span class="keyword-tag highlight">コンテキストエンジニアリングの見せどころ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>
+                            <span>マネージャーは<span class="keyword-tag info">判断を分裂させずに</span>、子のスコープをまとめる共通の考え方が重要</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-2);"></i>
+                            コンテキストエンジニアリングが<br>
+                            マルチエージェントの成否を分ける！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17: Claude Codeでの実践 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ Claude Codeでの実践: すでに動いている仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-compass" aria-hidden="true"></i>
+                            <span>Claude Codeでは<span class="keyword-tag highlight">Explorerエージェント</span>がすでにRead-Onlyの補助エージェントとして活躍中</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-graduate" aria-hidden="true"></i>
+                            <span>Claude Codeに<span class="keyword-tag info">Advisor機能</span>が登場。スラッシュコマンドでSonnetやOpusにアドバイザーを切り替え可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-compare" aria-hidden="true"></i>
+                            <span>Opusに実装させて、最後に<span class="keyword-tag success">サブエージェントでレビューさせる</span>パターンが実用的に機能している</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shuffle" aria-hidden="true"></i>
+                            <span>Claudeのモデルと<span class="keyword-tag info">GPT 5.5</span>、Gemini 3.1 Proを組み合わせるクロスモデル運用も効果的</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                            Claude CodeのExplorerやAdvisorは<br>
+                            まさにこの設計パターンの実践例！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18: 所感 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-star fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ Cognitionへの所感: 本質に向き合う姿勢</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                            <span>Cognition/Devinチームは<span class="keyword-tag highlight">本質に向き合っている</span>。派手なデモだけでなく、実際の開発の課題に取り組んでいる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-users" aria-hidden="true"></i>
+                            <span>人間の<span class="keyword-tag highlight">判断と意思をスケールさせる</span>協調システムを目指している。ただの自律スウォームではない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>ブログで語られていることは<span class="keyword-tag info">よく言われている話</span>でもあるが、実践から得た知見としての重みがある</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>これからもDevinのチームの動向に注目。マルチエージェント設計の<span class="keyword-tag success">本質的な進化</span>が期待できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-2);"></i>
+                            本質に向き合うチームからは<br>
+                            学ぶことが多い。これからも注目！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/7QHAUml4Wc4" target="_blank" style="color: inherit;">まさおAIじっくり解説ch</a> | 📅 2026年5月4日<br>
+            📰 参考記事: <a href="https://cognition.ai/blog/multi-agents-working" target="_blank" style="color: inherit;">Cognition Blog - Multi-Agents Working</a>
+        </footer>
+    </div>
+</body>
+</html>

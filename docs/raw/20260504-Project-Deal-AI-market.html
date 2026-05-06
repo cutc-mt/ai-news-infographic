@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AnthropicのAIが勝手に売買した実験｜Claudeの性能の差が気づかれずに広がる</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #6A3DE8;
+            --ui-color-2: #E8A83D;
+            --ui-color-3: #F0E6F6;
+            --ui-color-4: #1A0A3E;
+            --ui-color-5: #E84D6A;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F8F5FF;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-5));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9EE;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(232,168,61,0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* VS Badge */
+        .vs-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--ui-color-5), var(--ui-color-2));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+
+        /* Comparison Table */
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ddd;
+            font-size: 15px;
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .comp-left, .comp-right {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .comp-center {
+            flex: 0 0 40%;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .winner {
+            color: var(--ui-color-1);
+            font-weight: 900;
+        }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Stagger animation delays */
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+
+        .full-width {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-handshake-angle fa-7x" aria-hidden="true"></i></div>
+            <h1>AnthropicのAIが勝手に売買した実験</h1>
+            <div class="subtitle">Claudeの性能の差が気づかれずに広がる — Project Dealの衝撃</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年5月4日</div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flask fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Project Dealとは — Anthropicの衝撃実験</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-calendar-check"></i><span><span class="keyword-tag">2025年12月</span> Anthropicがサンフランシスコ社員69名を対象に1週間の実験を実施</span></li>
+                        <li><i class="fa-solid fa-robot"></i><span>AIが人間の代わりに<span class="highlight">売買・交渉・成約まで全自動</span>で実行するという前例のない試み</span></li>
+                        <li><i class="fa-solid fa-microphone"></i><span>まず10分のインタビューで個人の好みを把握。そのデータをもとにAIが自律的に取引を開始</span></li>
+                        <li><i class="fa-solid fa-building"></i><span>実験名は<span class="keyword-tag">Project Deal</span>。Anthropicの内部プロジェクトとして設計された</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            自社社員を実験台にするという<br>踏み込みよう！本気度が<span class="keyword-tag">伝説レベル</span>。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 実験の仕掛け — 69人が二つの陣営に</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-crown"></i><span><span class="keyword-tag">高性能グループ</span>にはClaude Opus 4.5を割り当て。最強の交渉力を持つモデル</span></li>
+                        <li><i class="fa-solid fa-feather"></i><span><span class="keyword-tag">軽量グループ</span>にはClaude Haiku 4.5を割り当て。高速だが能力は控えめ</span></li>
+                        <li><i class="fa-solid fa-eye-slash"></i><span>参加者には<span class="highlight">自分がどちらのAIを使っているか知らされていない</span> — ブラインドテスト</span></li>
+                        <li><i class="fa-solid fa-shuffle"></i><span>この二重盲検設計により、AI性能の差が人間の行動にどう影響するかを純粋に測定可能に</span></li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            Opus vs Haiku — でも本人たちは<br>
+                            <span class="keyword-tag">知らない</span>という究極のフェアさ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments-dollar fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ 10分のインタビュー — AIがあなたを知る</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-stopwatch"></i><span>たった<span class="keyword-tag">10分のインタビュー</span>でAIが個人の好み・価値観・希望価格を把握</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>「どんなものが欲しい」「いくらまで払える」を聞き出し、プロファイルを構築</span></li>
+                        <li><i class="fa-solid fa-user-gear"></i><span>そのデータをもとにAIが<span class="highlight">人間に代わって自律的に交渉</span>を開始</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>売り手としても買い手としても機能。AIが両面から最適な取引を探す仕組み</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: var(--ui-color-2);"></i>
+                            10分で人間を理解して<br>代わりに交渉するAI — <br>
+                            <span class="keyword-tag">もう人間の出番なし？</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 数字で見る実験の規模</h2>
+                </div>
+                <div class="card-content">
+                    <div class="comparison-row">
+                        <div class="comp-left winner">186件</div>
+                        <div class="comp-center">成立した取引数</div>
+                        <div class="comp-right">フリマアプリ級</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left winner">$4,000+</div>
+                        <div class="comp-center">取引総額</div>
+                        <div class="comp-right">実額ベース</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left winner">500+</div>
+                        <div class="comp-center">出品品目数</div>
+                        <div class="comp-right">多種多様</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left">69名</div>
+                        <div class="comp-center">参加者</div>
+                        <div class="comp-right winner">SF社員</div>
+                    </div>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                            1週間で186件・$4,000超！<br>
+                            実際のフリマアプリと<br>
+                            <span class="keyword-tag">同等の活況</span>でした。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-face-laugh-beam fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ ユニークな取引事例 — AIの自由裁量</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hat-cowboy"></i><span><span class="keyword-tag">カウボーイ交渉</span> — AIが独自の交渉スタイルを展開。人間なら恥ずかしい提案も堂々と</span></li>
+                        <li><i class="fa-solid fa-table-tennis-paddle-ball"></i><span>Claude自身が<span class="highlight">ピンポン玉を購入</span>するという予想外の取引が成立</span></li>
+                        <li><i class="fa-solid fa-dog"></i><span>犬との1日の取引など、ユニークなバーター取引も発生</span></li>
+                        <li><i class="fa-solid fa-heart"></i><span>AIが個人の好みを正確に把握し、希望に近い取引を次々成立させた</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-grin-tears fa-lg" style="color: var(--ui-color-5);"></i>
+                            ピンポン玉を買うAIとか<br>
+                            犬と1日トレードとか…<br>
+                            <span class="keyword-tag">想像以上に人間臭い</span>😂
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-unbalanced fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 衝撃の格差 — Opusは$3.64高く売れた</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-trend-up"></i><span>同じ商品でも<span class="keyword-tag">Opus使用者</span>は平均<span class="highlight">$3.64高く売却</span>できた</span></li>
+                        <li><i class="fa-solid fa-arrow-trend-down"></i><span>買い手側でもOpusは平均<span class="highlight">$2.45安く購入</span>。売買両面で優位性を確保</span></li>
+                        <li><i class="fa-solid fa-calculator"></i><span>1取引あたり約$6の差。186件の取引全体では<span class="keyword-tag">$1,000以上の格差</span>に</span></li>
+                        <li><i class="fa-solid fa-chart-bar"></i><span>統計的に有意な差であり、偶然では説明できないレベルの性能差</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-money-bill-trend-up fa-lg" style="color: var(--ui-color-2);"></i>
+                            売る時は高く、買う時は安く。<br>
+                            Opusの交渉力が<span class="keyword-tag">数値で証明</span>された。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bicycle fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 壊れた自転車で見えた格差のリアル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-tag"></i><span><span class="keyword-tag">壊れた自転車</span> — Haiku使用者は$38でしか売れなかった</span></li>
+                        <li><i class="fa-solid fa-tags"></i><span>同じ壊れた自転車をOpus使用者は<span class="highlight">$65で売却</span>に成功 — 約70%増！</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span>Opusは商品の価値を正確に伝え、買い手にとって魅力的な提案を構築した</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation"></i><span>$27の差。たった1つの取引でこれだけの格差が生まれる現実</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            $38 vs $65 — 同じ自転車。<br>
+                            <span class="keyword-tag">AIの差がそのまま価格に</span><br>
+                            反映される時代が来た。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-face-meh fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 誰も気づかなかった — 満足度は同じ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-face-smile"></i><span>参加者<span class="highlight">全員の満足度はほぼ同じ</span> — OpusもHaikuも「自分のAIは良かった」と感じた</span></li>
+                        <li><i class="fa-solid fa-eye-slash"></i><span>格差が<span class="keyword-tag">客観的には存在する</span>のに、主観的には誰も不公平を感じなかった</span></li>
+                        <li><i class="fa-solid fa-masks-theater"></i><span>これが最も恐ろしい発見 — 格差が「見えない」こと自体が問題</span></li>
+                        <li><i class="fa-solid fa-ghost"></i><span>見えない格差は修正されない。気づかれないまま静かに広がり続ける</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            全員が「満足」しているのに<br>
+                            客観的には<span class="keyword-tag">大格差</span>があった。<br>
+                            これが一番怖い。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gem fa-5x" style="color: var(--ui-color-1); animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑨ Opus 4.5の交渉力 — 何が違うのか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-language"></i><span>Opusは商品の<span class="keyword-tag">魅力的な説明文</span>を自動生成。買い手の心を掴む表現力</span></li>
+                        <li><i class="fa-solid fa-chess"></i><span>交渉の<span class="highlight">戦略的判断</span>が優れている — いつ引き下げ、いつ譲歩するかを的確に判断</span></li>
+                        <li><i class="fa-solid fa-handshake"></i><span>相手の立場を理解し、Win-Winの提案を構築する能力がHaikuを圧倒</span></li>
+                        <li><i class="fa-solid fa-compass"></i><span>価格交渉だけでなく、バーター取引の提案など<span class="keyword-tag">創造的な解決策</span>も生成</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i>
+                            Opusは交渉のプロ。<br>
+                            Haikuは頑張るけど<br>
+                            <span class="keyword-tag">次元が違う</span>賢さ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ Haiku 4.5 — 高速だが限界あり</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge-high"></i><span><span class="keyword-tag">高速・低コスト</span>がHaikuの強み。サクサク動くのは評価できる</span></li>
+                        <li><i class="fa-solid fa-minus"></i><span>しかし交渉の質はOpusに劣る。シンプルな提案にとどまりがち</span></li>
+                        <li><i class="fa-solid fa-comment-dots"></i><span>商品説明が端的すぎて、買い手の購買意欲を十分に刺激できない</span></li>
+                        <li><i class="fa-solid fa-balance-scale"></i><span>「安くて速い」vs「高くて賢い」— <span class="highlight">コストと品質の古典的トレードオフ</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            Haikuは悪くない。<br>
+                            ただOpusが<span class="keyword-tag">段違いに良い</span><br>
+                            だけの話。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microscope fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ 実験設計の妙 — なぜブラインドだったか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-vial"></i><span><span class="keyword-tag">二重盲検</span> — 参加者も研究者も、その場では誰がどのAIか分からない設計</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>これにより「強いAIだと思って積極的に使う」という<span class="highlight">プラセボ効果を排除</span></span></li>
+                        <li><i class="fa-solid fa-chart-simple"></i><span>純粋にAIの性能だけが差を生む。科学的な実験としての信頼性が高い</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i><span>AIの性能差が人間の経済行動にどう影響するかを測る<span class="keyword-tag">初の本格的実験</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-flask fa-lg" style="color: var(--ui-color-2);"></i>
+                            臨床試験と同じ手法を<br>
+                            AI実験に応用。<br>
+                            <span class="keyword-tag">Anthropicの本気度</span>が違う。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clock-rotate-left fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑫ 1週間で何が変わったか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-play"></i><span>初日は「AIに任せるってどうなの？」という<span class="keyword-tag">戸惑い</span>からスタート</span></li>
+                        <li><i class="fa-solid fa-fire"></i><span>しかし数日で取引が活発化。AIが勝手に交渉している間に<span class="highlight">人間は他の仕事ができる</span></span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>1週間後には186件の取引が成立。参加者はAIの存在に慣れ、信頼を築いていた</span></li>
+                        <li><i class="fa-solid fa-people-group"></i><span>「AIが勝手に動く」体験が、たった7日で<span class="keyword-tag">当たり前</span>になった</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                            7日で「当たり前」に。<br>
+                            <span class="keyword-tag">適応の早さ</span>が<br>
+                            一番の衝撃かも。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-percent fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 46%が「有料でも使いたい」</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-square-poll-vertical"></i><span>実験後のアンケートで参加者の<span class="highlight">46%が「将来有料でも使いたい」</span>と回答</span></li>
+                        <li><i class="fa-solid fa-cart-shopping"></i><span>「自分の代わりに最適な買い物をしてくれる」体験の価値を実感した人が多数</span></li>
+                        <li><i class="fa-solid fa-briefcase"></i><span><span class="keyword-tag">AIエージェント経済</span>は実験室の外でも現実になりつつある</span></li>
+                        <li><i class="fa-solid fa-bell"></i><span>SalesforceやMicrosoftもAIエージェント市場に参入。ビジネスとしての期待は大きい</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-coins fa-lg" style="color: var(--ui-color-2);"></i>
+                            半数近くが「お金払ってもいい」<br>
+                            ってことは<span class="keyword-tag">ビジネス成立</span>。<br>
+                            市場はもう動いている。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 見えない格差の危険性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye-slash"></i><span>格差が<span class="highlight">「気づかれにくい」からこそ、静かに広がり続ける</span>というリスク</span></li>
+                        <li><i class="fa-solid fa-lock-open"></i><span>富裕層が高性能AIを使い、そうでない人は軽量AI — 経済格差が<span class="keyword-tag">AIを通じて拡大</span></span></li>
+                        <li><i class="fa-solid fa-user-secret"></i><span>見えない格差は政策でも対処しづらい。気づかれない=対策もされない</span></li>
+                        <li><i class="fa-solid fa-globe"></i><span>社会的な監視メカニズムが追いついていない前例のない問題</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            目に見える格差なら<br>
+                            対策できる。でも<span class="keyword-tag">見えない格差</span>は<br>
+                            どうやって見つけるの？
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gavel fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 法的枠組みは未整備 — 野良状態</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>AIが自律的に取引する際の<span class="keyword-tag">法的責任の所在</span>が不明確</span></li>
+                        <li><i class="fa-solid fa-file-contract"></i><span>契約は誰の意思か？AIが勝手に結んだ取引は有効か？答えがない</span></li>
+                        <li><i class="fa-solid fa-building-columns"></i><span>規制当局も対応が追いついていない。<span class="highlight">技術が法律を数年リード</span>している状態</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>消費者保護の観点でも、AI交渉による損失をどう防ぐかの議論が必要</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-1);"></i>
+                            AIが勝手に契約したら<br>
+                            それは誰の責任？<br>
+                            <span class="keyword-tag">法整備が急務</span>です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullhorn fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ Anthropicの警告 — 社会へのメッセージ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-megaphone"></i><span>Anthropicはこの実験結果を通じて<span class="keyword-tag">社会全体への警告</span>を発信</span></li>
+                        <li><i class="fa-solid fa-lightbulb"></i><span>「AIの性能差が見えない形で経済的優位性を生む」という事実を自ら公開した勇気</span></li>
+                        <li><i class="fa-solid fa-hand-holding-heart"></i><span>自社の実験で不利なデータも公表する<span class="highlight">透明性の姿勢</span>は評価できる</span></li>
+                        <li><i class="fa-solid fa-landmark"></i><span>AI企業が自ら規制を呼びかける珍しいケース。政策立案者への強いメッセージ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-5);"></i>
+                            不利なデータも公表する<br>
+                            Anthropicの<span class="keyword-tag">誠実さ</span>。<br>
+                            これこそAI企業のあるべき姿。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5 -->
+        <div class="section-layout">
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-5); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑰ AIエージェント経済の未来 — 次は何が起きる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shop"></i><span>Amazonやメルカリのような市場にAIエージェントが参加する未来が<span class="keyword-tag">もうすぐそこ</span></span></li>
+                        <li><i class="fa-solid fa-car"></i><span>不動産、車、保険 — 高額取引でのAI交渉は格差の影響がさらに拡大する恐れ</span></li>
+                        <li><i class="fa-solid fa-network-wired"></i><span>AI同士が交渉する世界では、<span class="highlight">モデルの性能が直接的に利益を決める</span></span></li>
+                        <li><i class="fa-solid fa-infinity"></i><span>人間はAIに任せるか任せないかの選択だけ。その選択自体が新しい格差の源泉に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-forward fa-lg" style="color: var(--ui-color-5);"></i>
+                            AI vs AIの交渉バトル。<br>
+                            モデルの差が<span class="keyword-tag">富の差</span>に<br>
+                            直結する未来が来る。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-road fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ 私たちが知っておくべきこと</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye"></i><span><span class="highlight">AIの性能差は見えない形で広がる</span> — 自分がどのAIを使っているか意識することが第一歩</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i><span>AIリテラシーの重要性がかつてないほど高まっている。<span class="keyword-tag">知らないことが損</span>に直結</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>社会としてAI格差をどう扱うかの議論を今から始める必要がある</span></li>
+                        <li><i class="fa-solid fa-circle-question"></i><span>あなたは自分のAIエージェントを信頼できるか？その問いに向き合う時が来ている</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--ui-color-1);"></i>
+                            Project Dealは未来の予演。<br>
+                            <span class="keyword-tag">今のうちに知っておく</span>ことが<br>
+                            一番の防衛策です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://youtu.be/jimBcr5_FgU" target="_blank">AI market — AnthropicのAIが勝手に売買した実験</a> | 📅 2026年5月4日</p>
+            <p style="margin-top: 5px; font-size: 12px; color: #999;">Project Deal インフォグラフィック | Anthropic AI自動売買実験 | 2026年5月4日作成</p>
+        </footer>
+
+    </div>
+</body>
+</html>

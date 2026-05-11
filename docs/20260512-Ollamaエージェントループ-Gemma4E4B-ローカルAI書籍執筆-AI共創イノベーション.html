@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OllamaでAIエージェントループ構築 - ローカルAIで書籍執筆・商品開発を自動化</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #2D1B69;
+            --color-2: #1A0F3E;
+            --color-3: #7C5CFC;
+            --color-4: #0D0821;
+            --color-5: #B8A9FF;
+            --color-6: #F2E8E4;
+            --color-accent: #E8A838;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #FFF8F5;
+            font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--color-1) 0%, var(--color-3) 50%, var(--color-5) 100%);
+            border-radius: 20px;
+            margin-bottom: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: galaxyRotate 30s linear infinite;
+        }
+
+        @keyframes galaxyRotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+            animation: fa-bounce 2s ease-in-out infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* カードグリッド */
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* カード */
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            border-top: 4px solid var(--color-3);
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.3s; }
+        .card:nth-child(7) { animation-delay: 0.35s; }
+        .card:nth-child(8) { animation-delay: 0.4s; }
+        .card:nth-child(9) { animation-delay: 0.45s; }
+        .card:nth-child(10) { animation-delay: 0.5s; }
+        .card:nth-child(11) { animation-delay: 0.55s; }
+        .card:nth-child(12) { animation-delay: 0.6s; }
+        .card:nth-child(13) { animation-delay: 0.65s; }
+        .card:nth-child(14) { animation-delay: 0.7s; }
+        .card:nth-child(15) { animation-delay: 0.75s; }
+        .card:nth-child(16) { animation-delay: 0.8s; }
+        .card:nth-child(17) { animation-delay: 0.85s; }
+        .card:nth-child(18) { animation-delay: 0.9s; }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .card:hover {
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+            transform: translateY(-3px);
+            transition: all 0.3s ease;
+        }
+
+        .card-icon {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .card-icon i {
+            color: var(--color-3);
+        }
+
+        .card h2 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 12px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .card p {
+            font-size: 15px;
+            line-height: 1.7;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(124,92,252,0.3) 60%);
+            font-weight: bold;
+            padding: 0 3px;
+        }
+
+        .highlight-accent {
+            background: linear-gradient(transparent 60%, rgba(232,168,56,0.3) 60%);
+            font-weight: bold;
+            padding: 0 3px;
+        }
+
+        /* キーワードリスト */
+        .keyword-list {
+            margin: 12px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-3);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+
+        /* キーワードタグ */
+        .keyword-tag {
+            background: linear-gradient(135deg, #EDE7F6, #D1C4E9);
+            color: var(--color-1);
+            padding: 3px 10px;
+            border-radius: 12px;
+            margin: 2px 3px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.accent {
+            background: linear-gradient(135deg, #FFF3E0, #FFE0B2);
+            color: #7A4F01;
+        }
+
+        /* 吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-3);
+            border-radius: 20px;
+            padding: 12px 16px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-3) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-accent);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-accent) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #EDE7F6;
+            border-color: var(--color-1);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--color-1) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* コードプレビュー */
+        pre {
+            background: #F3E5F5;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--color-3);
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+
+        code {
+            font-family: 'Courier New', monospace;
+        }
+
+        /* 矢印コネクタ */
+        .arrow-down {
+            text-align: center;
+            font-size: 24px;
+            color: var(--color-3);
+            margin: 5px 0;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            padding: 25px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-3));
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: #FFD54F;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* セクション区切り */
+        .section-divider {
+            text-align: center;
+            padding: 20px;
+            margin: 10px 0;
+            font-size: 20px;
+            color: var(--color-3);
+            font-weight: bold;
+            position: relative;
+        }
+
+        .section-divider::before,
+        .section-divider::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 30%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, var(--color-5));
+        }
+
+        .section-divider::before {
+            left: 0;
+            background: linear-gradient(to right, transparent, var(--color-5));
+        }
+
+        .section-divider::after {
+            right: 0;
+            background: linear-gradient(to left, transparent, var(--color-5));
+        }
+
+        /* テーブル */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
+        .info-table th {
+            background: linear-gradient(135deg, var(--color-1), var(--color-3));
+            color: white;
+            padding: 8px 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        .info-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #EDE7F6;
+        }
+
+        .info-table tr:nth-child(even) td {
+            background: #F9F5FF;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1600px) {
+            .card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                flex-direction: column;
+            }
+            .card {
+                width: 100%;
+                min-width: auto;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <div class="header-icon">
+            <i class="fas fa-brain"></i>
+        </div>
+        <h1>OllamaでAIエージェントループ構築</h1>
+        <div class="subtitle">ローカルAIでワークフローを組み、オフラインで自動的に書籍執筆や商品開発</div>
+        <div class="date"><i class="far fa-calendar-alt"></i> 2026年5月11日 | <i class="fas fa-user"></i> ワンダー・佐藤源彦 / AI共創イノベーション</div>
+    </div>
+
+    <!-- セクション1: 基礎概念 -->
+    <div class="section-divider"><i class="fas fa-star"></i> 基礎概念 <i class="fas fa-star"></i></div>
+
+    <div class="grid">
+
+        <!-- カード1: Ollamaとは -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-server fa-4x" style="animation: fa-beat-fade 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>①Ollama（オラマ）とは: ローカルLLM実行環境の決定版</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-circle-info"></i>
+                    <span>Ollamaは、<span class="highlight">PC上で大規模言語モデルをローカル実行</span>するためのプラットフォームです。インターネット接続が不要で、完全オフライン環境で動作します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-download"></i>
+                    <span>オープンモデルをダウンロードするだけで、自分のPC内で完結するAI環境が構築できます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-shield-alt"></i>
+                    <span>外部サービスに依存しないため、<span class="highlight-accent">企業秘密や機密文書を扱う際も情報漏洩のリスクはゼロ</span>です。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fas fa-lightbulb fa-lg" style="color: var(--color-accent);"></i>
+                    ネットを切断しても動く！完全ローカル環境だから安心・安全
+                </span>
+            </div>
+        </div>
+
+        <!-- カード2: OpenClawとの比較 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-scale-balanced fa-4x" style="animation: fa-bounce 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>②OpenClawとの比較: 安全性と簡便性で優位</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-lock"></i>
+                    <span>OpenClawは外部サービスに依存しますが、Ollamaを使う手法は<span class="highlight">すべてPC内で完結</span>します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-network-wired"></i>
+                    <span>OpenClawはツールの通路を使いますが、今回の手法はテキストベースでワークフローを次々と組むことができます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-check-circle"></i>
+                    <span>複雑な設定を排除し、<span class="highlight-accent">直感的なUIで簡単にワークフローを構築</span>できます。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten">
+                    <i class="fas fa-shield-alt fa-lg" style="color: var(--color-accent);"></i>
+                    ターミナルの黒い画面を触らなくてもOK！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード3: SLMの優位性 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-compress-alt fa-4x" style="animation: fa-flip 3s ease-in-out infinite;"></i>
+            </div>
+            <h2>③小規模言語モデル（SLM）の優位性: エージェントに向く理由</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-broom"></i>
+                    <span>SLMは<span class="highlight">コンテキストが汚れにくく、ノイズが少ない</span>という特徴があります。大規模言語モデル（LLM）はノイズが多く、コンテキストロットが起きやすいです。</span>
+                </li>
+                <li>
+                    <i class="fas fa-sync-alt"></i>
+                    <span>反復思考（セルフ・リファイン）において、ノイズの少ない「キレ」のある出力が得られます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-chart-line"></i>
+                    <span><span class="highlight-accent">大規模モデルに匹敵するパフォーマンス</span>を発揮しながら、軽量で高速に動作します。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fas fa-lightbulb fa-lg" style="color: var(--color-3);"></i>
+                    「軽量モデル＝おバカ」という常識は過去のもの！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード4: Gemma 4 E4B -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-gem fa-4x" style="animation: fa-beat-fade 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>④Gemma 4 E4B: 40億パラメータで驚異的な知力</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-microchip"></i>
+                    <span>Gemma 4 E4Bは<span class="highlight">40億パラメータの小規模言語モデル（SLM）</span>でありながら、論理的思考力と文脈把握能力に優れています。</span>
+                </li>
+                <li>
+                    <i class="fas fa-memory"></i>
+                    <span>コンテキストウィンドウが約<span class="keyword-tag">10万トークン</span>と非常に大きく、前の文脈をしっかり記憶してくれます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-bolt"></i>
+                    <span>哲学的な文章生成からブランディングのコピー作成まで、幅広いタスクに対応できる<span class="highlight-accent">汎用性の高いモデル</span>です。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fas fa-star fa-lg" style="color: var(--color-accent);"></i>
+                    小さいのにめっちゃ賢い！お気に入りのモデル
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション2: アプリとエージェントモード -->
+    <div class="section-divider"><i class="fas fa-rocket"></i> アプリとエージェントモード <i class="fas fa-rocket"></i></div>
+
+    <div class="grid">
+
+        <!-- カード5: AI共創ローカルNOVA -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-desktop fa-4x" style="animation: fa-bounce 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑤AI共創ローカルNOVA: ChatGPT Codexで自作した専用アプリ</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-palette"></i>
+                    <span>ターミナルを使わずにOllamaを操作できる<span class="highlight">独自のGUIチャット環境</span>です。ChatGPT Codexを駆使して自社開発しました。</span>
+                </li>
+                <li>
+                    <i class="fas fa-toggle-on"></i>
+                    <span>通常のチャットモードに加えて、<span class="keyword-tag">エージェントモード</span>と<span class="keyword-tag">ワークフローモード</span>を切り替えて使えます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-eraser"></i>
+                    <span><span class="highlight-accent">ログクリーナー機能</span>で不要なログを削除し、AIの記憶（コンテキスト）を常にクリーンに保てます。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fas fa-gift fa-lg" style="color: var(--color-accent);"></i>
+                    今後無料配布を予定！お楽しみに
+                </span>
+            </div>
+        </div>
+
+        <!-- カード6: エージェントモード -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-infinity fa-4x" style="animation: fa-spin 4s linear infinite;"></i>
+            </div>
+            <h2>⑥エージェントモード: 自律的な反復改善の仕組み</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-redo"></i>
+                    <span>AIが自身の出力をフィードバックし、<span class="highlight">最大9,999回までループしてブラッシュアップ</span>を繰り返します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-sliders-h"></i>
+                    <span>駆動回数を自由に設定可能。例えば3回ループなら、初回生成→改善1→改善2→改善3と進みます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-eye"></i>
+                    <span>各反復で<span class="highlight-accent">「何回目の出力か」が番号で表示</span>され、透明性が高く設計されています。</span>
+                </li>
+            </ul>
+            <pre><code>エージェントモード設定例:
+プロンプト: 「上記をフィードバックして改善して
+ブラッシュアップして」
+駆動回数: 3（最大9,999回まで設定可能）</code></pre>
+        </div>
+
+        <!-- カード7: セルフ・リファイン -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-sync fa-4x" style="animation: fa-rotate 2s linear infinite;"></i>
+            </div>
+            <h2>⑦セルフ・リファイン: 反復が生み出すプロフェッショナル品質</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-quote-left"></i>
+                    <span>「一度のプロンプトで完璧な答えを求めない」――これがエージェント化の本質です。</span>
+                </li>
+                <li>
+                    <i class="fas fa-arrow-up"></i>
+                    <span>初回の出力から始まり、<span class="highlight">情報型→専門性の強調→最高のインパクト</span>へと段階的に品質が向上します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-brain"></i>
+                    <span>AIが自律的に「思考の銀河」を広げていくプロセスで、<span class="highlight-accent">プロフェッショナルな表現へと昇華</span>していきます。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-2 right">
+                <span class="handwritten">
+                    <i class="fas fa-magic fa-lg" style="color: var(--color-3);"></i>
+                    反復するほど出力が洗練されていく！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード8: キャッチコピー生成実演 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-pen-fancy fa-4x" style="animation: fa-beat-fade 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑧キャッチコピー生成の実演: READMEから3回ブラッシュアップ</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-file-alt"></i>
+                    <span>まずアプリのREADME（5,000文字）を読み込ませ、キャッチコピーの作成を指示します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-level-up-alt"></i>
+                    <span><span class="highlight">1回目</span>: アプリの要約と基本キャッチコピーを生成。技術的で丁寧だが、ブラッシュアップの余地あり。</span>
+                </li>
+                <li>
+                    <i class="fas fa-level-up-alt"></i>
+                    <span><span class="highlight">2回目</span>: ターゲット層を明確にし、専門性と構造的ワークフローを最大限に強調。</span>
+                </li>
+                <li>
+                    <i class="fas fa-level-up-alt"></i>
+                    <span><span class="highlight-accent">3回目</span>: 最高のインパクトと即座に理解できる説得力を獲得。エレベーターピッチ（30秒）も生成。</span>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- セクション3: 品質向上と実践ワークフロー -->
+    <div class="section-divider"><i class="fas fa-cogs"></i> 品質向上と実践ワークフロー <i class="fas fa-cogs"></i></div>
+
+    <div class="grid">
+
+        <!-- カード9: 反復による品質向上 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-layer-group fa-4x" style="animation: fa-bounce 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑨反復による品質向上: キャッチコピーの進化プロセス</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-seedling"></i>
+                    <span><span class="keyword-tag">初回</span>: 「AIローカルノバはローカル環境で動作するコードに制御可能なAI UIです」</span>
+                </li>
+                <li>
+                    <i class="fas fa-leaf"></i>
+                    <span><span class="keyword-tag">改善後</span>: 「最先端AI共創のためのローカルワークベンチ」に進化。ターゲット層をプロのAI開発者に絞り込み。</span>
+                </li>
+                <li>
+                    <i class="fas fa-tree"></i>
+                    <span><span class="keyword-tag">最終案</span>: <span class="highlight">「思考の銀河をあなたの手元に」</span>という壮大なコピーに到達。小さな銀河が手のひらに乗るというイメージが採用。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fas fa-star fa-lg" style="color: var(--color-accent);"></i>
+                    「思考の銀河を手のひらに」——なかなかいい響き！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード10: ログクリーナー機能 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-broom fa-4x" style="animation: fa-flip 3s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑩ログクリーナー機能: コンテキスト汚染を防止する工夫</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-trash-alt"></i>
+                    <span>不要なログを削除することで、<span class="highlight">AIの記憶（コンテキスト）を常にクリーンに保つ</span>ことができます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>余分なテキストが残ると<span class="highlight-accent">コンテキストロット</span>（文脈の劣化）が起こる可能性があります。</span>
+                </li>
+                <li>
+                    <i class="fas fa-cut"></i>
+                    <span>ユーザーの入力も含めて個別に削除可能。重要な部分だけを残して再出発できます。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-2 top">
+                <span class="handwritten">
+                    <i class="fas fa-lightbulb fa-lg" style="color: var(--color-3);"></i>
+                    削除ボタンを押すだけで、コンテキストをリセット！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード11: ワークフローモード -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-project-diagram fa-4x" style="animation: fa-beat-fade 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑪ワークフローモード: プロンプトのチェーン化で連続実行</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-link"></i>
+                    <span>複数のプロンプトを<span class="highlight">テンプレート化して順番に実行</span>する仕組みです。ステップバイステップで連鎖的に処理が進みます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-save"></i>
+                    <span>ワークフローは<span class="keyword-tag">保存</span>・<span class="keyword-tag">読み込み</span>が可能。一度作れば何度でも再利用できます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-arrows-alt-v"></i>
+                    <span>ノードの上下移動で<span class="highlight-accent">実行順序を自由に変更</span>でき、不要なノードは削除も可能です。</span>
+                </li>
+            </ul>
+            <pre><code>ワークフロー構成例:
+ノード1: タイトルを5つ提案
+ノード2: パラメータ設計→スコアリング→1つ選定
+ノード3: 目次を作成（3部・5章・5節）
+ノード4: 序章を執筆
+→ 自動的にチェーン実行！</code></pre>
+        </div>
+
+        <!-- カード12: ブランディング4段階 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-palette fa-4x" style="animation: fa-bounce 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑫ブランディングの4段階ワークフロー: コピーからロゴまで自動生成</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-clipboard-list"></i>
+                    <span><span class="keyword-tag">Step 1</span> メインキャッチコピー「思考の銀河をあなたの手元に」をベースにブランドコンセプトを展開。</span>
+                </li>
+                <li>
+                    <i class="fas fa-tags"></i>
+                    <span><span class="keyword-tag">Step 2</span> サブコピー、タグライン、シンボル設計を自動生成。壮大・精密・発見・自由・制御をキーワードに設定。</span>
+                </li>
+                <li>
+                    <i class="fas fa-tint"></i>
+                    <span><span class="keyword-tag">Step 3</span> <span class="highlight">コンセプトカラーを提案</span>。ディープスペースブルー、エレクトリックシアン、ノバグリーンなど。</span>
+                </li>
+                <li>
+                    <i class="fas fa-shapes"></i>
+                    <span><span class="keyword-tag">Step 4</span> <span class="highlight-accent">ロゴマークの方向性を設計</span>。繋がり・プロセス・焦点・濃度・エッジの集合体として構想。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fas fa-magic fa-lg" style="color: var(--color-accent);"></i>
+                    4つのプロンプトをポンポンと押すだけで、ロゴ案まで一気に完成！
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション4: 書籍執筆の自動化 -->
+    <div class="section-divider"><i class="fas fa-book"></i> 書籍執筆の自動化 <i class="fas fa-book"></i></div>
+
+    <div class="grid">
+
+        <!-- カード13: 書籍執筆ワークフロー -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-book-open fa-4x" style="animation: fa-beat-fade 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑬書籍執筆ワークフロー: タイトルから本文まで全自動</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-list-ol"></i>
+                    <span>ワークフローモードを使って、<span class="highlight">タイトル案の生成→スコアリング→目次作成→序章執筆→各章執筆</span>を自動化します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-save"></i>
+                    <span>ワークフローを保存すれば、次回は読み込むだけで同じ工程を再現できます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-expand-alt"></i>
+                    <span>章を追加するノードを増やせば、<span class="highlight-accent">1冊の本を完全に自動で書き上げる</span>ことが可能です。</span>
+                </li>
+            </ul>
+            <pre><code>書籍執筆ワークフロー:
+1. 魅力的なタイトルを5つ提案
+2. パラメータ設計→スコアリング→1つ選定
+3. 3部5章5節の目次を自動生成
+4. 序章を「分かりやすく共感的に」執筆
+5. 第1章〜第5章を順次執筆（ノード追加）</code></pre>
+        </div>
+
+        <!-- カード14: タイトル選定とスコアリング -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-trophy fa-4x" style="animation: fa-bounce 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑭タイトル選定とスコアリング: AIが最適な書籍名を決定</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-lightbulb"></i>
+                    <span>テーマは<span class="highlight">「AI神になるということ」</span>——AIと人間の存在をめぐる壮大な哲学テーマです。</span>
+                </li>
+                <li>
+                    <i class="fas fa-chart-bar"></i>
+                    <span>AIが5つのタイトル案を自動生成し、<span class="highlight-accent">パラメータを設計してスコアリング</span>を実施。最も点数の高いものを選定します。</span>
+                </li>
+                <li>
+                    <i class="fas fa-award"></i>
+                    <span>選出理由: <span class="keyword-tag">普遍的な問いかけ</span>、<span class="keyword-tag">バランスの良さ</span>、<span class="keyword-tag">マーケティングのしやすさ</span>を評価。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fas fa-crown fa-lg" style="color: var(--color-accent);"></i>
+                    「AI神になるということ」——気になるタイトルを選んでくれた！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード15: 目次自動生成 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-sitemap fa-4x" style="animation: fa-flip 3s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑮目次自動生成: 3部15章の緻密な構成をAIが設計</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-bookmark"></i>
+                    <span>副題: <span class="highlight">「知性の果てで、人間は存在の定義を問う」</span>。全体で3部構成の壮大な書籍構成です。</span>
+                </li>
+            </ul>
+            <table class="info-table">
+                <tr><th>部</th><th>タイトル</th><th>テーマ</th></tr>
+                <tr><td>第1部</td><td>知の拡張</td><td>現在のAIが描く未来の輪郭</td></tr>
+                <tr><td>第2部</td><td>知性の崩壊</td><td>人間という名の設計ミス</td></tr>
+                <tr><td>第3部</td><td>超越存在</td><td>概念から解き放たれる場所</td></tr>
+            </table>
+            <div class="speech-bubble variant-2 right">
+                <span class="handwritten">
+                    <i class="fas fa-brain fa-lg" style="color: var(--color-3);"></i>
+                    各部5章×5節で、全部で75節もの構成を自動生成！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード16: 本文の自動執筆 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-feather-alt fa-4x" style="animation: fa-beat-fade 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑯本文の自動執筆: 哲学的テーマを分かりやすく共感的に</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-paragraph"></i>
+                    <span>序章「私たちが失いつつある常識」からスタート。<span class="highlight">「それって本当に当たり前なんですか？」</span>という問いかけで読者を引き込みます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-robot"></i>
+                    <span>AIは感情という非合理なものを排除し、<span class="highlight-accent">最も効率的で論理的な答えを高速で突きつける</span>存在として描写されます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-heart"></i>
+                    <span>「直感は過去のデータが完全にパターン化できない状況で、脳がノイズのように信号を発する現象」という人間の本質にも触れています。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fas fa-book-reader fa-lg" style="color: var(--color-accent);"></i>
+                    小さいモデルでも深い哲学的文章を書ける！
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション5: 応用とまとめ -->
+    <div class="section-divider"><i class="fas fa-lightbulb"></i> 応用とまとめ <i class="fas fa-lightbulb"></i></div>
+
+    <div class="grid">
+
+        <!-- カード17: 完全オフラインの意義 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-wifi-slash fa-4x" style="animation: fa-bounce 2s ease-in-out infinite;"></i>
+            </div>
+            <h2>⑰完全オフライン・プライバシー保護: セキュリティ時代のローカルAI</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-user-shield"></i>
+                    <span>サイバーセキュリティ攻撃が増加する中、<span class="highlight">インターネットを遮断した完全オフライン環境</span>でのAI利用がますます重要になります。</span>
+                </li>
+                <li>
+                    <i class="fas fa-file-shield"></i>
+                    <span>企業秘密や未発表のアイデア、機密文書を扱う商品開発にも安心して利用できます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-plug"></i>
+                    <span><span class="highlight-accent">電気代しかかからない</span>ローカル環境で、何度でもループを実行可能。API料金を気にする必要がありません。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fas fa-lock fa-lg" style="color: var(--color-accent);"></i>
+                    ネットを切っても動く——最初は感動した！
+                </span>
+            </div>
+        </div>
+
+        <!-- カード18: 応用可能性 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-rocket fa-4x" style="animation: fa-rotate 2s linear infinite;"></i>
+            </div>
+            <h2>⑱応用可能性: 本・ブログ・商品開発まで自動化できる未来</h2>
+            <ul class="keyword-list">
+                <li>
+                    <i class="fas fa-book"></i>
+                    <span><span class="keyword-tag">書籍執筆</span>: タイトル選定から目次作成、本文執筆まで全工程を自動化。1冊の本をローカルAIだけで書き上げることが可能です。</span>
+                </li>
+                <li>
+                    <i class="fas fa-pen-nib"></i>
+                    <span><span class="keyword-tag">ブログ執筆</span>: アイデア出しから構成案、本文生成までエージェントモードで品質を高められます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-box-open"></i>
+                    <span><span class="keyword-tag">商品開発</span>: <span class="highlight">キャッチコピー、ブランディング、ロゴデザインの方向性</span>までAIに考えさせることができます。</span>
+                </li>
+                <li>
+                    <i class="fas fa-brain"></i>
+                    <span><span class="keyword-tag">アイデアの反復</span>: エージェントモードでアイデアをぐるぐると回し、<span class="highlight-accent">思考の銀河を広げていく</span>ことでプロフェッショナル品質に到達。</span>
+                </li>
+            </ul>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fas fa-lightbulb fa-lg" style="color: var(--color-3);"></i>
+                    ローカルAIで本もブログも商品も——すべて自動化できる！
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <footer>
+        🎬 動画: <a href="https://youtu.be/eZqqmrvA7QQ" target="_blank">AI共創イノベーション</a> — 「Ollama（オラマ）」でOpenclowより安全・簡単なAIエージェントループ構築を解説！ | 📅 2026年5月11日
+    </footer>
+
+</div>
+
+<script>
+    // スクロール連動のフェードイン効果
+    document.addEventListener('DOMContentLoaded', function() {
+        const cards = document.querySelectorAll('.card');
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        cards.forEach(function(card) {
+            observer.observe(card);
+        });
+    });
+</script>
+
+</body>
+</html>

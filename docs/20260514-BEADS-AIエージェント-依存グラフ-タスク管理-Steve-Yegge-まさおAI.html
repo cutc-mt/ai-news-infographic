@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIエージェントのタスク管理と記憶管理に「Beads」がめちゃくちゃ使える件 | まさおAIじっくり解説ch</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #00ACC1;
+            --color-2: #00838F;
+            --color-3: #B2EBF2;
+            --color-4: #006064;
+            --color-5: #4DD0E1;
+            --color-accent: #0277BD;
+            --color-accent-light: #E1F5FE;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #E0F7FA 0%, #E8EAF6 50%, #E0F7FA 100%);
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-1), var(--color-accent));
+            border-radius: 25px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .header-icon {
+            font-size: 80px;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s ease-in-out infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .layer-label {
+            text-align: center;
+            margin: 30px 0 15px;
+            padding: 10px 30px;
+            background: linear-gradient(90deg, transparent, var(--color-3), transparent);
+            border-radius: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--color-2);
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .card-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            padding: 10px 0;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 20px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-top: 4px solid var(--color-1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 12px 30px rgba(0,0,0,0.15);
+        }
+
+        .card-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container i {
+            color: var(--color-1);
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.15));
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: var(--color-4);
+            margin-top: 10px;
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 5px 10px;
+        }
+
+        .keyword-list {
+            margin: 10px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-1);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--color-3);
+            color: var(--color-4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.accent {
+            background-color: #FFD166;
+            color: #333;
+        }
+
+        .keyword-tag.orange {
+            background-color: var(--color-accent-light);
+            color: var(--color-accent);
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 25px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 25px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-accent);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-accent) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #C62828;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #C62828 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .stats-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: bold;
+            margin: 3px;
+        }
+
+        .stats-badge.blue {
+            background: linear-gradient(135deg, var(--color-accent), #01579B);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            background: linear-gradient(135deg, var(--color-2), var(--color-1));
+            border-radius: 25px;
+            color: white;
+            font-size: 15px;
+        }
+
+        .footer a {
+            color: var(--color-3);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, #FFD166, #FFC107);
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--color-3), #E0F7FA);
+            border-radius: 12px;
+            padding: 10px 15px;
+            margin: 8px 0;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            color: var(--color-4);
+        }
+
+        @media (max-width: 1600px) {
+            .card { min-width: 280px; }
+        }
+
+        @media (max-width: 1200px) {
+            .card { min-width: 320px; }
+        }
+
+        @media (max-width: 900px) {
+            .card { min-width: 380px; }
+        }
+
+        @media (max-width: 768px) {
+            .card-grid { flex-direction: column; }
+            .card { width: 100%; min-width: auto; }
+            .header h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="header-icon">
+                <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+            </div>
+            <h1>AIエージェントのタスク管理に「Beads」<br>依存グラフで記憶喪失問題を解決</h1>
+            <p class="subtitle">Steve Yeggeが公開した革新的なCLIツールがAIコーディングエージェントを劇的に進化させる</p>
+            <div style="margin-top: 15px; position: relative; z-index: 1;">
+                <span class="stats-badge"><i class="fa-solid fa-diagram-project"></i> 依存グラフ</span>
+                <span class="stats-badge blue"><i class="fa-solid fa-brain"></i> 永続メモリ</span>
+                <span class="stats-badge"><i class="fa-solid fa-robot"></i> AIエージェント</span>
+            </div>
+            <p class="date"><i class="fa-regular fa-calendar"></i> 2026年5月14日 | まさおAIじっくり解説ch</p>
+        </header>
+
+        <!-- ===== セクション1: BEADSとは何か ===== -->
+        <div class="layer-label"><i class="fa-solid fa-circle-info"></i> BEADSとは何か</div>
+
+        <div class="card-grid">
+
+            <!-- カード1 -->
+            <div class="card">
+                <div class="card-badge">1</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>① BEADSの概要: 依存グラフ型Issue Tracker</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">BEADS（bd）</span>はSteve Yeggeが公開したCLIベースのツール</span></li>
+                        <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>タスク間の<span class="keyword-tag accent">依存関係をグラフ構造</span>で管理するIssue Tracker</span></li>
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span><span class="highlight">AIコーディングエージェント</span>の「記憶喪失問題」を解決するために生まれた</span></li>
+                        <li><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span>オープンソース: <span class="keyword-tag orange">github.com/gastownhall/beads</span></span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-diagram-project fa-lg" style="color: var(--color-1);"></i>
+                            AIがセッションを開き直しても<br>「どこまで進んだか」を覚えている<br>魔法のツール！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2 -->
+            <div class="card">
+                <div class="card-badge">2</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fire fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 実際に使ってみた感想</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-list-ol fa-lg" aria-hidden="true"></i><span>以前の体感: <span class="keyword-tag">TODOリストを上から順に消化する感覚</span></span></li>
+                        <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>BEADS導入後: <span class="keyword-tag accent">readyが空になるまでAIが次々タスクを取って終わらせる</span></span></li>
+                        <li><i class="fa-solid fa-arrows-spin fa-lg" aria-hidden="true"></i><span>AIが自律的にタスクを獲得して完了させる<span class="highlight">体感が劇的に変わった</span></span></li>
+                        <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">bd remember</span>の永続メモリも面白い機能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--color-accent);"></i>
+                            人間が指示を出さなくても<br>AIが勝手に次のタスクを<br>見つけてやってくれるのよ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3 -->
+            <div class="card">
+                <div class="card-badge">3</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ 解決する課題: 記憶喪失問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>セッションをリセットすると<span class="keyword-tag">会話のコンテキストが全て失われる</span></span></li>
+                        <li><i class="fa-solid fa-question fa-lg" aria-hidden="true"></i><span>「どこまで進んだか」「何をやったか」が<span class="keyword-tag accent">分からなくなる</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">同じタスクを何度もやり直すハメ</span>になる悪循環</span></li>
+                        <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span><span class="highlight">max-turns制限でタイムアウト</span>すると全てがパーになる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-brain fa-lg" style="color: #C62828;"></i>
+                            Claude Codeがタイムアウトしたら<br>それまでの作業が全部消える…<br>それが最大の悩みだった！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション2: 従来ツールの限界と依存グラフ ===== -->
+        <div class="layer-label"><i class="fa-solid fa-scale-balanced"></i> 従来ツールの限界と依存グラフの革新性</div>
+
+        <div class="card-grid">
+
+            <!-- カード4 -->
+            <div class="card">
+                <div class="card-badge">4</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 既存TODOツールの限界</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>MarkdownのTODOリスト: <span class="keyword-tag">タスク間の依存関係を表現できない</span></span></li>
+                        <li><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span>GitHub Issues: <span class="keyword-tag accent">エージェントがCLIから直接操作しづらい</span></span></li>
+                        <li><i class="fa-solid fa-arrow-down-long fa-lg" aria-hidden="true"></i><span>線形リスト: <span class="keyword-tag orange">タスクの順序や優先順位を動的に管理できない</span></span></li>
+                        <li><i class="fa-solid fa-link-slash fa-lg" aria-hidden="true"></i><span><span class="highlight">「Aが終わらないとBに着手できない」</span>という関係が表現できない</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--color-1);"></i>
+                            TODOリストは「やること」は<br>書けても「関係性」は<br>書けないんだよね！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード5 -->
+            <div class="card">
+                <div class="card-badge">5</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-share-nodes fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 依存グラフが画期的な理由</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>タスク同士の<span class="keyword-tag">先行・後続の関係</span>をグラフ構造で表現</span></li>
+                        <li><i class="fa-solid fa-lock fa-lg" aria-hidden="true"></i><span>「タスクAが完了しないとタスクBに着手できない」を<span class="keyword-tag accent">自動的に管理</span></span></li>
+                        <li><i class="fa-solid fa-forward-fast fa-lg" aria-hidden="true"></i><span>前提条件を満たしたタスクを<span class="keyword-tag orange">自動的に「ready」</span>として提示</span></li>
+                        <li><i class="fa-solid fa-shuffle fa-lg" aria-hidden="true"></i><span>グラフを動的に更新し<span class="highlight">最適な実行順序を常に提示</span>してくれる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-share-nodes fa-lg" style="color: var(--color-accent);"></i>
+                            線形リストは1番→2番だけど<br>依存グラフは並列で<br>どんどん進められる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6 -->
+            <div class="card">
+                <div class="card-badge">6</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ リスト型と依存グラフ型の比較</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-down-1-9 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">リスト型</span>: 1番目→2番目→3番目と<span class="keyword-tag accent">直列にしか処理できない</span></span></li>
+                        <li><i class="fa-solid fa-arrows-split-up-and-left fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">依存グラフ型</span>: 前提条件を満たしたタスク<span class="keyword-tag orange">全てを並列に「ready」にする</span></span></li>
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>AIエージェントにとって<span class="highlight">「次にやるべきこと」が明確</span>になる</span></li>
+                        <li><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>結果として<span class="keyword-tag">タスクの消化スピードが大幅に向上</span>する</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-code-compare fa-lg" style="color: #C62828;"></i>
+                            AとBが終わったらCとDが<br>一気にreadyになるから<br>AIはサクサク進められる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション3: 内部構造とセットアップ ===== -->
+        <div class="layer-label"><i class="fa-solid fa-microchip"></i> 内部構造とプロジェクトセットアップ</div>
+
+        <div class="card-grid">
+
+            <!-- カード7 -->
+            <div class="card">
+                <div class="card-badge">7</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-database fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 内部構造: Doltデータベース</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Dolt</span>: Gitのようにバージョン管理できる<span class="keyword-tag accent">リレーショナルデータベース</span></span></li>
+                        <li><i class="fa-solid fa-code-merge fa-lg" aria-hidden="true"></i><span>コミット・ブランチ・マージが可能なDBとして<span class="keyword-tag orange">BEADSのバックエンド</span>に採用</span></li>
+                        <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>依存グラフを保存し<span class="highlight">変更履歴も自動的に管理</span></span></li>
+                        <li><i class="fa-solid fa-tag fa-lg" aria-hidden="true"></i><span>「Git for Data」というキャッチコピー通り<span class="keyword-tag">データのGit</span>が実現</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-database fa-lg" style="color: var(--color-1);"></i>
+                            データベースなのに<br>Gitみたいにコミットや<br>マージができるの！すごい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 卡片8 -->
+            <div class="card">
+                <div class="card-badge">8</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ JSON APIでの統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>CLIコマンドだけでなく<span class="keyword-tag">JSON API</span>も提供されている</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>他のツールからの<span class="keyword-tag accent">統合が容易</span>で拡張性が高い</span></li>
+                        <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i><span>エージェントがAPI経由で<span class="keyword-tag orange">タスク状態を確認・更新</span>可能</span></li>
+                        <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>MCPサーバーとしても機能し<span class="highlight">よりシームレスな統合</span>ができる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-plug fa-lg" style="color: var(--color-accent);"></i>
+                            CLIでもAPIでも使えるから<br>どんなエージェントとも<br>相性が良いのが魅力！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 卡片9 -->
+            <div class="card">
+                <div class="card-badge">9</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-folder-plus fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ bd initでプロジェクト初期化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">bd init</span>を実行するだけでプロジェクトが初期化される</span></li>
+                        <li><i class="fa-solid fa-folder-open fa-lg" aria-hidden="true"></i><span>プロジェクトディレクトリに<span class="keyword-tag accent">.beads/</span>フォルダを自動作成</span></li>
+                        <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>Doltデータベースを初期化して<span class="keyword-tag orange">グラフ構造のひな形</span>を作成</span></li>
+                    </ul>
+<pre>project/
+├── .beads/          # BEADSデータベース
+│   └── (Dolt files)
+├── src/
+└── ...</pre>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-folder-plus fa-lg" style="color: #C62828;"></i>
+                            bd init 1発で<br>準備完了！超シンプル！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション4: コアコマンド ===== -->
+        <div class="layer-label"><i class="fa-solid fa-terminal"></i> BEADSのコアコマンド</div>
+
+        <div class="card-grid">
+
+            <!-- カード10 -->
+            <div class="card">
+                <div class="card-badge">10</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-check fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ タスクの5つの状態とbd ready</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hourglass-start fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">todo</span>: まだ着手できない（前提条件が未完了）</span></li>
+                        <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">ready</span>: 前提条件を満たして<span class="highlight">着手可能な状態</span></span></li>
+                        <li><i class="fa-solid fa-spinner fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">active</span>: 現在作業中のタスク</span></li>
+                        <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">done</span>: 完了したタスク</span></li>
+                        <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">blocked</span>: 何らかの理由でブロックされている</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-check fa-lg" style="color: var(--color-1);"></i>
+                            bd readyで「今やれること」が<br>一覧で出るからAIも<br>迷わず次のタスクへ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11 -->
+            <div class="card">
+                <div class="card-badge">11</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plus fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ bd addで依存関係付きタスク追加</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">bd add</span>コマンドでタスクを依存関係付きで追加</span></li>
+                        <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">--before</span>: このタスクの後に実行すべきタスクを指定</span></li>
+                        <li><i class="fa-solid fa-arrow-left fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">--after</span>: このタスクの前に完了すべきタスクを指定</span></li>
+                    </ul>
+<pre>bd add "実装する" --before "テスト" --after "設計"</pre>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-plus fa-lg" style="color: var(--color-accent);"></i>
+                            --before と --after で<br>タスクの関係を宣言するだけで<br>グラフが自動で構築される！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12 -->
+            <div class="card">
+                <div class="card-badge">12</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-spin fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ claim→closeの作業サイクル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">bd ready</span> で着手可能なタスクを確認</span></li>
+                        <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">bd claim</span> でタスクを獲得（activeに移行）</span></li>
+                        <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span>作業を実行（コード変更など）</span></li>
+                        <li><i class="fa-solid fa-4 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">bd close</span> でタスク完了（doneに移行）</span></li>
+                        <li><i class="fa-solid fa-5 fa-lg" aria-hidden="true"></i><span><span class="highlight">依存していたタスクが自動的にreadyに昇格！</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrows-spin fa-lg" style="color: #C62828;"></i>
+                            このサイクルを回し続けるだけで<br>AIが自律的に全タスクを<br>完了させていくのよ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション5: エージェントへの統合 ===== -->
+        <div class="layer-label"><i class="fa-solid fa-gears"></i> Claude Code / Codex / Cursorへの統合</div>
+
+        <div class="card-grid">
+
+            <!-- カード13 -->
+            <div class="card">
+                <div class="card-badge">13</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-code fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ Claude Codeへの統合方法</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">CLAUDE.md</span>にBEADSの使い方を記述するだけで統合完了</span></li>
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>エージェントに自動的に<span class="keyword-tag accent">ready → claim → work → close</span>をループさせる</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">max-turnsでタイムアウト</span>しても次のセッションで<span class="highlight">bd readyすれば続きから再開</span></span></li>
+                        <li><i class="fa-solid fa-floppy-disk fa-lg" aria-hidden="true"></i><span>コンテキストを引き継がなくても<span class="keyword-tag">タスク状態は永続化</span>されている</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-file-code fa-lg" style="color: var(--color-1);"></i>
+                            CLAUDE.mdに書くだけで<br>「タイムアウトしても続きから」が<br>自動でできるようになるの！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード14 -->
+            <div class="card">
+                <div class="card-badge">14</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ Codex / Cursorにも対応</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">OpenAI Codex</span>にも同様にCLIコマンドで統合可能</span></li>
+                        <li><i class="fa-solid fa-display fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">Cursor</span>ならエディタ内のターミナルパネルから<span class="keyword-tag orange">直接bdコマンドを実行</span></span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>コーディングエージェント<span class="highlight">全般に適用可能</span>な汎用的なツール</span></li>
+                        <li><i class="fa-solid fa-handshake fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">CLIが一番シンプル</span>でどのエージェントでも動くのが強み</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-laptop-code fa-lg" style="color: var(--color-accent);"></i>
+                            Claude CodeでもCursorでも<br>同じCLIで動くから<br>乗り換えも安心だよね！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15 -->
+            <div class="card">
+                <div class="card-badge">15</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microchip fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ MCP対応とシームレスな統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">MCP（Model Context Protocol）</span>サーバーとしても機能</span></li>
+                        <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>MCP対応のエージェントなら<span class="keyword-tag accent">よりシームレスに統合</span>可能</span></li>
+                        <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>CLIの方がシンプルで<span class="keyword-tag orange">どのエージェントでも動く</span>メリットあり</span></li>
+                        <li><i class="fa-solid fa-arrows-turn-to-dots fa-lg" aria-hidden="true"></i><span><span class="highlight">用途に応じてCLIとMCPを使い分ける</span>のがおすすめ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-microchip fa-lg" style="color: #C62828;"></i>
+                            CLIが基本でMCPも使える<br>両方の道があるから<br>環境に合わせて選べる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション6: 永続メモリとまとめ ===== -->
+        <div class="layer-label"><i class="fa-solid fa-bookmark"></i> 永続メモリと実践ワークフロー</div>
+
+        <div class="card-grid">
+
+            <!-- カード16 -->
+            <div class="card">
+                <div class="card-badge">16</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-floppy-disk fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ bd remember: 永続メモリ機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">bd remember</span>でプロジェクトの重要情報を<span class="keyword-tag accent">永続的に記憶</span></span></li>
+                        <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>新しいセッション開始時に<span class="keyword-tag orange">自動的にコンテキストとして読み込まれる</span></span></li>
+                        <li><i class="fa-solid fa-clipboard-list fa-lg" aria-hidden="true"></i><span>コーディング規約・アーキテクチャ決定・<span class="highlight">学んだこと</span>などを記録</span></li>
+                    </ul>
+<pre>bd remember "React Router v6を使用"
+bd remember "テストはVitestを使うこと"</pre>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-floppy-disk fa-lg" style="color: var(--color-1);"></i>
+                            AIのメモ帳みたいなもの！<br>でもコンテキストが膨張すると<br>コスト増になるから注意！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17 -->
+            <div class="card">
+                <div class="card-badge">17</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ rememberの注意点: 貯めすぎに注意</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-explosion fa-lg" aria-hidden="true"></i><span>rememberしすぎると<span class="keyword-tag">コンテキストが膨張</span>してコスト増・精度低下</span></li>
+                        <li><i class="fa-solid fa-broom fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">定期的に整理・要約</span>が必要なポイント</span></li>
+                        <li><i class="fa-solid fa-gem fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">重要なことだけに絞る</span>のがコツ。何でもかんでも記録しない</span></li>
+                        <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span>面白い機能だけど<span class="highlight">試す価値は十分にある</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--color-accent);"></i>
+                            お部屋の片付けと同じ！<br>溜め込みすぎないように<br>定期的に整理しよう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18 -->
+            <div class="card">
+                <div class="card-badge">18</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ: BEADSのキーポイント</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">記憶喪失問題を解決</span>: タイムアウトしても続きから再開可能</span></li>
+                        <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">依存グラフ</span>: タスク間の関係を管理して並列実行を実現</span></li>
+                        <li><i class="fa-solid fa-floppy-disk fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">永続メモリ</span>: プロジェクトのコンテキストを保持し続ける</span></li>
+                        <li><i class="fa-solid fa-laptop-code fa-lg" aria-hidden="true"></i><span><span class="highlight">Claude Code / Codex / Cursor</span>など主要エージェントに対応</span></li>
+                        <li><i class="fa-solid fa-user-astronaut fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Steve Yegge</span>開発のオープンソースプロジェクト</span></li>
+                        <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>人間は<span class="highlight">監督者に回り戦略的な判断に集中</span>できるようになる</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--color-1);"></i>
+                            readyが空になったら完了！<br>AIコーディングの未来が<br>ここから変わるかも！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- フッター -->
+        <footer class="footer">
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=iFWyw2ZZRm4" target="_blank" style="color: inherit;">まさおAIじっくり解説ch</a> | 📅 2026年5月14日</p>
+            <p style="margin-top: 8px; opacity: 0.8;"><i class="fa-brands fa-github"></i> GitHub: <a href="https://github.com/gastownhall/beads" target="_blank" style="color: inherit;">gastownhall/beads</a></p>
+        </footer>
+
+    </div>
+</body>
+</html>

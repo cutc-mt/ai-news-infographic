@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>コンテキストファーストでSLMを限界突破！Gemma4 e4b実践解説 | ワンダー佐藤</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #5C6BC0;
+            --color-2: #3949AB;
+            --color-3: #C5CAE9;
+            --color-4: #1A237E;
+            --color-5: #7E57C2;
+            --color-accent: #AB47BC;
+            --color-accent-light: #F3E5F5;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #E8EAF6 0%, #F3E5F5 50%, #E8EAF6 100%);
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-2), var(--color-1), var(--color-accent));
+            border-radius: 25px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .header-icon {
+            font-size: 80px;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s ease-in-out infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .layer-label {
+            text-align: center;
+            margin: 30px 0 15px;
+            padding: 10px 30px;
+            background: linear-gradient(90deg, transparent, var(--color-3), transparent);
+            border-radius: 30px;
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--color-2);
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .card-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            padding: 10px 0;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 20px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-top: 4px solid var(--color-1);
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 12px 30px rgba(0,0,0,0.15);
+        }
+
+        .card-badge {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container i {
+            color: var(--color-1);
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.15));
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: var(--color-4);
+            margin-top: 10px;
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 5px 10px;
+        }
+
+        .keyword-list {
+            margin: 10px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-1);
+            min-width: 18px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--color-3);
+            color: var(--color-4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.accent {
+            background-color: #CE93D8;
+            color: #fff;
+        }
+
+        .keyword-tag.orange {
+            background-color: var(--color-accent-light);
+            color: var(--color-accent);
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 25px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 25px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-accent);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-accent) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #C62828;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #C62828 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .stats-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 13px;
+            font-weight: bold;
+            margin: 3px;
+        }
+
+        .stats-badge.accent {
+            background: linear-gradient(135deg, var(--color-accent), #7B1FA2);
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            background: linear-gradient(135deg, var(--color-2), var(--color-1));
+            border-radius: 25px;
+            color: white;
+            font-size: 15px;
+        }
+
+        .footer a {
+            color: var(--color-3);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .highlight {
+            background: linear-gradient(135deg, #CE93D8, #AB47BC);
+            padding: 2px 8px;
+            border-radius: 5px;
+            font-weight: bold;
+            color: #fff;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, var(--color-3), #E8EAF6);
+            border-radius: 12px;
+            padding: 10px 15px;
+            margin: 8px 0;
+        }
+
+        .comparison {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+        }
+
+        .comparison-bad, .comparison-good {
+            flex: 1;
+            padding: 8px 10px;
+            border-radius: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .comparison-bad {
+            background: #FFEBEE;
+            border: 2px solid #EF9A9A;
+        }
+
+        .comparison-good {
+            background: #E8F5E9;
+            border: 2px solid #A5D6A7;
+        }
+
+        .score-display {
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        .score-big {
+            font-size: 48px;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--color-1), var(--color-accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        @media (max-width: 1600px) {
+            .card { min-width: 280px; }
+        }
+
+        @media (max-width: 1200px) {
+            .card { min-width: 320px; }
+        }
+
+        @media (max-width: 900px) {
+            .card { min-width: 380px; }
+        }
+
+        @media (max-width: 768px) {
+            .card-grid { flex-direction: column; }
+            .card { width: 100%; min-width: auto; }
+            .header h1 { font-size: 24px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="header-icon">
+                <i class="fa-solid fa-brain" aria-hidden="true"></i>
+            </div>
+            <h1>コンテキストファーストでSLMを限界突破<br>Gemma4 e4b × Ollama実践解説</h1>
+            <p class="subtitle">ローカルAIの「最後優位性」を逆手に取るプロンプト設計の真髄</p>
+            <div style="margin-top: 15px; position: relative; z-index: 1;">
+                <span class="stats-badge"><i class="fa-solid fa-shield-halved"></i> ローカルAI</span>
+                <span class="stats-badge accent"><i class="fa-solid fa-microchip"></i> SLM</span>
+                <span class="stats-badge"><i class="fa-solid fa-wand-magic-sparkles"></i> コンテキストファースト</span>
+            </div>
+            <p class="date"><i class="fa-regular fa-calendar"></i> 2026年5月14日 | AI共創イノベーション（ワンダー・佐藤源彦）</p>
+        </header>
+
+        <!-- ===== セクション1: ローカルAIの重要性 ===== -->
+        <div class="layer-label"><i class="fa-solid fa-star"></i> ローカルAIとSLMの可能性</div>
+
+        <div class="card-grid">
+
+            <!-- カード1 -->
+            <div class="card">
+                <div class="card-badge">1</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>① なぜローカルAIが注目されるのか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span>Claude Mythosのような<span class="keyword-tag">圧倒的なクラウドAI</span>の登場で、外部送信のリスクが浮き彫りに</span></li>
+                        <li><i class="fa-solid fa-lock fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">機密情報を外部に送らない</span>完全ローカル環境での運用が急速に注目</span></li>
+                        <li><i class="fa-solid fa-laptop-code fa-lg" aria-hidden="true"></i><span>数十億パラメータクラスの<span class="highlight">小規模言語モデル（SLM）</span>がローカルAIの主力に</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-shield-halved fa-lg" style="color: var(--color-1);"></i>
+                            クラウドAIは強力だけど<br>機密データを送るのは<br>怖いよね！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2 -->
+            <div class="card">
+                <div class="card-badge">2</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>② SLMの強力な武器とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>知識量は巨大モデルに劣るが、<span class="keyword-tag">ハルシネーションやノイズが極めて少ない</span></span></li>
+                        <li><i class="fa-solid fa-arrows-spin fa-lg" aria-hidden="true"></i><span>ローカル環境で<span class="keyword-tag accent">何度も推敲と反復</span>によるフィードバックループが可能</span></li>
+                        <li><i class="fa-solid fa-trophy fa-lg" aria-hidden="true"></i><span>結果として<span class="highlight">大規模モデルを凌駕する高精度な出力</span>が得られる場合がある</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--color-accent);"></i>
+                            小さいのに速くて正確<br>何度でもやり直せるのが<br>SLMの最強ポイント！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3 -->
+            <div class="card">
+                <div class="card-badge">3</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microchip fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ 今回の実践環境</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>実行環境: <span class="keyword-tag">Ollama</span>でローカル推論</span></li>
+                        <li><i class="fa-solid fa-gem fa-lg" aria-hidden="true"></i><span>実践モデル: <span class="keyword-tag accent">Gemma4 e4b</span>（Googleのオープンモデル）</span></li>
+                        <li><i class="fa-solid fa-display fa-lg" aria-hidden="true"></i><span>チャットUI: <span class="keyword-tag orange">AI共創ローカルNOVA</span>（自作アプリ）</span></li>
+                        <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>動画は約<span class="highlight">28分</span>の濃密な内容</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-microchip fa-lg" style="color: #C62828;"></i>
+                            Gemma4 e4bは<br>思考プロセス表示もできる<br>優秀なモデル！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション2: Lost in the Middle ===== -->
+        <div class="layer-label"><i class="fa-solid fa-eye-slash"></i> AIの致命的な弱点「Lost in the Middle」</div>
+
+        <div class="card-grid">
+
+            <!-- カード4 -->
+            <div class="card">
+                <div class="card-badge">4</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye-slash fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ Lost in the Middle現象とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>研究論文「Lost in the Middle」で<span class="keyword-tag">言語モデルの処理弱点</span>が証明された</span></li>
+                        <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span>情報の<span class="keyword-tag accent">先頭と末尾には強く注目</span>できるが…</span></li>
+                        <li><i class="fa-solid fa-xmark fa-lg" aria-hidden="true"></i><span><span class="highlight">中間の情報を無視</span>してしまうという致命的な問題</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-eye-slash fa-lg" style="color: var(--color-1);"></i>
+                            長い文章の真ん中にある情報<br>AIは読めてないことが多い<br>これが「ミドルロスト」！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード5 -->
+            <div class="card">
+                <div class="card-badge">5</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ U字型の性能曲線</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>性能曲線は<span class="keyword-tag">U字型</span>を描く。先頭と末尾が高く、真ん中が低い</span></li>
+                        <li><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>位置によって<span class="keyword-tag accent">情報の処理精度が大きく変動</span>する</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>プロンプトの構造を<span class="highlight">意図的に設計しないと精度が落ちる</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-chart-line fa-lg" style="color: var(--color-accent);"></i>
+                            U字型ってことは<br>真ん中は要注意ゾーン<br>大事な指示を置いちゃダメ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6 -->
+            <div class="card">
+                <div class="card-badge">6</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clock-rotate-left fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ SLM特有の「最後優位性」</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i><span>SLMは先頭情報の処理能力がさらに弱く、<span class="keyword-tag">一番最後の情報を極端に重視</span></span></li>
+                        <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>指示を先頭に置いて長文を読み込ませると<span class="keyword-tag accent">肝心の指示が中間に押し流される</span></span></li>
+                        <li><i class="fa-solid fa-ghost fa-lg" aria-hidden="true"></i><span>AIが<span class="highlight">指示を無視したり関係のない出力をする</span>原因はここにある</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-clock-rotate-left fa-lg" style="color: #C62828;"></i>
+                            SLMは「最後の言葉」を<br>一番大切に聞くタイプ<br>そこを逆手に取る！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション3: コンテキストファースト戦略 ===== -->
+        <div class="layer-label"><i class="fa-solid fa-wand-magic-sparkles"></i> コンテキストファースト戦略の全貌</div>
+
+        <div class="card-grid">
+
+            <!-- カード7 -->
+            <div class="card">
+                <div class="card-badge">7</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ コンテキストファーストとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>外部知識や過去の会話などの<span class="keyword-tag">長い文脈をすべて先に提示</span></span></li>
+                        <li><i class="fa-solid fa-flag-checkered fa-lg" aria-hidden="true"></i><span>今回実行したい<span class="keyword-tag accent">具体的な指示を一番最後の末尾に配置</span></span></li>
+                        <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>SLMの<span class="highlight">最後優位性（Recency Bias）を直接活用</span>する設計アプローチ</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--color-1);"></i>
+                            資料を先に出して<br>最後に「で、これ要約して」<br>この順番が正解！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード8 -->
+            <div class="card">
+                <div class="card-badge">8</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-left-right fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 配置の比較: 絶対に覚えよう</h2>
+                </div>
+                <div class="card-content">
+                    <div class="comparison">
+                        <div class="comparison-bad">
+                            <strong><i class="fa-solid fa-xmark"></i> ❌ プロンプトファースト</strong><br>
+                            <span style="font-size:12px;">[指示] → [長い文脈]<br>指示が中間に押し流される！</span>
+                        </div>
+                        <div class="comparison-good">
+                            <strong><i class="fa-solid fa-check"></i> ✅ コンテキストファースト</strong><br>
+                            <span style="font-size:12px;">[長い文脈] → [指示]<br>指示が末尾に残り確実に認識！</span>
+                        </div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span>基本ルール: <span class="keyword-tag">長文＝コンテキストファースト</span>、短文＝プロンプトファースト</span></li>
+                        <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>短文処理なら<span class="keyword-tag accent">プロンプトファーストでもOK</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrows-left-right fa-lg" style="color: var(--color-accent);"></i>
+                            長い資料を渡す時は<br>必ず「資料→指示」の順番<br>これを徹底しよう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カard9 -->
+            <div class="card">
+                <div class="card-badge">9</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-mug-hot fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ プロンプトの「鮮度」問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i><span>プロンプトが末尾にあるほど<span class="keyword-tag">「鮮度」が高く</span>AIに強く伝わる</span></li>
+                        <li><i class="fa-solid fa-snowflake fa-lg" aria-hidden="true"></i><span>中間に埋もれると<span class="keyword-tag accent">指示の効果が薄れ</span>、AIに伝わらない</span></li>
+                        <li><i class="fa-solid fa-gem fa-lg" aria-hidden="true"></i><span>末尾配置は<span class="highlight">「熱い指示」をAIに届ける</span>方法と理解できる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-mug-hot fa-lg" style="color: #C62828;"></i>
+                            指示も「鮮度」が大事<br>古い指示＝冷めたコーヒー<br>最後が一番熱い！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション4: Ollamaの構造 ===== -->
+        <div class="layer-label"><i class="fa-solid fa-server"></i> Ollamaの構造と注意点</div>
+
+        <div class="card-grid">
+
+            <!-- カード10 -->
+            <div class="card">
+                <div class="card-badge">10</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-server fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ OllamaのModelfile構造</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i><span>派生モデル作成時の<span class="keyword-tag">ModelfileのSYSTEM命令が最上流に強制配置</span></span></li>
+                        <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>Ollama特有の構造: <span class="keyword-tag accent">SYSTEM（最上位固定）→ Context → Prompt</span></span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>これにより<span class="highlight">プロンプトがミドルロストしやすい環境</span>になる</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-server fa-lg" style="color: var(--color-1);"></i>
+                            Ollamaはシステムプロンプトが<br>必ず最初に来る仕組み<br>だからコンテキストファーストが<br>さらに重要に！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11 -->
+            <div class="card">
+                <div class="card-badge">11</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ ChatGPT / Gemini / Ollama の比較</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-message fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ChatGPT型</span>: System Prompt → Context → User Input</span></li>
+                        <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">Gemini型</span>: 独自の配置ルールを採用</span></li>
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">Ollama</span>: Modelfile SYSTEM（固定）→ Context → Prompt</span></li>
+                        <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>各プラットフォームの<span class="highlight">構造の違いを理解した上で</span>プロンプトを設計する必要がある</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-code-compare fa-lg" style="color: var(--color-accent);"></i>
+                            プラットフォームごとに<br>プロンプトの置き場所を<br>調整するのがプロのやり方！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12 -->
+            <div class="card">
+                <div class="card-badge">12</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-desktop fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ LOCAL NOVAチャットアプリ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-display fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">AI共創ローカルNOVA</span>はOllama専用の自作チャットUI</span></li>
+                        <li><i class="fa-solid fa-toggle-on fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">コンテキストファースト／プロンプトファースト</span>の切替機能を搭載</span></li>
+                        <li><i class="fa-solid fa-list-ol fa-lg" aria-hidden="true"></i><span>処理順序: システムプロンプト → メモリ → 文脈 → ユーザー入力</span></li>
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">エージェントモード</span>と<span class="keyword-tag orange">ワークフローモード</span>も搭載</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-desktop fa-lg" style="color: #C62828;"></i>
+                            自作アプリで<br>コンテキストファーストを<br>デフォルトで組み込んでる<br>これすごくない！？
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション5: 実演と検証 ===== -->
+        <div class="layer-label"><i class="fa-solid fa-flask"></i> Gemma4 e4bでの実演と検証結果</div>
+
+        <div class="card-grid">
+
+            <!-- カード13 -->
+            <div class="card">
+                <div class="card-badge">13</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flask fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ Gemma4 e4bでのA/B比較実演</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-play fa-lg" aria-hidden="true"></i><span>Gemma4 e4bをOllamaで起動し、<span class="keyword-tag">長文コンテキストで要約処理</span>を実行</span></li>
+                        <li><i class="fa-solid fa-check-double fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">コンテキストファースト</span>: [長いテキスト] → 「要約して」＝ 高精度な要約</span></li>
+                        <li><i class="fa-solid fa-circle-xmark fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">プロンプトファースト</span>: 「要約して」→ [長いテキスト] ＝ 具体性に欠ける結果</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-flask fa-lg" style="color: var(--color-1);"></i>
+                            実際にやってみると<br>結果の差が歴然<br>びっくりするレベルで違う！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード14 -->
+            <div class="card">
+                <div class="card-badge">14</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-ranking-star fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ スコア検証: ChatGPTによる評価</h2>
+                </div>
+                <div class="card-content">
+                    <div class="highlight-box">
+                        <div class="score-display">
+                            <span style="font-size:14px; color:#555;">コンテキストファースト</span>
+                            <div class="score-big">87点</div>
+                        </div>
+                    </div>
+                    <div style="background: #F5F5F5; border-radius: 12px; padding: 10px 15px; margin: 8px 0; text-align: center;">
+                        <span style="font-size:14px; color:#555;">プロンプトファースト</span>
+                        <div style="font-size: 36px; font-weight: bold; color: #999;">83点</div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span><span class="highlight">4点の差</span>でコンテキストファーストが勝利</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-ranking-star fa-lg" style="color: var(--color-accent);"></i>
+                            ChatGPTに評価させても<br>コンテキストファーストが<br>確実に勝つ結果に！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15 -->
+            <div class="card">
+                <div class="card-badge">15</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-star-half-stroke fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ Geminiによる評価と勝つ理由</h2>
+                </div>
+                <div class="card-content">
+                    <div class="highlight-box">
+                        <div class="score-display">
+                            <span style="font-size:14px; color:#555;">コンテキストファースト（Gemini評価）</span>
+                            <div class="score-big">9.5点</div>
+                        </div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">原文への忠実度が高い</span></span></li>
+                        <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">具体的な情報の保持率が良い</span></span></li>
+                        <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">要約の粒度が適切</span></span></li>
+                        <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span><span class="highlight">脱線や幻覚が少ない</span></span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star-half-stroke fa-lg" style="color: var(--color-1);"></i>
+                            Geminiは圧倒的に高評価<br>もうコンテキストファースト<br>以外の選択肢はないよね！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ===== セクション6: メモリーとまとめ ===== -->
+        <div class="layer-label"><i class="fa-solid fa-layer-group"></i> 多層メモリー構造とまとめ</div>
+
+        <div class="card-grid">
+
+            <!-- カード16 -->
+            <div class="card">
+                <div class="card-badge">16</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 多層メモリ構造で精度を最大化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">システムプロンプト</span>: 最上位に固定。AIの人格と基本ルール</span></li>
+                        <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">セッションプロンプト</span>: 会話の文脈を保持</span></li>
+                        <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag orange">カスタムプロンプト</span>: ユーザー固有の設定を反映</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>この<span class="highlight">3層を適切に配置</span>することで複雑なタスクにも対応</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-layer-group fa-lg" style="color: var(--color-accent);"></i>
+                            レイヤーを重ねるほど<br>AIの理解度が深くなる<br>ケーキみたいな層構造！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17 -->
+            <div class="card">
+                <div class="card-badge">17</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ Gemma4の思考表示と応用例</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>Gemma4には<span class="keyword-tag">思考プロセスを表示する機能</span>がある</span></li>
+                        <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>多層処理によって<span class="keyword-tag accent">推論の品質を向上</span>させることが可能</span></li>
+                        <li><i class="fa-solid fa-cat fa-lg" aria-hidden="true"></i><span>猫語・名前・好みなど<span class="keyword-tag orange">複数メモリー統合</span>の実例も紹介</span></li>
+                        <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i><span>各層に<span class="highlight">適切な役割を振る</span>ことで長文処理でも精度を維持</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-brain fa-lg" style="color: #C62828;"></i>
+                            AIが「どう考えたか」を<br>見れるのって面白いよね<br>デバッグにも使えるし！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18 -->
+            <div class="card">
+                <div class="card-badge">18</div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ: コンテキストファーストの真髄</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>AIのアテンションの偏りを<span class="keyword-tag">科学的に理解</span>する</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span><span class="keyword-tag accent">Lost in the Middle</span>現象を逆手に取るプロンプト設計</span></li>
+                        <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>SLMの<span class="keyword-tag orange">最後優位性を活用</span>した配置戦略</span></li>
+                        <li><i class="fa-solid fa-trophy fa-lg" aria-hidden="true"></i><span><span class="highlight">完全ローカル環境でも大規模モデルに匹敵する精度</span>を実現</span></li>
+                        <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>著書: <span class="keyword-tag">『かんたんプロンプト』</span>（芸術新聞社）</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--color-1);"></i>
+                            「資料を先に、指示を最後に」<br>たったこれだけでローカルAIが<br>次元レベルで強くなる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- フッター -->
+        <footer class="footer">
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=Jad4FEzYH8k" target="_blank" style="color: inherit;">AI共創イノベーション（ワンダー・佐藤源彦）</a> | 📅 2026年5月14日 | 実践モデル: Gemma4 e4b</p>
+        </footer>
+
+    </div>
+</body>
+</html>

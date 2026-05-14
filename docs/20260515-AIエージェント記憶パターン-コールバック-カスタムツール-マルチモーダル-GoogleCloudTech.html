@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIエージェントの記憶を実装する3つの高度なパターン</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #1565C0;
+            --ui-color-2: #E65100;
+            --ui-color-3: #E3F2FD;
+            --ui-color-4: #0A1929;
+            --ui-color-5: #C62828;
+            --bg-canvas: #FFF8F5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--ui-color-1), #0D47A1, #1976D2);
+            border-radius: 25px;
+            margin-bottom: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+            margin-top: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* グリッドレイアウト */
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* カードスタイル */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        /* カード内アイコン */
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: #333;
+            margin-top: 10px;
+        }
+
+        /* カードコンテンツ */
+        .card-content {
+            padding: 0 10px 10px;
+        }
+
+        /* キーワードリスト */
+        .keyword-list {
+            margin: 10px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* キーワードタグ */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-right: 3px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.orange {
+            background-color: #FFF3E0;
+            color: #E65100;
+        }
+
+        .keyword-tag.red {
+            background-color: #FFEBEE;
+            color: #C62828;
+        }
+
+        .keyword-tag.green {
+            background-color: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .keyword-tag.purple {
+            background-color: #F3E5F5;
+            color: #6A1B9A;
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* コードプレビュー */
+        pre {
+            background: #263238;
+            color: #A5D6FF;
+            padding: 12px;
+            border-radius: 10px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Courier New', monospace;
+            line-height: 1.5;
+        }
+
+        pre .comment { color: #546E7A; }
+        pre .keyword { color: #FF79C6; }
+        pre .string { color: #50FA7B; }
+        pre .func { color: #8BE9FD; }
+        pre .var { color: #FFB86C; }
+
+        /* アニメーション */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.9);
+            animation: fadeInScale 0.6s forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.1s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.2s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.3s; }
+        .section-card:nth-child(7) { animation-delay: 0.35s; }
+        .section-card:nth-child(8) { animation-delay: 0.4s; }
+        .section-card:nth-child(9) { animation-delay: 0.45s; }
+        .section-card:nth-child(10) { animation-delay: 0.5s; }
+        .section-card:nth-child(11) { animation-delay: 0.55s; }
+        .section-card:nth-child(12) { animation-delay: 0.6s; }
+        .section-card:nth-child(13) { animation-delay: 0.65s; }
+        .section-card:nth-child(14) { animation-delay: 0.7s; }
+        .section-card:nth-child(15) { animation-delay: 0.75s; }
+        .section-card:nth-child(16) { animation-delay: 0.8s; }
+        .section-card:nth-child(17) { animation-delay: 0.85s; }
+        .section-card:nth-child(18) { animation-delay: 0.9s; }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, #FFF176 60%);
+            font-weight: bold;
+        }
+
+        .card-number {
+            display: inline-block;
+            background: var(--ui-color-1);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+
+        /* 矢印つなぎ */
+        .arrow-connector {
+            text-align: center;
+            color: var(--ui-color-1);
+            font-size: 24px;
+            margin: 5px 0;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            padding: 30px;
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .grid { flex-direction: column; align-items: center; }
+            .section-card { width: 100%; min-width: auto; max-width: 100%; }
+            .header h1 { font-size: 24px; }
+        }
+
+        /* 比較テーブル */
+        .compare-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+        .compare-row .label {
+            font-weight: bold;
+            min-width: 70px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="header-icon"><i class="fa-solid fa-brain fa-beat-fade"></i></div>
+            <h1>AIエージェントの記憶を実装する<br>3つの高度なパターン</h1>
+            <p class="subtitle">Google Cloud Tech × Agent Development Kit | コールバック・カスタムツール・マルチモーダルメモリ</p>
+            <p class="date"><i class="fa-regular fa-calendar"></i> 2026年5月15日</p>
+        </header>
+
+        <!-- カードグリッド -->
+        <div class="grid">
+
+            <!-- カード1: ゴールドフィッシュ問題 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fish fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">①</span>ゴールドフィッシュ問題とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                            <span>AIエージェントが<span class="highlight">2分前の会話も忘れてしまう</span>問題のことを「ゴールドフィッシュ問題」と呼ぶ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-slash" aria-hidden="true"></i>
+                            <span>多くの開発者が<span class="keyword-tag">モデル</span>と<span class="keyword-tag">ツール</span>ばかりに注目して、<span class="keyword-tag orange">記憶</span>を忘れがち</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                            <span>ユーザーを感動させるアプリを作るには、<span class="highlight">「完全な脳」を使うエージェント</span>が必要</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-quote-left" style="color: var(--ui-color-2);"></i>
+                            モデルの賢さだけでは不十分。記憶があってこそ、エージェントは本当に役に立つ存在になるんだよ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2: 6つの記憶パターン全体像 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: #0D47A1; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">②</span>エージェント記憶の6つのパターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1" style="color: #1976D2;" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">基本</span> セッションステート（会話中の一時記憶）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2" style="color: #1976D2;" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">基本</span> マルチエージェントステート（エージェント間の共有記憶）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3" style="color: #1976D2;" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">基本</span> 永続的メモリ（長期保存の記憶）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-4" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">高度</span> コールバック（自動で記憶を更新）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-5" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">高度</span> カスタムツール（構造化データの読み書き）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-6" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">高度</span> マルチモーダルメモリ（画像・音声・動画の記憶）</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-up" style="color: var(--ui-color-2);"></i>
+                            前回の動画で基本3つ、今回は<span class="keyword-tag orange">高度な3つ</span>を解説！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3: 基本パターン復習 セッションステート -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments fa-5x" style="color: #1976D2; animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">③</span>基本の復習: セッションステート</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">会話中</span>だけ有効な一時的な記憶</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span>エージェントが会話の<span class="highlight">コンテキストを保持</span>する仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug-circle-xmark" aria-hidden="true"></i>
+                            <span>セッションが終了すると<span class="keyword-tag red">リセット</span>される</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info" style="color: var(--ui-color-1);"></i>
+                            ブラウザのタブを閉じると消えるデータと同じイメージだよ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード4: マルチエージェントステート -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-arrows fa-5x" style="color: #1976D2; animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">④</span>基本の復習: マルチエージェントステート</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-share-nodes" aria-hidden="true"></i>
+                            <span>複数のエージェント間で<span class="highlight">状態を共有</span>する仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake" aria-hidden="true"></i>
+                            <span>あるエージェントが学んだことを<span class="keyword-tag">別のエージェント</span>が利用可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+                            <span>チームワークのような<span class="keyword-tag green">協調動作</span>を実現</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-users" style="color: var(--ui-color-5);"></i>
+                            エージェントAが調べたことをエージェントBが引き継ぐイメージ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード5: 永続的メモリ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hard-drive fa-5x" style="color: #1976D2; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑤</span>基本の復習: 永続的メモリ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                            <span>セッションをまたいで<span class="highlight">データを長期保存</span>する仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span>アプリを再起動しても<span class="keyword-tag green">記憶が残る</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-server" aria-hidden="true"></i>
+                            <span>データベースやファイルシステムに<span class="keyword-tag">永続化</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb" style="color: var(--ui-color-2);"></i>
+                            基本パターンは前回の動画で詳しく解説済み。今回はここからが本番！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6: 高度パターン① コールバックとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑥</span>高度パターン①: コールバックとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-user-secret" aria-hidden="true"></i>
+                            <span>会話に基づいて<span class="highlight">自動的に記憶を更新</span>する仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-binoculars" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">スパイ</span>のように会話を見守り、メモを取るイメージ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gears" aria-hidden="true"></i>
+                            <span>エージェント自身を<span class="keyword-tag">複雑にせずに</span>コンテキストを保存できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-pen-fancy" style="color: var(--ui-color-2);"></i>
+                            専属のアシスタントが常にノートを取りながら話を聞いてくれるようなもの！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード7: コールバックの仕組み -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑦</span>コールバックの仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>エージェント実行の<span class="keyword-tag orange">前後</span>にカスタムロジックを追加可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i>
+                            <span>モデル呼び出しの<span class="keyword-tag orange">前後</span>で処理を挟める</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                            <span>ツール呼び出しの<span class="keyword-tag orange">前後</span>でも処理可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span>コールバックが<span class="highlight">エージェントのライフサイクル</span>を横取りする形で動作</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-diagram-project" style="color: var(--ui-color-1);"></i>
+                            「before_model_callback」「after_tool_callback」など、フックポイントが複数あるよ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード8: コールバック実装例 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-map-location-dot fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑧</span>コールバック実装例: 旅行プランニング</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-museum" aria-hidden="true"></i>
+                            <span>ユーザーが「美術館」をリクエスト → アクティビティタイプを<span class="keyword-tag">Cultural</span>に記録</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+                            <span>レストランをリクエスト → タイプを<span class="keyword-tag green">Food</span>に記録</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tree" aria-hidden="true"></i>
+                            <span>公園をリクエスト → タイプを<span class="keyword-tag purple">Outdoor</span>に記録</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                            <span>連続して同じタイプの場合、<span class="highlight">別の種類を提案</span>して重複を防ぐ</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb" style="color: var(--ui-color-2);"></i>
+                            「美術館」の後にまた「美術館」を提案しないように、自動で制御できるんだ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード9: コールバックのコード解説 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: #455A64; animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑨</span>コールバックのコード解説</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-function" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">after_tool_callback</span>でツール実行後に処理を追加</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+                            <span>呼び出されたツールに応じて<span class="highlight">アクティビティタイプを自動設定</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            <span>タイプを<span class="keyword-tag">ツールコンテキスト</span>に書き込む</span>
+                        </li>
+                    </ul>
+<pre>
+<span class="comment">// after_tool_callback のイメージ</span>
+<span class="keyword">if</span> tool == <span class="string">"museum_expert"</span>:
+    activity_type = <span class="string">"cultural"</span>
+<span class="keyword">elif</span> tool == <span class="string">"restaurant_finder"</span>:
+    activity_type = <span class="string">"food"</span>
+
+<span class="comment">// プランナーの指示で前回のタイプを確認</span>
+<span class="keyword">if</span> last_activity == <span class="string">"cultural"</span>:
+    <span class="func">ban_tool</span>(<span class="string">"museum_expert"</span>)</pre>
+                </div>
+            </div>
+
+            <!-- カード10: 高度パターン② カスタムツールとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-screwdriver-wrench fa-5x" style="color: var(--ui-color-2); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑩</span>高度パターン②: カスタムツールとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-up-right-dots" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">非構造化テキスト</span>から<span class="keyword-tag orange">構造化データ</span>への進化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-address-card" aria-hidden="true"></i>
+                            <span>チャットログではなく、<span class="highlight">ユーザープロファイル</span>に保存</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-leaf" aria-hidden="true"></i>
+                            <span>例: 「ヴィーガンです」と言ったら → 食事の好みフィールドを<span class="keyword-tag green">自動更新</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exchange-alt" style="color: var(--ui-color-5);"></i>
+                            膨大なチャットログから探すより、プロフィール欄を見た方が速いよね！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11: 非構造化から構造化へ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-table fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑪</span>非構造化から構造化データへの進化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-xmark" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                            <span><span class="keyword-tag red">Before</span> 全てがテキストのチャットログに埋もれている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" style="color: #2E7D32;" aria-hidden="true"></i>
+                            <span><span class="keyword-tag green">After</span> ユーザー属性をフィールドとして整理して保存</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span>エージェントが<span class="highlight">必要な情報に瞬時にアクセス</span>可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span>辞書オブジェクトとして保存し、<span class="keyword-tag">データベース</span>に書き込む</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right" style="color: var(--ui-color-2);"></i>
+                            「ヴィーガン」という発言 → <span class="keyword-tag">dietary_preference: "vegan"</span> として保存
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12: カスタムツールのユーザー体験 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-utensils fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑫</span>カスタムツールのユーザー体験例</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                            <span>初回: 「夕食を計画して」→ 好みを知らないので<span class="keyword-tag">質問される</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                            <span>ユーザー: 「ヴィーガンです」→ <span class="highlight">プロファイルに自動保存</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                            <span>スクリプトを再起動</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-4" style="color: #2E7D32;" aria-hidden="true"></i>
+                            <span>再回: 「夕食を計画して」→ <span class="keyword-tag green">もう質問なし</span>でヴィーガンレストランを提案</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-smile" style="color: var(--ui-color-1);"></i>
+                            一度伝えれば、次からは自動で覚えていてくれる。これが構造化データの力！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード13: カスタムツールの実装 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: #455A64; animation: fa-shake 2.5s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑬</span>カスタムツールの実装: 2つのツール</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">save_user_preference</span>: ユーザーの好みをデータベースに保存</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">recall_user_preferences</span>: 保存済みの好みを読み出し</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-ol" aria-hidden="true"></i>
+                            <span>エージェントの指示に<span class="highlight">必ず最初に recall を呼ぶ</span>と設定</span>
+                        </li>
+                    </ul>
+<pre>
+<span class="comment">// ツールの定義</span>
+<span class="var">save_user_preference</span>({
+    preferences: {
+        <span class="string">"dietary"</span>: <span class="string">"vegan"</span>,
+        <span class="string">"budget"</span>: <span class="string">"moderate"</span>
+    }
+})
+
+<span class="comment">// recall は保存されたレコードを読み出すだけ</span>
+<span class="var">prefs</span> = <span class="func">recall_user_preferences</span>()</pre>
+                </div>
+            </div>
+
+            <!-- カード14: マルチモーダルメモリとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-photo-film fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑭</span>高度パターン③: マルチモーダルメモリとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-image" aria-hidden="true"></i>
+                            <span>これまでの記憶は<span class="keyword-tag red">テキストだけ</span>だった</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-camera" aria-hidden="true"></i>
+                            <span>人間は写真の<span class="highlight">雰囲気</span>や声の<span class="highlight">トーン</span>も覚えている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-video" aria-hidden="true"></i>
+                            <span>優れたエージェントは<span class="keyword-tag purple">写真・動画・音声</span>も記憶すべき</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span>異なるメディアタイプを<span class="keyword-tag green">横断的に接続</span>する能力</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles" style="color: var(--ui-color-5);"></i>
+                            テキストだけじゃなく、写真や音声の「感覚」も記憶するのが次世代のエージェント！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15: マルチモーダルメモリの体験 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑮</span>マルチモーダルメモリの体験例</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-upload" aria-hidden="true"></i>
+                            <span>旅行アシスタントに<span class="keyword-tag">写真</span>・<span class="keyword-tag">動画</span>・<span class="keyword-tag">音声</span>をアップロード</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
+                            <span>「共有したメディアに基づいて、どこに旅行すべき？」と質問</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span>エージェントが<span class="highlight">異なるメディアを横断して好みを推測</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-route" aria-hidden="true"></i>
+                            <span>過去の体験と結びつけて<span class="keyword-tag green">最適な旅行先</span>を提案</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-link" style="color: var(--ui-color-2);"></i>
+                            写真の雰囲気＋動画の風景＋音声の好み = すべてを総合して提案するよ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード16: マルチモーダルメモリの実装 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="color: #455A64; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑯</span>マルチモーダルメモリの実装</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-piggy-bank" aria-hidden="true"></i>
+                            <span>写真・動画・音声を含むセッションを<span class="keyword-tag purple">メモリバンク</span>に保存</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-download" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">preload_memory</span>ツールでメモリバンクから会話へ読み込み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-nodes" aria-hidden="true"></i>
+                            <span>Vertex AI Agent Engineの<span class="highlight">Memory Bank</span>を活用</span>
+                        </li>
+                    </ul>
+<pre>
+<span class="comment">// メモリバンクにセッションを保存</span>
+<span class="func">memory_bank.save</span>({
+    session_id: <span class="string">"travel_001"</span>,
+    media: [<span class="string">photo</span>, <span class="string">video</span>, <span class="string">audio</span>]
+})
+
+<span class="comment">// エージェントがメモリをプリロード</span>
+<span class="func">preload_memory</span>(session_id=<span class="string">"travel_001"</span>)</pre>
+                </div>
+            </div>
+
+            <!-- カード17: 3つのパターンの振り返り -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-check fa-5x" style="color: #2E7D32; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑰</span>3つの高度パターンの振り返り</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">コールバック</span>: エージェントを複雑にせずに、<span class="highlight">自動で記憶を更新</span>する仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">カスタムツール</span>: ユーザープロファイルなどの<span class="highlight">構造化データ</span>を読み書き</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-photo-film" aria-hidden="true"></i>
+                            <span><span class="keyword-tag orange">マルチモーダル</span>: 写真・動画・音声を含む<span class="highlight">豊かな記憶</span>を実現</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star" style="color: var(--ui-color-1);"></i>
+                            この3つを組み合わせれば、ユーザーを感動させるエージェントが作れる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18: Vertex AI Agent Engine -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 1.5s infinite;" aria-hidden="true"></i>
+                    <h2><span class="card-number">⑱</span>Vertex AI Agent Engine Memory Bank</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+                            <span>Google Cloudの<span class="keyword-tag">Vertex AI</span>上で動作するエージェント基盤</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-cubes" aria-hidden="true"></i>
+                            <span><span class="keyword-tag purple">Agent Development Kit</span>を使って簡単に実装</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                            <span>Colabノートブックが提供されており、<span class="highlight">すぐに試せる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-link" aria-hidden="true"></i>
+                            <span><span class="keyword-tag green">Memory Bank</span>で6つのパターンをすべてサポート</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-flask" style="color: var(--ui-color-2);"></i>
+                            動画の説明欄にColabリンクがあるから、自分でコードを動かしてみよう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- フッター -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=9ebzuW5PMW4" target="_blank">Your AI agent still has no memory? Fix it with these 3 patterns - Google Cloud Tech</a></p>
+            <p style="margin-top: 8px;">📅 2026年5月15日 | 📺 Google Cloud Tech | 🎤 Annie Wang &amp; Martin Omander</p>
+            <p style="margin-top: 5px; font-size: 12px; color: #999;">🛠️ Agent Development Kit | Vertex AI Agent Engine Memory Bank</p>
+        </footer>
+    </div>
+</body>
+</html>

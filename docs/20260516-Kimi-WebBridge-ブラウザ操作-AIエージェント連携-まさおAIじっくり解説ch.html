@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kimi WebBridge - AIエージェントからブラウザを操作する拡張機能</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+:root {
+    --ui-color-1: #1B6C8C;
+    --ui-color-2: #BF8136;
+    --ui-color-3: #F2E8E4;
+    --ui-color-4: #260101;
+    --ui-color-5: #BF5656;
+    --bg-canvas: #FFF8F5;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background-color: var(--bg-canvas);
+    font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    padding: 40px 20px;
+    margin-bottom: 30px;
+    background: linear-gradient(135deg, #1B6C8C 0%, #2A8FB5 40%, #BF8136 100%);
+    border-radius: 25px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+}
+
+.header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+    animation: headerGlow 6s ease-in-out infinite;
+}
+
+@keyframes headerGlow {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(5%, 5%); }
+}
+
+.header h1 {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.header .header-icon {
+    font-size: 80px;
+    margin-bottom: 15px;
+    position: relative;
+    z-index: 1;
+    animation: fa-bounce 2s ease-in-out infinite;
+}
+
+.header .date {
+    font-size: 14px;
+    color: rgba(255,255,255,0.85);
+    position: relative;
+    z-index: 1;
+}
+
+/* 4 Column Layout */
+.section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+}
+
+/* Card */
+.section-card {
+    flex: 1;
+    min-width: 220px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+}
+
+/* Mega Icon */
+.mega-icon-container {
+    text-align: center;
+    margin: 15px 0;
+}
+
+.mega-icon-container h2 {
+    font-size: 20px;
+    color: #555;
+    margin-top: 10px;
+    line-height: 1.4;
+}
+
+/* Card Content */
+.card-content {
+    padding: 0 10px 15px;
+}
+
+/* Keyword List */
+.keyword-list {
+    margin: 15px 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+.keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 16px;
+    margin-top: 4px;
+}
+
+/* Keyword Tag */
+.keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.keyword-tag.blue {
+    background-color: #D6E8F7;
+    color: var(--ui-color-1);
+}
+
+.keyword-tag.amber {
+    background-color: #FFF3D6;
+    color: #8B6914;
+}
+
+.keyword-tag.red {
+    background-color: #FFE9E9;
+    color: var(--ui-color-5);
+}
+
+.keyword-tag.green {
+    background-color: #E0F5E0;
+    color: #2D7A2D;
+}
+
+/* Speech Bubble */
+.speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+}
+
+.speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+    border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+    background: #FFE9E9;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+    border-color: var(--ui-color-5) transparent;
+}
+
+/* Handwritten */
+.handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* Code Preview */
+pre {
+    background: #f5f5f5;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 10px;
+    overflow-x: auto;
+    border-left: 4px solid var(--ui-color-1);
+    font-family: 'Courier New', monospace;
+}
+
+code {
+    font-family: 'Courier New', monospace;
+}
+
+/* Animations */
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+.fade-in-scale {
+    animation: fadeInScale 0.6s ease-out forwards;
+}
+
+/* Stagger delays */
+.section-card:nth-child(1) { animation-delay: 0.05s; }
+.section-card:nth-child(2) { animation-delay: 0.1s; }
+.section-card:nth-child(3) { animation-delay: 0.15s; }
+.section-card:nth-child(4) { animation-delay: 0.2s; }
+.section-card:nth-child(5) { animation-delay: 0.25s; }
+.section-card:nth-child(6) { animation-delay: 0.3s; }
+.section-card:nth-child(7) { animation-delay: 0.35s; }
+.section-card:nth-child(8) { animation-delay: 0.4s; }
+.section-card:nth-child(9) { animation-delay: 0.45s; }
+.section-card:nth-child(10) { animation-delay: 0.5s; }
+.section-card:nth-child(11) { animation-delay: 0.55s; }
+.section-card:nth-child(12) { animation-delay: 0.6s; }
+.section-card:nth-child(13) { animation-delay: 0.65s; }
+.section-card:nth-child(14) { animation-delay: 0.7s; }
+.section-card:nth-child(15) { animation-delay: 0.75s; }
+.section-card:nth-child(16) { animation-delay: 0.8s; }
+.section-card:nth-child(17) { animation-delay: 0.85s; }
+.section-card:nth-child(18) { animation-delay: 0.9s; }
+
+/* Arrow Connector */
+.arrow-connector {
+    text-align: center;
+    color: var(--ui-color-1);
+    font-size: 24px;
+    margin: 5px 0;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 30px 20px;
+    margin-top: 30px;
+    background: linear-gradient(135deg, #1B6C8C, #2A8FB5);
+    border-radius: 20px;
+    color: #fff;
+    font-size: 15px;
+}
+
+footer a {
+    color: #fff;
+    text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 1600px) {
+    .section-card { min-width: 280px; }
+}
+@media (max-width: 1200px) {
+    .section-card { min-width: 320px; }
+}
+@media (max-width: 900px) {
+    .section-card { min-width: 380px; }
+}
+@media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; }
+    .header h1 { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- Header -->
+<div class="header">
+    <div class="header-icon">
+        <i class="fa-solid fa-globe" aria-hidden="true"></i>
+    </div>
+    <h1>Kimi WebBridge - AIエージェントからいつものブラウザを操作</h1>
+    <p class="date"><i class="fa-solid fa-calendar"></i> 2026年5月16日 | Moonshot AI 提供</p>
+</div>
+
+<!-- Cards -->
+<div class="section-layout">
+
+<!-- Card 1 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① Kimi WebBridgeとは</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Moonshot AI</span>が提供するChrome拡張機能</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-link" aria-hidden="true"></i>
+                <span>AIエージェントとブラウザを橋渡しする<span class="keyword-tag">ブリッジ</span>として機能</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-desktop" aria-hidden="true"></i>
+                <span>普段使っているブラウザ（Braveなど）をそのまま操作可能</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                <span>新しくブラウザを立ち上げる必要がなく、<span class="keyword-tag amber">既存の環境</span>を活用できる</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            エージェントからブラウザを操作できるようにする、<br>それがKimi WebBridgeの役割です！
+        </span>
+    </div>
+</div>
+
+<!-- Card 2 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② 対応するAIエージェント一覧</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Claude Code</span> - AnthropicのCLIツール</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Hermes</span> - 汎用AIエージェント</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Codex</span> - OpenAIのコーディングエージェント</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Cursor</span> - AI搭載エディタ</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Kimi Code</span> - Moonshot AIのコードツール</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+            様々なAIエージェントから<br>統一的にブラウザを操作できるのが強みです
+        </span>
+    </div>
+</div>
+
+<!-- Card 3 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-download fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ セットアップ手順（Chrome拡張）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-1" aria-hidden="true"></i>
+                <span><span class="keyword-tag">kimi.com/features/webbridge</span>にアクセス</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-2" aria-hidden="true"></i>
+                <span>「拡張機能」ボタンを押してChromeに追加</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-3" aria-hidden="true"></i>
+                <span>ブラウザにWebBridgeのプラグインが表示される</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                <span>BraveなどのChromium系ブラウザでも<span class="keyword-tag amber">動作可能</span></span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-clock fa-lg" style="color: var(--ui-color-1);"></i>
+            Chrome拡張のインストールは<br>クリック1回で完了します！
+        </span>
+    </div>
+</div>
+
+<!-- Card 4 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ セットアップ手順（コマンド実行）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                <span>「Connect WebBridge to your Agent」をクリック</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-copy" aria-hidden="true"></i>
+                <span>表示されたコマンドをコピー</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
+                <span>ターミナルに貼り付けてEnterで実行</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                <span>スキルがグローバル領域に自動インストールされる</span>
+            </li>
+        </ul>
+        <pre><code># セットアップのコマンド例
+# 拡張機能のConnectボタンからコピー
+# ターミナルに貼り付けてEnter
+$ &lt;copied-command&gt;
+# → スキルが自動インストール</code></pre>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+            コマンド1行叩くだけで<br>スキルがバッと入ります！
+        </span>
+    </div>
+</div>
+
+<!-- Card 5 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-newspaper fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ 実際の使用例 - Hacker Newsを開く</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-slash" aria-hidden="true"></i>
+                <span>Claude Codeで<span class="keyword-tag blue">/webbridge</span>を実行</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-comment" aria-hidden="true"></i>
+                <span>「ハッカーズニュース開いて」と指示を入力</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-gear fa-spin" aria-hidden="true"></i>
+                <span>WebBridgeが裏側で確認しながら自動操作</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-window-restore" aria-hidden="true"></i>
+                <span>ブラウザが自動的に<span class="keyword-tag amber">Hacker Newsを開く</span></span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--ui-color-1);"></i>
+            自然言語で指示するだけで<br>ブラウザが勝手に動いてくれる！
+        </span>
+    </div>
+</div>
+
+<!-- Card 6 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-key fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ ログイン認証を使えるのが強み</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-user-check" aria-hidden="true"></i>
+                <span>普段使っているブラウザの<span class="keyword-tag">ログイン状態</span>をそのまま活用</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-cookie-bite" aria-hidden="true"></i>
+                <span>Cookieやセッション情報が引き継がれる</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                <span>新しいブラウザを立ち上げてログインし直す必要がない</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-star" aria-hidden="true"></i>
+                <span>この機能が<span class="keyword-tag amber">最大のメリット</span>と解説者が評価</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+            Playwrightなどは新規ブラウザ起動なので<br>ログイン情報が引き継がれないんです
+        </span>
+    </div>
+</div>
+
+<!-- Card 7 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ 裏側の仕組み（アーキテクチャ）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                <span>3層構造で動作：<span class="keyword-tag blue">AIエージェント</span>→<span class="keyword-tag">デーモン</span>→<span class="keyword-tag amber">Chrome拡張</span></span>
+            </li>
+            <li>
+                <i class="fa-solid fa-server" aria-hidden="true"></i>
+                <span>デーモンがローカルで常駐してリクエストを中継</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                <span>デーモンとChrome拡張がインタラクション</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                <span>結果としてブラウザ操作が実行される</span>
+            </li>
+        </ul>
+        <pre><code>AIエージェント
+    ↓ HTTP POST
+デーモン（ローカル常駐）
+    ↓ インタラクション
+Chrome拡張
+    ↓ 操作
+ブラウザ（Brave等）</code></pre>
+    </div>
+</div>
+
+<!-- Card 8 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-paper-plane fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ HTTP POSTリクエストの仕組み</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-code" aria-hidden="true"></i>
+                <span>AIエージェントがデーモンに対して<span class="keyword-tag">HTTP POST</span>でリクエストを送信</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                <span>開発者ツールでリクエストのやり取りを確認可能</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                <span>デーモンがリクエストを受け取り、Chrome拡張に命令を渡す</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                <span>Chrome拡張が実際のブラウザ操作を実行</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-2);"></i>
+            HTTPリクエストの流れを<br>開発者ツールで覗けます！
+        </span>
+    </div>
+</div>
+
+<!-- Card 9 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ Playwrightや他ツールとの比較</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-mask-theater" aria-hidden="true"></i>
+                <span><span class="keyword-tag">Playwright</span>は新規ブラウザを起動する方式</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-times-circle" aria-hidden="true"></i>
+                <span>Playwrightは<span class="keyword-tag red">ログイン状態が引き継がれない</span></span>
+            </li>
+            <li>
+                <i class="fa-solid fa-check-circle" aria-hidden="true"></i>
+                <span>WebBridgeは<span class="keyword-tag green">既存のブラウザを借用</span>する方式</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                <span>動作確認だけならPlaywrightでも十分。ログインが必要な場合はWebBridgeが有利</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble right">
+        <span class="handwritten">
+            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-1);"></i>
+            用途に応じて使い分けるのが<br>一番の正解みたいです
+        </span>
+    </div>
+</div>
+
+<!-- Card 10 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-chrome fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ Claude in Chrome / Codex in Chromeとの違い</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Claude in Chrome</span>はClaude専用のブラウザ統合機能</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                <span><span class="keyword-tag blue">Codex in Chrome</span>はCodex専用の同様の機能</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-star" aria-hidden="true"></i>
+                <span>WebBridgeは<span class="keyword-tag amber">複数エージェントに対応</span>する統一的なアプローチ</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                <span>スキルとして配布されるため、自作エージェントにも組み込みやすい</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-arrows-rotate fa-lg" style="color: var(--ui-color-2);"></i>
+            専用機能ではなく、<br>どんなエージェントでも使えるのがポイント！
+        </span>
+    </div>
+</div>
+
+<!-- Card 11 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-box-open fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ スキル配布の仕組みと利点</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-gift" aria-hidden="true"></i>
+                <span>WebBridgeは<span class="keyword-tag amber">スキル形式</span>で配布される</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                <span>コマンド1行でグローバル領域にインストール</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-recycle" aria-hidden="true"></i>
+                <span>自作エージェントでも<span class="keyword-tag green">使い回しが可能</span></span>
+            </li>
+            <li>
+                <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                <span>Playwright MCPやCLIより圧倒的に導入が簡単</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble top">
+        <span class="handwritten">
+            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+            スキルで配布されると<br>めっちゃ簡単に使えていいなと！
+        </span>
+    </div>
+</div>
+
+<!-- Card 12 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ タブグループの自動作成</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-folder-plus" aria-hidden="true"></i>
+                <span>リクエストに応じて<span class="keyword-tag blue">新しいタブグループ</span>を自動作成</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-object-group" aria-hidden="true"></i>
+                <span>タブグループ内で次々とブラウザ操作を実行</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                <span>複数のタスクを整理して管理できる</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i>
+                <span>ただし<span class="keyword-tag red">できない操作もある</span>ので注意が必要</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+            できることとできないことを<br>把握しておくのが大事です
+        </span>
+    </div>
+</div>
+
+<!-- Card 13 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-hammer fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ 自作エージェントへの応用</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                <span>汎用AIエージェントを自作する際の<span class="keyword-tag amber">ブラウザツール</span>として活用</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-server" aria-hidden="true"></i>
+                <span>CodexのサブエージェントやHermesのようなツールを自作する場合に有効</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+                <span>「ブラウザツールどうする？」という課題に<span class="keyword-tag green">WebBridgeが回答</span>になる</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                <span>スキルとして配布されているため、自作エージェントに組み込みやすい</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            自作エージェントのブラウザ問題を<br>これで解決できるかも！
+        </span>
+    </div>
+</div>
+
+<!-- Card 14 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-feather fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ 導入の圧倒的な簡単さ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-1" aria-hidden="true"></i>
+                <span>Chrome拡張をインストール（ワンクリック）</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-2" aria-hidden="true"></i>
+                <span>Connect ボタンからコマンドをコピー</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-3" aria-hidden="true"></i>
+                <span>ターミナルでコマンドを実行（Enter連打で進むだけ）</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                <span><span class="keyword-tag green">たったこれだけで完了</span>、追加の設定はほぼ不要</span>
+            </li>
+        </ul>
+        <pre><code># 導入に必要なステップ
+1. Chrome拡張を追加
+2. Connect → コマンドをコピー
+3. ターミナルで実行 → 完了！</code></pre>
+    </div>
+</div>
+
+<!-- Card 15 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ 使用上の注意点</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-ban" aria-hidden="true"></i>
+                <span><span class="keyword-tag red">すべての操作が可能ではない</span>点に注意</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-file-contract" aria-hidden="true"></i>
+                <span>ログインサイトの活用は<span class="keyword-tag amber">利用規約の範囲内</span>で行うこと</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                <span>一部のサイトではエラーが出る可能性がある</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                <span>Describedが多くなる傾向がある（整理しながら使うことを推奨）</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+            利用規約を守って<br>安全に活用しましょう！
+        </span>
+    </div>
+</div>
+
+<!-- Card 16 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-briefcase fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ 実務での活用シーン</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-building" aria-hidden="true"></i>
+                <span>特定のサイトにログインして<span class="keyword-tag">情報を収集・整理</span></span>
+            </li>
+            <li>
+                <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                <span>ログインが必要なダッシュボードや管理画面の自動操作</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+                <span>日頃の業務で繰り返す<span class="keyword-tag amber">ブラウザ作業の自動化</span></span>
+            </li>
+            <li>
+                <i class="fa-solid fa-vial" aria-hidden="true"></i>
+                <span>動作確認やテストの自動化にも活用できる</span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            ログインが必要なサイトの<br>自動化に最も威力を発揮します！
+        </span>
+    </div>
+</div>
+
+<!-- Card 17 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microscope fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ 作りが良いと感じたポイント</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-thumbs-up" aria-hidden="true"></i>
+                <span>導入が<span class="keyword-tag green">極めてシンプル</span>（コマンド1行）</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-users" aria-hidden="true"></i>
+                <span>複数のAIエージェントから利用可能（ロックインなし）</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-recycle" aria-hidden="true"></i>
+                <span>既存のブラウザ環境をそのまま活用できる設計</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-cubes" aria-hidden="true"></i>
+                <span>自作エージェントにも<span class="keyword-tag amber">スキルとして組み込みやすい</span></span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-5);"></i>
+            Moonshot AI（Kimi）の<br>作りの良さが光るツールです
+        </span>
+    </div>
+</div>
+
+<!-- Card 18 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ まとめ - Kimi WebBridgeの評価</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li>
+                <i class="fa-solid fa-star" aria-hidden="true"></i>
+                <span>AIエージェントからブラウザ操作を可能にする<span class="keyword-tag">革新的な拡張機能</span></span>
+            </li>
+            <li>
+                <i class="fa-solid fa-key" aria-hidden="true"></i>
+                <span><span class="keyword-tag amber">ログイン状態の引き継ぎ</span>が最大の差別化ポイント</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                <span>導入はコマンド1行で完結する圧倒的な手軽さ</span>
+            </li>
+            <li>
+                <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                <span>自作エージェントの構築にも応用可能で、<span class="keyword-tag green">将来性も高い</span></span>
+            </li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+            とりあえず1回使ってみて！<br>その使いやすさに驚くはずです
+        </span>
+    </div>
+</div>
+
+</div><!-- end section-layout -->
+
+<!-- Footer -->
+<footer>
+    🎬 動画: <a href="https://youtu.be/6v-gzUGOZKg" target="_blank">まさおAIじっくり解説ch</a> | 📅 2026年5月15日公開<br>
+    🔗 公式: <a href="https://www.kimi.com/features/webbridge" target="_blank">kimi.com/features/webbridge</a>
+</footer>
+
+</div><!-- end container -->
+</body>
+</html>

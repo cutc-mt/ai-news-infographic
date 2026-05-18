@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Codex × Ollama SLM 推論ブースト 〜論理プレ出力の威力〜</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+:root {
+  --ui-color-1: #1B6C8C;
+  --ui-color-2: #BF8136;
+  --ui-color-3: #F2E8E4;
+  --ui-color-4: #260101;
+  --ui-color-5: #BF5656;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #FFF8F5;
+  font-family: 'Kaisei Decol', serif;
+  color: #333;
+}
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+header {
+  text-align: center;
+  padding: 40px 20px;
+  margin-bottom: 30px;
+  background: linear-gradient(135deg, var(--ui-color-1), #2A8DAD);
+  border-radius: 25px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+header::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+}
+header .header-icon { font-size: 5rem; margin-bottom: 15px; animation: fa-beat-fade 2s infinite; }
+header h1 { font-size: 2.2rem; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+header .subtitle { font-size: 1.1rem; opacity: 0.9; }
+header .date { font-size: 0.9rem; opacity: 0.7; margin-top: 8px; }
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+.section-card {
+  flex: 1;
+  min-width: 280px;
+  max-width: 450px;
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+}
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+.mega-icon-container h2 {
+  font-size: 1.3rem;
+  color: #555;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+.card-content { padding: 0 5px 15px; }
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+.keyword-list li {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 18px;
+  margin-top: 4px;
+}
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 12px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+.speech-bubble.variant-1 {
+  background: #FFF9E3;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+.speech-bubble.variant-2 {
+  background: #FFE9E9;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: #333;
+}
+pre {
+  background: #f5f5f5;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  margin-top: 10px;
+  overflow-x: auto;
+  border-left: 4px solid var(--ui-color-1);
+}
+.highlight-box {
+  background: linear-gradient(135deg, rgba(27,108,140,0.08), rgba(191,129,54,0.08));
+  border-radius: 12px;
+  padding: 12px;
+  margin: 10px 0;
+  border-left: 4px solid var(--ui-color-2);
+}
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+.fade-in-scale {
+  animation: fadeInScale 0.6s ease-out forwards;
+  opacity: 0;
+}
+footer {
+  text-align: center;
+  padding: 30px;
+  margin-top: 40px;
+  background: linear-gradient(135deg, var(--ui-color-4), #3A0505);
+  border-radius: 20px;
+  color: var(--ui-color-3);
+  font-size: 0.95rem;
+}
+footer a { color: #8DD; text-decoration: none; }
+footer a:hover { text-decoration: underline; }
+@media (max-width: 1600px) { .section-card { min-width: 300px; } }
+@media (max-width: 1200px) { .section-card { min-width: 340px; } }
+@media (max-width: 900px) { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .grid { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="header-icon"><i class="fa-solid fa-brain"></i></div>
+  <h1>Codex × Ollama 〜 小規模言語モデルに推論を実装 〜</h1>
+  <p class="subtitle">二段階プレ出力システムでSLMを超ブーストする画期的アプローチ</p>
+  <p class="date"><i class="fa-regular fa-calendar"></i> 2026年5月18日</p>
+</header>
+
+<div class="grid">
+
+<!-- Card 1 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.05s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-rocket fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite"></i>
+    <h2>① プロジェクトの目的：ローカルSLMに推論を実装</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-info"></i><span><span class="keyword-tag">Codex</span>（コーディングAI）を使って、<span class="keyword-tag">Ollama</span>のローカル小規模言語モデルに推論能力を実装する試み。</span></li>
+      <li><i class="fa-solid fa-lightbulb"></i><span>現在のリーズニングモデル（o1など）のような高度な思考プロセスを、小規模言語モデルでも再現できるかが最大の見どころ。</span></li>
+      <li><i class="fa-solid fa-shield-alt"></i><span>ローカルモデルは<span class="keyword-tag">ノイズが少なく安全性が高い</span>が、複雑なタスクが苦手という弱点がある。</span></li>
+      <li><i class="fa-solid fa-gear"></i><span>アプリケーション側で推論を強化し、大規模言語モデルに匹敵する深みのある出力を目指す。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten">
+        <i class="fa-solid fa-star fa-lg" style="color:var(--ui-color-2)"></i>
+        小さいモデルでも工夫次第で深い回答が出せるようになる！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 2 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.1s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-link-slash fa-5x" style="color:var(--ui-color-5);animation:fa-beat-fade 2s infinite"></i>
+    <h2>② 小規模言語モデルの弱点とCoT不足問題</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>小規模言語モデル（<span class="keyword-tag">SLM</span>）は軽量で安全だが、<span class="keyword-tag">CoT（思考の連鎖）</span>が組み込まれていない。</span></li>
+      <li><i class="fa-solid fa-brain"></i><span>現在の大規模モデルには内部的に<span class="keyword-tag">リーズニング機能</span>が組み込まれているが、SLMにはそれがない。</span></li>
+      <li><i class="fa-solid fa-puzzle-piece"></i><span>自己回帰モデルは「次の単語を予測する」仕組みのため、<span class="keyword-tag">段階的な推論が苦手</span>。</span></li>
+      <li><i class="fa-solid fa-list-ol"></i><span>複雑なタスクをこなせなかったり、深い回答が出なかったりするのが大きな課題。</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <span class="handwritten">
+        <i class="fa-solid fa-circle-exclamation fa-lg" style="color:var(--ui-color-5)"></i>
+        一気にまとめて答えを出してしまうため、分解する力がないのが弱点
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 3 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.15s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-font fa-5x" style="color:var(--ui-color-2);animation:fa-flip 3s infinite"></i>
+    <h2>③ 文字カウント問題で見るSLMの限界</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-question-circle"></i><span>「<span class="keyword-tag">スターゲートプロジェクト</span>」の中に<span class="keyword-tag">T</span>はいくつある？正解は<span class="keyword-tag">3つ</span>。</span></li>
+      <li><i class="fa-solid fa-xmark"></i><span>SLMは「1つ」や「2つ」と間違えて回答。自己回帰モデルの典型的な弱点。</span></li>
+      <li><i class="fa-solid fa-code"></i><span>対策として、Pythonを使って文字を分解してカウントする方法も紹介。</span></li>
+      <li><i class="fa-solid fa-check-circle"></i><span>プレ出力（事前思考）を使うと、タスクを分解してから考えるため正解に到達できる。</span></li>
+    </ul>
+    <div class="highlight-box">
+      <i class="fa-solid fa-lightbulb" style="color:var(--ui-color-2)"></i>
+      <strong>トークン境界に依存する処理ミス</strong>を防ぐには、事前にタスクを分解させるのが効果的。
+    </div>
+  </div>
+</div>
+
+<!-- Card 4 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.2s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-layer-group fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2.5s infinite"></i>
+    <h2>④ 二段階プレ出力推論システムの仕組み</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-arrow-up"></i><span><span class="keyword-tag">第1段階：プレ出力</span>（事前思考）— AIに論理プロセスを構築させる。</span></li>
+      <li><i class="fa-solid fa-arrow-down"></i><span><span class="keyword-tag">第2段階：メイン出力</span>（本番出力）— プレ出力の結果をもとに最終回答を生成。</span></li>
+      <li><i class="fa-solid fa-rotate"></i><span>エージェントループの技術を応用し、役割の異なるプロンプトを自動で連続投入。</span></li>
+      <li><i class="fa-solid fa-eye-slash"></i><span>プレ出力のプロンプトはユーザーには見えず、最終結果のみが表示される。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten">
+        <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color:var(--ui-color-2)"></i>
+        AI自身に思考プロセスを強制させる環境を構築！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 5 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.25s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-microchip fa-5x" style="color:#555;animation:fa-beat-fade 2s infinite"></i>
+    <h2>⑤ O1型推論をSLM上で再現する発想</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-history"></i><span>2024年9月、<span class="keyword-tag">OpenAI</span>が<span class="keyword-tag">o1モデル</span>を発表。4o（自己回帰）とo1（推論）の二本立て。</span></li>
+      <li><i class="fa-solid fa-recycle"></i><span>このo1のような推論機能を、ローカルの小規模言語モデルで再現しようという発想。</span></li>
+      <li><i class="fa-solid fa-arrows-rotate"></i><span>内部的には「事前プレ出力 → メイン出力」の二段構え。</span></li>
+      <li><i class="fa-solid fa-scale-balanced"></i><span>大規模モデルと同等の推論能力を、軽量なローカル環境で実現することを目指す。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten">
+        <i class="fa-solid fa-bolt fa-lg" style="color:var(--ui-color-2)"></i>
+        小規模言語モデルをo1のようにしていくというイメージ！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 6 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.3s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-arrows-spin fa-5x" style="color:var(--ui-color-1);animation:fa-spin 4s linear infinite"></i>
+    <h2>⑥ エージェントループによる自己改善・反復推論</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-repeat"></i><span><span class="keyword-tag">AI共創Local Nova</span>では、最大<span class="keyword-tag">9999回</span>までエージェントループが可能。</span></li>
+      <li><i class="fa-solid fa-comments"></i><span>「前回の出力をフィードバックして改善・ブラッシュアップ」を自動で繰り返す仕組み。</span></li>
+      <li><i class="fa-solid fa-chart-line"></i><span>ループを重ねるごとに、出力の深みと精度が向上していく。</span></li>
+      <li><i class="fa-solid fa-sliders"></i><span>ループ回数は3回・4回・5回と自由に調整可能。</span></li>
+    </ul>
+    <pre>
+# エージェントループの流れ
+1. ユーザー入力 → AI出力
+2. フィードバック自動投入
+3. ブラッシュアップ出力
+4. 2-3を指定回数分繰り返し
+→ 最終的な深みのある回答</pre>
+  </div>
+</div>
+
+<!-- Card 7 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.35s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color:var(--ui-color-2);animation:fa-bounce 2s infinite"></i>
+    <h2>⑦ 論理プレ出力モード：深掘り型推論</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-diagram-project"></i><span>タスクの方向性が<span class="keyword-tag">明確な場合</span>に使用するモード。</span></li>
+      <li><i class="fa-solid fa-sitemap"></i><span>単純なCoT（ステップバイステップ）ではなく、まず<span class="keyword-tag">タスク自体を細かく分解</span>する。</span></li>
+      <li><i class="fa-solid fa-arrow-down-long"></i><span>分解した要素から論理的に深掘りを行い、精緻な回答を構築していく。</span></li>
+      <li><i class="fa-solid fa-gear"></i><span>プロンプトは設定画面から書き換え可能で、自分好みの思考プロセスを設計できる。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten">
+        <i class="fa-solid fa-search fa-lg" style="color:var(--ui-color-2)"></i>
+        1つのテーマを徹底的に深掘りしていくのが論理モード！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 8 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.4s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-network-wired fa-5x" style="color:var(--ui-color-1);animation:fa-beat-fade 2s infinite"></i>
+    <h2>⑧ 探索プレ出力モード：仮説生成型推論</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-lightbulb"></i><span>答えが導き出しにくい<span class="keyword-tag">難解なタスク</span>や創造的なアプローチが必要な場面で使用。</span></li>
+      <li><i class="fa-solid fa-table-cells"></i><span><span class="keyword-tag">Tree of Thoughts（ToT）</span>の概念を取り入れ、表形式で5つの仮説を並列出力。</span></li>
+      <li><i class="fa-solid fa-arrows-left-right"></i><span>直列思考に陥るのを防ぎ、<span class="keyword-tag">多角的に可能性を探索</span>してから最適な枝を深掘りする。</span></li>
+      <li><i class="fa-solid fa-ranking-star"></i><span>仮説を評価し、最適なものを選択して最終出力を生成する。</span></li>
+    </ul>
+    <div class="speech-bubble right">
+      <span class="handwritten">
+        <i class="fa-solid fa-star fa-lg" style="color:var(--ui-color-2)"></i>
+        いきなり深掘りせずに、まず広く探索してから絞り込む！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 9 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.45s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-code-branch fa-5x" style="color:var(--ui-color-5);animation:fa-flip 3s infinite"></i>
+    <h2>⑨ 論理と探索の使い分け戦略</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-check-circle"></i><span><span class="keyword-tag">論理プレ出力</span>は、タスクがすでに分かっている場合に有効。1つの方向を深く追求。</span></li>
+      <li><i class="fa-solid fa-compass"></i><span><span class="keyword-tag">探索プレ出力</span>は、未知のタスクに最適。広く仮説を立ててから方向を決める。</span></li>
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>未知タスクで論理モードを使うと、最初の方向が間違っていた場合に<span class="keyword-tag">間違ったまま深掘り</span>してしまう危険がある。</span></li>
+      <li><i class="fa-solid fa-arrow-right"></i><span><span class="keyword-tag">おすすめの流れ</span>：探索 → 当たりを見つける → 論理で深掘り。</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <span class="handwritten">
+        <i class="fa-solid fa-circle-exclamation fa-lg" style="color:var(--ui-color-5)"></i>
+        探索して当たりを見つけてから深掘りすると確率と精度が上がる！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 10 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.5s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-sitemap fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2.5s infinite"></i>
+    <h2>⑩ 並列思考で直列の罠を回避する仕組み</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-grip"></i><span>箇条書き形式で仮説を出させると<span class="keyword-tag">直列思考</span>になってしまう（上から順に出力される）。</span></li>
+      <li><i class="fa-solid fa-table"></i><span>対策として<span class="keyword-tag">表形式</span>で横並びに仮説を出力。各仮説が独立して生成される。</span></li>
+      <li><i class="fa-solid fa-ban"></i><span>いきなり1つの答えを出さず、まず<span class="keyword-tag">仮説のタイトルだけを並列</span>で出力させる。</span></li>
+      <li><i class="fa-solid fa-code"></i><span>最初の仮説に引きずられず、真に多角的な探索が可能になる。</span></li>
+    </ul>
+    <div class="highlight-box">
+      <i class="fa-solid fa-lightbulb" style="color:var(--ui-color-2)"></i>
+      <strong>自己回帰モデル</strong>は最初の確率が最も高いものを選ぶため、直列だと1つの方向に偏ってしまう。並列表形式で多様性を確保する工夫が重要。
+    </div>
+  </div>
+</div>
+
+<!-- Card 11 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.55s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-desktop fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite"></i>
+    <h2>⑪ AI共創Local Novaとたぬきモデルの紹介</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-window-maximize"></i><span><span class="keyword-tag">AI共創Local Nova</span>は、Ollamaの出力を投映する専用アプリ。GitHubから無料ダウンロード可能。</span></li>
+      <li><i class="fa-solid fa-paw"></i><span><span class="keyword-tag">たぬきモデル</span>は松尾研が作成したフルスクラッチの日本語モデル。</span></li>
+      <li><i class="fa-solid fa-heart"></i><span>たぬきの特徴は<span class="keyword-tag">柔らかく共感的で温かみのある文章</span>が書けること。</span></li>
+      <li><i class="fa-solid fa-wifi"></i><span>完全ローカル動作。ネットを切っても動作するオフライン環境。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten">
+        <i class="fa-solid fa-download fa-lg" style="color:var(--ui-color-2)"></i>
+        GitHub: AICo-Creation/localnova からダウンロード！たぬきは名前も可愛いよね
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 12 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.6s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-scale-balanced fa-5x" style="color:var(--ui-color-5);animation:fa-flip 3s infinite"></i>
+    <h2>⑫ 通常出力と論理プレ出力の品質比較</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-file-lines"></i><span><span class="keyword-tag">通常出力</span>：「人生とは成長と変化の連続」というSF風の回答。速いが深みに欠ける。</span></li>
+      <li><i class="fa-solid fa-file-waveform"></i><span><span class="keyword-tag">論理プレ出力</span>：発達心理学的に「幼少期→思春期→成人期→退職後→終焉」とライフサイクルで構成。</span></li>
+      <li><i class="fa-solid fa-book"></i><span>論理出力では<span class="keyword-tag">エリクソンの発達段階</span>も引用されるなど、学術的な深みが出る。</span></li>
+      <li><i class="fa-solid fa-clock"></i><span>生成速度は推論モデルとほぼ同等。プレ出力のオーバーヘッドは最小限。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten">
+        <i class="fa-solid fa-arrow-trend-up fa-lg" style="color:var(--ui-color-2)"></i>
+        同じたぬきモデル・同じプロンプトでも、プレ出力の有無でここまで違う！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 13 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.65s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-feather-pointed fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite"></i>
+    <h2>⑬ たぬきモデルの日本語表現力の特徴</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-language"></i><span>日本語ネイティブで作られたモデルなので、<span class="keyword-tag">非常に自然な日本語</span>が出力される。</span></li>
+      <li><i class="fa-solid fa-pen-fancy"></i><span>「人生とは一言で言えば成長と変化の連続と言えるでしょう」のように丁寧で温かい文体。</span></li>
+      <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>共感的な文章を書きたい時に<span class="keyword-tag">たぬき + 論理プレ出力</span>の組み合わせが強力。</span></li>
+      <li><i class="fa-solid fa-robot"></i><span>温かみのある文章にロジックが加わることで、説得力と深みが両立する。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten">
+        <i class="fa-solid fa-star fa-lg" style="color:var(--ui-color-2)"></i>
+        たぬきの温かみ＋論理の深さ＝最強の組み合わせ！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 14 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.7s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-person-digging fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite"></i>
+    <h2>⑭ 「人生とは？」を論理モデルで深掘り</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-scissors"></i><span>論理プレ出力では「人生」を<span class="keyword-tag">タスク分解</span>してから思考を開始。</span></li>
+      <li><i class="fa-solid fa-baby"></i><span><span class="keyword-tag">幼少期</span>の経験 → <span class="keyword-tag">思春期</span>の葛藤 → <span class="keyword-tag">成人期</span>の責任 → と段階的に深掘り。</span></li>
+      <li><i class="fa-solid fa-eye"></i><span>通常出力にはない「<span class="keyword-tag">意識と自己意識</span>」「瞑想や内省」といった深い概念が登場。</span></li>
+      <li><i class="fa-solid fa-flag-checkered"></i><span>最後に全要素を統合した<span class="keyword-tag">結論</span>で締めくくる構造的な文章。</span></li>
+    </ul>
+    <div class="speech-bubble right">
+      <span class="handwritten">
+        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2)"></i>
+        行けば行くほど深いテキストが出てくる！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 15 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.75s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-compass fa-5x" style="color:var(--ui-color-1);animation:fa-spin 6s linear infinite"></i>
+    <h2>⑮ 「人生とは？」を探索モデルで多角的分析</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-table"></i><span>5つの仮説を並列生成：①個人的成長と変化 ②人間関係の複雑さ ③ストレス管理 ④自己実現と幸福感 ⑤時間の有限性。</span></li>
+      <li><i class="fa-solid fa-ranking-star"></i><span>評価の結果、<span class="keyword-tag">仮説①と④を総合</span>した回答を選択。</span></li>
+      <li><i class="fa-solid fa-layer-group"></i><span>さらに<span class="keyword-tag">マズロー</span>の自己実現欲求や、時間の有限性も採用され多角的な文章に。</span></li>
+      <li><i class="fa-solid fa-code-merge"></i><span>複数の仮説を掛け合わせることで、単一方向では出ない深みのある文章が生成される。</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <span class="handwritten">
+        <i class="fa-solid fa-star fa-lg" style="color:var(--ui-color-5)"></i>
+        自己回帰モデルなら仮説1だけだが、探索モデルは複数を組み合わせる！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 16 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.8s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-book-open fa-5x" style="color:var(--ui-color-5);animation:fa-bounce 2.5s infinite"></i>
+    <h2>⑯ 推論モデルではなく論理モデルと呼ぶ理由</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-exchange-alt"></i><span>本来、<span class="keyword-tag">自己回帰モデル</span>の方が「次の言葉を予測する」という意味で推論的。</span></li>
+      <li><i class="fa-solid fa-list-check"></i><span>CoTを組み込んだリーズニングモデルは、タスクを<span class="keyword-tag">分解して論理的に構築</span>するもの。</span></li>
+      <li><i class="fa-solid fa-language"></i><span>「Reasoning」の訳語として「推論」を使うのは<span class="keyword-tag">概念のずれ</span>が生じると指摘。</span></li>
+      <li><i class="fa-solid fa-tag"></i><span>本来の言葉の意味に即すると、<span class="keyword-tag">論理モデル</span>という呼称が適切だと主張。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten">
+        <i class="fa-solid fa-pen fa-lg" style="color:var(--ui-color-1)"></i>
+        「他力本願」や「お客様は神様」と同じように、言葉の意味がどんどんずれていく…
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 17 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.85s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-drafting-compass fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite"></i>
+    <h2>⑰ 概念設計と表記揺れがAI長文生成に与える影響</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-bug"></i><span>表記揺れ（同じ概念を異なる言葉で表すこと）は、AIエージェントを走らせると<span class="keyword-tag">コンシステンシーが崩れる</span>原因になる。</span></li>
+      <li><i class="fa-solid fa-book"></i><span>1冊の本を書くような長時間タスクでは、定義がずれていくと<span class="keyword-tag">矛盾が蓄積</span>していく。</span></li>
+      <li><i class="fa-solid fa-wrench"></i><span><span class="keyword-tag">概念エンジニアリング</span>：純粋出力で定義を確定させ、表記揺れを防ぐ考え方。</span></li>
+      <li><i class="fa-solid fa-check-double"></i><span>概念設計ができないと、長文生成やエージェントループでの品質が安定しない。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten">
+        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color:var(--ui-color-2)"></i>
+        定義をしっかり確定していくことが、AIを使う上でも大事！
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- Card 18 -->
+<div class="section-card fade-in-scale" style="animation-delay:0.9s">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-earth-asia fa-5x" style="color:var(--ui-color-1);animation:fa-flip 3s infinite"></i>
+    <h2>⑱ 推論の民主化とローカルモデルの未来</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-bolt"></i><span>今後、大規模言語モデルが<span class="keyword-tag">高価なもの</span>になる可能性がある。推論には膨大な電力と計算リソースが必要。</span></li>
+      <li><i class="fa-solid fa-users"></i><span>一般庶民が使えなくなったり、<span class="keyword-tag">モデルの格差</span>が拡大する懸念がある。</span></li>
+      <li><i class="fa-solid fa-laptop-code"></i><span>ローカルモデルで推論を実装できれば、<span class="keyword-tag">誰もが無料で高度なAI</span>を利用可能に。</span></li>
+      <li><i class="fa-solid fa-handshake"></i><span>推論の民主化、論理思考と探索思考の<span class="keyword-tag">普及</span>が、このプロジェクトの大きな意義。</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <span class="handwritten">
+        <i class="fa-solid fa-heart fa-lg" style="color:var(--ui-color-5)"></i>
+        小さいモデルでも工夫すれば、皆が高度な推論を使えるようになる！
+      </span>
+    </div>
+  </div>
+</div>
+
+</div><!-- end grid -->
+
+<footer>
+  <p>🎬 動画: <a href="https://youtu.be/JOkIf8A6P40" target="_blank">AI共創イノベーション（ワンダー・佐藤源彦）</a> | 📅 2026年5月18日</p>
+  <p style="margin-top:8px;font-size:0.85rem;opacity:0.7">Codex × Ollama SLM 〜 小規模言語モデルに推論を実装 〜 論理プレ出力の威力</p>
+</footer>
+
+</div><!-- end container -->
+</body>
+</html>

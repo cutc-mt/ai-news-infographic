@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Codeの仕組みをやさしく解説</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #0F766E;
+            --ui-color-2: #D97706;
+            --ui-color-3: #F0FDFA;
+            --ui-color-4: #134E4A;
+            --ui-color-5: #F43F5E;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #FFF8F5;
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-4));
+            border-radius: 24px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerPulse 8s ease-in-out infinite;
+        }
+
+        @keyframes headerPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .header-icon {
+            font-size: 5rem;
+            margin-bottom: 15px;
+            display: inline-block;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+            font-family: 'Kaisei Decol', serif;
+        }
+
+        .header .date {
+            font-size: 16px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .subtitle {
+            font-size: 18px;
+            margin-top: 10px;
+            opacity: 0.85;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* セクションレイアウト */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            text-align: center;
+            font-size: 28px;
+            color: var(--ui-color-4);
+            margin: 40px 0 20px;
+            font-family: 'Kaisei Decol', serif;
+            position: relative;
+            padding-bottom: 10px;
+        }
+
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--ui-color-2), transparent);
+        }
+
+        /* カードスタイル */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        /* カード内アイコンコンテナ */
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+            font-family: 'Kaisei Decol', serif;
+            line-height: 1.4;
+        }
+
+        /* カードコンテンツ */
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* キーワードリスト */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* キーワードタグ */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.accent {
+            background-color: #FEF3C7;
+            color: #92400E;
+        }
+
+        .keyword-tag.danger {
+            background-color: #FFE4E6;
+            color: #9F1239;
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        /* 手書き文字 */
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* コードプレビュー */
+        pre {
+            background: #1E293B;
+            color: #E2E8F0;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            line-height: 1.5;
+        }
+
+        code {
+            font-family: 'Fira Code', 'Courier New', monospace;
+        }
+
+        .code-label {
+            font-size: 12px;
+            color: var(--ui-color-2);
+            font-weight: bold;
+            margin-top: 10px;
+            display: block;
+        }
+
+        /* フェードインアニメーション */
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* 矢印コネクタ */
+        .flow-arrow {
+            text-align: center;
+            font-size: 24px;
+            color: var(--ui-color-2);
+            padding: 10px 0;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            padding: 30px;
+            color: #777;
+            font-size: 14px;
+            border-top: 2px solid #eee;
+            margin-top: 40px;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+
+        /* ハイライト */
+        .highlight {
+            color: var(--ui-color-1);
+            font-weight: bold;
+        }
+
+        .highlight-accent {
+            color: var(--ui-color-2);
+            font-weight: bold;
+        }
+
+        .highlight-danger {
+            color: var(--ui-color-5);
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <header class="header">
+            <div class="header-icon">
+                <i class="fas fa-terminal" aria-hidden="true"></i>
+            </div>
+            <h1>Claude Codeの仕組みをやさしく解説</h1>
+            <p class="subtitle">AIエージェントの動作原理からコンテキスト管理まで</p>
+            <p class="date"><i class="far fa-calendar-alt"></i> 2026年5月18日</p>
+        </header>
+
+        <!-- ===== セクション1: 大枠の仕組み ===== -->
+        <h2 class="section-title"><i class="fas fa-cogs"></i> 第1部：Claude Codeの大枠の仕組み</h2>
+
+        <div class="section-layout">
+            <!-- カード1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rotate fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>①根本の仕組みはシンプル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span>Claude Codeは<span class="keyword-tag">PC内のプログラム</span>として動いている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>AnthropicのサーバーにいるAIに<span class="highlight">プロンプトを送ってテキストを受け取る</span>を繰り返すだけ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span>ユーザーのプロンプトに様々な要素をくっつけて組み立てる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                            <span>仕事が終わったと判断するまで<span class="highlight">送信→受信→操作→追加</span>を延々と繰り返す</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            複雑な仕事をこなすけど、<br>動き自体は<span class="keyword-tag accent">超シンプル</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-satellite-dish fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>②プロンプトのやり取りサイクル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">人間</span>がAIに実現したいことをプロンプトとして送る</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2" aria-hidden="true"></i>
+                            <span>Claude Codeがプロンプトに様々な要素を付加して組み立てる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">API</span>を通じてAnthropicサーバーに送信</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-4" aria-hidden="true"></i>
+                            <span>サーバーからAIの結果テキストが返ってくる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-5" aria-hidden="true"></i>
+                            <span>プログラムがPC内のファイルを<span class="highlight">読み書き・操作</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-6" aria-hidden="true"></i>
+                            <span>操作結果をプロンプトに追加して<span class="highlight">再送信</span></span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード3 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-desktop fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ブラウザ版Claudeとの違い</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span>本質的には<span class="keyword-tag">プロンプト送受信の繰り返し</span>は同じ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                            <span>最大の違いは<span class="highlight">動ける環境の広さ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                            <span>Claude Code → <span class="keyword-tag">PCのファイルシステム</span>にアクセス可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                            <span>ブラウザ版 → PCのファイルをいじる権限がない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span>GoogleカレンダーやSlackなども「環境」になり得る</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            「環境」＝ AIが情報を読み取ったり<br>働きかけたりする対象のこと
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード4 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>④Claude Codeを構成する2つの要素</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-handshake" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">環境とのやり取り</span> → どのように操作しているか</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">思考の中身</span> → プロンプトに何が含まれ、どう変化するか</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>この2つを解剖すれば<span class="highlight">全体像が見えてくる</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-map fa-lg" style="color: var(--ui-color-1);"></i>
+                            CodexやCursorなど<br>他のAIエージェントも<br>ほぼ同じ仕組み！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== セクション2: 環境とツール ===== -->
+        <h2 class="section-title"><i class="fas fa-wrench"></i> 第2部：環境とのやり取り（ツール）</h2>
+
+        <div class="section-layout">
+            <!-- カード5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-font fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤AIはテキストしか生成できない</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>大事な前提：AIができるのは<span class="highlight-danger">テキストを生成することだけ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-question" aria-hidden="true"></i>
+                            <span>テキストだけでどうやってファイル編集や各種操作を？</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span>それを実現するのが<span class="keyword-tag accent">ツール</span>という仕組み</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            テキストだけど実は<br>いろんな操作ができる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ツールとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>ツール＝<span class="keyword-tag accent">AIが呼び出せる、あらかじめ用意された処理の塊</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                            <span>プログラムが「こんなツールが使えますよ」とAIに教える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-code" aria-hidden="true"></i>
+                            <span>使いたい時は<span class="highlight">指定フォーマット通りにテキストを書く</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-play" aria-hidden="true"></i>
+                            <span>プログラムがそのテキストを解釈して<span class="highlight">実際の処理を実行</span></span>
+                        </li>
+                    </ul>
+                    <span class="code-label">ツール呼び出しの概念</span>
+                    <pre><code>// AIが出力するテキスト
+{ "tool": "web_search",
+  "query": "Claude Code 最新情報" }
+
+// ↓ プログラムが解釈して実行
+→ Web検索が実行される</code></pre>
+                </div>
+            </div>
+
+            <!-- カード7 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-pen fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑦基本ツール：Read・Write</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Read</span> → ファイルの中身を読み込む</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Write</span> → ファイルを新規作成、または中身を丸ごと書き換え</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span>Claude Codeの操作の大半は<span class="highlight">基本ファイルツール + Bash</span>で成り立っている</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            ファイルの読み書きが<br>Claude Codeの基本動作！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧万能ツール：Bash</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span><span class="keyword-tag accent">Bash</span>＝パソコンに文字で命令を出す仕組み（黒い画面）</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-infinity" aria-hidden="true"></i>
+                            <span>ファイル編集、情報取得、動画編集など<span class="highlight">ほぼあらゆる操作</span>が可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                            <span>決まったコマンドを入力するだけで実行できる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-crown" aria-hidden="true"></i>
+                            <span>ツールの中でも<span class="highlight-accent">特に汎用性が高い</span>存在</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            Bashがあれば<br>たいていのことはできる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== セクション3: 機能としてのツール ===== -->
+        <h2 class="section-title"><i class="fas fa-puzzle-piece"></i> 第3部：機能もすべてツールで動いている</h2>
+
+        <div class="section-layout">
+            <!-- カード9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨質問機能：AskUserQuestion</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+                            <span>Claude Codeを使っていると<span class="highlight">「どうしたらいいですか？」</span>と質問してくる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                            <span>これは<span class="keyword-tag">AskUserQuestion</span>というツールが呼び出されている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                            <span>すべてのユーザーとのやり取りもツールで実現</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード10 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-list fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑩プランモード：EnterPlanMode</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-map" aria-hidden="true"></i>
+                            <span><span class="keyword-tag accent">Plan Mode</span>＝事前に綿密な計画を立ててから実装に取りかかる機能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>ユーザーが計画を<span class="highlight">レビュー</span>した後に実装開始</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">EnterPlanMode</span>ツールが呼び出されることで動作</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-1);"></i>
+                            安全に実装を進めるための<br>大切な機能！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-list fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪すべての機能がツールとして定義されている</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-user-secret" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">サブエージェント</span> → タスクの一部を別のAIに委任</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scroll" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">スキル</span> → AI向けの業務マニュアル</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">検索</span> → コードベースやWebの検索</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>公式ツール一覧で<span class="highlight">すべての機能がツールとして定義</span>されていることを確認できる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-cubes fa-lg" style="color: var(--ui-color-2);"></i>
+                            Claude Code ≒<br>ツールの集合体！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-up-right-and-down-left-from-center fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ツールの拡張方法</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            <span>ユーザーが直接ツールを追加することは<span class="highlight-danger">できない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+                            <span><span class="keyword-tag accent">Bash活用</span> → コマンドをAIに教えるだけで拡張可能</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scroll" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">スキル</span> → 実行するコードをマニュアルに書けばOK</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag accent">MCP</span> → ツール呼び出しフォーマットの統一規格</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            Bashとスキルは汎用性が<br>めちゃくちゃ高い！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== セクション4: コンテキスト ===== -->
+        <h2 class="section-title"><i class="fas fa-brain"></i> 第4部：AIの頭の中身とコンテキスト</h2>
+
+        <div class="section-layout">
+            <!-- カード13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-upload fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬セッション開始時に読み込む情報</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-book" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">システムプロンプト</span> → より良く動くための指示</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-memory" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">メモリー</span> → 過去セッションで学んだこと</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-ul" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">スキルリスト</span> → 使えるスキル（業務マニュアル）の一覧</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                            <span><span class="keyword-tag accent">CLAUDE.md</span> → プロジェクトのルールや説明</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            仕事を始める前から<br>結構な量が読み込まれている！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-balloons fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭プロンプトの膨張問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                            <span>ユーザーのプロンプトが全体のプロンプトに追加される</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-folder-plus" aria-hidden="true"></i>
+                            <span>AIがファイルを読み込むたびに<span class="highlight">内容がコンテキストに追加</span>される</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-up-right-dots" aria-hidden="true"></i>
+                            <span>いろんなファイルを読むと<span class="highlight-danger">あっという間に膨れ上がる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-face-tired" aria-hidden="true"></i>
+                            <span>これが<span class="highlight-danger">ずっと働いていると調子が悪くなる原因</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            <code>/context</code>コマンドで<br>今のコンテキストの中身を<br>確認できるよ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-window-maximize fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮コンテキストウィンドウと制限</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-ruler" aria-hidden="true"></i>
+                            <span><span class="keyword-tag accent">コンテキストウィンドウ</span>＝AIに渡せる最大テキスト長</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+                            <span>Claude Opus 4.7だと<span class="highlight">100万トークン（約200万文字）</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>上限を超えていなくても<span class="highlight-danger">関係ない情報が多いと性能が低下</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                            <span>この現象は<span class="keyword-tag danger">コンテキストロスト</span>と呼ばれている</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bell fa-lg" style="color: var(--ui-color-2);"></i>
+                            状況に応じた情報の取捨選択が<br>AIの力を引き出すカギ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-compress fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯コンパクション機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-scissors" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Compaction</span>＝長くなりすぎた会話ログを丸ごと要約</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span>要約で重要情報が抜け落ちる<span class="highlight-danger">可能性もある</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check" aria-hidden="true"></i>
+                            <span>しかしパフォーマンス低下や上限超過を<span class="highlight">防ぐために重要</span></span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-1);"></i>
+                            情報の損失と<br>パフォーマンスのバランス！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye-dropper fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰スキルの段階的開示</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                            <span>最初はスキルの<span class="keyword-tag accent">名前と説明文だけ</span>が読み込まれる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>「今の仕事に使えそう」とAIが判断した時だけ<span class="highlight">全文が読み込まれる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span>スキルを100個作っても<span class="highlight">一気に全部は読み込まれない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>能力を拡張しつつ<span class="highlight-accent">コンテキストも圧迫しない</span>仕組み</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+                            必要な時だけ読み込むから<br>効率的！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-arrows fa-5x" style="color: var(--ui-color-4); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱サブエージェントの活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-people-group" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">サブエージェント</span>は<span class="highlight">独自のコンテキスト</span>を持っている</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                            <span>途中の作業ログはメインに伝えず、<span class="highlight-accent">最終成果だけを渡す</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-broom" aria-hidden="true"></i>
+                            <span>これにより<span class="highlight">メインのコンテキストを汚さずに</span>結果だけ得られる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                            <span>すべての機能が<span class="keyword-tag accent">コンテキスト効率化</span>という共通の問題に取り組んでいる</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                            各機能がいろんな角度から<br>コンテキスト問題にアプローチ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/qfDYg8q_D_Y" target="_blank" style="color: inherit;">AIでサボろうチャンネル「Claude Codeの仕組みをやさしく解説する動画」</a> | 📅 2026年5月18日
+        </footer>
+    </div>
+</body>
+</html>

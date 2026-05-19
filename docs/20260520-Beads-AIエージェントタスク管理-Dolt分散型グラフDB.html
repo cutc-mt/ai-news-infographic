@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEMORY.md卒業！AIエージェント専用タスク管理「Beads」徹底解説</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #0E7C61;
+            --color-2: #F0A500;
+            --color-3: #E8F5E9;
+            --color-4: #0A3D2E;
+            --color-5: #FF6B6B;
+        }
+
+        body {
+            font-family: 'Kaisei Decol', 'Noto Sans JP', sans-serif;
+            background: #FFFDF8;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, var(--color-1) 0%, #1ABC9C 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 4px 4px 15px rgba(14, 124, 97, 0.1);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid var(--color-3);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(14, 124, 97, 0.2);
+            border-color: var(--color-1);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: var(--color-4);
+            margin: 8px 0 0;
+        }
+
+        .keyword-list {
+            margin: 10px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-2);
+            min-width: 18px;
+            margin-top: 3px;
+        }
+
+        .keyword-tag {
+            background-color: var(--color-3);
+            color: var(--color-4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-right: 4px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(240, 165, 0, 0.3) 60%);
+            font-weight: bold;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 12px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -12px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -12px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 8px;
+            overflow-x: auto;
+            border-left: 4px solid var(--color-1);
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            max-width: 2000px;
+            margin: 0 auto;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        .float-anim {
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @media (max-width: 1200px) {
+            .section-layout { gap: 16px; }
+            .card { min-width: 320px; }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; align-items: center; }
+            .card { width: 95%; min-width: auto; max-width: none; }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- ヘッダー -->
+        <header class="text-center mb-10 fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-database fa-7x float-anim" style="color: var(--color-1);"></i>
+            </div>
+            <h1 class="text-4xl font-bold mb-3 gradient-text">MEMORY.md卒業！<br>AIエージェント専用タスク管理「Beads」</h1>
+            <p class="text-lg" style="color: #666;">分散型グラフデータベースでエージェントの記憶を構造化</p>
+            <p class="text-sm mt-2" style="color: #999;">2026年5月20日</p>
+            <div class="w-40 h-1 mx-auto rounded-full mt-3" style="background: linear-gradient(90deg, var(--color-1), var(--color-2));"></div>
+        </header>
+
+        <!-- 18カード -->
+        <div class="section-layout">
+
+            <!-- カード① -->
+            <div class="card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-circle-question fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;"></i>
+                    <h2>①Beadsとは: AIエージェント専用タスク管理DB</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bullseye"></i><span><span class="highlight">AIコーディングエージェント専用のタスク管理データベース</span>。コマンドは <code>bd</code> の2文字で起動。</span></li>
+                        <li><i class="fa-solid fa-users"></i><span>Claude Code、Codex CLI、Aider、Cline、Cursor など、主要なエージェントツールに対応。</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>単なるタスク管理ではなく、<span class="keyword-tag">依存関係</span>まで把握するグラフ構造のDB。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-2);"></i> 「Git for Tasks」がキャッチコピー！タスク管理の常識を変えるツール🌟</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード② -->
+            <div class="card fade-in-scale" style="animation-delay: 0.15s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-brain fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s;"></i>
+                    <h2>②MEMORY.mdの限界: コンテキストリセットで記憶が飛ぶ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-rotate"></i><span>コンテキストウィンドウがリセットされると、昨日までの作業内容をエージェントが忘れる。</span></li>
+                        <li><i class="fa-solid fa-file-lines"></i><span>仕方なく <code>MEMORY.md</code> や <code>TODO.md</code> に状況を書き込むのが現状。</span></li>
+                        <li><i class="fa-solid fa-expand"></i><span>放置すると<span class="highlight">無限に膨らんでいき</span>、気づいたら数千行のファイルが完成する。</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>自由形式テキストだから、エージェントが解釈ミスして<span class="highlight">同じタスクを2回実行</span>することも。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--color-5);"></i> 「続きを頼んだら、どこからでしたっけ？」→ エージェあるある😭</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード③ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-bolt fa-5x" style="color: var(--color-2); animation: fa-bounce 2.5s;"></i>
+                    <h2>③複数エージェントの衝突問題: TODO.mdが壊れる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-branch"></i><span>Claude CodeとCodexを同じプロジェクトで<span class="highlight">並列実行</span>すると大惨事が発生。</span></li>
+                        <li><i class="fa-solid fa-file-code"></i><span>両方が同時に <code>TODO.md</code> を書き換えて<span class="highlight">Gitで衝突</span>し、最悪の場合ファイルが壊れる。</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>せっかく並列で高速化しようとしているのに、コンフリクト解消で逆に時間がかかる。</span></li>
+                        <li><i class="fa-solid fa-ban"></i><span>テキストファイルベースでは、マルチエージェントの<span class="keyword-tag">排他制御</span>が原理的に不可能。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード④ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.25s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-sitemap fa-5x" style="color: var(--color-1); animation: fa-flip 3s;"></i>
+                    <h2>④Beadsの設計思想: 分散型・グラフ型・エージェントファースト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-laptop"></i><span><span class="highlight">分散型</span>: クラウド不要。基本ローカルで動作し、Gitのようにピア同期可能。</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span><span class="highlight">グラフ型</span>: タスク同士をリンクで繋いで管理。DAG（有向非巡回グラフ）構造。</span></li>
+                        <li><i class="fa-solid fa-robot"></i><span><span class="highlight">エージェントファースト</span>: 人間UIではなく、エージェントがCLIから直接操作できる設計。</span></li>
+                    </ul>
+                    <pre>bd ready → 着手可能タスクをJSONで出力
+bd create --priority P0 → 最優先タスク作成</pre>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--color-1);"></i> GitHub IssuesやLinearは人間中心。Beadsは機械中心の設計🎯</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑤ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-cubes fa-5x" style="color: var(--color-2); animation: fa-beat-fade 2.5s;"></i>
+                    <h2>⑤Doltとは: バージョン管理可能なSQLデータベース</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database"></i><span><span class="highlight">Dolt</span>はGitのバージョン管理機能を持ったSQLデータベース。SQLでクエリ可能。</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span>データに対して<span class="highlight">ブランチ作成・チェックアウト</span>ができる。Gitと同じ感覚で操作。</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate"></i><span><span class="highlight">ピア同期</span>: チームや別マシンとGit感覚でデータ共有可能。</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span><span class="highlight">SQLクエリ</span>: 構造化データなので誤読がほぼゼロ。エージェントと相性抜群。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--color-2);"></i> SQLite＋Gitバージョン管理＝Dolt。シンプルで強力な組み合わせ✨</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑥ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.35s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-table-cells fa-5x" style="color: var(--color-1); animation: fa-bounce 3s;"></i>
+                    <h2>⑥セルレベルマージ: Dolt最大の強み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-border-all"></i><span>表計算ソフトのように<span class="highlight">セル（1マス）を最小単位</span>として競合判定を行う。</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>Gitは行単位だから、同じ行を2人が違う風に編集すると<span class="highlight">必ずコンフリクト</span>する。</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>Doltなら、<span class="highlight">同じ行でも違うカラム</span>を編集していれば両方の変更を自動でマージする。</span></li>
+                        <li><i class="fa-solid fa-people-arrows"></i><span>例: Claudeが優先度を変更し、Codexがアサイン先を変更しても衝突しない。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--color-5);"></i> これがマルチエージェント調停の安全弁！TODO.mdでは絶対無理🔥</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑦ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.4s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-fingerprint fa-5x" style="color: #8E44AD; animation: fa-flip 2.5s;"></i>
+                    <h2>⑦ハッシュベースのタスクID: マージ時の衝突を回避</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hashtag"></i><span>IDは <code>bd:A1B2</code> のような<span class="highlight">ランダムハッシュ</span>で生成される。連番ではない。</span></li>
+                        <li><i class="fa-solid fa-code-merge"></i><span>連番だと、ブランチAとブランチBで<span class="highlight">同じ番号が衝突</span>するリスクがある。</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>ハッシュなら衝突確率が天文学的に低い。Gitのコミットハッシュと同じ哲学。</span></li>
+                        <li><i class="fa-solid fa-layer-group"></i><span>階層構造も可能: <code>bd:A1B2</code> のサブタスクは <code>bd:A1B2.1</code>。さらに深く <code>bd:A1B2.11</code> まで。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード⑧ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.45s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-link fa-5x" style="color: var(--color-2); animation: fa-beat-fade 3s;"></i>
+                    <h2>⑧5種類のリンク: タスク間の関係を明示的に表現</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban"></i><span><span class="keyword-tag">BLOCKS</span>: これが終わらないと進められない（依存関係の主役）</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span><span class="keyword-tag">COMPLETED_BY</span>: 完了タスクの記録</span></li>
+                        <li><i class="fa-solid fa-clone"></i><span><span class="keyword-tag">DUPLICATES</span>: 重複タスクのマーキング</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span><span class="keyword-tag">SUPERSEDES</span>: 新しい設計が古い設計を置き換える</span></li>
+                        <li><i class="fa-solid fa-comments"></i><span><span class="keyword-tag">REPLIES_TO</span>: メッセージのスレッド接続</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-diagram-successor fa-lg" style="color: var(--color-2);"></i> A→B→C のブロックチェーンで依存関係を可視化！🔗</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑨ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.5s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-rocket fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;"></i>
+                    <h2>⑨bd readyコマンド: 着手可能タスクを一瞬で抽出</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge-high"></i><span><code>bd ready</code> を叩くと、<span class="highlight">ブロッカーが全て解除されたタスクだけ</span>が一覧で出力される。</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>エージェントは「次に何をやるか」を<span class="highlight">迷わず即座に決定</span>できる。</span></li>
+                        <li><i class="fa-solid fa-file-code"></i><span>MEMORY.mdだと、LLMがブロック状態を見落として誤ったタスクに着手するリスクがある。</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>Beadsなら依存関係グラフを解析して<span class="highlight">100%確実</span>に判定可能。</span></li>
+                    </ul>
+                    <pre>bd ready --format json
+→ P0: ログイン機能実装 (bd:A1B2)
+→ P1: DBマイグレーション (bd:C3D4)</pre>
+                </div>
+            </div>
+
+            <!-- カード⑩ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.55s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-microchip fa-5x" style="color: #2980B9; animation: fa-flip 2s;"></i>
+                    <h2>⑩エージェント直結: JSON出力でパースが簡単</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span><code>bd ready --format json</code> で<span class="highlight">マシンリーダブルなJSON</span>を出力。</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>エージェントがパースして次のアクションを自律的に決定できる。</span></li>
+                        <li><i class="fa-solid fa-flag"></i><span><code>bd create --priority P0</code> で優先度付きタスク作成。<code>P0</code> なら最優先。</span></li>
+                        <li><i class="fa-solid fa-arrows-down-to-line"></i><span>優先度順に <code>bd ready</code> から取得して実行、という運用が自然に組める。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-gear fa-lg" style="color: #2980B9;"></i> 「準備OK」＝bd ready。名前も直感的で使いやすい😊</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑪ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.6s;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-compress fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2.5s;"></i>
+                    <h2>⑪Compaction機能: 完了タスクを自動圧縮要約</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-minimize"></i><span><span class="highlight">古い完了済みタスクを意味的に要約</span>して、コンテキストの圧迫を防ぐ。</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left"></i><span>全詳細を残すとコンテキストウィンドウを圧迫するが、消すと<span class="highlight">履歴が失われる</span>ジレンマ。</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span><span class="keyword-tag">メモリ減衰</span>という考え方。人間の記憶と同じで、古いほど抽象化される。</span></li>
+                        <li><i class="fa-solid fa-crosshairs"></i><span>最新のアクティブタスクに集中できるので、エージェントの判断精度が向上。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--color-5);"></i> 10年前の細かい記憶は忘れるけど概要は残る＝人間の記憶と同じ！🧠</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑫ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.65s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-hard-drive fa-5x" style="color: var(--color-1); animation: fa-bounce 2.5s;"></i>
+                    <h2>⑫永続メモリ: bd rememberとbd prime</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-floppy-disk"></i><span><code>bd remember</code>: PostgreSQLのように<span class="highlight">永続的なキーバリュー保存</span>が可能。</span></li>
+                        <li><i class="fa-solid fa-file-export"></i><span><code>bd prime</code>: Markdown形式で<span class="highlight">保存メモリを出力</span>。エージェント起動時に呼ぶ設計。</span></li>
+                        <li><i class="fa-solid fa-repeat"></i><span>MEMORY.mdの置き換えとして機能するが、<span class="highlight">構造化されているからノイズが入りにくい</span>。</span></li>
+                        <li><i class="fa-solid fa-shuffle"></i><span>自由形式テキストの「解釈ガチャ」がなくなり、毎回安定した読み取りが可能。</span></li>
+                    </ul>
+                    <pre># エージェント起動時に
+MEMORY=$(bd prime)
+# → 構造化されたメモリを取得</pre>
+                </div>
+            </div>
+
+            <!-- カード⑬ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.7s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-scale-balanced fa-5x" style="color: #8E44AD; animation: fa-flip 3s;"></i>
+                    <h2>⑬MEMORY.md vs Beads: 構造化データの圧倒的勝利</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-alt"></i><span>MEMORY.mdは自由形式 → LLMの<span class="highlight">解釈に依存しすぎる</span>。毎回違う読み方をされる。</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span>Beadsはグラフ構造 → <span class="keyword-tag">BLOCKS</span> <span class="keyword-tag">REPLIES_TO</span> で明示的に関係を表現。</span></li>
+                        <li><i class="fa-solid fa-hashtag"></i><span>Markdownには本質的にIDがない。<span class="highlight">タスクの並び替えで参照が壊れる</span>致命的問題。</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>排他制御: Beadsは<span class="highlight">原子的クレーム</span>で安全。TODO.mdは書き込み途中の上書きリスクあり。</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left"></i><span>変更履歴: Doltのコミットログで<span class="highlight">誰がいつ何を変更したか</span>を完全に追跡可能。</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード⑭ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.75s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-download fa-5x" style="color: var(--color-2); animation: fa-bounce 2s;"></i>
+                    <h2>⑭インストールと初期セットアップ: 数分で完了</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-apple"></i><span>Mac: <code>brew install beaded-dev/tap/beads</code> で<span class="highlight">1発インストール</span>。</span></li>
+                        <li><i class="fa-brands fa-linux"></i><span>Linux/Mac: <code>npm install -g @beads-io/beads</code> または <code>curl</code> でもインストール可能。</span></li>
+                        <li><i class="fa-solid fa-terminal"></i><span>プロジェクトディレクトリで <code>bd init</code> を叩くだけ。ローカルにDolt DBが立ち上がる。</span></li>
+                        <li><i class="fa-solid fa-cube"></i><span><code>.beaded/dolt</code> ディレクトリが作成される。<span class="highlight">Embedded Mode</span>で個人利用に最適。</span></li>
+                        <li><i class="fa-solid fa-user"></i><span>ファイルロックで排他制御。1人で使う分には全く問題なし。</span></li>
+                    </ul>
+                    <pre>cd my-project
+bd init
+# → .beaded/dolt/ が作成される ✅</pre>
+                </div>
+            </div>
+
+            <!-- カード⑮ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.8s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-plug fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑮エージェント連携: bd setupで自動設定生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span><code>bd setup claude</code> で<span class="highlight">Claude Code用の設定ファイル</span>が自動生成される。</span></li>
+                        <li><i class="fa-solid fa-file-pen"></i><span><code>AGENTS.md</code> が更新され、エージェントにBeadsの使い方を自動で教える。</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span>対応ツール一覧は <code>bd setup --list</code> で確認可能。新エージェントも随時追加中。</span></li>
+                    </ul>
+                    <pre>bd setup claude     # Claude Code用
+bd setup codex      # Codex CLI用
+bd setup aider      # Aider用
+bd setup cursor     # Cursor用
+bd setup max        # マルチエージェント管理用</pre>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-party-horn fa-lg" style="color: var(--color-2);"></i> コマンド1発でエージェント教育完了！面倒な設定なし🎉</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑯ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.85s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-people-group fa-5x" style="color: var(--color-5); animation: fa-bounce 2.5s;"></i>
+                    <h2>⑯マルチエージェント協調: Claude×Codexの並列実行</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span>ターミナルAで <code>bd setup claude</code>、ターミナルBで <code>bd setup codex</code>。<span class="highlight">同じBeadsを見る</span>。</span></li>
+                        <li><i class="fa-solid fa-hand"></i><span>両方で <code>bd ready</code> を叩くと同じタスクが表示される。</span></li>
+                        <li><i class="fa-solid fa-gavel"></i><span>Claudeが <code>bd update bd:A1B2 --claim</code> で<span class="highlight">原子的にクレーム</span>。その瞬間ロックがかかる。</span></li>
+                        <li><i class="fa-solid fa-eye-slash"></i><span>もう一度 <code>bd ready</code> を叩くと、クレーム済みタスクは表示されない。自然と<strong>タスクが分散</strong>する。</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>裏側では<span class="highlight">Doltのセルレベルマージ</span>が衝突を防いでいる。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-handshake fa-lg" style="color: var(--color-2);"></i> ClaudeとCodexが仲良く協力できる世界が来た🤝</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑰ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.9s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-comments fa-5x" style="color: #2980B9; animation: fa-beat-fade 3s;"></i>
+                    <h2>⑰特殊モード: ステルス・Git-free・ ephemeral</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-secret"></i><span><span class="keyword-tag">Stealth Mode</span>: <code>bd init --stealth</code>。共有リポジトリに公開しない個人用モード。</span></li>
+                        <li><i class="fa-brands fa-git-alt"></i><span><code>NO_GIT</code> 設定でGit操作も無効化。完全にローカル・ノーコミット。</span></li>
+                        <li><i class="fa-solid fa-box-open"></i><span><span class="keyword-tag">Git-free Mode</span>: 環境変数 <code>BEADS_DIR</code> で保存先を自由に指定。</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span><span class="keyword-tag">Ephemeral DB</span>: テストやベンチマーク用の<span class="highlight">使い捨てデータベース</span>。毎回クリーンな状態。</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">Contributor Mode</span>: OSS貢献者向け。<code>bd init --contributor</code> でプランニングを別リポに分離。</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-wand-sparkles fa-lg" style="color: var(--color-5);"></i> SupabaseやGoogle Piperなど企業内VCSでも対応可能！🏢</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑱ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.95s;">
+                <div class="mega-icon-container">
+                    <i class="fas fa-trophy fa-5x" style="color: var(--color-2); animation: fa-bounce 2s;"></i>
+                    <h2>⑱Beadsの世界観: エージェント時代のGit for Tasks</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-landmark"></i><span>Git登場前は各自バラバラのバックアップだった。<span class="highlight">今のMEMORY.md/TODO.mdはまさにその段階</span>。</span></li>
+                        <li><i class="fa-solid fa-trophy"></i><span>GitHub Issues: 人間中心。API制限あり。エージェント特化機能なし。</span></li>
+                        <li><i class="fa-solid fa-weight-hanging"></i><span>Linear: 重量級チーム管理。API認証必要。ローカル動作不可。</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>Anthropic公式メモリ機能: Claude専用で<span class="highlight">プロバイダーロックイン</span>のリスク。</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>Beadsだけが<span class="highlight">ローカル＋グラフ＋エージェント対応＋オープン</span>を全部満たす。</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-crown fa-lg" style="color: var(--color-2);"></i> Claude Code/Codex/Aiderを使っている開発者は今すぐ試すべき！🚀</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- フッター -->
+        <footer class="text-center mt-12 pb-8" style="color: #999; font-size: 14px;">
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=FmardbKKINQ" target="_blank" style="color: var(--color-1); text-decoration: underline;">MEMORY.md卒業！AIエージェントの新時代タスク管理「Beads」徹底解説</a></p>
+            <p class="mt-1">📅 2026年5月20日</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent-first Workflows: プロンプトからプロダクションへ | Google I/O 2026</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #1565C0;
+            --ui-color-2: #E67E22;
+            --ui-color-3: #E3F2FD;
+            --ui-color-4: #0A1929;
+            --ui-color-5: #42A5F5;
+            --bg-canvas: #FFF8F5;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-canvas);
+            font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4) 0%, var(--ui-color-1) 50%, var(--ui-color-5) 100%);
+            border-radius: 25px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 10px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 20px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        /* Grid Layout */
+        .grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* Card */
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: #555;
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword list */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword tags */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech bubbles */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #BF5656;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #BF5656 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code preview */
+        pre {
+            background: #1e1e2e;
+            color: #cdd6f4;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+        }
+
+        /* Animations */
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out both;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px;
+            margin-top: 30px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .grid { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+            .header h1 { font-size: 24px; }
+        }
+
+        /* Card number badges */
+        .card-badge {
+            display: inline-block;
+            background: var(--ui-color-1);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        /* Arrow connectors */
+        .arrow-connector {
+            text-align: center;
+            color: var(--ui-color-5);
+            font-size: 24px;
+            padding: 5px 0;
+        }
+
+        /* Section divider */
+        .section-divider {
+            text-align: center;
+            margin: 25px 0;
+            padding: 10px;
+            font-size: 18px;
+            color: var(--ui-color-1);
+            border-top: 2px dashed var(--ui-color-5);
+            border-bottom: 2px dashed var(--ui-color-5);
+            background: var(--ui-color-3);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-robot" aria-hidden="true"></i></div>
+            <h1>Agent-first Workflows: プロンプトからプロダクションへ</h1>
+            <p class="subtitle">Google I/O 2026 — Antigravity × Google Cloud で実現するエージェントファースト開発</p>
+            <p class="date"><i class="fas fa-calendar-alt"></i> 2026年5月21日 | Speakers: Richard Seroter, Christina Lin, Denise Kwan</p>
+        </div>
+
+        <!-- Section 1: Intro -->
+        <div class="section-divider">
+            <i class="fas fa-rocket"></i> 第1部: プロトタイプから本番環境への移行
+        </div>
+
+        <div class="grid">
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <span class="card-badge">1</span>
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>AI Studio × Antigravity 2.0でプロトタイプ構築</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gamepad" aria-hidden="true"></i>
+                            <span>AI Studioでゲームをプロンプトから直接構築。クリックひとつで <span class="keyword-tag">Publish</span> 可能に。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-cloud" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Cloud Run</span> と <span class="keyword-tag">Firebase</span> へデプロイ。クレジットカード不要で最初の2アプリを無料公開。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <span>デモでは「Dino Quest」という恐竜ゲームをリアルタイムで構築・デプロイ。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            プロンプトや音声入力だけでアプリが作れる時代。Day 1の開発体験は最高にスムーズ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">2</span>
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>Day 1の甘い夢からDay 2の現実へ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-champagne-glasses" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Day 1</span> は最高。デプロイできて気分が良い。でも...</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Day 2</span> にはリアルなトラフィック、エッジケース、予期しないエラーが次々と発生。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-bar" aria-hidden="true"></i>
+                            <span>多くの開発者はAIを「コーディング・ドキュメント作成」に使っているが、<span class="keyword-tag">運用・監視・修正</span>にはまだ活用が不足している。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            デモ中、I/O参加者の負荷テストでDino Questがクラッシュ！まさにDay 2の現実を体験。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">3</span>
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>3つのエージェントファーストワークフロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bug" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">① デバッグ</span>: エージェントが障害を自動調査し、原因を特定して修正コードを生成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">② 最適化</span>: ログデータから分析ダッシュボードを自動構築し、ユーザー行動を可視化。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">③ 自己修復</span>: 障害を自動検知して修正し、CI/CDパイプラインを自律的に実行。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: #BF5656;"></i>
+                            プロトタイプを本番レベルに引き上げる3つのアプローチ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">4</span>
+                    <i class="fa-solid fa-microphone fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s;" aria-hidden="true"></i>
+                    <h2>音声入力でエージェントにデバッグを指示</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-voice" aria-hidden="true"></i>
+                            <span>「Dino Questの何が悪いか見つけて」と音声で指示するだけ。手動でログを確認する必要がない。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span>エージェントが自動的にログを調査し、<span class="keyword-tag">503 Service Unavailable</span> が原因と特定。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hand" aria-hidden="true"></i>
+                            <span>手動での設定確認、パフォーマンスメトリクス確認がすべて自動化される。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-comment-dots fa-lg" style="color: var(--ui-color-1);"></i>
+                            ログの場所やサービスの指定すら不要。自然言語で指示するだけ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 2: MCP -->
+        <div class="section-divider">
+            <i class="fas fa-plug"></i> 第2部: Google管理のMCPサーバーとスキル
+        </div>
+
+        <div class="grid">
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <span class="card-badge">5</span>
+                    <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>Google管理のMCPサーバー: 50以上のサービスに接続</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-key" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">APIキーの管理が不要</span>。Google Cloudのサービスに安全に接続。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i>
+                            <span>BigQuery、Cloud Run、Firestoreなど <span class="keyword-tag">50以上</span> のマネージドMCPサーバーが利用可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-laptop-code" aria-hidden="true"></i>
+                            <span>Claude Code、Codex、Antigravityなど、どんなエージェントツールからでも利用できる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);"></i>
+                            コンソールをクリックして回る必要なし。すべてのデータとサービスがエージェントに直接アクセス可能！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">6</span>
+                    <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>Developer Knowledge MCP: 最新ドキュメントを常に取得</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span>12以上のGoogle Docベース（AI、Cloud、Firebase等）を検索し、<span class="keyword-tag">8〜12時間以内</span> の最新版を取得。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sync" aria-hidden="true"></i>
+                            <span>間違ったバージョンを使うリスクを排除。常に最新のドキュメントがエージェントツールに反映。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>コーディング中にドキュメントを検索する手間がなくなり、<span class="keyword-tag">推測不要</span> の開発が可能に。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-check-circle fa-lg" style="color: var(--ui-color-1);"></i>
+                            古い情報を使ってエージェントが誤動作する問題を解決。常に最新ドキュメントを参照！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">7</span>
+                    <i class="fa-solid fa-database fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>Data Agent Kit: 自然言語でデータ操作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                            <span>Antigravityに拡張としてインストールし、<span class="keyword-tag">MCPサーバー</span> 経由でデータソースにアクセス。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wand-magic" aria-hidden="true"></i>
+                            <span>「ユーザーに5つのトレートを追加して」と指示するだけで、Pythonコードを自動生成・実行。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shield-alt" aria-hidden="true"></i>
+                            <span>Antigravityが自動で <span class="keyword-tag">実行許可</span> を確認。安全性を確保しながらデータを操作。</span>
+                        </li>
+                    </ul>
+                    <pre>
+# Data Agent Kitが自動生成したコード例
+db.collection('users').get()
+for user in users:
+    user.update({'treats': 5})</pre>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">8</span>
+                    <i class="fa-solid fa-fire fa-5x" style="color: #E65100; animation: fa-beat-fade 1.5s;" aria-hidden="true"></i>
+                    <h2>FirestoreドキュメントDBの自然言語操作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-file-alt" aria-hidden="true"></i>
+                            <span>Firestoreはドキュメント型DB。単純なSQLではなく、コードでドキュメントを挿入する必要がある。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-comment" aria-hidden="true"></i>
+                            <span>「クラッシュのお詫びメッセージを追加して」と指示するだけで、<span class="keyword-tag">ドキュメントを自動作成</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                            <span>エージェントがデータストア全体を検索し、適切な場所にメッセージを自動挿入。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            午前3時のVibe Codingでどこに何を保存したか忘れても大丈夫。エージェントが探してくれる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 3: Optimization -->
+        <div class="section-divider">
+            <i class="fas fa-chart-bar"></i> 第3部: エージェントによる最適化と分析
+        </div>
+
+        <div class="grid">
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <span class="card-badge">9</span>
+                    <i class="fa-solid fa-chart-pie fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>0-ETL分析パイプラインの自動構築</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-stream" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Log Router Sync</span> がライブログをBigQueryデータセットに直接ストリーミング。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-database" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">BigQuery MCP</span> で並列クエリを実行し、ログデータを自動抽出。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tachometer-alt" aria-hidden="true"></i>
+                            <span>手動のデータ配線が不要。ETLパイプラインをゼロから自動構築。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-1);"></i>
+                            数百万のログからアクション可能なインサイトを数分で抽出！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">10</span>
+                    <i class="fa-solid fa-tv fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>インタラクティブダッシュボードの自動生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-traffic-light" aria-hidden="true"></i>
+                            <span>トラフィック概要、リクエスト数、サーバーログ数を自動可視化。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+                            <span>恐竜タイプ別の勝率を分析。<span class="keyword-tag">Speedyが54%</span> の最高勝率を記録。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gift" aria-hidden="true"></i>
+                            <span>結果別のトレート数や、最も使われる恐竜ランキングも自動生成。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-chart-bar fa-lg" style="color: #BF5656;"></i>
+                            コンソールに戻ってSQLを書く必要なし。すべてAntigravity内で完結！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">11</span>
+                    <i class="fa-solid fa-language fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>自然言語でBigQueryデータを分析</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                            <span>Antigravity内で直接、日本語や英語の自然言語でデータに質問可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-project-diagram" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">分布グラフ</span> も自然言語の指示だけで描画。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-alt" aria-hidden="true"></i>
+                            <span>コンソールとエディタの <span class="keyword-tag">コンテキストスイッチ</span> が不要。すべて一箇所で完結。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-user fa-lg" style="color: var(--ui-color-2);"></i>
+                            SQLを普段書かないフロントエンドエンジニアでも、高度なデータ分析が可能に。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">12</span>
+                    <i class="fa-solid fa-clock fa-5x" style="color: #E65100; animation: fa-flip 2.5s;" aria-hidden="true"></i>
+                    <h2>手動では不可能なスピードで分析完了</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-stopwatch" aria-hidden="true"></i>
+                            <span>カスタムエージェントスキルが <span class="keyword-tag">約9分</span> で全パイプラインを実行。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-check" aria-hidden="true"></i>
+                            <span>ログルーター作成 → BigQuery並列クエリ → ダッシュボード生成まで一気通貫。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced" aria-hidden="true"></i>
+                            <span>手動で同じ作業を行うと、<span class="keyword-tag">数時間〜数日</span> かかる可能性のある作業を自動化。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                            Data Agent Kitはマネージドサービス。スキルとMCPが自動更新されるので常に最新版が使える！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 4: Self-healing -->
+        <div class="section-divider">
+            <i class="fas fa-shield-halved"></i> 第4部: 自己修復システムとDinoエージェント
+        </div>
+
+        <div class="grid">
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <span class="card-badge">13</span>
+                    <i class="fa-solid fa-dragon fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>Dinoエージェント: 3つの自律型エージェント</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-wrench" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Remediation Agent</span>: 常時稼働のSRE。障害を自動検知・調査し、根本原因を修正。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">CI Agent</span>: テスト実行、セキュリティスキャン、イメージビルドを担当。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-truck-fast" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">CD Agent</span>: デプロイメント管理、カナリアリリース、自動ロールバックを実行。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-cloud fa-lg" style="color: var(--ui-color-2);"></i>
+                            すべてCloud Run上でホスト。アプリと同じプラットフォームで低レイテンシ・安全・コスト効率良好！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">14</span>
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-2); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>自己修復の仕組み: Event-driven自動修復</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-rectangle-list" aria-hidden="true"></i>
+                            <span>アプリが <span class="keyword-tag">Cloud Logging</span> にログを記録（デフォルト動作）。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bell" aria-hidden="true"></i>
+                            <span>エラー検知時、<span class="keyword-tag">Eventarc + Pub/Sub</span> がRemediation Agentを起動。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code" aria-hidden="true"></i>
+                            <span>Geminiで問題を調査・修正し、<span class="keyword-tag">GitHub PR</span> を自動作成して <span class="keyword-tag">Slack</span> で通知。</span>
+                        </li>
+                    </ul>
+                    <pre>
+# 自己修復フロー
+App → Cloud Logging → Eventarc
+  → Pub/Sub → Remediation Agent
+    → Gemini (調査・修正)
+      → GitHub PR + Slack通知</pre>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">15</span>
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>Agent Development Kit (ADK) の活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-recycle" aria-hidden="true"></i>
+                            <span>状態管理、ツールルーティング、リトライロジックの <span class="keyword-tag">ボイラープレートが不要</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-book" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Skill Toolset</span> でカスタムドメインプレイブックをロードし、知識を再利用可能なワークフローに。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                            <span>各エージェントは <span class="keyword-tag">IAMセキュリティ</span> を継承。CI Agentはデプロイ権限を持たず、Remediation Agentはビルド権限を持たない。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-shield-halved fa-lg" style="color: #BF5656;"></i>
+                            秘密情報はすべてSecret Managerで管理。セキュリティを犠牲にしないエージェント設計！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">16</span>
+                    <i class="fa-solid fa-terminal fa-5x" style="color: #1B5E20; animation: fa-bounce 2.5s;" aria-hidden="true"></i>
+                    <h2>Agent CLI: エージェント開発を数秒で開始</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-play" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Agent CLI</span> でエージェントのひな形を数秒で生成。テスト、評価、コンテナ化ファイルも自動作成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-code" aria-hidden="true"></i>
+                            <span>エージェントコード、指示ファイル、ツール定義、テストスイートがすべて含まれる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-box" aria-hidden="true"></i>
+                            <span>デプロイ用の <span class="keyword-tag">コンテナ化ファイル</span> も自動生成。Cloud Runへのデプロイがスムーズ。</span>
+                        </li>
+                    </ul>
+                    <pre>
+# Agent CLIの使用例
+$ agent create --name t-rex-agent
+  ✓ エージェントコード生成
+  ✓ テストスイート作成
+  ✓ コンテナ設定ファイル生成
+  ✓ デプロイ準備完了</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: A2A and CI/CD -->
+        <div class="section-divider">
+            <i class="fas fa-arrows-spin"></i> 第5部: エージェント間連携と自律的CI/CD
+        </div>
+
+        <div class="grid">
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <span class="card-badge">17</span>
+                    <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;" aria-hidden="true"></i>
+                    <h2>Agent-to-Agent (A2A): エージェント間の協調動作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                            <span>エージェント同士が <span class="keyword-tag">A2Aプロトコル</span> で直接対話。チームメンバーのように協調。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-address-book" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Agent Registry</span> で各エージェントの場所、呼び出し方、性格（説明）、アクセス可能なツールを管理。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain" aria-hidden="true"></i>
+                            <span>静的パイプラインと違い、エージェントが <span class="keyword-tag">自律的に判断</span>。テスト内容やセキュリティスキャンの要否を自動決定。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-users-gear fa-lg" style="color: var(--ui-color-2);"></i>
+                            CI Agentが間違ったイメージを指定すると、CD Agentが「これ存在しないよ」と指摘。自動で再実行まで行う！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="mega-icon-container">
+                    <span class="card-badge">18</span>
+                    <i class="fa-solid fa-money-bill-trend-up fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>自律的CI/CDとSpend Capsによる安全な運用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-vial" aria-hidden="true"></i>
+                            <span>CD Agentが <span class="keyword-tag">リスクスコア</span> を評価し、カナリアリリースの割合を自動決定。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                            <span>デプロイ中に障害を検知すると、<span class="keyword-tag">自動ロールバック</span> を実行して安全を確保。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-piggy-bank" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">Spend Caps</span>（Private Preview）: 予算上限に達するとトラフィックを一時停止。翌朝に予算を破壊される心配なし。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-mobile-screen" aria-hidden="true"></i>
+                            <span>SlackからCI/CDを起動可能。どこからでもパイプラインを実行できる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-snowflake fa-lg" style="color: #BF5656;"></i>
+                            Cloud Runはアイドル時にスリープ。エージェントはエラー発生時だけ起動して、終わったら停止。無駄な課金なし！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=CBL6KgCsQNY" target="_blank">Agent-first workflows from prompt to production — Google Cloud Tech</a> | 📅 2026年5月21日</p>
+            <p>📍 Google I/O 2026 | 📚 Codelab: <a href="https://goo.gle/4nx2dCg" target="_blank">https://goo.gle/4nx2dCg</a></p>
+            <p style="margin-top: 10px; font-size: 12px; color: #aaa;">Generated with Claude Code</p>
+        </footer>
+    </div>
+</body>
+</html>

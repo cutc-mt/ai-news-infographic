@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotebookLM 最新アップデート - 自動ラベリングとマインドマップ強化</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #0D7377;
+            --ui-color-2: #D4864A;
+            --ui-color-3: #E8F4F4;
+            --ui-color-4: #0A3D40;
+            --ui-color-5: #C75B5B;
+        }
+
+        body {
+            font-family: 'Zen Kurenaido', sans-serif;
+            background-color: #FFF8F5;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        header h1 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 36px;
+            font-weight: bold;
+            color: #333333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        header .header-icon {
+            font-size: 48px;
+            color: var(--ui-color-1);
+        }
+
+        header p {
+            font-size: 14px;
+            color: #777777;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 25px;
+            justify-content: center;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 220px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 20px rgba(0,0,0,0.15);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-family: 'Kaisei Decol', serif;
+            font-size: 20px;
+            color: #555;
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.1s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.2s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.3s; }
+        .section-card:nth-child(7) { animation-delay: 0.35s; }
+        .section-card:nth-child(8) { animation-delay: 0.4s; }
+        .section-card:nth-child(9) { animation-delay: 0.45s; }
+        .section-card:nth-child(10) { animation-delay: 0.5s; }
+        .section-card:nth-child(11) { animation-delay: 0.55s; }
+        .section-card:nth-child(12) { animation-delay: 0.6s; }
+        .section-card:nth-child(13) { animation-delay: 0.65s; }
+        .section-card:nth-child(14) { animation-delay: 0.7s; }
+        .section-card:nth-child(15) { animation-delay: 0.75s; }
+        .section-card:nth-child(16) { animation-delay: 0.8s; }
+        .section-card:nth-child(17) { animation-delay: 0.85s; }
+        .section-card:nth-child(18) { animation-delay: 0.9s; }
+
+        .highlight-bar {
+            width: 4px;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: linear-gradient(to bottom, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>
+                <i class="fa-solid fa-book-open header-icon" aria-hidden="true"></i>
+                NotebookLM 最新アップデート徹底解説
+                <i class="fa-solid fa-wand-magic-sparkles header-icon" aria-hidden="true"></i>
+            </h1>
+            <p>2026年5月最新情報 | 自動ラベリング＆マインドマップ強化</p>
+        </header>
+
+        <div class="section-layout">
+
+            <!-- カード1: NotebookLMとは -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>①NotebookLMとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                            <span>Googleが提供する、<span class="keyword-tag">独自のAIアシスタント</span>を簡単な操作で作成できるサービスです。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                            <span>自分の資料やドキュメントを学習させて、その内容に基づいて回答するアシスタントを構築できます。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <span>こーすけ先生は「<span class="keyword-tag">可能性の獣</span>」と表現。業務でも家庭DXでも強力なツールとして活用可能です。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            一般的な知識からではなく、<br>あなたの資料をベースに回答してくれるのが最大の特徴！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2: 家庭での活用例 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-house-chimney fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>②家庭DXの実例：家電の説明書</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-blender" aria-hidden="true"></i>
+                            <span>冷蔵庫、テレビ、洗濯機、掃除機、電子レンジなど、家電の説明書をすべてNotebookLMに投入。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span>洗濯機がピーピー鳴った時に「この音の原因は？」と聞けば、<span class="keyword-tag">説明書ベース</span>で即座に回答。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                            <span>説明書をいちいち探して開く手間がなくなり、トラブル対応が圧倒的に速くなります。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-2);"></i>
+                            PDFの説明書を入れるだけ！<br>あとは聞くだけで答えてくれる ✨
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3: ソースの追加方法 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-folder-plus fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ソースの追加方法</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-file-pdf" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">PDFファイル</span>を直接アップロードして知識として追加。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-music" aria-hidden="true"></i>
+                            <span>音声ファイルにも対応。会議録やインタビューなどの音声もソースにできます。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-globe" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">ウェブサイト</span>のURLを指定して、Webコンテンツを取り込むことも可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-brands fa-google-drive" aria-hidden="true"></i>
+                            <span>Googleドライブから直接ファイルを選択して追加することもできます。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-1);"></i>
+                            ソースを追加するだけで、<br>もうAIアシスタントが完成！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード4: 機能一覧 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④NotebookLMの機能一覧</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">AIチャット</span>：ソースをベースにした対話型の質問応答。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-file-alt" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">レポート作成</span>：各種レポートを自動生成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">マインドマップ</span>：思考の整理を視覚的にサポート。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-headphones" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">音声解説</span>・動画解説もワンクリックで生成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">フラッシュカード</span>：単語帳やテストも自動作成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">インフォグラフィック</span>とスライド作成にも対応。</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード5: インフォグラフィック自動生成 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤インフォグラフィック自動生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
+                            <span>スタジオパネルの「インフォグラフィック」ボタンをポチッと押すだけ。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-palette" aria-hidden="true"></i>
+                            <span>ビジュアルスタイルを選択（<span class="keyword-tag">プロフェッショナル</span>など）して送信すると一瞬で完成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+                            <span>プロンプトを一切書かずに、Geminiが自動的に高品質なインフォグラフィックを生成。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            プロンプトなしでこれだけの<br>ものが一瞬でできるのは異次元！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6: 新機能① 自動ラベリング -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-tags fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑥新機能①：自動ラベリング</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>ソースが増えると管理が大変に。100件を超えると「あのソースどれだっけ？」と探すのに時間がかかる問題。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">自動ラベリング機能</span>が新たに追加。ボタン1つでソースをトピック別に自動分類。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check-double" aria-hidden="true"></i>
+                            <span>「AI活用とガイドライン」「Gemini 3」「その他資料」「地区関連情報」のように自動でカテゴリー分け。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            先頭に番号を振って管理する<br>必要がなくなりました！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード7: 自動ラベリングの使い方 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-play fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦自動ラベリングの使い方</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                            <span>手順はカンタン：<span class="keyword-tag">「トピック別に整理」</span>ボタンを押すだけ。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-robot" aria-hidden="true"></i>
+                            <span>AIがソースの内容を分析して、自動的にラベルを作成して各ソースに割り当て。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>実際に試したところ、「AI活用とガイドライン」「Gemini 3」など的確な分類が完了。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-star" aria-hidden="true"></i>
+                            <span>こーすけ先生の23〜3個のノートブックで試して「かなり感動した」との評価。</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード8: ラベルによるソース選択 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-filter fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ラベルによるソース選択</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-mouse-pointer" aria-hidden="true"></i>
+                            <span>ラベルをクリックするだけで、そのカテゴリーのソースを<span class="keyword-tag">一括選択</span>可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i>
+                            <span>これまでは中身を1つずつ開いて確認する必要があったソースも、ラベルビューから一目で特定。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+                            <span>「AI関連のソースだけ選択」「地区関連の情報だけ選択」のように、目的別に素早く切り替え。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-clock fa-lg" style="color: var(--ui-color-2);"></i>
+                            ソース選びの時間が大幅に短縮！<br>生産性がグッと上がります。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード9: ラベルのカスタマイズ -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-pen-to-square fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ラベルのカスタマイズ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-i-cursor" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">名前の変更</span>：自動生成されたラベル名が気に入らなければ自由に変更可能。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">削除</span>：「その他」など不要なラベルは削除してスッキリ整理。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">新規ラベル追加</span>：自分でラベルを作成して、ソースを手動で移動させることもできます。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-gear fa-lg" style="color: var(--ui-color-1);"></i>
+                            自動＋手動の組み合わせで<br>自分好みの管理が実現！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード10: ラベリング後の活用 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ラベリング後のさらなる活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-crosshairs" aria-hidden="true"></i>
+                            <span>特定のラベルだけを選択して、<span class="keyword-tag">焦点を絞った</span>スライド資料やインフォグラフィックを作成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                            <span>関連するソースだけをピックアップできるため、出力の精度と relevant 性が向上。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-up-right-dots" aria-hidden="true"></i>
+                            <span>大量のソースがあるノートブックほど、このラベリング機能の恩恵が大きくなります。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i>
+                            ソースが大量の人ほど<br>絶対に使うべき機能！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11: マインドマップによる思考整理 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪マインドマップによる思考の整理</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                            <span>スタジオパネルの<span class="keyword-tag">マインドマップ</span>ボタンを押すと、ソースの内容が視覚的にマップ化。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-expand" aria-hidden="true"></i>
+                            <span>1回層だけではなく、ノードを開くとさらに詳細な要素が展開されていく構造。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                            <span>資料を1から読むのではなく、マインドマップで全体像を把握してから深掘りする使い方がおすすめ。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            資料の理解スピードが<br>劇的に上がる活用法です！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12: マインドマップ→チャット連携 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrow-right-arrow-left fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑫マインドマップからチャットへ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-hand-pointer" aria-hidden="true"></i>
+                            <span>マインドマップの各要素をクリックすると、<span class="keyword-tag">チャット画面</span>に直接ジャンプ。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-comments" aria-hidden="true"></i>
+                            <span>チャットはソースをベースにしているので、「ソースでどう語られているか」がそのまま確認できる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-route" aria-hidden="true"></i>
+                            <span>全体把握 → 気になる要素をクリック → 詳細をチャットで確認、という<span class="keyword-tag">シームレスな流れ</span>が完成。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i>
+                            これがこーすけ先生が<br>一番活用している使い方！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード13: 実務でのマインドマップ活用 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-briefcase fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬実務でのマインドマップ活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+                            <span>取引先から資料が送られてきたら、すぐにNotebookLMに入れて<span class="keyword-tag">マインドマップ</span>を即座に作成。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                            <span>マインドマップで全体を俯瞰しながら、「この部分はどういう文脈？」と深掘りして理解。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                            <span>1から資料を読むより、<span class="keyword-tag">資料の読解スピード</span>が大幅に向上。行政でも民間でも実践中。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-building fa-lg" style="color: var(--ui-color-5);"></i>
+                            業務改善の現場でも大活躍！<br>導入企業が増えています。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード14: 新機能② マインドマップのパワーアップ -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrow-up-right-dots fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭新機能②：マインドマップ大幅強化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bullhorn" aria-hidden="true"></i>
+                            <span>NotebookLMの公式ポストで「<span class="keyword-tag">マインドマップが大幅にパワーアップ</span>」と発表。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list" aria-hidden="true"></i>
+                            <span>3つの強化ポイント：<span class="keyword-tag">カスタマイズ</span>、名前変更・共有、ナビゲーションの改善。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate" aria-hidden="true"></i>
+                            <span>本日からロールアウト開始。ただし環境によってはまだ展開されていない機能もある。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-1);"></i>
+                            一部の機能はこーすけ先生の<br>環境にもまだ来ていません！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15: カスタマイズ機能 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sliders fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮マインドマップのカスタマイズ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-pointer" aria-hidden="true"></i>
+                            <span>これまでマインドマップにはカスタマイズの矢印ボタンがなかったが、<span class="keyword-tag">新バージョン</span>では追加。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-keyboard" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">独自のプロンプト</span>でマップを操作可能に。音声解説と同じように焦点を指定できる。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span>「この観点で再構成して」など、自分の目的に合わせてマインドマップをカスタマイズ。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-check fa-lg" style="color: var(--ui-color-2);"></i>
+                            他のスタジオ機能と同じ<br>カスタマイズ性がついに！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード16: 名前変更と共有 -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-share-nodes fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯名前変更と共有機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                            <span>これまでマインドマップの<span class="keyword-tag">名前変更</span>は不可能だった。自動付与された名前をそのまま使うしかなかった。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-share-from-square" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">共有ボタン</span>が追加。これまでは画像保存してから共有するしかなかったが、直接共有可能に。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ellipsis" aria-hidden="true"></i>
+                            <span>「もっと見る」メニューから名前変更と共有にアクセス。開いた後の画面からも名前変更ができる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-users fa-lg" style="color: var(--ui-color-5);"></i>
+                            チーム内での共有が<br>ぐんと楽になりました！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17: ナビゲーションの改善（謎） -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-question fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ナビゲーションの改善（謎）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-scroll" aria-hidden="true"></i>
+                            <span>公式ポストでは「<span class="keyword-tag">濃度感のシルキースムーズなトランジション</span>」と表現。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                            <span>新旧バージョンを比較してみたが、こーすけ先生には<span class="keyword-tag">違いが分からず</span>…。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-comment-dots" aria-hidden="true"></i>
+                            <span>もしかするとまだ完全にロールアウトされていない可能性も。分かる方はぜひコメントで教えて！</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i>
+                            一生見比べたけど…<br>どこが変わったのか分からない 🤔
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18: まとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="highlight-bar"></div>
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱まとめ：進化し続けるNotebookLM</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">自動ラベリング</span>でソース管理が劇的に改善。大量のソースを扱うユーザーに特におすすめ。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-sitemap" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">マインドマップ強化</span>でカスタマイズ、名前変更、共有が可能に。実用性が大幅アップ。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+                            <span>NotebookLMはすでに便利なサービスですが、<span class="keyword-tag">さらに進化</span>を続けています。</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hand-point-right" aria-hidden="true"></i>
+                            <span>業務DXにも家庭DXにも使える「可能性の獣」。まずは使ってみるのが一番！</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            新機能を試して、<br>あなたのDXを加速させましょう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer>
+            🎬 動画: <a href="https://youtu.be/KO0iKfu1bl8" target="_blank" style="color: inherit;">こーすけ先生のGoogle塾</a> | 📅 2026年5月22日 | 📌 「【2026年5月最新情報】NotebookLM、何が変わったか徹底解説します」
+        </footer>
+    </div>
+</body>
+</html>

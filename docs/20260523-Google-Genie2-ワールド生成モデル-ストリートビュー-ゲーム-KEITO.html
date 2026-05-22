@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Genie 2 - テキストから世界を作る3Dワールド生成モデル</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --color-1: #0D47A1;
+            --color-2: #1565C0;
+            --color-3: #42A5F5;
+            --color-4: #E3F2FD;
+            --color-5: #FF8F00;
+            --color-6: #FFF8E1;
+            --bg-color: #FFF8F5;
+            --text-color: #333333;
+            --card-bg: #ffffff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2), var(--color-3));
+            border-radius: 25px;
+            margin-bottom: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .header-icon {
+            font-size: 80px;
+            margin-bottom: 15px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header p {
+            font-size: 18px;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .date {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* カードグリッド */
+        .card-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* カード */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        /* 大型アイコン */
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 20px;
+            color: var(--color-1);
+            margin-top: 10px;
+            line-height: 1.4;
+        }
+
+        /* カードコンテンツ */
+        .card-content {
+            padding: 0 5px 10px;
+        }
+
+        /* キーワードリスト */
+        .keyword-list {
+            margin: 10px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-2);
+            min-width: 20px;
+            margin-top: 3px;
+        }
+
+        /* キーワードタグ */
+        .keyword-tag {
+            background-color: var(--color-4);
+            color: var(--color-1);
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin: 0 2px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(66, 165, 245, 0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-5);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-5) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #E53935;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #E53935 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* フェードインアニメーション */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.9);
+            animation: fadeInScale 0.6s forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.05s; }
+        .section-card:nth-child(2) { animation-delay: 0.1s; }
+        .section-card:nth-child(3) { animation-delay: 0.15s; }
+        .section-card:nth-child(4) { animation-delay: 0.2s; }
+        .section-card:nth-child(5) { animation-delay: 0.25s; }
+        .section-card:nth-child(6) { animation-delay: 0.3s; }
+        .section-card:nth-child(7) { animation-delay: 0.35s; }
+        .section-card:nth-child(8) { animation-delay: 0.4s; }
+        .section-card:nth-child(9) { animation-delay: 0.45s; }
+        .section-card:nth-child(10) { animation-delay: 0.5s; }
+        .section-card:nth-child(11) { animation-delay: 0.55s; }
+        .section-card:nth-child(12) { animation-delay: 0.6s; }
+        .section-card:nth-child(13) { animation-delay: 0.65s; }
+        .section-card:nth-child(14) { animation-delay: 0.7s; }
+        .section-card:nth-child(15) { animation-delay: 0.75s; }
+        .section-card:nth-child(16) { animation-delay: 0.8s; }
+        .section-card:nth-child(17) { animation-delay: 0.85s; }
+        .section-card:nth-child(18) { animation-delay: 0.9s; }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            color: #777;
+            font-size: 14px;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        footer a {
+            color: var(--color-2);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .card-grid {
+                flex-direction: column;
+            }
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+
+        /* セクション区切り */
+        .section-divider {
+            width: 100%;
+            text-align: center;
+            padding: 15px 0;
+            font-size: 24px;
+            color: var(--color-2);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <div class="header-icon">
+                <i class="fas fa-globe"></i>
+            </div>
+            <h1>Google Genie 2 〜 テキストから3D世界を作るワールド生成モデル</h1>
+            <p>プロンプト1つでゲーム世界を生成し、キャラクターを自由に操作できる驚異のAI</p>
+            <p class="date"><i class="fas fa-calendar-alt"></i> 2026年5月22日</p>
+        </div>
+
+        <!-- カードグリッド -->
+        <div class="card-grid">
+
+            <!-- カード1: Genie 2とは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-globe fa-5x" style="color: var(--color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Genie 2とは: テキストから世界を生成するAI</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-circle-info" aria-hidden="true"></i>
+                            <span>Googleが開発した<span class="keyword-tag">ワールド生成モデル</span>。テキストプロンプトを入力するだけで3Dの世界を作り出す。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-gamepad" aria-hidden="true"></i>
+                            <span>生成された世界の中で<span class="highlight">キャラクターを自由に操作</span>できる。まるでゲームを作ったかのような体験。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-brain" aria-hidden="true"></i>
+                            <span>従来の画像生成や動画生成とは全く異なる、<span class="keyword-tag">物理世界を構築</span>する新しいアプローチ。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-lightbulb fa-lg" style="color: var(--color-5);"></i>
+                            昨年の生成AIの「驚き」を超えるインパクト。テキスト1つでプレイステーション級のゲームが作れる未来が見えてきた！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード2: 利用料金とアクセス -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-dollar-sign fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 利用料金: Google AI Ultraが必要</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-lock" aria-hidden="true"></i>
+                            <span>Genie 2を使うには<span class="keyword-tag">Google AI Ultra</span>プラン（月額$200）への加入が必要。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>$100のプランでは使えない。<span class="highlight">最高プランのみアクセス可能</span>な限定公開状態。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-hand" aria-hidden="true"></i>
+                            <span>現状は「何ができるかを見る」段階で、急いで契約する必要はないとKEITO氏はアドバイス。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fas fa-circle-exclamation fa-lg" style="color: var(--color-5);"></i>
+                            この動画を見るだけで「こんなサービス」と理解できる。今は様子見でOK！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード3: 基本的な使い方 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-wand-magic-sparkles fa-5x" style="color: var(--color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ 基本的な使い方: 3ステップで世界を作る</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">STEP 1</span> 「新宿」などの場所名を入力して環境を作成。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">STEP 2</span> 「太陽」などのキャラクター名を入力。視点（1人称/3人称）も選択。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">STEP 3</span> 「ワールド生成」をクリックすると、<span class="highlight">キャラクターが操作可能な世界が完成</span>。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-keyboard fa-lg" style="color: var(--color-2);"></i>
+                            操作方法: <span class="keyword-tag">W</span>で前進、<span class="keyword-tag">A/D</span>で左右、<span class="keyword-tag">Space</span>でジャンプ
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード4: アリの世界 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-bug fa-5x" style="color: #8BC34A; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ アリの世界: ミクロ視点のリアルな表現</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-eye" aria-hidden="true"></i>
+                            <span>「ミクロな世界・一般家庭」をプロンプトに入力し、<span class="keyword-tag">アリの目線</span>で世界を生成。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-mountain" aria-hidden="true"></i>
+                            <span>アリのキャラクターなら柱を<span class="highlight">上に登ることができる</span>。人間キャラだと登れない。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-check-circle" aria-hidden="true"></i>
+                            <span>キャラクターに応じた物理挙動を学習している可能性がある。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-lightbulb fa-lg" style="color: var(--color-5);"></i>
+                            「アリなら登る」を自然に表現。物理エンジンをAIが学習してるってこと！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード5: 渋谷を飛ぶ飛行機 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-plane fa-5x" style="color: var(--color-3); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 渋谷上空を飛ぶ: ストリートビューの再現性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+                            <span>環境を<span class="keyword-tag">「渋谷」</span>に設定し、飛行機を飛ばす実験を実施。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-star" aria-hidden="true"></i>
+                            <span>渋谷の街並みが<span class="highlight">非常にリアルに再現</span>される。Googleストリートビューのデータを活用している。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-triangle-exclamation" aria-hidden="true"></i>
+                            <span>ただし、文字が潰れたり見たことのない風景が出たりする場面もあり、AIの限界も見える。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fas fa-question-circle fa-lg" style="color: #E53935;"></i>
+                            「渋谷の真ん中に人が立てる場所ってあったっけ？」AIならではの不自然な場面も時々出現する。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード6: 迷路ワールド -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-puzzle-piece fa-5x" style="color: #9C27B0; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 迷路ワールド: ジャンプと物理表現</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-border-all" aria-hidden="true"></i>
+                            <span>「迷路を作ってください」とプロンプトに入力。スタートとゴール付きの迷路が生成された。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-up-long" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">スペースキー</span>でジャンプして壁を飛び越えることが可能。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-scale-balanced" aria-hidden="true"></i>
+                            <span>ジャンプして届かないと<span class="highlight">登りきれない</span>という微妙な表現も忠実に再現。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-gamepad fa-lg" style="color: var(--color-2);"></i>
+                            違和感なくゲームをプレイしている感覚。物理エンジンを学習してるみたい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード7: ブロックの世界 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-cube fa-5x" style="color: #FF5722; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ ブロックの世界: フィクションな世界観</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-shapes" aria-hidden="true"></i>
+                            <span>完全にフィクションな世界観で<span class="keyword-tag">ブロックが歩き出す</span>シーンを生成。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-shield-halved" aria-hidden="true"></i>
+                            <span>家などのオブジェクトにぶつかると<span class="highlight">前に進めなくなる</span>。すり抜けはできない。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-circle-check" aria-hidden="true"></i>
+                            <span>オブジェクトがちゃんと物理的に配置されている感覚がある。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-lightbulb fa-lg" style="color: var(--color-5);"></i>
+                            マインクラフト的な世界も作れる。衝突判定がちゃんとあるのがすごい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード8: 金魚の海 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-fish fa-5x" style="color: #00BCD4; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 金魚の海: シミュレーションとしての優秀さ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-water" aria-hidden="true"></i>
+                            <span>金魚が海を泳ぐシーンを生成し、その金魚をプレイヤーが操作。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-mountain-sun" aria-hidden="true"></i>
+                            <span>岩の中に入ると<span class="highlight">ちゃんと繋がっている</span>世界が広がる。永遠と前に進める。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-rotate-left" aria-hidden="true"></i>
+                            <span>ただし後ろを振り返ると、そんなに進んでいないように見えるという面白い現象も。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-flask fa-lg" style="color: var(--color-2);"></i>
+                            現実世界のシミュレーションとしてかなり優秀。金魚が海を泳いでたらこうなるんだな！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード9: ペンキ塗りシミュレーション -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-paint-roller fa-5x" style="color: #E91E63; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ ペンキ塗り: 意図しない驚きの表現</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-palette" aria-hidden="true"></i>
+                            <span>サンプルにあった<span class="keyword-tag">ペンキ塗りシミュレーション</span>。壁に近づくと自動的にペンキを塗り始める。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-hand-sparkles" aria-hidden="true"></i>
+                            <span>ペンキを塗る手の動きは<span class="highlight">全く操作していない</span>のに、自動で動いて色を塗ってくれる。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-question-circle" aria-hidden="true"></i>
+                            <span>「どうやってるんだろう？」と不思議がるほど、AIが自律的にアクションを生成。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-magic fa-lg" style="color: #E53935;"></i>
+                            数行のテキスト指示だけでここまで。もはやペンキ塗りシミュレーションゲーム！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード10: 格闘ゲーム（失敗例） -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-hand-fist fa-5x" style="color: #F44336; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 格闘ゲーム: 失敗から見える課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-dog" aria-hidden="true"></i>
+                            <span>「擬人化した犬と猫が格闘機場で戦う」というプロンプトを入力。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-cat" aria-hidden="true"></i>
+                            <span>犬が猫に近づくと<span class="keyword-tag">パンチする</span>という指示。1回だけモーションが発生した。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-xmark" aria-hidden="true"></i>
+                            <span>その後は近づいても<span class="highlight">何も起きない</span>。複雑なアクションの制御はまだ難しい。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fas fa-circle-info fa-lg" style="color: var(--color-5);"></i>
+                            移動とジャンプ以外のアクションは基本できない。ペンキの例は特別なケース。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード11: ストリートビューからゲーム化 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-street-view fa-5x" style="color: var(--color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ ストリートビュー: 現実世界をゲームに</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-map" aria-hidden="true"></i>
+                            <span>Genie 2の最大の特徴。Googleストリートビューのデータから<span class="keyword-tag">現実の場所をゲーム化</span>できる。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-location-dot" aria-hidden="true"></i>
+                            <span>場所を選んで確定し、キャラクターを配置するだけで<span class="highlight">その場所を散歩できる</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-database" aria-hidden="true"></i>
+                            <span>Googleが持つ膨大なストリートビューデータが世界構築のベースになっている。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-earth-americas fa-lg" style="color: var(--color-2);"></i>
+                            ストリートビューの範囲が正確な情報。範囲外はAIが生成した別世界になる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード12: ニューヨークの鳩 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-dove fa-5x" style="color: #78909C; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ ニューヨークの鳩: ストリートビュー活用例</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-city" aria-hidden="true"></i>
+                            <span>ニューヨーク州のストリートビューを選択し、<span class="keyword-tag">鳩を操作</span>する設定で生成。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-arrows-up-down" aria-hidden="true"></i>
+                            <span>ジャンプができ、さらに<span class="highlight">2段、3段ジャンプ</span>も可能。無限にジャンプできた。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-road" aria-hidden="true"></i>
+                            <span>路地裏にも入れる。ただし最初の写真の範囲を超えると別世界に。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-dove fa-lg" style="color: var(--color-5);"></i>
+                            鳩目線でニューヨークを散歩。路地裏の確認もできちゃう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード13: 厨房の魚 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-shrimp fa-5x" style="color: #FF7043; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 厨房の魚: 面白いアイデア満載のデモ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-utensils" aria-hidden="true"></i>
+                            <span>厨房にいる、これから捌かれる<span class="keyword-tag">魚を操作</span>して逃げ出すというゲーム。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-face-laugh-beam" aria-hidden="true"></i>
+                            <span>アイデアが面白いと大絶賛。魚が空中に浮いたり、泳いだりする挙動もユニーク。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-kitchen-set" aria-hidden="true"></i>
+                            <span>料理している人の邪魔しに行くなど、<span class="highlight">くだらないけど面白い</span>体験ができる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fas fa-face-grin-tears fa-lg" style="color: #E53935;"></i>
+                            くだらないけど面白い！こういう発想が出てくるのがGenieの面白さ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード14: 絵の世界 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-image fa-5x" style="color: #AB47BC; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 絵の世界: アニメーション制作への応用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-paint-brush" aria-hidden="true"></i>
+                            <span><span class="keyword-tag">絵の世界</span>の中も散歩することが可能。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-user-astronaut" aria-hidden="true"></i>
+                            <span>オリジナルキャラクターを作っている人は、そのキャラを世界に配置して<span class="highlight">散歩させられる</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-film" aria-hidden="true"></i>
+                            <span>シーンを切り取ってアニメーション制作に活用できる可能性がある。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-wand-magic-sparkles fa-lg" style="color: var(--color-2);"></i>
+                            思った通りの動きを自分で操作して作れる。アニメ制作に革命かも！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード15: 操作限界と現状の制約 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-clock fa-5x" style="color: #FF8F00; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 現状の制約: 60秒の壁と操作の限界</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-hourglass-half" aria-hidden="true"></i>
+                            <span>操作できるのは<span class="keyword-tag">60秒間のみ</span>。現状では短時間の体験に留まる。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-arrows-up-down-left-right" aria-hidden="true"></i>
+                            <span>移動とジャンプ以外のアクションは<span class="highlight">ほとんどできない</span>。パンチなどの複雑な動きは難しい。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-video" aria-hidden="true"></i>
+                            <span>操作したシーンは動画で録画され、ダウンロードが可能。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-download fa-lg" style="color: var(--color-5);"></i>
+                            操作シーンを動画保存できる。SNS共有や作品作りに活用できる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード16: ワールド生成の仕組み -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-gears fa-5x" style="color: var(--color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 生成の仕組み: 常に生成か事前生成か</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-infinity" aria-hidden="true"></i>
+                            <span>前に進み続けると<span class="keyword-tag">永遠に続く世界</span>が生成される。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-question" aria-hidden="true"></i>
+                            <span>常にリアルタイムで生成されているのか、事前に生成されているのかは<span class="highlight">不明</span>。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-backward" aria-hidden="true"></i>
+                            <span>後ろを振り返ると「そんなに進んでいない」ように見える現象も確認。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fas fa-microscope fa-lg" style="color: #E53935;"></i>
+                            無限に進めるのはすごいが、背後の世界はどうなってるのか気になるポイント。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード17: 今後の展望 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-rocket fa-5x" style="color: #4CAF50; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 今後の展望: プロンプト1つでゲーム完成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-playstation" aria-hidden="true"></i>
+                            <span>進化すれば<span class="keyword-tag">プロンプト1つでゲームが完成</span>する未来が来る。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                            <span>パンチ、銃を撃つなどのアクションや、障害物でゲームオーバーになる仕組みがプロンプトだけで作れれば。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-map-location-dot" aria-hidden="true"></i>
+                            <span>ストリートビューとの組み合わせで<span class="highlight">現実世界をゲームに</span>できる。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fas fa-star fa-lg" style="color: var(--color-2);"></i>
+                            ワールドモデルは今後かなり注目のポイント。プロンプトでPS4級ゲームが作れる日も？
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード18: まとめと所感 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fas fa-trophy fa-5x" style="color: #FFC107; animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ: ワールド生成AIの新時代</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fas fa-thumbs-up" aria-hidden="true"></i>
+                            <span>Genie 2は<span class="keyword-tag">画像・動画生成とは全く異なる</span>、物理世界を構築する新しいAI。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-bolt" aria-hidden="true"></i>
+                            <span>最近のGemini 3.5やOmniのアップデート以上に<span class="highlight">「驚き」を感じた</span>とKEITO氏。</span>
+                        </li>
+                        <li>
+                            <i class="fas fa-eye" aria-hidden="true"></i>
+                            <span>ワールドモデル分野は今後のテクノロジーにおいて要注目の領域。</span>
+                        </li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fas fa-fire fa-lg" style="color: var(--color-5);"></i>
+                            ストリートビューで現実世界をゲーム化できるのは革命的。これからが楽しみ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- フッター -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/TJbiuAxcve0" target="_blank" style="color: inherit;">KEITO【AI&WEB ch】</a> | 📅 2026年5月22日
+        </footer>
+    </div>
+</body>
+</html>

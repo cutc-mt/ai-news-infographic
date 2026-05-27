@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>G-Brain記憶フレームワーク解説 ─ 汎用AIエージェント向け記憶システム</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        :root {
+            --color-1: #6A1B9A;
+            --color-2: #8E24AA;
+            --color-3: #E1BEE7;
+            --color-4: #4A148C;
+            --color-5: #AB47BC;
+            --bg-canvas: #FDF8FF;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Kaisei Decol','Noto Sans JP',sans-serif; background:var(--bg-canvas); color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:20px; }
+        header { text-align:center; padding:40px 20px 30px; background:linear-gradient(135deg,var(--color-4) 0%,var(--color-1) 50%,var(--color-5) 100%); color:#fff; border-radius:0 0 30px 30px; margin-bottom:40px; }
+        header .header-icon { font-size:5rem; margin-bottom:15px; animation:fa-beat-fade 2s infinite; }
+        header h1 { font-size:2.2rem; font-weight:900; margin-bottom:10px; text-shadow:2px 2px 4px rgba(0,0,0,0.3); }
+        header .subtitle { font-size:1.1rem; opacity:0.9; font-family:'Yomogi',cursive; }
+        header .date { margin-top:10px; font-size:0.9rem; opacity:0.7; }
+        .section-title { display:flex; align-items:center; gap:12px; margin:40px 0 20px; padding:12px 20px; background:linear-gradient(90deg,var(--color-1),transparent); color:#fff; border-radius:12px; font-size:1.5rem; font-weight:700; }
+        .section-title i { font-size:1.8rem; }
+        .card-layout { display:flex; flex-wrap:wrap; gap:20px; justify-content:center; }
+        .section-card { flex:1; min-width:280px; max-width:450px; background:#fff; border-radius:20px; padding:20px; box-shadow:4px 4px 15px rgba(106,27,154,0.1); position:relative; overflow:hidden; transition:transform 0.3s,box-shadow 0.3s; }
+        .section-card:hover { transform:translateY(-5px); box-shadow:6px 8px 25px rgba(106,27,154,0.2); }
+        .section-card::before { content:''; position:absolute; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,var(--color-1),var(--color-5)); }
+        .mega-icon-container { text-align:center; margin:10px 0 15px; }
+        .mega-icon-container i { color:var(--color-1); filter:drop-shadow(2px 2px 4px rgba(106,27,154,0.2)); }
+        .mega-icon-container h2 { font-size:1.15rem; color:var(--color-2); margin-top:8px; font-weight:700; }
+        .card-content { padding:0 5px 10px; }
+        .keyword-list { margin:10px 0; padding:0; list-style:none; }
+        .keyword-list li { margin-bottom:8px; display:flex; align-items:flex-start; font-size:0.92rem; }
+        .keyword-list li i { margin-right:8px; color:var(--color-1); min-width:18px; margin-top:3px; }
+        .keyword-tag { background:var(--color-3); color:var(--color-4); padding:2px 8px; border-radius:5px; margin-right:4px; display:inline-block; font-weight:700; font-size:0.85rem; }
+        .highlight { background:linear-gradient(transparent 60%,rgba(106,27,154,0.15) 60%); font-weight:700; }
+        .speech-bubble { position:relative; background:#FFF; border:2.5px solid var(--color-1); border-radius:18px; padding:10px 14px; margin:12px 5px; font-family:'Yomogi',cursive; font-size:0.88rem; box-shadow:3px 3px 8px rgba(106,27,154,0.1); transform:rotate(-0.5deg); line-height:1.6; }
+        .speech-bubble::after { content:''; position:absolute; bottom:-12px; left:20px; border-width:11px 7px 0; border-style:solid; border-color:var(--color-1) transparent; display:block; width:0; }
+        .speech-bubble.variant-1 { background:#FFF8E1; border-color:#FF8F00; transform:rotate(0.8deg); }
+        .speech-bubble.variant-1::after { border-color:#FF8F00 transparent; }
+        .speech-bubble.variant-2 { background:#F3E5F5; border-color:var(--color-2); transform:rotate(-1deg); }
+        .speech-bubble.variant-2::after { border-color:var(--color-2) transparent; }
+        .speech-bubble.variant-3 { background:#E8EAF6; border-color:#5C6BC0; transform:rotate(0.6deg); }
+        .speech-bubble.variant-3::after { border-color:#5C6BC0 transparent; }
+        .speech-bubble.right::after { left:auto; right:20px; }
+        .handwritten { font-family:'Yomogi',cursive; color:#333; }
+        pre { background:#f0ecf4; padding:8px 12px; border-radius:8px; font-size:0.82rem; margin-top:8px; overflow-x:auto; border-left:3px solid var(--color-1); }
+        .flow-arrow { text-align:center; font-size:1.5rem; color:var(--color-2); margin:10px 0; animation:fa-beat-fade 2s infinite; }
+        footer { text-align:center; padding:30px 20px; margin-top:40px; background:linear-gradient(135deg,var(--color-4),var(--color-1)); color:#fff; border-radius:20px 20px 0 0; font-size:0.9rem; }
+        footer a { color:var(--color-5); text-decoration:underline; }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(0.9) translateY(15px);} to{opacity:1;transform:scale(1) translateY(0);} }
+        .fade-in-scale { animation:fadeInScale 0.5s ease-out forwards; }
+        @media(max-width:1200px){ .section-card{min-width:300px;} }
+        @media(max-width:900px){ .section-card{min-width:100%;} }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<header>
+    <div class="header-icon"><i class="fa-solid fa-brain"></i></div>
+    <h1>🧠 G-Brain記憶フレームワーク解説</h1>
+    <div class="subtitle">汎用AIエージェント向け記憶システム。OpenClaw・Hermesエージェントに対応。5つのサイクルで知識を蓄積・整理・再利用する革新的なフレームワーク</div>
+    <div class="date">📅 2026年5月28日 | 解説AI系チャンネル</div>
+</header>
+
+<!-- ===== セクション1: G-Brainとは ===== -->
+<div class="section-title">
+    <i class="fa-solid fa-circle-info"></i>
+    <span>G-Brainとは ─ 汎用AIエージェント向け記憶システム</span>
+</div>
+<div class="card-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="animation:fa-bounce 2s;"></i>
+        <h2>①G-Brainとは何か？</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user-gear"></i><span><span class="keyword-tag">ギャリータン</span>氏が開発した汎用AIエージェント向け記憶システム</span></li>
+            <li><i class="fa-solid fa-robot"></i><span><span class="keyword-tag">OpenClaw</span>や<span class="keyword-tag">Hermes</span>エージェントに対応</span></li>
+            <li><i class="fa-solid fa-rotate"></i><span>アップデートが頻繁に行われており、常に進化している</span></li>
+            <li><i class="fa-solid fa-cubes"></i><span>人間の記憶プロセスを<span class="highlight">AIエージェント用にモデル化</span>したフレームワーク</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb" style="color:var(--color-2);"></i> 人間の記憶の仕組みをAIに応用するなんて、すごいアイデアだよね！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="animation:fa-beat-fade 2s;"></i>
+        <h2>②対応するエージェント</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-cat"></i><span><span class="highlight">OpenClaw</span> — オープンソースのAIエージェントプラットフォーム</span></li>
+            <li><i class="fa-solid fa-bolt"></i><span><span class="highlight">Hermes</span> — マクロハーネスのエージェントシステム</span></li>
+            <li><i class="fa-solid fa-bullseye"></i><span>どちらも<span class="keyword-tag">エージェント特化型</span>で作られている</span></li>
+            <li><i class="fa-solid fa-link"></i><span>マクロハーネスのHermesやClawのような<span class="highlight">エージェントに向いている</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-comment-dots" style="color:var(--color-2);"></i> エージェント専用に作られてるから、相性バッチリ！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-nodes fa-5x" style="animation:fa-flip 3s;"></i>
+        <h2>③5つのサイクルで構成</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-arrow-right"></i><span><span class="keyword-tag">①キャプチャー</span> → 情報を貯める</span></li>
+            <li><i class="fa-solid fa-arrow-right"></i><span><span class="keyword-tag">②サーチ</span> → 情報を引き出す</span></li>
+            <li><i class="fa-solid fa-arrow-right"></i><span><span class="keyword-tag">③シンク/レポート</span> → 整理して答える</span></li>
+            <li><i class="fa-solid fa-arrow-right"></i><span><span class="keyword-tag">④ドリームサイクル</span> → 夜間に自動整理</span></li>
+            <li><i class="fa-solid fa-arrow-right"></i><span><span class="keyword-tag">⑤スキーマ育成</span> → パターンを再利用</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-layer-group" style="color:#5C6BC0;"></i> この5つの流れがぐるぐる回って、どんどん賢くなっていくんだ！</span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション2: キャプチャーとサーチ ===== -->
+<div class="section-title">
+    <i class="fa-solid fa-database"></i>
+    <span>キャプチャー & サーチ ─ 情報の蓄積と検索</span>
+</div>
+<div class="card-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-download fa-5x" style="animation:fa-bounce 2s;"></i>
+        <h2>④キャプチャー: 情報を貯める</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-pen-to-square"></i><span>メモや情報を<span class="highlight">どんどん貯めていく</span>プロセス</span></li>
+            <li><i class="fa-solid fa-inbox"></i><span>エージェントが日常のやり取りから知識を自動的に収集</span></li>
+            <li><i class="fa-solid fa-tags"></i><span>情報にタグ付けや構造化を行って整理</span></li>
+            <li><i class="fa-solid fa-floppy-disk"></i><span>後から検索できる形で保存される仕組み</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-box-archive" style="color:#FF8F00;"></i> 人間でいう「メモを取る」作業を、AIが自動でやってくれるイメージ！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass fa-5x" style="animation:fa-beat-fade 2s;"></i>
+        <h2>⑤サーチ: 情報を引き出す</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-search"></i><span>貯めた情報から<span class="highlight">必要なものを素早く検索</span></span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>セマンティック検索で関連情報を見つけ出す</span></li>
+            <li><i class="fa-solid fa-layer-group"></i><span>蓄積された記憶の中からパターンを発見</span></li>
+            <li><i class="fa-solid fa-bolt"></i><span>エージェントの応答に<span class="highlight">過去の知識を活用</span>できるようになる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-bolt" style="color:var(--color-2);"></i> 記憶を引き出せるから、同じミスを繰り返さないんだね！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-spin fa-5x" style="animation:fa-flip 3s;"></i>
+        <h2>⑥キャプチャー→サーチの連携</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-circle-dot"></i><span>情報を貯めるだけでなく、<span class="highlight">使いやすく引き出す</span>ことが重要</span></li>
+            <li><i class="fa-solid fa-diagram-project"></i><span>キャプチャーで入力 → サーチで出力のサイクルを回す</span></li>
+            <li><i class="fa-solid fa-chart-line"></i><span>使えば使うほどエージェントが賢くなっていく</span></li>
+            <li><i class="fa-solid fa-repeat"></i><span>日常的な操作の中で<span class="highlight">自然に知識が蓄積</span>されていく</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-infinity" style="color:#5C6BC0;"></i> 入力と出力のサイクル！人間の学習にそっくりだね</span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション3: シンク/レポート ===== -->
+<div class="section-title">
+    <i class="fa-solid fa-gears"></i>
+    <span>シンク/レポート & インターフェイス ─ 整理と連携</span>
+</div>
+<div class="card-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="animation:fa-bounce 2s;"></i>
+        <h2>⑦シンク/レポート: 情報を整理して答える</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-arrows-to-dot"></i><span>蓄積した情報を<span class="highlight">整理・統合</span>するプロセス</span></li>
+            <li><i class="fa-solid fa-file-lines"></i><span>整理した情報からレポートを生成</span></li>
+            <li><i class="fa-solid fa-comments"></i><span>ユーザーへの応答に活用される</span></li>
+            <li><i class="fa-solid fa-scale-balanced"></i><span>情報の重複や矛盾を解消して<span class="highlight">一貫性のある知識</span>を保つ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-broom" style="color:#FF8F00;"></i> 散らかった情報をきれいに整理整頓！掃除は大事だよね</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="animation:fa-beat-fade 2s;"></i>
+        <h2>⑧インターフェイス: 外部とのやり取り</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-server"></i><span><span class="keyword-tag">MCP</span>（Model Context Protocol）で接続</span></li>
+            <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">CLI</span>からも操作可能</span></li>
+            <li><i class="fa-solid fa-right-left"></i><span>AIエージェントとG-Brainの間を<span class="highlight">スムーズに通信</span></span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>様々なツールやサービスと<span class="highlight">柔軟に連携</span>できる設計</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-plug-circle-check" style="color:var(--color-2);"></i> MCPとCLIの両方に対応だから、使い方が自由自在！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-sitemap fa-5x" style="animation:fa-flip 3s;"></i>
+        <h2>⑨仕組み: JLEエンジン</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-engine-warning"></i><span><span class="keyword-tag">JLE</span>がG-Brainのコアエンジン</span></li>
+            <li><i class="fa-solid fa-screwdriver-wrench"></i><span>インストール手順に従ってAIエージェントに組み込む</span></li>
+            <li><i class="fa-solid fa-key"></i><span><span class="highlight">エンベディングのAPIキー</span>を設定してスタート</span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>スキルを追加して機能を拡張していく</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-gear" style="color:#5C6BC0;"></i> JLEエンジンが心臓部！セットアップしてキーを入れたらすぐ始められるよ</span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション4: ドリームサイクル ===== -->
+<div class="section-title">
+    <i class="fa-solid fa-moon"></i>
+    <span>ドリームサイクル ─ 夜間の自動記憶整理</span>
+</div>
+<div class="card-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-moon fa-5x" style="animation:fa-beat-fade 2s;"></i>
+        <h2>⑩ドリームサイクルとは？</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-bed"></i><span><span class="highlight">溜まっている記憶を夜間に自動で整理する</span>システム</span></li>
+            <li><i class="fa-solid fa-brain"></i><span>人間の睡眠中の記憶整理を<span class="highlight">AIで模倣</span>した仕組み</span></li>
+            <li><i class="fa-solid fa-clock"></i><span>ユーザーが寝ている間にバックグラウンドで動作</span></li>
+            <li><i class="fa-solid fa-broom"></i><span>断片的な情報を<span class="highlight">つなぎ合わせて意味のある知識</span>に変換</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-moon" style="color:var(--color-2);"></i> 人間が寝てる間にAIも記憶を整理してるの、ロマンがあるよね！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-recycle fa-5x" style="animation:fa-bounce 2s;"></i>
+        <h2>⑪ドリームサイクルの効果</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-check-double"></i><span>情報の<span class="highlight">重複を排除</span>して統合する</span></li>
+            <li><i class="fa-solid fa-link"></i><span>関連する情報同士を<span class="highlight">自動的に結びつける</span></span></li>
+            <li><i class="fa-solid fa-trash-can"></i><span>古くなった情報を特定して整理</span></li>
+            <li><i class="fa-solid fa-star"></i><span>重要なパターンを浮かび上がらせる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--color-2);"></i> 人間の「寝てるときに記憶が整理される」のをAIでも再現！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-network-wired fa-5x" style="animation:fa-flip 3s;"></i>
+        <h2>⑫記憶のネットワーク化</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-diagram-project"></i><span>バラバラの情報を<span class="highlight">知識ネットワーク</span>として構築</span></li>
+            <li><i class="fa-solid fa-circle-nodes"></i><span>情報同士のつながりを可視化して理解しやすく</span></li>
+            <li><i class="fa-solid fa-route"></i><span>エージェントが<span class="highlight">関連情報をたどれる</span>経路を作る</span></li>
+            <li><i class="fa-solid fa-lightbulb"></i><span>新たな発見やインサイトを生み出す土台になる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-spider" style="color:#5C6BC0;"></i> クモの巣のように情報がつながっていくイメージ！美しいね</span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション5: スキーマ育成 ===== -->
+<div class="section-title">
+    <i class="fa-solid fa-seedling"></i>
+    <span>スキーマ育成 ─ 知識のパターン化と再利用</span>
+</div>
+<div class="card-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-seedling fa-5x" style="animation:fa-bounce 2s;"></i>
+        <h2>⑬G-Brainスキーマとは？</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-chart-simple"></i><span>整理された知識から<span class="highlight">パターンを育てて再利用</span>する仕組み</span></li>
+            <li><i class="fa-solid fa-graduation-cap"></i><span>「肩（スキーマ）」が育つと<span class="highlight">判断が早くなる</span></span></li>
+            <li><i class="fa-solid fa-repeat"></i><span>同じような状況に<span class="highlight">再現性高く対応</span>できるようになる</span></li>
+            <li><i class="fa-solid fa-compass"></i><span>迷いがなくなり、<span class="highlight">的確な行動</span>が取れるようになる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-trophy" style="color:#FF8F00;"></i> 経験を積んで「直感」が働くようになるのと同じ！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-trend-up fa-5x" style="animation:fa-beat-fade 2s;"></i>
+        <h2>⑭スキーマ育成の3つの効果</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-gauge-high"></i><span><span class="keyword-tag">判断の高速化</span> — パターン認識で素早い意思決定</span></li>
+            <li><i class="fa-solid fa-copy"></i><span><span class="keyword-tag">再現性の向上</span> — 同じ品質で一貫した対応</span></li>
+            <li><i class="fa-solid fa-compass"></i><span><span class="keyword-tag">迷いの排除</span> — 明確な方針で迷わず行動</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-fire" style="color:var(--color-2);"></i> この3つが揃うと、エージェントがめちゃくちゃ頼りになる！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate fa-5x" style="animation:fa-flip 3s;"></i>
+        <h2>⑮全サイクルの統合</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">キャプチャー</span>で情報を集める</span></li>
+            <li><i class="fa-solid fa-2"></i><span><span class="keyword-tag">サーチ</span>で必要なものを引き出す</span></li>
+            <li><i class="fa-solid fa-3"></i><span><span class="keyword-tag">シンク</span>で整理してレポート</span></li>
+            <li><i class="fa-solid fa-4"></i><span><span class="keyword-tag">ドリームサイクル</span>で夜間に自動整理</span></li>
+            <li><i class="fa-solid fa-5"></i><span><span class="highlight">スキーマ育成</span>でパターンを蓄積して再利用</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-infinity" style="color:#5C6BC0;"></i> 5つのステップがぐるぐる回って、どんどん賢くなっていくんだ！</span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション6: 導入と評価 ===== -->
+<div class="section-title">
+    <i class="fa-solid fa-rocket"></i>
+    <span>導入方法と評価 ─ どんな人におすすめか</span>
+</div>
+<div class="card-layout">
+
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench fa-5x" style="animation:fa-bounce 2s;"></i>
+        <h2>⑯セットアップの手順</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-download"></i><span>JLE（G-Brainのエンジン）を<span class="highlight">インストール</span></span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>AIエージェントに<span class="keyword-tag">スキル</span>を追加</span></li>
+            <li><i class="fa-solid fa-key"></i><span><span class="keyword-tag">エンベディングのAPIキー</span>を設定</span></li>
+            <li><i class="fa-solid fa-play"></i><span>設定完了で<span class="highlight">すぐにスタート</span>可能</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-circle-info" style="color:#FF8F00;"></i> インプットは少し大変だけど、一度設定すれば自動で動くよ！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-thumbs-up fa-5x" style="animation:fa-beat-fade 2s;"></i>
+        <h2>⑰メリットと評価</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-star"></i><span>非常に<span class="highlight">作り込まれており</span>、完成度が高い</span></li>
+            <li><i class="fa-solid fa-check-circle"></i><span>使いこなせると<span class="highlight">非常に便利</span></span></li>
+            <li><i class="fa-solid fa-book"></i><span>自分で記憶システムを作る際の<span class="highlight">参考にもなる</span></span></li>
+            <li><i class="fa-solid fa-code-branch"></i><span>エージェントに<span class="keyword-tag">特化</span>して設計されている点が優秀</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-heart" style="color:var(--color-2);"></i> 最初は大変でも、使い始めたら手放せなくなりそう！</span>
+    </div>
+</div>
+
+<div class="section-card fade-in-scale" style="animation-delay:0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-question fa-5x" style="animation:fa-flip 3s;"></i>
+        <h2>⑱まとめ: G-Brainの価値</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-brain"></i><span><span class="highlight">AIエージェントに「記憶」を与える</span>画期的なフレームワーク</span></li>
+            <li><i class="fa-solid fa-people-group"></i><span>OpenClawやHermesの<span class="keyword-tag">コミュニティ</span>で注目を集めている</span></li>
+            <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>頻繁なアップデートで<span class="highlight">進化し続けている</span></span></li>
+            <li><i class="fa-solid fa-lightbulb"></i><span>AIエージェントの記憶システム設計の<span class="highlight">ベストプラクティス</span>と言える</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-rocket" style="color:#5C6BC0;"></i> AIエージェントの未来を変えるかもしれない超重要フレームワーク！要チェック！</span>
+    </div>
+</div>
+
+</div>
+
+<footer>
+    <p>🎬 動画: <a href="https://youtu.be/Wlq2wKMrn-I" target="_blank">G-Brain記憶フレームワーク解説（OpenClaw/Hermesエージェント向け）</a> | 📅 2026年5月28日</p>
+    <p style="margin-top:8px;opacity:0.7;">解説AI系チャンネル</p>
+</footer>
+
+</div>
+</body>
+</html>

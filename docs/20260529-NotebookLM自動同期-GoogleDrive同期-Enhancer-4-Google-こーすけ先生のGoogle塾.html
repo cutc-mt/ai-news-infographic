@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotebookLMに「自動同期」が実装！Google Drive連携が劇的に進化</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #0097A7;
+            --ui-color-2: #FF6F00;
+            --ui-color-3: #E0F7FA;
+            --ui-color-4: #004D40;
+            --ui-color-5: #26C6DA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F0FDFA;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-4));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-5));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #E0F7FA;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(0,151,167,0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* Comparison */
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ddd;
+            font-size: 15px;
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .comp-left, .comp-right {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .comp-center {
+            flex: 0 0 40%;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .winner {
+            color: var(--ui-color-1);
+            font-weight: 900;
+        }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-sync fa-7x" aria-hidden="true"></i></div>
+            <h1>NotebookLMに「自動同期」が実装！</h1>
+            <div class="subtitle">Google Drive連携が劇的に進化 — 手動更新のお悩みがついに解消</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年5月29日</div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1: 動画概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-play-circle fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① 動画概要 — 興奮が隠せないNotebookLMの大アプデ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-video"></i><span><span class="keyword-tag">YouTube</span>「こーすけ先生のGoogle塾」が最新情報を解説</span></li>
+                        <li><i class="fa-solid fa-users"></i><span>チャンネル登録者数<span class="highlight">6.37万人</span>。Google関連ツールを分かりやすく解説する大人気チャンネル</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>動画の長さは<span class="keyword-tag">14分9秒</span>。手短に要点を押さえた解説</span></li>
+                        <li><i class="fa-solid fa-calendar-plus"></i><span>公開日は<span class="keyword-tag">2026年5月29日</span>。公式発表から3日後のスピード解説</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            公式ブロぐの発表から3日で<br>
+                            解説動画が出ている — <br>
+                            <span class="keyword-tag">スピード感</span>がすごい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: NotebookLMとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② NotebookLMとは — GoogleのAI研究アシスタント</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info"></i><span>Googleが提供する<span class="highlight">AIベースの研究・学習アシスタント</span>。資料を読み込んで質問に答えてくれるツール</span></li>
+                        <li><i class="fa-solid fa-file-lines"></i><span>Google Docs・Sheets・Slidesなどのドキュメントをソースとして追加して活用できる</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>追加した資料をもとに要約を作ったり、複数の資料をまたいだ質問に答えたりする機能が充実</span></li>
+                        <li><i class="fa-solid fa-podcast"></i><span>音声概要機能が特に人気で、資料からポッドキャスト風の音声を自動生成できる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--ui-color-2);"></i>
+                            要するに「自分だけの<br>
+                            AI学習助手」を作れる — <br>
+                            <span class="keyword-tag">研究・学習に欠かせない</span>ツールです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: これまでの悩み -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-face-sad-tear fa-5x" style="color: var(--ui-color-2); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ これまでの最大の悩み — Driveを更新しても反映されない</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>Google Docsで<span class="highlight">文書を更新してもNotebookLMには自動で反映されなかった</span></span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>更新を反映させるには、ノートブック内でソースを<span class="keyword-tag">手動で削除して再追加</span>する必要があった</span></li>
+                        <li><i class="fa-solid fa-hourglass-half"></i><span>大量のソースを使っている場合は、再同期の手間がかなりの時間を奪う</span></li>
+                        <li><i class="fa-solid fa-bug"></i><span>「更新したはずなのに古い情報のまま」というミスが起きやすい状況だった</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-angry fa-lg" style="color: var(--ui-color-5);"></i>
+                            一番のストレスは<br>
+                            「更新したのに古いまま」<br>
+                            <span class="keyword-tag">手動作業</span>が本当に面倒だった。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: 新機能①自動同期 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-rotate fa-5x" style="color: var(--ui-color-5); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>④ 新機能①: 自動同期（Automatic Drive Syncing）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-rocket"></i><span>Google DriveとNotebookLMが<span class="highlight">自動的に同期</span>されるようになった</span></li>
+                        <li><i class="fa-solid fa-file-pen"></i><span>Drive上のDocs・Sheets・Slidesの内容を変更すると、ノートブック内の情報も<span class="keyword-tag">自動で更新</span>される</span></li>
+                        <li><i class="fa-solid fa-hand-sparkles"></i><span>手動でファイルを再同期する手間が完全に不要になった</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>常に最新の情報をベースにAIの回答が得られる — <span class="highlight">リアルタイム性</span>が劇的に向上</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                            これまでの最大の不満が<br>
+                            一発で解決！<br>
+                            <span class="keyword-tag">待望の公式機能</span>がついに登場。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5: 公式ソースの詳細 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-newspaper fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 公式発表の詳細 — Workspace Updates ブログ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-calendar-check"></i><span><span class="keyword-tag">2026年5月26日</span>にGoogle Workspace Updatesブログで公式発表</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>出典: <span class="keyword-tag">workspaceupdates.googleblog.com</span>。Google公式のアップデート情報ページ</span></li>
+                        <li><i class="fa-solid fa-shield-check"></i><span>自動同期に加えて<span class="highlight">ファイルの削除とアクセス権の管理</span>も同時に実装された</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span>Google Workspace顧客と個人Googleアカウントの両方が対象となっている</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                            自動同期だけでなく<br>
+                            <span class="keyword-tag">セキュリティ機能</span>も<br>
+                            セットで追加されています。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: 回避策 Enhancer 4 Google -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 回避策: Enhancer 4 Google拡張機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plug"></i><span>自動同期がなかった時代、サードパーティの拡張機能で<span class="highlight">無理やり同期</span>させていた</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span><span class="keyword-tag">Enhancer 4 Google</span>という拡張機能が代表的な回避策</span></li>
+                        <li><i class="fa-solid fa-wrench"></i><span>Chrome拡張としてインストールして、NotebookLMの画面から同期操作を可能にするもの</span></li>
+                        <li><i class="fa-solid fa-user-gear"></i><span>公式の自動同期がなかったため、<span class="highlight">有志のコミュニティが勝手に作って</span>対応していた状況</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-grin-beam fa-lg" style="color: var(--ui-color-5);"></i>
+                            ユーザーが勝手に拡張機能を<br>
+                            作って対策していた — <br>
+                            <span class="keyword-tag">切実さ</span>が伝わってきます。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7: Enhancer 4 Googleの詳細 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ Enhancer 4 Googleの使い方と限界</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-download"></i><span>Chromeウェブストアからインストールして使う。設定も比較的シンプル</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>手動ではあるが、拡張機能のボタン一つで再同期ができる<span class="keyword-tag">時短ツール</span></span></li>
+                        <li><i class="fa-solid fa-circle-xmark"></i><span>あくまでサードパーティ製。<span class="highlight">公式サポートは一切ない</span>ため、不具合が出ても自己責任</span></li>
+                        <li><i class="fa-solid fa-lock-open"></i><span>外部拡張機能にDriveへのアクセス権を与えることになり、セキュリティ上の懸念もあった</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-2);"></i>
+                            サードパーティにアクセス権を<br>
+                            渡すのはリスクがあった — <br>
+                            <span class="keyword-tag">公式実装は安心</span>。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: Before/After -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ Before / After — 同期の大変化</h2>
+                </div>
+                <div class="card-content">
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">✅ After</div>
+                        <div class="comp-center">更新の反映</div>
+                        <div class="comp-right" style="color: #999;">❌ Before</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">✅ 自動</div>
+                        <div class="comp-center">Driveとの同期</div>
+                        <div class="comp-right" style="color: #999;">❌ 手動</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">✅ 不要</div>
+                        <div class="comp-center">Enhancer 4 Google</div>
+                        <div class="comp-right" style="color: #999;">❌ 必須</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">✅ 安全</div>
+                        <div class="comp-center">アクセス権管理</div>
+                        <div class="comp-right" style="color: #999;">❌ 不明</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">✅ 自動削除</div>
+                        <div class="comp-center">ファイル削除</div>
+                        <div class="comp-right" style="color: #999;">❌ 残ったまま</div>
+                    </div>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-1);"></i>
+                            全項目が「自動」に — <br>
+                            <span class="keyword-tag">手作業ゼロ</span>の世界が到来。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+            <!-- Card 9: ファイル削除の自動連動 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trash-can fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ 新機能②: ファイル削除の自動連動</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-folder-minus"></i><span>Google Driveからファイルを削除すると、<span class="highlight">ノートブックからも自動的に削除</span>されるようになった</span></li>
+                        <li><i class="fa-solid fa-broom"></i><span>以前は削除したファイルがソースリストに残り続けて、<span class="keyword-tag">不要なデータが溜まる</span>問題があった</span></li>
+                        <li><i class="fa-solid fa-broom"></i><span>不要なソースが混ざっているとAIの回答の精度も下がるため、<span class="highlight">情報の整理が必須</span>だった</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>今は自動で消えるので、研究環境を常にクリーンに保てる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-broom fa-lg" style="color: var(--ui-color-5);"></i>
+                            古いソースがゴミのように<br>
+                            残っていたのが<span class="keyword-tag">自動で消える</span> —<br>
+                            これで環境がスッキリ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: アクセス権の管理 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-lock fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ アクセス権の取り扱い — セキュリティの向上</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-key"></i><span>ユーザーのアクセス権が<span class="highlight">取り消されると</span>、そのファイルをソースとして使えなくなる</span></li>
+                        <li><i class="fa-solid fa-link-slash"></i><span>アクセスできなくなったファイルは、ノートブック内でも自動的に使用不可に</span></li>
+                        <li><i class="fa-solid fa-hand-pointer"></i><span>ソースリストには<span class="keyword-tag">アクセス権リクエストのリンク</span>が表示されるので、再取得も簡単</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>共同作業の環境で権限の変更があった場合にも、安全に対応できる仕組み</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);"></i>
+                            「見ちゃいけないファイル」が<br>
+                            AIに読まれるリスクを<span class="keyword-tag">排除</span>。<br>
+                            企業利用でも安心感が増す。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: セキュリティ向上の意義 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-check fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ セキュリティと整理の意義 — 研究環境の品質向上</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building"></i><span>企業や教育機関での利用を想定すると、<span class="highlight">アクセス権の管理は必須</span>の機能</span></li>
+                        <li><i class="fa-solid fa-users-gear"></i><span>組織のメンバーが入れ替わっても、適切に権限が引き継がれる</span></li>
+                        <li><i class="fa-solid fa-broom"></i><span>不要なソースが自動で消えることで、<span class="keyword-tag">AIの回答精度</span>も安定する</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>情報整理の手間が減る = <span class="highlight">本来の研究活動</span>に集中できる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i>
+                            「ただの同期」ではなく<br>
+                            <span class="keyword-tag">セキュリティ</span>もセットで —<br>
+                            企業ユースの壁が下がった。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: ロールアウト情報 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-calendar-days fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ 利用開始日 — いつから使える？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flag"></i><span><span class="highlight">2026年5月26日</span>から段階的なロールアウトが開始された</span></li>
+                        <li><i class="fa-solid fa-hourglass"></i><span>ロールアウトの完了までに<span class="keyword-tag">最長15日間</span>かかる予定。6月10日頃までに全ユーザーに行き渡る見込み</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span><span class="keyword-tag">Rapid Release</span>ドメインと<span class="keyword-tag">Scheduled Release</span>ドメインの両方に対応</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>管理者設定やエンドユーザー設定は<span class="highlight">一切不要</span>。自動的に適用される</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-1);"></i>
+                            設定不要で自動適用 — <br>
+                            <span class="keyword-tag">何もしなくていい</span>のが<br>
+                            一番ありがたい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+            <!-- Card 13: 対象ユーザー -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-group fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 対象ユーザー — 誰が使える？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building"></i><span><span class="keyword-tag">Google Workspace</span>の全顧客が対象。Business StarterからEnterpriseまで全プラン対応</span></li>
+                        <li><i class="fa-solid fa-user"></i><span>個人Googleアカウントも<span class="highlight">対象外ではなく利用可能</span>。無料ユーザーでも恩恵を受けられる</span></li>
+                        <li><i class="fa-solid fa-school"></i><span>教育機関のGoogle Workspace for Educationも含まれる</span></li>
+                        <li><i class="fa-solid fa-globe"></i><span>日本を含む全世界のGoogleアカウントユーザーが順次利用可能に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-gift fa-lg" style="color: var(--ui-color-2);"></i>
+                            無料アカウントでもOK — <br>
+                            <span class="keyword-tag">全ユーザー</span>に届く<br>
+                            ありがたいアップデートです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: 設定不要の意味 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gear fa-5x" style="color: var(--ui-color-4); animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 設定不要 — 管理者もユーザーも何もしなくていい</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-sliders"></i><span>管理者側でオン/オフを切り替える設定項目は<span class="highlight">存在しない</span></span></li>
+                        <li><i class="fa-solid fa-toggle-off"></i><span>エンドユーザー側にも同期の有無を設定する画面はない</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>ロールアウト完了後にNotebookLMを開けば、<span class="keyword-tag">自動的に機能が有効</span>になっている</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span>同期のタイミングや頻度をコントロールするオプションも今のところなし</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-5);"></i>
+                            設定ができない＝同期を<br>
+                            オフにできない。<br>
+                            <span class="keyword-tag">全自動</span>なので問題なしなのかな？
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: 気になる点① -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-question fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 気になる点①: 同期のタイミングと頻度</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i><span>Driveファイルを更新してから<span class="keyword-tag">どれくらいの遅延</span>でノートブックに反映されるのか？</span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>数秒で反映されるのか、それとも数分かかるのか。実用性に大きく関わるポイント</span></li>
+                        <li><i class="fa-solid fa-file-code"></i><span>大きなファイルや多数のソースを使っている場合の<span class="highlight">同期の負荷</span>はどうなる？</span></li>
+                        <li><i class="fa-solid fa-wifi"></i><span>オフライン環境でDriveファイルを編集した後、オンラインに戻った時の挙動も気になる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            実際に使ってみないと<br>
+                            <span class="keyword-tag">体感速度</span>は分からない。<br>
+                            使い勝手の確認が楽しみ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16: 気になる点② -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 気になる点②: 意図しない同期と制御</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-pen-to-square"></i><span>書きかけの下書きをDriveに保存した時点で<span class="highlight">ノートブックにも反映</span>されてしまう？</span></li>
+                        <li><i class="fa-solid fa-pause-circle"></i><span>「まだ完成版じゃないからAIに読ませたくない」という場面で、同期を一時停止できない</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span>バージョン管理のように「この時点の状態をAIに読ませる」コントロールが欲しい</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>将来的には<span class="keyword-tag">同期の細かな設定</span>が追加される可能性に期待</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-thinking fa-lg" style="color: var(--ui-color-5);"></i>
+                            全自動は便利だけど<br>
+                            <span class="keyword-tag">コントロール</span>も欲しい。<br>
+                            次のアップデートに期待！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5 -->
+        <div class="section-layout">
+
+            <!-- Card 17: まとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ まとめ — NotebookLMが「実用ツール」に進化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check-circle"></i><span><span class="highlight">自動同期</span>により、Drive上の更新が即座にノートブックに反映される</span></li>
+                        <li><i class="fa-solid fa-trash-can"></i><span><span class="highlight">ファイルの自動削除</span>で不要なソースが溜まらない。研究環境が常に整理される</span></li>
+                        <li><i class="fa-solid fa-user-lock"></i><span><span class="highlight">アクセス権の管理</span>でセキュリティも向上。企業利用の安心感が増す</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>Enhancer 4 Googleなどの<span class="keyword-tag">回避策が不要</span>になった。公式機能で安心</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i>
+                            「便利だけど使い勝手に不満」<br>
+                            が「<span class="keyword-tag">実用的なツール</span>」に。<br>
+                            NotebookLMの進化は続く！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18: 今後の期待 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ 今後の期待 — NotebookLMの進化はこれからも</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-sliders"></i><span>同期の細かな設定（タイミングや頻度の制御）が追加されると<span class="highlight">さらに便利</span>に</span></li>
+                        <li><i class="fa-solid fa-plug-circle-check"></i><span>Drive以外のサービス（Notion、Confluenceなど）との連携も期待される</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>AIの回答精度がソースの鮮度に直接影響するため、<span class="keyword-tag">自動同期の価値は大きい</span></span></li>
+                        <li><i class="fa-solid fa-arrow-trend-up"></i><span>GoogleはNotebookLMへの投資を加速中。<span class="highlight">今後も機能追加が期待できる</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-forward fa-lg" style="color: var(--ui-color-5);"></i>
+                            GoogleのAI研究ツールとして<br>
+                            NotebookLMの<span class="keyword-tag">ポテンシャル</span>は<br>
+                            まだまだこれからです！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=MvBsNI-pkkw" target="_blank">こーすけ先生のGoogle塾</a> | 📅 2026年5月29日公開</p>
+            <p style="margin-top: 5px;"><i class="fas fa-newspaper"></i> 公式ソース: <a href="https://workspaceupdates.googleblog.com" target="_blank">Google Workspace Updates Blog</a> | 📅 2026年5月26日</p>
+            <p style="margin-top: 5px; font-size: 12px; color: #999;">NotebookLM 自動同期機能 インフォグラフィック | 2026年5月29日作成</p>
+        </footer>
+
+    </div>
+</body>
+</html>

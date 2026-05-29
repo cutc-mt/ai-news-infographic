@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude CodeのDynamic Workflowsを徹底解説！並列エージェントの新機能</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #00BCD4;
+            --ui-color-2: #FF4081;
+            --ui-color-3: #E0F7FA;
+            --ui-color-4: #006064;
+            --ui-color-5: #80DEEA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0a0e17;
+            font-family: 'Kaisei Decol', serif;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #006064, #00BCD4, #FF4081);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, 30px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0,188,212,0.5);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.95;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background: linear-gradient(145deg, #111827, #1a2332);
+            border: 1px solid rgba(0,188,212,0.3);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0,188,212,0.1), 5px 5px 15px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0 30px rgba(0,188,212,0.25), 8px 8px 25px rgba(0,0,0,0.4);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.2em;
+            color: var(--ui-color-5);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #0d2137;
+            border: 2px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 0 0 10px rgba(0,188,212,0.15);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #1a0d2e;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #0a1f1a;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #e0e0e0;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #0a0e17;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+            color: var(--ui-color-5);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(0,188,212,0.35) 60%);
+            font-weight: bold;
+            color: #fff;
+        }
+
+        /* Neon badge */
+        .neon-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 0 5px;
+            box-shadow: 0 0 10px rgba(0,188,212,0.4);
+        }
+
+        /* Comparison Table */
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed rgba(0,188,212,0.2);
+            font-size: 15px;
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .comp-left, .comp-right {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .comp-center {
+            flex: 0 0 40%;
+            text-align: center;
+            font-size: 13px;
+            color: #999;
+        }
+
+        .winner {
+            color: var(--ui-color-5);
+            font-weight: 900;
+        }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed rgba(0,188,212,0.3);
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+
+        /* Full width */
+        .full-width {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-network-wired fa-7x" aria-hidden="true"></i></div>
+            <h1>Claude Code Dynamic Workflows</h1>
+            <div class="subtitle">大量並列エージェントを決定論的に操作する新機能を徹底解説</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年5月29日</div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Opus 4.8と一緒に登場した新機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-calendar-check"></i><span><span class="keyword-tag">Opus 4.8</span>と同時にリリースされたClaude Codeの新機能「Dynamic Workflows」</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>Claude Code <span class="keyword-tag">v2.1.154</span>以降で利用可能なJavaScriptオーケストレーションスクリプト機能</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span>現在は<span class="highlight">リサーチプレビュー</span>段階。Pro/Max/Team/Enterpriseで対応</span></li>
+                        <li><i class="fa-solid fa-gear"></i><span>Proユーザーは<span class="keyword-tag">/config</span>コマンドで有効化する必要がある</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            単発のサブエージェントとAgent Teamsの<span class="keyword-tag">中間を埋める</span>存在として設計されています。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② Dynamic Workflowsとは何か</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-code"></i><span>Claudeがタスクに応じて<span class="keyword-tag">JavaScriptのスクリプト</span>を自動で記述する仕組み</span></li>
+                        <li><i class="fa-solid fa-play"></i><span>バックグラウンドで<span class="highlight">独立したランタイム</span>がそのスクリプトを実行する</span></li>
+                        <li><i class="fa-solid fa-users-rectangle"></i><span>スクリプトが大量の<span class="keyword-tag">サブエージェントを並列で制御</span>して検証を回す</span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span>結果を相互にチェックして、最終的に<span class="highlight">単一の回答に収束</span>させる</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            「段取りスクリプトをClaude自身が書いて、<br>その上で何十個ものエージェントが動く」<br>というイメージです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ オーケストレーションの仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hat-wizard"></i><span><span class="keyword-tag">オーケストレーター</span>（Claude本体）が段取りスクリプトを生成するのが第一歩</span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>スクリプトが<span class="highlight">数十〜数百のサブエージェント</span>を並列で制御・起動する</span></li>
+                        <li><i class="fa-solid fa-code-compare"></i><span>各エージェントの結果を<span class="keyword-tag">相互チェック・検証</span>して品質を担保</span></li>
+                        <li><i class="fa-solid fa-display"></i><span>メインセッションの<span class="highlight">応答性は維持</span>。オーケストレーションはバックグラウンドで動く</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                            Claude本体はあなたとの会話を続けながら、<br>裏でスクリプトが大量のエージェントを<br><span class="keyword-tag">自律的に動かす</span>のがポイント！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 3つのアプローチの違い</h2>
+                </div>
+                <div class="card-content">
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">Subagents</div>
+                        <div class="comp-center">ターンごとに1つずつ<br>コンテキスト内に結果</div>
+                        <div class="comp-right" style="color: #999;">最小単位</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">Agent Teams</div>
+                        <div class="comp-center">複数エージェントが<br>協調して動く</div>
+                        <div class="comp-right" style="color: #999;">中規模</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left winner">Workflows</div>
+                        <div class="comp-center">スクリプトが<span class="highlight">数十〜数百</span>の<br>エージェントを並列制御</div>
+                        <div class="comp-right" style="color: var(--ui-color-2);">大規模</div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info"></i><span>Workflowsの中間結果は<span class="keyword-tag">スクリプト変数内</span>に保持されるのが特徴</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: var(--ui-color-2);"></i>
+                            Subagents → Agent Teams → Workflows<br>
+                            <span class="keyword-tag">スケールの階段</span>を登るイメージ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shuffle fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ Parallel — 待たない同時実行</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bolt-lightning"></i><span><span class="keyword-tag">Parallel</span>は<span class="highlight">待たない・同時に並列実行</span>するモード</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>互いに独立した<span class="keyword-tag">サブタスク</span>に最適。前の結果を待つ必要がない</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>例：「ファイルA・B・Cをそれぞれ別アプローチで検証」のような並行作業</span></li>
+                        <li><i class="fa-solid fa-gauge-high"></i><span>Parallelなら<span class="highlight">実行時間は最も遅いタスク</span>に収まるので高速</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            それぞれが独立して動けるから<br><span class="keyword-tag">スピード重視</span>のタスクに向いています。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrow-down-long fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ Pipeline — 順次で結果を渡す</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-list-ol"></i><span><span class="keyword-tag">Pipeline</span>は<span class="highlight">待つ・順次実行</span>するモード</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>前段の<span class="keyword-tag">結果を後段が使う</span>場合に必須の実行方式</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span>例：「リサーチ → 分析 → レポート作成」のように段階的に処理が進む流れ</span></li>
+                        <li><i class="fa-solid fa-arrows-turn-to-dots"></i><span>Pipelineは<span class="highlight">段階ごとに品質が上がる</span>ので精度重視のタスクに最適</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-5);"></i>
+                            前の結果が次の入力になるなら<br>迷わず<span class="keyword-tag">Pipeline</span>を選びましょう。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-merge fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ Parallel vs Pipelineの使い分け</h2>
+                </div>
+                <div class="card-content">
+                    <div class="comparison-row">
+                        <div class="comp-left winner">Parallel ⚡</div>
+                        <div class="comp-center">独立タスク<br>スピード重視</div>
+                        <div class="comp-right" style="color:#999;">待たない</div>
+                    </div>
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color:#999;">待たない</div>
+                        <div class="comp-center">依存タスク<br>精度重視</div>
+                        <div class="comp-right winner">Pipeline 🔗</div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-star"></i><span><span class="highlight">使い分けがDynamic Workflowsのキーポイント</span>だと言及されている</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>実は<span class="keyword-tag">ParallelとPipelineを組み合わせる</span>ことも可能。複雑なタスクでは混合運用が強力</span></li>
+                        <li><i class="fa-solid fa-lightbulb"></i><span>タスクの構造を把握して最適なパターンを選ぶのがエンジニアの腕の見せ所</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i>
+                            この使い分けをマスターするだけで<br><span class="keyword-tag">ワークフローの品質</span>が劇的に変わります！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="color: #FFD700; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ トーナメント方式で品質を担保</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-users"></i><span>複数のエージェントが<span class="keyword-tag">同じ問題に異なるアプローチ</span>で取り組む</span></li>
+                        <li><i class="fa-solid fa-comments"></i><span>お互いの結果を<span class="highlight">相互にレビュー・検証</span>する（敵対的レビュー）</span></li>
+                        <li><i class="fa-solid fa-medal"></i><span>最も<span class="highlight">信頼性の高い回答</span>を自動的に選択する仕組み</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>複数の視点から計画を策定できるので、<span class="keyword-tag">盲点を減らせる</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            トーナメントのようにバトルしながら<br>
+                            <span class="keyword-tag">品質を担保</span>する仕組み。<br>
+                            1人の天才より5人の审查家。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ Dynamic Workflowsの起動方法</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-comment-dots"></i><span>プロンプトに<span class="keyword-tag">「workflow」</span>という言葉を含める</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span><span class="keyword-tag">/deep-research</span>コマンドを使う</span></li>
+                        <li><i class="fa-solid fa-sliders"></i><span><span class="keyword-tag">ultracode</span>設定を有効化する</span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span><span class="keyword-tag">/goal</span>コマンドを使うとワークフローが自動トリガーされる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                            一番手軽なのはプロンプトに<br><span class="keyword-tag">「workflow」</span>と書くだけ。<br>
+                            Claudeが判断して起動します。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-bar fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ ワークフローの監視と制御</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye"></i><span><span class="keyword-tag">/workflows</span>コマンドでフェーズ・トークン消費・エージェント出力を検査</span></li>
+                        <li><i class="fa-solid fa-gauge"></i><span><span class="keyword-tag">タスクパネル</span>で進捗概要を確認できる</span></li>
+                        <li><i class="fa-solid fa-pause"></i><span>一時停止・再開・再起動・停止などの<span class="highlight">ライブ制御</span>が可能</span></li>
+                        <li><i class="fa-solid fa-keyboard"></i><span><span class="keyword-tag">Ctrl+G</span>でスクリプトを確認・承認できる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            Ctrl+Gは<span class="keyword-tag">緊急ブレーキ</span>にもなります。<br>
+                            暴走したら即確認・停止が可能です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-folder-tree fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ ワークフローの保存と再利用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-floppy-disk"></i><span>生成されたスクリプトは<span class="keyword-tag">.claude/workflows/</span>に自動保存される</span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>保存したスクリプトは<span class="highlight">後から再利用</span>可能。同じ作業の繰り返しに便利</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>JavaScriptなので<span class="keyword-tag">手動で編集</span>してカスタマイズもできる</span></li>
+                        <li><i class="fa-solid fa-share-nodes"></i><span>チームで<span class="keyword-tag">ワークフローのテンプレート</span>を共有する運用も現実的</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                            一度作ったワークフローを<br>
+                            資産として<span class="keyword-tag">蓄積していく</span>のが<br>
+                            この機能の本当の価値です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ セキュリティ監査に最適</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-magnifying-glass-chart"></i><span><span class="keyword-tag">コードベース全体</span>を一気に監査できる。数百ファイルを並列でスキャン</span></li>
+                        <li><i class="fa-solid fa-bug"></i><span><span class="highlight">バグスイープ</span> — あらゆるファイルからバグを探し出して報告</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>脆弱性パターンを<span class="keyword-tag">複数エージェントで交差検証</span>して見逃しを防ぐ</span></li>
+                        <li><i class="fa-solid fa-user-shield"></i><span>単独エージェントより<span class="highlight">検出率が格段に高い</span>のが最大の強み</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-2);"></i>
+                            セキュリティ監査は盲点が致命傷。<br>
+                            <span class="keyword-tag">トーナメント方式</span>で<br>
+                            見逃しを大幅に減らせます。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-migration fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 大規模マイグレーションを一括処理</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-folder-open"></i><span><span class="keyword-tag">500ファイル超</span>の大規模なコードベース変更に対応</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>APIのバージョンアップや<span class="highlight">ライブラリの全面置き換え</span>を並列で実行</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>変更後のコードを<span class="keyword-tag">相互に検証</span>して整合性をチェック</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>手作業なら何日もかかる作業を<span class="highlight">大幅に短縮</span>できる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                            「全部のファイルを変えたい」<br>
+                            そんな時に<span class="keyword-tag">Workflowの出番</span>です。<br>
+                            手作業では絶対無理なスケール。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 複数ソースの交差検証調査</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database"></i><span>複数の<span class="keyword-tag">ドキュメント・コード・ログ</span>を同時に読み込んで分析</span></li>
+                        <li><i class="fa-solid fa-circle-nodes"></i><span>各ソースを<span class="highlight">別のエージェントが担当</span>して結果を突き合わせる</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>矛盾する情報を<span class="keyword-tag">トーナメントで判定</span>し、最も信頼できる結論に到達</span></li>
+                        <li><i class="fa-solid fa-file-lines"></i><span>根拠のある調査レポートを<span class="highlight">短時間で生成</span>できる</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            1人で全部読むのは時間がかかる。<br>
+                            <span class="keyword-tag">並列で分担</span>すれば圧倒的に早い。<br>
+                            AI時代の「チーム調査」ですね。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-dollar-sign fa-5x" style="color: #FFD700; animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ コストに注意 — トークン消費が激しい</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span><span class="highlight">トークン消費が著しく多い</span>。並列エージェントの分だけ倍増する</span></li>
+                        <li><i class="fa-solid fa-seedling"></i><span>最初は<span class="keyword-tag">小さいタスクで試す</span>ことが推奨されている</span></li>
+                        <li><i class="fa-solid fa-chart-simple"></i><span><span class="keyword-tag">/usage</span>コマンドで消費をリアルタイムに監視できる</span></li>
+                        <li><i class="fa-solid fa-sliders"></i><span><span class="highlight">/model</span>で小さいモデルにルーティングしてコストを管理する</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            力は強力なぶん<span class="keyword-tag">コストも強力</span>。<br>
+                            使い所を見極めるのが重要。<br>
+                            まずは小さなタスクから！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑯ JavaScriptスクリプトの構造</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-code"></i><span><span class="keyword-tag">JavaScript</span>で書かれたオーケストレーションスクリプト</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>Parallel/Pipelineの呼び出しを<span class="highlight">宣言的に記述</span>する</span></li>
+                        <li><i class="fa-solid fa-variable"></i><span>中間結果は<span class="keyword-tag">スクリプト変数</span>に保持。次のフェーズで参照可能</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>エージェントへの<span class="keyword-tag">プロンプト・タスク・条件</span>を動的に設定できる</span></li>
+                    </ul>
+                    <pre>// 例: 並列で3つ検証して最良を選ぶ
+const results = await parallel([
+  { task: "アプローチAで検証" },
+  { task: "アプローチBで検証" },
+  { task: "アプローチCで検証" }
+]);
+const best = selectBest(results);</pre>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-pen-fancy fa-lg" style="color: var(--ui-color-2);"></i>
+                            Claudeが自動生成するから<br>
+                            <span class="keyword-tag">JavaScriptが書けなくてもOK</span>。<br>
+                            手動でカスタマイズもできます。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5 -->
+        <div class="section-layout">
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-forward fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 今後の展望と期待</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flask"></i><span>現在は<span class="keyword-tag">リサーチプレビュー</span>段階。今後本格的に機能が拡充される予定</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>サブエージェント・Agent Teams・Workflowsの<span class="highlight">統一的な枠組み</span>になる可能性</span></li>
+                        <li><i class="fa-solid fa-users-gear"></i><span>チーム開発での<span class="keyword-tag">ワークフローの共有・再利用</span>文化が生まれるかも</span></li>
+                        <li><i class="fa-solid fa-ranking-star"></i><span>コスト管理の仕組みが整えば、<span class="highlight">開発者のデフォルト</span>になるポテンシャル</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i>
+                            まだ始まったばかりの機能。<br>
+                            <span class="keyword-tag">プレビュー段階</span>から触っておくと<br>
+                            先行者メリットが大きいです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-check-double fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ — 並列エージェントの新時代</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-star"></i><span>Dynamic Workflowsは<span class="highlight">Claude Codeのパラダイムシフト</span>となる機能</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">ParallelとPipeline</span>の使い分けがすべて</span></li>
+                        <li><i class="fa-solid fa-trophy"></i><span><span class="keyword-tag">トーナメント方式</span>で品質を担保。多数の視点が盲点を埋める</span></li>
+                        <li><i class="fa-solid fa-money-bill-wave"></i><span>コストには注意が必要。<span class="highlight">小さいタスクから始めて</span>スケールアップ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-2);"></i>
+                            単発エージェントの時代から<br>
+                            <span class="keyword-tag">並列オーケストレーション</span>の時代へ。<br>
+                            Claude Codeの可能性が広がりました！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=shyzjdtVxpc" target="_blank" style="color: var(--ui-color-1);">まさおAIじっくり解説ch</a> | 📅 2026年5月29日公開</p>
+            <p style="margin-top: 5px; font-size: 12px; color: #555;">Claude Code Dynamic Workflows インフォグラフィック | 2026年5月29日作成</p>
+        </footer>
+
+    </div>
+</body>
+</html>

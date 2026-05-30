@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Codeを自分専用に育てる！対話履歴から興味・学習内容を抽出してパーソナライズする方法</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #2E9E6B;
+            --ui-color-2: #F5A623;
+            --ui-color-3: #E8F5EE;
+            --ui-color-4: #1A6B4A;
+            --ui-color-5: #5BC49E;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F5FFF9;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1) 0%, #1A6B4A 50%, var(--ui-color-2) 100%);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .header .tag-row {
+            display: inline-block;
+            margin-top: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-5));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.15em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-1);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-list li .orange-icon {
+            color: var(--ui-color-2);
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(to top, rgba(46, 158, 107, 0.3) 40%, transparent 40%);
+            font-weight: bold;
+            padding: 0 2px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #E8F5EE;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Block */
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1));
+            border-radius: 20px;
+            color: white;
+            font-size: 1em;
+        }
+
+        .footer a {
+            color: #FFD54F;
+            text-decoration: underline;
+        }
+
+        /* Fade-in Animation */
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon">🌱</div>
+            <h1>Claude Codeを自分専用に育てる！</h1>
+            <div class="subtitle">対話履歴から興味や学習内容を抽出してパーソナライズする方法</div>
+            <div class="date">📅 2026年5月30日</div>
+            <div class="tag-row"><i class="fa-solid fa-robot"></i> Claude Code × <i class="fa-solid fa-user-gear"></i> パーソナライズ × <i class="fa-solid fa-brain"></i> 興味プロファイル</div>
+        </div>
+
+        <!-- Cards Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-graduate fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>①「Claude Codeを育てる」とは？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>単にコードを書かせるだけでなく、<span class="highlight">使えば使うほど自分を理解してくれる存在</span>にする</span></li>
+                        <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>YouTubeコンテンツ制作や調べ物にも活用している</span></li>
+                        <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span>自分の興味に合った提案や情報収集が可能に</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>いわば<span class="highlight">自分だけのAIエージェント</span>を育てるイメージ</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-cat fa-lg" style="color: var(--ui-color-2);"></i> にゃんたさんはコード以外にもYouTube作成・情報収集など幅広く活用中！</span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cogs fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>②仕組みの基本：対話ログの蓄積</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database fa-lg orange-icon" aria-hidden="true"></i><span>claude codeと対話すると<span class="highlight">ローカルに会話ログが自動蓄積</span>される</span></li>
+                        <li><i class="fa-solid fa-file-code fa-lg orange-icon" aria-hidden="true"></i><span>形式は<span class="keyword-tag">JSONL</span>（JSON Lines）でセッションごとに保存</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>このログを解析すれば、疑問・関心・興味が抽出できる</span></li>
+                        <li><i class="fa-solid fa-chart-pie fa-lg" aria-hidden="true"></i><span>結果を<span class="keyword-tag">interests.md</span>にまとめてプロファイル化</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> ローカルファイルにログが溜まるのがclaude codeの強み！</span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                    <h2>③Andrej Karpathyの知識ベースとの違い</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-tie fa-lg" aria-hidden="true"></i><span>Andrej氏はOpenAI創業者でAnthropicにジョイン</span></li>
+                        <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>氏のアプローチは<span class="highlight">広範な知識を整理するシステム</span></span></li>
+                        <li><i class="fa-solid fa-sitemap fa-lg" aria-hidden="true"></i><span>知識の関係性や構造を理解する目的</span></li>
+                        <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>にゃんたさんの手法は<span class="highlight">興味・関心に特化</span>してより実用的</span></li>
+                        <li><i class="fa-solid fa-difference fa-lg orange-icon" aria-hidden="true"></i><span>調べ事や勉強のサポートに最適化</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-1);"></i> 知識整理 vs 興味抽出、目的が違う！</span>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>④実演：興味プロファイルの活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>claude codeで「私の最近興味あることは？」と入力</span></li>
+                        <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span><span class="highlight">interests.mdを参照して即座に回答</span></span></li>
+                        <li><i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i><span>エージェントハーネスの評価やClaude Codeの育て方などが表示</span></li>
+                        <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>対話ログを反映した正確なプロファイルが生成される</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten"><i class="fa-solid fa-sparkles fa-lg" style="color: var(--ui-color-2);"></i> 自分の興味をclaude codeがちゃんと理解してる！</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Cards Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-search fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑤興味に沿った情報収集</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hand-point-right fa-lg orange-icon" aria-hidden="true"></i><span>「私の興味にありそうなことを調べて」</span></li>
+                        <li><i class="fa-solid fa-globe fa-lg" aria-hidden="true"></i><span><span class="highlight">プロファイルを参照して関連情報を自動収集</span></span></li>
+                        <li><i class="fa-solid fa-video fa-lg" aria-hidden="true"></i><span>YouTubeネタ探しにも活躍（にゃんたさんはこれをよく使う）</span></li>
+                        <li><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i><span>以前動画の「言語モデルの出力が静かに壊れてる」の続編論文を提案</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i> 興味に合った提案をしてくれるから助かる！</span>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥YouTube以外でも応用可能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building fa-lg orange-icon" aria-hidden="true"></i><span>会社で使っている場合も同様の仕組みが使える</span></li>
+                        <li><i class="fa-solid fa-clipboard-question fa-lg" aria-hidden="true"></i><span>会話ログから質問を抽出して<span class="highlight">自作問題集が作れる</span></span></li>
+                        <li><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i><span>メール作成の入力情報から得意分野がわかる</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots fa-lg" aria-hidden="true"></i><span>本質は「対話ログを解析してパターンを抽出」する話</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--ui-color-2);"></i> YouTubeやってない人も応用できる！</span>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-desktop-screen fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑦Webアプリを使わなくてよくなる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-xmark fa-lg" aria-hidden="true"></i><span>パーソナライズが進むと<span class="highlight">ClaudeのWebアプリが不要に</span></span></li>
+                        <li><i class="fa-solid fa-file-export fa-lg" aria-hidden="true"></i><span>Webアプリの会話履歴エクスポート機能で移行も可能</span></li>
+                        <li><i class="fa-solid fa-laptop-code fa-lg" aria-hidden="true"></i><span>claude codeなら直接ローカルにログが溜まるのが最大のメリット</span></li>
+                        <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span>自分のデータを自分で管理できる安心感</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> ローカルにログがあるから一番便利！</span>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑧オープンソースコードの提供</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-github fa-lg orange-icon" aria-hidden="true"></i><span>にゃんたさんがGitHubに<span class="highlight">最小限のコードを公開中</span></span></li>
+                        <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>概要欄にリンクあり</span></li>
+                        <li><i class="fa-solid fa-download fa-lg" aria-hidden="true"></i><span>手元で試したい人は必見</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>claude codeのスキルとして組み込んで使える</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top variant-2">
+                    <span class="handwritten"><i class="fa-brands fa-github fa-lg" style="color: var(--ui-color-1);"></i> GitHubからコードを取ってきてすぐ始められる！</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Cards Row 3 -->
+        <div class="section-layout">
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-filter fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑨ノイズ除外の仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-broom fa-lg" aria-hidden="true"></i><span>「こんにちは」などの雑談は<span class="highlight">興味分析から除外</span></span></li>
+                        <li><i class="fa-solid fa-slash fa-lg orange-icon" aria-hidden="true"></i><span>スキル実行時の定型入力もノイズとして扱う</span></li>
+                        <li><i class="fa-solid fa-screwdriver-wrench fa-lg" aria-hidden="true"></i><span> Claude Codeを使うとスキルの実行コマンドもログに残る</span></li>
+                        <li><i class="fa-solid fa-check-double fa-lg" aria-hidden="true"></i><span>意味のある対話だけを抽出するフィルターが重要</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-broom fa-lg" style="color: var(--ui-color-2);"></i> 雑談を除外しないとプロファイルが汚れちゃう</span>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-star fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩スコアリング：深掘り度の評価</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i><span>質問の<span class="highlight">深掘り度合いに応じてスコアを付与</span></span></li>
+                        <li><i class="fa-solid fa-arrow-down fa-lg orange-icon" aria-hidden="true"></i><span>1回の質問で済んだ話題 → スコア低め</span></li>
+                        <li><i class="fa-solid fa-arrow-up fa-lg orange-icon" aria-hidden="true"></i><span>何回も質問した話題 → <span class="highlight">高いスコア＝強い関心</span></span></li>
+                        <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>「難しかった」か「すごく興味がある」かをスコアで判定</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-1);"></i> 何回も聞くトピックは本気の興味！</span>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clock fa-5x" style="color: var(--ui-color-1); animation: fa-spin 3s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑪時間の重み付け</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-calendar-day fa-lg" aria-hidden="true"></i><span>興味は日々変わるので<span class="highlight">最新のものを優先</span></span></li>
+                        <li><i class="fa-solid fa-hourglass-half fa-lg orange-icon" aria-hidden="true"></i><span>直近の質問と1ヶ月前の質問では重みが異なる</span></li>
+                        <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>最近聞いたことほど調べ事に参照されやすい</span></li>
+                        <li><i class="fa-solid fa-timeline fa-lg" aria-hidden="true"></i><span>「スコア3」で時間による重み付けスコアを算出</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-hourglass-start fa-lg" style="color: var(--ui-color-2);"></i> 昨日の興味と今日の興味は別物！</span>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-lines fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑫interests.mdの生成と活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ranking-star fa-lg" aria-hidden="true"></i><span><span class="highlight">興味度が高い順に並べて出力</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>定期的に更新することで常に最新の状態を維持</span></li>
+                        <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>claude codeが「この人はこういう人だ」と理解する</span></li>
+                        <li><i class="fa-solid fa-link fa-lg orange-icon" aria-hidden="true"></i><span>検索や調べ物の際に自動参照される</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-file-medical fa-lg" style="color: var(--ui-color-1);"></i> claude codeの「自分への理解」がここに凝縮される</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Cards Row 4 -->
+        <div class="section-layout">
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬スキル化：/interest-profile sync</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal fa-lg orange-icon" aria-hidden="true"></i><span>claude codeで<span class="keyword-tag">/interest-profile sync</span>を実行</span></li>
+                        <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>会話ログを参照して自動で興味をまとめる</span></li>
+                        <li><i class="fa-solid fa-file-check fa-lg" aria-hidden="true"></i><span>抽出されたシグナルを分析して<span class="highlight">interests.mdに保存</span></span></li>
+                        <li><i class="fa-solid fa-repeat fa-lg" aria-hidden="true"></i><span>スキルとして登録しておけば何度でも実行可能</span></li>
+                    </ul>
+                    <pre>/interest-profile sync</pre>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-keyboard fa-lg" style="color: var(--ui-color-2);"></i> スラッシュコマンド一発で同期完了！</span>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-pen-to-square fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑭進捗管理：どこまで分析したか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bookmark fa-lg" aria-hidden="true"></i><span>全ログを毎回参照すると入力が膨大になる</span></li>
+                        <li><i class="fa-solid fa-forward fa-lg" aria-hidden="true"></i><span><span class="highlight">「まだ分析していないログ」だけを抽出</span></span></li>
+                        <li><i class="fa-solid fa-location-dot fa-lg" aria-hidden="true"></i><span>どこまで処理したかを記録して差分更新</span></li>
+                        <li><i class="fa-solid fa-money-bill-wave fa-lg orange-icon" aria-hidden="true"></i><span>コストも節約できる賢い設計</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-coins fa-lg" style="color: var(--ui-color-1);"></i> 差分処理でトークン消費も節約！</span>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑮応用：学習問題集の自動生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>会話ログから<span class="highlight">学習内容を抽出して問題集を作成</span></span></li>
+                        <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>HTML形式で見やすいレポートとして出力</span></li>
+                        <li><i class="fa-solid fa-brain fa-lg orange-icon" aria-hidden="true"></i><span>間隔反復で記憶の定着に役立つ</span></li>
+                        <li><i class="fa-solid fa-calendar-check fa-lg" aria-hidden="true"></i><span>毎日復習する習慣が作れる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten"><i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i> Claude Codeが自分専用の問題集を作ってくれる！</span>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯Claude Desktopアプリの活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>claude codeの<span class="highlight">定期実行にはDesktopアプリが最適</span></span></li>
+                        <li><i class="fa-solid fa-bell fa-lg" aria-hidden="true"></i><span>ルーティン機能で好きな時間に自動実行</span></li>
+                        <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i><span>「スタートアップ時に実行」をオンにすれば常駐OK</span></li>
+                        <li><i class="fa-solid fa-power-off fa-lg orange-icon" aria-hidden="true"></i><span>PCを開けば自動で定期処理が走る</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-desktop fa-lg" style="color: var(--ui-color-1);"></i> CronよりDesktopアプリがおすすめ！</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Cards Row 5 -->
+        <div class="section-layout">
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑰Cron実行の注意点</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-key fa-lg" aria-hidden="true"></i><span>Cronで実行すると<span class="highlight">Claudeの認証が期限切れ</span>になる問題が発生</span></li>
+                        <li><i class="fa-solid fa-circle-xmark fa-lg" aria-hidden="true"></i><span>にゃんたさんもCronではうまくいかなかった</span></li>
+                        <li><i class="fa-solid fa-arrow-right fa-lg orange-icon" aria-hidden="true"></i><span>Desktopアプリを使う方が安定して動作する</span></li>
+                        <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>loopコマンドもあるがセッションの起動が手間</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--ui-color-2);"></i> 認証切れに要注意！Desktopアプリが安全</span>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱今後の展望：AIエージェントのトレンド</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>ChatGPTから<span class="highlight">コーディングエージェントへの関心シフト</span></span></li>
+                        <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>OpenClawやLMS AgentなどパーソナライズAIが流行</span></li>
+                        <li><i class="fa-solid fa-calendar-days fa-lg orange-icon" aria-hidden="true"></i><span>6月15日から<span class="keyword-tag">サードパーティ製ツール</span>がサブスクで使えるように</span></li>
+                        <li><i class="fa-solid fa-hand-holding-dollar fa-lg" aria-hidden="true"></i><span>重量課金を避けられてより手が届くようになる</span></li>
+                        <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>にゃんたさんもOpenClawを試す予定</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-globe fa-lg" style="color: var(--ui-color-2);"></i> 自分専用AIエージェントの時代が来る！</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            🎬 動画: <a href="https://www.youtube.com/watch?v=2JOLh8vtJS0" target="_blank">にゃんた</a> | 📅 2026年5月30日 | 🐱 Claude Code × パーソナライズ
+        </div>
+
+    </div>
+</body>
+</html>

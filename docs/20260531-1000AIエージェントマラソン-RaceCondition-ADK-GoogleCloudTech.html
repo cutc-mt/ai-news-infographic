@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>1000のAIエージェントがマラソンを走る｜Race Conditionのアーキテクチャ全解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root{--ui-color-1:#0D9488;--ui-color-2:#F59E0B;--ui-color-3:#CCFBF1;--ui-color-4:#134E4A;--ui-color-5:#14B8A6}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background-color:#F0FDFA;font-family:'Kaisei Decol',serif;color:#333;line-height:1.6}
+        .container{max-width:2000px;margin:0 auto;padding:20px}
+        .header{text-align:center;padding:50px 20px;margin-bottom:30px;background:linear-gradient(135deg,var(--ui-color-4) 0%,var(--ui-color-1) 50%,var(--ui-color-5) 100%);border-radius:30px;color:white;position:relative;overflow:hidden}
+        .header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,0.08) 0%,transparent 60%);animation:headerGlow 8s ease-in-out infinite}
+        @keyframes headerGlow{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,20px)}}
+        .header-icon{font-size:5em;margin-bottom:10px;animation:fa-bounce 2s infinite}
+        .header h1{font-size:2.2em;font-weight:900;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}
+        .header .subtitle{font-size:1.3em;opacity:0.9;font-family:'Yomogi',cursive}
+        .header .date{font-size:0.9em;opacity:0.7;margin-top:10px}
+        .header .vs-label{display:inline-block;margin-top:15px;background:rgba(0,0,0,0.3);padding:5px 20px;border-radius:20px;font-size:1.1em;font-weight:bold}
+        .teal-label{color:#99F6E4}.amber-label{color:#FDE68A}
+        .section-layout{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-bottom:20px}
+        .section-card{flex:1;min-width:280px;max-width:450px;background-color:white;border-radius:20px;padding:20px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);position:relative;overflow:hidden;transition:transform 0.3s ease,box-shadow 0.3s ease}
+        .section-card:hover{transform:translateY(-5px);box-shadow:8px 8px 25px rgba(0,0,0,0.15)}
+        .section-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px;background:linear-gradient(90deg,var(--ui-color-1),var(--ui-color-5))}
+        .section-card.teal-accent::before{background:linear-gradient(90deg,var(--ui-color-4),var(--ui-color-1))}
+        .section-card.amber-accent::before{background:linear-gradient(90deg,var(--ui-color-2),var(--ui-color-5))}
+        .mega-icon-container{text-align:center;margin:15px 0}
+        .mega-icon-container h2{font-size:1.15em;color:var(--ui-color-4);margin-top:10px}
+        .card-content{padding:0 10px 15px}
+        .keyword-list{margin:15px 0;padding:0;list-style-type:none}
+        .keyword-list li{margin-bottom:10px;display:flex;align-items:flex-start;font-size:15px;line-height:1.6}
+        .keyword-list li i{margin-right:8px;color:var(--ui-color-1);min-width:16px;margin-top:4px}
+        .keyword-list li .amber-icon{color:var(--ui-color-2)}
+        .keyword-tag{background-color:var(--ui-color-3);color:var(--ui-color-4);padding:3px 8px;border-radius:5px;margin-right:5px;display:inline-block;font-weight:bold;font-size:14px}
+        .keyword-tag.amber{background-color:#FEF3C7;color:#92400E}
+        .keyword-tag.teal{background-color:var(--ui-color-3);color:var(--ui-color-4)}
+        .speech-bubble{position:relative;background:#fff;border:3px solid var(--ui-color-1);border-radius:20px;padding:12px 15px;margin:15px 5px;font-family:'Yomogi',cursive;box-shadow:3px 3px 10px rgba(0,0,0,0.1);transform:rotate(-1deg)}
+        .speech-bubble::after{content:'';position:absolute;bottom:-13px;left:20px;border-width:12px 8px 0;border-style:solid;border-color:var(--ui-color-1) transparent;display:block;width:0}
+        .speech-bubble.right::after{left:auto;right:20px;transform:rotate(15deg)}
+        .speech-bubble.top::after{bottom:auto;top:-13px;border-width:0 8px 12px;transform:rotate(-5deg)}
+        .speech-bubble.variant-1{background:#FFFBEB;border-color:var(--ui-color-2);transform:rotate(1deg)}
+        .speech-bubble.variant-1::after{border-color:var(--ui-color-2) transparent}
+        .speech-bubble.variant-2{background:var(--ui-color-3);border-color:var(--ui-color-1);transform:rotate(-2deg)}
+        .speech-bubble.variant-2::after{border-color:var(--ui-color-1) transparent}
+        .speech-bubble.variant-3{background:#F0FDFA;border-color:var(--ui-color-5);transform:rotate(0.5deg)}
+        .speech-bubble.variant-3::after{border-color:var(--ui-color-5) transparent}
+        .handwritten{font-family:'Yomogi',cursive;font-size:15px;line-height:1.5;color:#333}
+        .highlight{background:linear-gradient(transparent 60%,rgba(13,148,136,0.25) 60%);font-weight:bold}
+        .highlight.amber{background:linear-gradient(transparent 60%,rgba(245,158,11,0.25) 60%)}
+        .stat-box{background:linear-gradient(135deg,var(--ui-color-3),#F0FDFA);border-radius:15px;padding:15px;margin:10px 0;text-align:center}
+        .stat-box .stat-number{font-size:2em;font-weight:900;color:var(--ui-color-1)}
+        .stat-box .stat-label{font-size:0.9em;color:#666;margin-top:5px}
+        .flow-steps{margin:10px 0}
+        .flow-step{display:flex;align-items:center;margin-bottom:8px;font-size:14px}
+        .flow-step .step-num{background:var(--ui-color-1);color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;margin-right:10px;flex-shrink:0;font-size:13px}
+        .flow-step .step-text{flex:1}
+        pre{background:#F0FDFA;padding:10px;border-radius:8px;font-size:13px;margin:10px 0;overflow-x:auto;border-left:4px solid var(--ui-color-1)}
+        footer{text-align:center;padding:30px 20px;margin-top:30px;background:linear-gradient(135deg,var(--ui-color-4) 0%,var(--ui-color-1) 100%);border-radius:20px;color:white;font-size:1em}
+        footer a{color:#99F6E4;text-decoration:none;font-weight:bold}
+        footer a:hover{text-decoration:underline}
+        @keyframes fa-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes fa-beat-fade{0%,100%{opacity:1}50%{opacity:0.6}}
+        .fade-in-scale{opacity:0;transform:scale(0.95);animation:fadeInScale 0.5s ease forwards}
+        @keyframes fadeInScale{to{opacity:1;transform:scale(1)}}
+        @media(max-width:1600px){.section-card{min-width:280px}}
+        @media(max-width:1200px){.section-card{min-width:320px}}
+        @media(max-width:900px){.section-card{min-width:380px}}
+        @media(max-width:768px){.section-layout{flex-direction:column}.section-card{width:100%;min-width:auto}}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="header-icon">🏃</div>
+        <h1>1000のAIエージェントがマラソンを走る</h1>
+        <div class="subtitle">Google Cloud Nextで披露された「Race Condition」プロジェクトのアーキテクチャを徹底解説</div>
+        <div class="date">📅 2026年5月31日</div>
+        <div class="vs-label"><span class="teal-label">🔥 Google Cloud Next 2026</span> × <span class="amber-label">⚡ Race Condition</span> × <span class="teal-label">🎯 ADK</span></div>
+    </div>
+    <div class="section-layout">
+        <!-- ① -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-person-running fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>①Race Condition：1000エージェントのマラソンシミュレーション</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-info"></i><span>Google Cloud Next 2026の<span class="highlight">開発者キーノート</span>で披露された大規模マルチエージェントシステム</span></li>
+                    <li><i class="fa-solid fa-map-location-dot amber-icon"></i><span>ラスベガスのマラソンコースを舞台に、<span class="highlight amber">1000人のAIランナーエージェント</span>がリアルタイムで走るシミュレーション</span></li>
+                    <li><i class="fa-solid fa-droplet amber-icon"></i><span>各ランナーは<span class="keyword-tag teal">水分補給レベル</span><span class="keyword-tag teal">速度</span>を独立して管理し、給水所で自分で判断して飲む</span></li>
+                    <li><i class="fa-solid fa-bullseye"></i><span><span class="highlight">全てオープンソース</span>で公開。ローカルマシンで試すことが可能</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color:var(--ui-color-1)"></i> マップ上のドット1つ1つがAIランナー。それぞれが独立して走っている！</span></div>
+            </div>
+        </div>
+        <!-- ② -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-layer-group fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>②4層のポリグロットアーキテクチャ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-globe"></i><span><span class="keyword-tag amber">Angular</span>フロントエンド：シミュレーションUIと管理ダッシュボードを提供</span></li>
+                    <li><i class="fa-solid fa-server amber-icon"></i><span><span class="keyword-tag teal">Goゲートウェイ</span>：高並行トラフィックの管理。何千ものWebSocket接続を軽々と処理</span></li>
+                    <li><i class="fa-brands fa-python"></i><span><span class="keyword-tag amber">Python ADK</span>：全てのAIロジックがここに。LLMアクセスと豊富なエコシステムを活用</span></li>
+                    <li><i class="fa-solid fa-cloud amber-icon"></i><span><span class="keyword-tag teal">インフラ層</span>：Redis・Pub/Subなどでエージェント間の通信を支える</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-wrench fa-lg" style="color:var(--ui-color-2)"></i> 各層に最適な言語を選ぶ「ベストツール・フォー・ジョブ」の哲学！</span></div>
+            </div>
+        </div>
+        <!-- ③ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-shuffle fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>③2つのディスパッチモード：Subscriber と Callable</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-tower-broadcast"></i><span><span class="highlight">Subscriber</span>（Redis Pub/Sub）：ランナーエージェント専用。<span class="keyword-tag teal">サブミリ秒</span>で応答可能</span></li>
+                    <li><i class="fa-solid fa-phone amber-icon"></i><span><span class="highlight amber">Callable</span>（HTTP）：プランナー・シミュレーター向け。標準の<span class="keyword-tag amber">A2Aプロトコル</span>で通信</span></li>
+                    <li><i class="fa-solid fa-bolt"></i><span>シミュレーターが<span class="keyword-tag teal">ティックメッセージをブロードキャスト</span>すると、全ランナーが同時に起動して応答</span></li>
+                    <li><i class="fa-solid fa-arrow-down amber-icon"></i><span>Callableは<span class="keyword-tag amber">スケールダウン可能</span>。アイドル時はゼロにスケールしてコストを節約</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2)"></i> 思考系エージェントはHTTP、実行系はPub/Sub。使い分けがポイント！</span></div>
+            </div>
+        </div>
+        <!-- ④ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-network-wired fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>④Goゲートウェイ：メッセージパッシングの中核</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-road"></i><span>全てのフロントエンドとエージェントの間に位置する<span class="highlight">中央通信ハブ</span></span></li>
+                    <li><i class="fa-solid fa-id-card amber-icon"></i><span>エージェントの<span class="keyword-tag amber">Agent Card</span>を読み取り、ディスパッチモードを自動判別して適切にルーティング</span></li>
+                    <li><i class="fa-solid fa-gauge-high amber-icon"></i><span>Goの並行処理能力により、<span class="highlight amber">数千のWebSocket接続とメッセージング</span>を効率的に処理</span></li>
+                    <li><i class="fa-solid fa-diagram-project"></i><span><span class="keyword-tag teal">BFF（Backend for Frontend）</span>パターンを採用。Cloud Run上で実行される</span></li>
+                </ul>
+                <pre>ゲートウェイのルーティング
+├ Agent Cardを読み取り
+├ dispatch = "subscriber" → Redis Pub/Sub
+└ dispatch = "callable"  → A2A HTTP</pre>
+            </div>
+        </div>
+        <!-- ⑤ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-people-arrows fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑤A2Aプロトコルとエージェントのメッシュネットワーク</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-nodes"></i><span><span class="highlight">Agent-to-Agent（A2A）プロトコル</span>を活用。エージェント同士が互いを発見・通信する</span></li>
+                    <li><i class="fa-solid fa-share-nodes amber-icon"></i><span>指向性グラフではなく、<span class="highlight amber">メッシュネットワーク</span>。どのエージェントも他のどのエージェントとも通信可能</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass amber-icon"></i><span>ハードコードされた設定ではなく、<span class="keyword-tag teal">動的ディスカバリー</span>でエージェントを見つける</span></li>
+                    <li><i class="fa-solid fa-rotate"></i><span>コールドスタート時の<span class="keyword-tag teal">自動リトライ</span>機能も内蔵。通信が確実に届く仕組み</span></li>
+                </ul>
+                <div class="speech-bubble variant-3"><span class="handwritten"><i class="fa-solid fa-handshake fa-lg" style="color:var(--ui-color-5)"></i> エージェント同士が自由に会話できるメッシュ型。柔軟性が高い！</span></div>
+            </div>
+        </div>
+        <!-- ⑥ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-id-badge fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+            </div>
+            <h2 style="text-align:center;font-size:1.15em;color:var(--ui-color-4);margin-top:10px">⑥Agent Card：エージェントの身分証</h2>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-address-card"></i><span><span class="highlight">Agent Card</span>はエージェントの「名刺」のようなもの。名前・説明・スキル・URLが含まれる</span></li>
+                    <li><i class="fa-solid fa-gear amber-icon"></i><span>A2Aプロトコルの<span class="keyword-tag amber">拡張機能</span>としてディスパッチモードを定義可能</span></li>
+                    <li><i class="fa-solid fa-robot amber-icon"></i><span>プランナー：<span class="keyword-tag teal">callable</span>。ランナー：<span class="keyword-tag teal">subscriber</span>。Cardを見れば通信方式が分かる</span></li>
+                    <li><i class="fa-solid fa-list-check"></i><span>スキル情報も定義。「マラソンルートの計画」「シミュレーション実行」などを記載</span></li>
+                </ul>
+                <pre>{
+  "name": "planner-agent",
+  "description": "マラソンルート・イベント計画の専門家",
+  "dispatch": "callable",
+  "skills": ["plan_marathon_route", "report_route"]
+}</pre>
+            </div>
+        </div>
+        <!-- ⑦ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-shield-halved fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑦レジリエントモデル：自動リトライとバックオフ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-triangle-exclamation"></i><span>429エラー（クオータ超過）や<span class="keyword-tag teal">ネットワーク障害</span>が発生しても自動でリトライ</span></li>
+                    <li><i class="fa-solid fa-chart-line amber-icon"></i><span><span class="highlight">指数的バックオフ＋ジッター</span>を搭載。リトライ間隔をランダムに変動させ、一斉アクセスを回避</span></li>
+                    <li><i class="fa-brands fa-google amber-icon"></i><span>Googleの<span class="keyword-tag amber">Gen AI クライアントライブラリ</span>の機能を活用してADKに統合</span></li>
+                    <li><i class="fa-solid fa-check-circle"></i><span>これがデモが<span class="highlight amber">スムーズで安定</span>している理由の一つだとのこと</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-heart-pulse fa-lg" style="color:var(--ui-color-1)"></i> デモが安定して見えたのは、裏で堅牢なエラーハンドリングが動いていたから！</span></div>
+            </div>
+        </div>
+        <!-- ⑧ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-puzzle-piece fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑧ADKのスキルシステム：遅延読み込み</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-hourglass-half"></i><span><span class="highlight">スキルの遅延読み込み（Lazy Loading）</span>でコンテキストウィンドウを効率管理</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles amber-icon"></i><span>プロンプトに<span class="keyword-tag amber">「必要な時だけスキルをロード」</span>と指示するだけでOK</span></li>
+                    <li><i class="fa-solid fa-map amber-icon"></i><span><span class="keyword-tag teal">GIS空間エンジニアリング</span>スキル：マラソンルートの計画に使用</span></li>
+                    <li><i class="fa-solid fa-file-code"></i><span>各スキルは<span class="keyword-tag teal">skill.markdown</span>にメタデータ・説明・関連ツールを定義</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-box-open fa-lg" style="color:var(--ui-color-2)"></i> 必要な道具だけを使う。無駄がないから高速でコストも安い！</span></div>
+            </div>
+        </div>
+        <!-- ⑨ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-route fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑨プランナーエージェント：マラソンルートの設計</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-brain"></i><span>マラソンルートとイベント計画の<span class="highlight">専門アナリスト</span>として設計されたエージェント</span></li>
+                    <li><i class="fa-solid fa-list-ol amber-icon"></i><span>計画プロセス：<span class="keyword-tag amber">GISスキル読み込み</span>→<span class="keyword-tag amber">ルート計画</span>→<span class="keyword-tag amber">レポート作成</span></span></li>
+                    <li><i class="fa-brands fa-google amber-icon"></i><span><span class="keyword-tag teal">Google Maps MCP</span>が利用可能なら天候データも取得して最適な開始時刻を検討</span></li>
+                    <li><i class="fa-solid fa-plug"></i><span>MCPはAPIキーが<span class="keyword-tag teal">オプション</span>。持っていなくても動く親切設計</span></li>
+                </ul>
+                <pre>プランナーの計画フロー
+├ ステップ1: GISスキルをロード
+├ ステップ2: ルートを計画
+├ ステップ3: レポートを作成
+└ ステップ4: Maps MCPがあれば天候を確認</pre>
+            </div>
+        </div>
+        <!-- ⑩ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-gauge-high fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑩シミュレーターエージェント：ティック駆動の実行</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-stopwatch"></i><span>シミュレーションの<span class="highlight">各ティック（刻み）</span>ごとにRedisにメッセージをブロードキャスト</span></li>
+                    <li><i class="fa-solid fa-users amber-icon"></i><span>全1000人のランナーが<span class="highlight amber">同時にメッセージを受信</span>し、各自の状態を更新</span></li>
+                    <li><i class="fa-solid fa-database amber-icon"></i><span>位置・速度・水分補給レベルなど、各ランナーの<span class="keyword-tag teal">ティレメトリ</span>を追跡</span></li>
+                    <li><i class="fa-solid fa-timeline"></i><span>_callable_モードで動作。使用頻度が低いため<span class="keyword-tag teal">ゼロスケール可能</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color:var(--ui-color-1)"></i> ティックごとに全員に一斉送信。Pub/Subだからこそ可能なリアルタイム性！</span></div>
+            </div>
+        </div>
+        <!-- ⑪ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-person-running fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑪ランナーエージェント：独立した意思決定</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-shoe-prints"></i><span>各ランナーは<span class="highlight">独立したセッション</span>を持ち、自身の状態を自律的に管理</span></li>
+                    <li><i class="fa-solid fa-glass-water amber-icon"></i><span>給水所を通過する時に<span class="keyword-tag teal">自分で水分補給するか判断</span>。これがエネルギーに影響する</span></li>
+                    <li><i class="fa-solid fa-person-walking amber-icon"></i><span>ペースは個々に異なる。<span class="keyword-tag amber">ウォーキング</span><span class="keyword-tag amber">ジョギング</span><span class="keyword-tag amber">全力疾走</span>など多様な走法</span></li>
+                    <li><i class="fa-solid fa-cloud-arrow-up"></i><span>Cloud Runにデプロイ。<span class="highlight amber">常時ホットインスタンス</span>を維持して即応性を確保</span></li>
+                </ul>
+                <div class="stat-box"><div class="stat-number">1000セッション</div><div class="stat-label">同時に稼働する独立したAIランナーエージェント</div></div>
+            </div>
+        </div>
+        <!-- ⑫ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-database fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑫Redis Pub/Subによる超高速通信</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-bolt-lightning"></i><span>Google Cloudの<span class="highlight">Memory Store（マネージドRedis）</span>のPub/Subを活用</span></li>
+                    <li><i class="fa-solid fa-tachometer-alt amber-icon"></i><span>1つのノードで<span class="highlight amber">約10万件の同時メッセージ</span>を処理可能。本プロジェクトには十分すぎる性能</span></li>
+                    <li><i class="fa-solid fa-ban amber-icon"></i><span>HTTPで1000件同時送信すると<span class="keyword-tag teal">ネットワークオーバーヘッド</span>が問題に。これがPub/Sub移行の決定打</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>全ランナーの応答を<span class="keyword-tag amber">約10秒以内</span>に収集する必要がある。ボトルネックは「ネットワーク」</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color:var(--ui-color-2)"></i> HTTPの限界に気づいてRedis Pub/Subに切り替えた。いい判断！</span></div>
+            </div>
+        </div>
+        <!-- ⑬ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-code fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑬ADKエージェントの構造：レジリエントモデルの実装</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cube"></i><span>ADKの<span class="highlight">LlmAgent</span>クラスでエージェントを定義。名前・モデル・説明・命令を設定</span></li>
+                    <li><i class="fa-solid fa-shield-halved amber-icon"></i><span><span class="keyword-tag amber">static_instructions</span>はキャッシュ可能。全セッションで共通の命令を効率よく送信</span></li>
+                    <li><i class="fa-brands fa-python amber-icon"></i><span><span class="keyword-tag teal">utils/retry.py</span>にレジリエントモデルの実装。最大試行回数・初期遅延・ジッター等を設定</span></li>
+                    <li><i class="fa-solid fa-globe"></i><span><span class="keyword-tag teal">global_gemini.py</span>でプレビューモデルに対応。エージェントランタイムでも最新モデルを使える</span></li>
+                </ul>
+                <pre>レジリエントモデルの設定例
+max_attempts: 5
+initial_delay: 1.0秒
+max_delay: 30.0秒
+jitter: true
+backoff_base: 2（指数的バックオフ）</pre>
+            </div>
+        </div>
+        <!-- ⑭ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-comments fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑭call_agent：エージェント間通信の統一インターフェース</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-right-left"></i><span><span class="highlight">call_agent</span>ツールが全エージェント間通信の<span class="keyword-tag amber">単一エントリーポイント</span></span></li>
+                    <li><i class="fa-solid fa-eye-slash amber-icon"></i><span>プランナーはシミュレーターの<span class="keyword-tag teal">場所を知らなくて良い</span>。名前で指定するだけ</span></li>
+                    <li><i class="fa-solid fa-rotate-right"></i><span>失敗時の<span class="keyword-tag teal">自動リトライ</span>、ティレメトリの送信、A2Aディスカバリーも自動で処理</span></li>
+                    <li><i class="fa-solid fa-plug-circle-check"></i><span>A2Aプロトコルをラップして<span class="highlight amber">ネットワークの複雑さを隠蔽</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-3"><span class="handwritten"><i class="fa-solid fa-link fa-lg" style="color:var(--ui-color-5)"></i> プランナーは「シミュレーターを呼んで」と言うだけ。後は全部自動！</span></div>
+            </div>
+        </div>
+        <!-- ⑮ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-brain fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑮なぜ手続き型ではなくエージェントにしたのか</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-code-compare"></i><span>手続き型コードでもシミュレーションは<span class="keyword-tag teal">作れる</span>が、LLM周辺の<span class="highlight">ライフサイクル管理</span>が必要</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left amber-icon"></i><span>ADKが<span class="keyword-tag amber">セッション管理</span><span class="keyword-tag amber">コールバック</span><span class="keyword-tag amber">ツール呼び出しの解釈</span><span class="keyword-tag amber">ティレメトリ</span>を無料で提供</span></li>
+                    <li><i class="fa-solid fa-calendar-check amber-icon"></i><span>分散システムの<span class="highlight amber">配管（プラミング）</span>をゼロから書かなくて済む</span></li>
+                    <li><i class="fa-solid fa-rocket"></i><span>開発期間が<span class="keyword-tag teal">数ヶ月から数週間</span>に短縮。開発者は知能の部分に100%集中できる</span></li>
+                </ul>
+                <div class="stat-box"><div class="stat-number">月数 → 週数</div><div class="stat-label">ADKを使ったことで開発期間が大幅に短縮</div></div>
+            </div>
+        </div>
+        <!-- ⑯ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-cloud-run fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑯Cloud Run vs Agent Runtime：デプロイ戦略</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-brands fa-google"></i><span>ランナーエージェントは<span class="highlight">Cloud Run</span>にデプロイ。スケーラビリティを細かく制御</span></li>
+                    <li><i class="fa-solid fa-sliders amber-icon"></i><span>Cloud Runは<span class="keyword-tag amber">並行数設定</span><span class="keyword-tag amber">ホット/コールドインスタンス数</span>など調整ノブが豊富</span></li>
+                    <li><i class="fa-solid fa-robot amber-icon"></i><span>プランナー・シミュレーターは<span class="keyword-tag teal">Agent Runtime</span>にデプロイ。ゼロスケールでコスト最適化</span></li>
+                    <li><i class="fa-solid fa-scale-balanced"></i><span>用途に応じて<span class="highlight amber">適切なインフラを選択</span>する柔軟な設計</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-bullseye fa-lg" style="color:var(--ui-color-2)"></i> 高頻度通信はCloud Run、低頻度はAgent Runtime。適材適所！</span></div>
+            </div>
+        </div>
+        <!-- ⑰ -->
+        <div class="section-card teal-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-wand-magic-sparkles fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑰拡張ビジョン：より多くのエージェントの可能性</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-person-shelter"></i><span><span class="keyword-tag teal">公共安全エージェント</span>：ランナーの安全確保や交通規制のシミュレーション</span></li>
+                    <li><i class="fa-solid fa-store amber-icon"></i><span><span class="keyword-tag amber">ビジネスエージェント</span>：マラソンの影響を受ける店舗をモデル化（ドライブスルーvsカフェ）</span></li>
+                    <li><i class="fa-solid fa-masks-theater amber-icon"></i><span>ランナーに<span class="highlight">個性とアイデンティティ</span>を付与。ルール遵守者とチーターなど多様な行動</span></li>
+                    <li><i class="fa-solid fa-eye"></i><span><span class="keyword-tag teal">監視エージェント</span>：不正行為を検知するシステム。予測不能なLLMの振る舞いを活用</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-film fa-lg" style="color:var(--ui-color-1)"></i> LLMだからこそ生まれる予測不能な面白い振る舞い。映画みたいだ！</span></div>
+            </div>
+        </div>
+        <!-- ⑱ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-flag-checkered fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑱まとめ：Race Conditionプロジェクトの全体像</h2>
+            </div>
+            <div class="card-content">
+                <div class="flow-steps">
+                    <div class="flow-step"><span class="step-num">1</span><span class="step-text"><span class="keyword-tag teal">ポリグロット設計</span>：Go（通信）＋Python（AI）＋Angular（UI）の最適な組み合わせ</span></div>
+                    <div class="flow-step"><span class="step-num">2</span><span class="step-text"><span class="keyword-tag amber">2つのディスパッチ</span>：Subscriber（高頻度）とCallable（低頻度）の使い分け</span></div>
+                    <div class="flow-step"><span class="step-num">3</span><span class="step-text"><span class="keyword-tag teal">ADKの活用</span>：レジリエンス・スキル・セッション管理をフレームワークに任せる</span></div>
+                </div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-nodes"></i><span>キーワード: <span class="keyword-tag">A2A</span><span class="keyword-tag">Redis Pub/Sub</span><span class="keyword-tag">Agent Card</span><span class="keyword-tag">Lazy Loading</span></span></li>
+                    <li><i class="fa-solid fa-circle-info amber-icon"></i><span>大規模マルチエージェントシステムの<span class="highlight amber">リファレンスアーキテクチャ</span>としてオープンソース公開</span></li>
+                    <li><i class="fa-solid fa-heart amber-icon"></i><span>「 deterministicコードだけでは大変。ADKが配管を引き受けてくれる」<span class="highlight">開発効率の革命的向上</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-hand-point-right fa-lg" style="color:var(--ui-color-1)"></i> 大規模エージェントシステムを設計する人は必見。実戦的なアーキテクチャだ！</span></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        🎬 動画: <a href="https://youtu.be/WSIzaih2vq4" target="_blank">Google Cloud Tech</a> | 📂 Race Condition: <a href="https://github.com/GoogleCloudPlatform/race-condition" target="_blank">オープンソースリポジトリ</a> | 📅 2026年5月31日作成
+    </footer>
+</div>
+</body>
+</html>

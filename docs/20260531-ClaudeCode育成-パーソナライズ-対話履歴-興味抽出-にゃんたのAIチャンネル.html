@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Codeを自分専用に育てる｜対話履歴から興味を抽出してパーソナライズする方法</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root{--ui-color-1:#7C3AED;--ui-color-2:#F59E0B;--ui-color-3:#F3E8FF;--ui-color-4:#3B0764;--ui-color-5:#C4B5FD}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background-color:#FAF5FF;font-family:'Kaisei Decol',serif;color:#333;line-height:1.6}
+        .container{max-width:2000px;margin:0 auto;padding:20px}
+        .header{text-align:center;padding:50px 20px;margin-bottom:30px;background:linear-gradient(135deg,var(--ui-color-4) 0%,var(--ui-color-1) 50%,var(--ui-color-2) 100%);border-radius:30px;color:white;position:relative;overflow:hidden}
+        .header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,0.08) 0%,transparent 60%);animation:headerGlow 8s ease-in-out infinite}
+        @keyframes headerGlow{0%,100%{transform:translate(0,0)}50%{transform:translate(20px,20px)}}
+        .header-icon{font-size:5em;margin-bottom:10px;animation:fa-bounce 2s infinite}
+        .header h1{font-size:2.2em;font-weight:900;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,0.3)}
+        .header .subtitle{font-size:1.3em;opacity:0.9;font-family:'Yomogi',cursive}
+        .header .date{font-size:0.9em;opacity:0.7;margin-top:10px}
+        .header .vs-label{display:inline-block;margin-top:15px;background:rgba(0,0,0,0.3);padding:5px 20px;border-radius:20px;font-size:1.1em;font-weight:bold}
+        .purple-label{color:var(--ui-color-5)}.amber-label{color:#FDE68A}
+        .section-layout{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-bottom:20px}
+        .section-card{flex:1;min-width:280px;max-width:450px;background-color:white;border-radius:20px;padding:20px;box-shadow:5px 5px 15px rgba(0,0,0,0.1);position:relative;overflow:hidden;transition:transform 0.3s ease,box-shadow 0.3s ease}
+        .section-card:hover{transform:translateY(-5px);box-shadow:8px 8px 25px rgba(0,0,0,0.15)}
+        .section-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px;background:linear-gradient(90deg,var(--ui-color-1),var(--ui-color-2))}
+        .section-card.purple-accent::before{background:linear-gradient(90deg,var(--ui-color-4),var(--ui-color-1))}
+        .section-card.amber-accent::before{background:linear-gradient(90deg,var(--ui-color-2),#FBBF24)}
+        .mega-icon-container{text-align:center;margin:15px 0}
+        .mega-icon-container h2{font-size:1.15em;color:var(--ui-color-4);margin-top:10px}
+        .card-content{padding:0 10px 15px}
+        .keyword-list{margin:15px 0;padding:0;list-style-type:none}
+        .keyword-list li{margin-bottom:10px;display:flex;align-items:flex-start;font-size:15px;line-height:1.6}
+        .keyword-list li i{margin-right:8px;color:var(--ui-color-1);min-width:16px;margin-top:4px}
+        .keyword-list li .amber-icon{color:var(--ui-color-2)}
+        .keyword-tag{background-color:var(--ui-color-3);color:var(--ui-color-4);padding:3px 8px;border-radius:5px;margin-right:5px;display:inline-block;font-weight:bold;font-size:14px}
+        .keyword-tag.amber{background-color:#FFFBEB;color:#92400E}
+        .keyword-tag.purple{background-color:var(--ui-color-3);color:var(--ui-color-4)}
+        .speech-bubble{position:relative;background:#fff;border:3px solid var(--ui-color-1);border-radius:20px;padding:12px 15px;margin:15px 5px;font-family:'Yomogi',cursive;box-shadow:3px 3px 10px rgba(0,0,0,0.1);transform:rotate(-1deg)}
+        .speech-bubble::after{content:'';position:absolute;bottom:-13px;left:20px;border-width:12px 8px 0;border-style:solid;border-color:var(--ui-color-1) transparent;display:block;width:0}
+        .speech-bubble.right::after{left:auto;right:20px;transform:rotate(15deg)}
+        .speech-bubble.top::after{bottom:auto;top:-13px;border-width:0 8px 12px;transform:rotate(-5deg)}
+        .speech-bubble.variant-1{background:#FFF8E1;border-color:#FFC107;transform:rotate(1deg)}
+        .speech-bubble.variant-1::after{border-color:#FFC107 transparent}
+        .speech-bubble.variant-2{background:var(--ui-color-3);border-color:var(--ui-color-1);transform:rotate(-2deg)}
+        .speech-bubble.variant-2::after{border-color:var(--ui-color-1) transparent}
+        .speech-bubble.variant-3{background:#FEE2E2;border-color:#EF4444;transform:rotate(0.5deg)}
+        .speech-bubble.variant-3::after{border-color:#EF4444 transparent}
+        .handwritten{font-family:'Yomogi',cursive;font-size:15px;line-height:1.5;color:#333}
+        .highlight{background:linear-gradient(transparent 60%,rgba(124,58,237,0.25) 60%);font-weight:bold}
+        .highlight.amber{background:linear-gradient(transparent 60%,rgba(245,158,11,0.25) 60%)}
+        .stat-box{background:linear-gradient(135deg,var(--ui-color-3),#FAF5FF);border-radius:15px;padding:15px;margin:10px 0;text-align:center}
+        .stat-box .stat-number{font-size:2em;font-weight:900;color:var(--ui-color-1)}
+        .stat-box .stat-label{font-size:0.9em;color:#666;margin-top:5px}
+        .flow-steps{margin:10px 0}
+        .flow-step{display:flex;align-items:center;margin-bottom:8px;font-size:14px}
+        .flow-step .step-num{background:var(--ui-color-1);color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;margin-right:10px;flex-shrink:0;font-size:13px}
+        .flow-step .step-text{flex:1}
+        .flow-step .step-arrow{color:var(--ui-color-2);margin:0 5px}
+        pre{background:#F5F3FF;padding:10px;border-radius:8px;font-size:13px;margin:10px 0;overflow-x:auto;border-left:4px solid var(--ui-color-1)}
+        footer{text-align:center;padding:30px 20px;margin-top:30px;background:linear-gradient(135deg,var(--ui-color-4) 0%,var(--ui-color-1) 100%);border-radius:20px;color:white;font-size:1em}
+        footer a{color:#DDD6FE;text-decoration:none;font-weight:bold}
+        footer a:hover{text-decoration:underline}
+        @keyframes fa-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+        @keyframes fa-beat-fade{0%,100%{opacity:1}50%{opacity:0.6}}
+        .fade-in-scale{opacity:0;transform:scale(0.95);animation:fadeInScale 0.5s ease forwards}
+        @keyframes fadeInScale{to{opacity:1;transform:scale(1)}}
+        @media(max-width:1600px){.section-card{min-width:280px}}
+        @media(max-width:1200px){.section-card{min-width:320px}}
+        @media(max-width:900px){.section-card{min-width:380px}}
+        @media(max-width:768px){.section-layout{flex-direction:column}.section-card{width:100%;min-width:auto}}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="header-icon">🤖</div>
+        <h1>Claude Codeを自分専用に育てる</h1>
+        <div class="subtitle">対話履歴から興味や学習内容を抽出してパーソナライズする方法を解説</div>
+        <div class="date">📅 2026年5月31日</div>
+        <div class="vs-label"><span class="purple-label">💬 対話ログ解析</span> × <span class="amber-label">🎯 興味抽出</span> × <span class="purple-label">📚 学習自動化</span> 三つの軸で育てる</div>
+    </div>
+    <div class="section-layout">
+        <!-- ① -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-seedling fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>①Claude Codeを「育てる」とは？</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-question"></i><span>「Claude Codeを育てる」＝<span class="highlight">使えば使うほど自分のことを理解して、パーソナライズされた返答が返ってくる</span>状態にすること</span></li>
+                    <li><i class="fa-solid fa-code amber-icon"></i><span>コードを書かせるだけでなく、<span class="keyword-tag">調べ物</span><span class="keyword-tag">情報収集</span><span class="keyword-tag">提案</span>など多彩な用途でClaude Codeを活用</span></li>
+                    <li><i class="fa-solid fa-user-graduate amber-icon"></i><span>にゃんたさんは<span class="highlight amber">YouTubeコンテンツ制作や勉強</span>にもClaude Codeを使いこなしている</span></li>
+                    <li><i class="fa-solid fa-bullseye"></i><span>自分の<span class="keyword-tag purple">興味関心</span>に近い情報を集めてもらったり、会話で提案してもらうことが可能に</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-1)"></i> Claude Codeは単なるコーディングツールじゃない！自分専用のAIアシスタントに育て上げよう！</span></div>
+            </div>
+        </div>
+        <!-- ② -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-brain fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>②興味関心を記憶する仕組みの全体像</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-comments"></i><span>Claude Codeと対話すると、<span class="highlight">パソコンに会話のログが自動的に蓄積</span>されていく</span></li>
+                    <li><i class="fa-solid fa-file-lines amber-icon"></i><span>この会話ログを解析すれば、自分が<span class="keyword-tag">どういった疑問</span>や<span class="keyword-tag">関心</span>を持っているかが分かる</span></li>
+                    <li><i class="fa-solid fa-database amber-icon"></i><span>会話ログから興味をプロファイルし、<span class="highlight amber">interest.mdというファイル</span>に定期的にまとめさせる</span></li>
+                    <li><i class="fa-solid fa-robot"></i><span>このファイルを参照させることで、自分の興味に沿った<span class="keyword-tag purple">情報収集</span>や<span class="keyword-tag purple">学習教材の作成</span>ができる</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-link fa-lg" style="color:var(--ui-color-1)"></i> 会話 → ログ蓄積 → 興味抽出 → プロファイル化 → パーソナライズ活用。この流れが全てだ！</span></div>
+            </div>
+        </div>
+        <!-- ③ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-book-open-reader fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>③Andrej Karpathyとの関連</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-user-tie"></i><span><span class="keyword-tag">Andrej Karpathy</span>（OpenAI創業者の一人で最近Anthropicにジョイン）が話題にした<span class="highlight">「LLMの知識ベース」</span></span></li>
+                    <li><i class="fa-solid fa-book amber-icon"></i><span>自分専用の<span class="highlight amber">コンテンツ管理システムを作る方法</span>として以前話題になった</span></li>
+                    <li><i class="fa-solid fa-code-branch amber-icon"></i><span>コーディングエージェントで質問した内容を参照させて知識を整理するもの。使うほど情報が溜まる</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span>今回は<span class="keyword-tag purple">知識ベース</span>とは別のアプローチ。<span class="highlight">興味関心そのものを定期抽出</span>してパーソナライズする</span></li>
+                </ul>
+            </div>
+        </div>
+        <!-- ④ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-file-alt fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>④interest.mdで関心プロファイルを活用</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-magnifying-glass"></i><span>「私が最近興味あることは？」と入力すると、<span class="highlight">Claude Codeが自分の興味を理解して教えてくれる</span></span></li>
+                    <li><i class="fa-solid fa-list-check amber-icon"></i><span>例えば<span class="keyword-tag amber">エージェントハーネスの評価</span>や<span class="keyword-tag amber">Claude Code育成</span>など、実際の関心事が的確に出力される</span></li>
+                    <li><i class="fa-solid fa-compass amber-icon"></i><span>このファイルを参照して「私の興味に沿って調べて」と頼めば、<span class="highlight amber">自分好みの情報を集めてくれる</span></span></li>
+                </ul>
+                <pre>/interest.md を参照して、私が興味ありそうなことや
+学ぶべきことを調べてください</pre>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color:#FFC107"></i> Claude Codeが自分の関心を理解して提案までしてくれる。まるで相棒みたいだ！</span></div>
+            </div>
+        </div>
+        <!-- ⑤ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-chart-bar fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑤Claude Code対話ログの保存形式</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-folder-open"></i><span>Claude Codeを使うと、<span class="highlight">ローカルファイルに会話履歴が自動保存</span>される</span></li>
+                    <li><i class="fa-solid fa-file-code amber-icon"></i><span><span class="keyword-tag">JSONL形式</span>で、セッションごとに会話履歴が蓄積されていく構造</span></li>
+                    <li><i class="fa-solid fa-compare-arrows amber-icon"></i><span>Webアプリ版のClaudeやChatGPTの<span class="highlight">会話履歴エクスポート機能</span>を使えば過去のログも移行可能</span></li>
+                    <li><i class="fa-solid fa-check-circle"></i><span>Claude Codeなら<span class="keyword-tag purple">直接ローカルにログが溜まる</span>ので手間いらず</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-hard-drive fa-lg" style="color:var(--ui-color-1)"></i> Claude Codeの最大のメリット：ログが自動的に手元に残る！外部サービス頼りじゃないのが強み</span></div>
+            </div>
+        </div>
+        <!-- ⑥ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-diagram-project fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑥interest-profileスキルの処理フロー</h2>
+            </div>
+            <div class="card-content">
+                <div class="flow-steps">
+                    <div class="flow-step"><span class="step-num">1</span><span class="step-text"><span class="keyword-tag purple">会話ログ</span>から<span class="highlight">未分析部分のみ</span>を抽出（全ログ参照は重すぎるため）</span></div>
+                    <div class="flow-step"><span class="step-num">2</span><span class="step-text"><span class="keyword-tag amber">ノイズ除外</span>：挨拶や雑談、スキル実行時のコマンドなどを除去</span></div>
+                    <div class="flow-step"><span class="step-num">3</span><span class="step-text"><span class="keyword-tag purple">深掘りスコア</span>：何回も質問しているトピックほど高く評価</span></div>
+                    <div class="flow-step"><span class="step-num">4</span><span class="step-text"><span class="keyword-tag amber">時間の重み付け</span>：直近の関心ほど重視してスコア算出</span></div>
+                </div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-gears amber-icon"></i><span>最終的に<span class="highlight amber">interest.md</span>を生成し、興味関心が高い順に並べる設計</span></li>
+                    <li><i class="fa-solid fa-github"></i><span>最小限のコードは<span class="keyword-tag">GitHubで公開済み</span>（nyanta012/cc-personalize）</span></li>
+                </ul>
+            </div>
+        </div>
+        <!-- ⑦ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-filter fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑦ノイズ除外と深掘りスコアの仕組み</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-broom"></i><span>ノイズを除外しないと<span class="highlight">「こんにちは」などの雑談まで興味に含まれてしまう</span></span></li>
+                    <li><i class="fa-solid fa-terminal amber-icon"></i><span>Claude Codeでスキルを使う際のコマンド入力も<span class="keyword-tag amber">ユーザー入力として扱われてしまう</span>ので除外が必要</span></li>
+                    <li><i class="fa-solid fa-layer-group amber-icon"></i><span><span class="keyword-tag purple">深掘りスコア</span>：1回で理解できる質問より、何回も質問したトピックを<span class="highlight amber">より興味が強いと評価</span></span></li>
+                    <li><i class="fa-solid fa-scale-balanced"></i><span>「難しかった」か「興味が高かった」かの区別はつかないが、<span class="keyword-tag purple">どのトピックに強い関心があるか</span>を表す指標としては有用</span></li>
+                </ul>
+                <div class="speech-bubble variant-3"><span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color:#EF4444"></i> 挨拶やスキルコマンドがノイズになるのを見落としがち！ここをちゃんと除外するのがポイント</span></div>
+            </div>
+        </div>
+        <!-- ⑧ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-clock fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑧時間の重み付けとスコア算出</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-hourglass-half"></i><span>興味は日々変わるので、<span class="highlight">直近の関心ほど重視</span>する必要がある</span></li>
+                    <li><i class="fa-solid fa-calendar-day amber-icon"></i><span>直近で聞いたことと1ヶ月前に聞いたことでは、<span class="highlight amber">直近の方が参照したい情報</span>になることが多い</span></li>
+                    <li><i class="fa-solid fa-calculator amber-icon"></i><span>時間経過による減衰スコアを組み込んで、<span class="keyword-tag purple">最新の関心が上位に来る</span>ように設計</span></li>
+                    <li><i class="fa-solid fa-arrow-down-wide-short"></i><span>深掘りスコア × 時間重みで<span class="highlight">総合的な興味スコア</span>を算出し、interest.mdに蓄積していく</span></li>
+                </ul>
+                <div class="stat-box"><div class="stat-number">スコア算出</div><div class="stat-label">深掘り度 × 時間の新しさ ＝ 興味関心の強さ</div></div>
+            </div>
+        </div>
+        <!-- ⑨ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-laptop-code fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑨VS Codeで実際に試すデモ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-play"></i><span>VS Code上で「Claude Codeの最新情報について教えて」と入力すると機能を紹介してくれる</span></li>
+                    <li><i class="fa-solid fa-comments amber-icon"></i><span>続けて「他に便利なコマンドは？」と聞くと、実用的なコマンドを教えてくれる</span></li>
+                    <li><i class="fa-solid fa-bolt amber-icon"></i><span>対話が溜まった状態で<span class="highlight">/interest-profile sync</span>を実行すると会話ログを解析</span></li>
+                </ul>
+                <pre>/interest-profile sync
+→ 会話ログを参照して興味関心をまとめる
+→ 2件のシグナルを分析して interest.md に保存</pre>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-terminal fa-lg" style="color:#FFC107"></i> スラッシュコマンド一発で実行できるから手軽！VS Codeから直接使えるのが便利</span></div>
+            </div>
+        </div>
+        <!-- ⑩ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-file-lines fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑩interest.mdの中身を見てみる</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-eye"></i><span>生成されたinterest.mdには、例えば<span class="highlight">「この人について」</span>というセクションで関心事が整理される</span></li>
+                    <li><i class="fa-solid fa-user-pen amber-icon"></i><span><span class="keyword-tag amber">最新機能の追跡</span><span class="keyword-tag amber">用途の深い理解</span><span class="keyword-tag amber">実際の利用シーンの確認</span>などが記述される</span></li>
+                    <li><i class="fa-solid fa-crosshairs amber-icon"></i><span>「クロードコードの<span class="highlight">最新機能や特定機能の用途理解</span>」のような具体的な関心事が抽出される</span></li>
+                    <li><i class="fa-solid fa-ranking-star"></i><span>興味関心が<span class="keyword-tag purple">高いものから順番に並べる</span>設計になっている</span></li>
+                </ul>
+            </div>
+        </div>
+        <!-- ⑪ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-search fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑪パーソナライズされた検索体験</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>「interest.mdを参照して私の興味あることを調べて」と指示すると<span class="highlight">自分の関心に沿った検索結果</span>が返ってくる</span></li>
+                    <li><i class="fa-solid fa-newspaper amber-icon"></i><span>例えば<span class="keyword-tag amber">Claudeエージェント</span>や<span class="keyword-tag amber">アップデートの用途別整理</span>など、関心事ベースでまとめてくれる</span></li>
+                    <li><i class="fa-solid fa-lightbulb amber-icon"></i><span>YouTubeのネタ探しにも活用。Claude Codeが<span class="highlight amber">「喜びそうな提案」</span>をしてくれる</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece"></i><span>以前の動画の続編として紹介すべき論文なども<span class="keyword-tag purple">的確に提案</span>される</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color:var(--ui-color-1)"></i> 「用途に関心がある」というニュアンスまで理解してくれた！すごく的確な検索体験ができる</span></div>
+            </div>
+        </div>
+        <!-- ⑫ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-book-bookmark fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑫会話履歴から学習問題集を作る</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-graduation-cap"></i><span>会話履歴から<span class="highlight">「何を学んでいるか」を抽出</span>して、そこから問題集を作れる</span></li>
+                    <li><i class="fa-solid fa-repeat amber-icon"></i><span><span class="keyword-tag amber">間隔反復</span>（思い出すように学習する）で記憶の定着に役立てることが可能</span></li>
+                    <li><i class="fa-solid fa-code amber-icon"></i><span>プログラミングを学んでいるなら、<span class="highlight">自分が質問した内容から復習問題</span>を自動生成できる</span></li>
+                </ul>
+                <pre>/interest-profile で会話履歴を解析 →
+学習内容を抽出 →
+HTML形式の問題集を自動生成
+（問題と回答が見やすいレポート形式）</pre>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-pencil fa-lg" style="color:#FFC107"></i> 毎日次の日に復習用の問題集が自動生成される。プログラミング学習に最高の相棒！</span></div>
+            </div>
+        </div>
+        <!-- ⑬ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-file-code fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑬学習問題集の実際の出力例</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-pdf"></i><span>HTML形式のレポートとして<span class="highlight">見やすい問題集</span>が自動生成される</span></li>
+                    <li><i class="fa-solid fa-question-circle amber-icon"></i><span>例：「Claude Codeは通常の対応と比べて何が決定的に違うのか？12分で答えよ」</span></li>
+                    <li><i class="fa-solid fa-list-ol amber-icon"></i><span>会話履歴に基づいた<span class="keyword-tag purple">具体的な問題</span>と<span class="keyword-tag purple">回答</span>がセットで出力される</span></li>
+                    <li><i class="fa-solid fa-calendar-check"></i><span>スキル化すれば<span class="highlight amber">毎日自動的に復習問題が生成</span>される仕組みを作れる</span></li>
+                </ul>
+                <div class="stat-box"><div class="stat-number">HTML出力</div><div class="stat-label">問題と回答がセットで見やすいレポート形式</div></div>
+            </div>
+        </div>
+        <!-- ⑭ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-globe fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑭Claude Webアプリを使わなくなる体験</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-arrow-right-from-bracket"></i><span>この仕組みを作ると、<span class="highlight">ClaudeのWebアプリやChatGPTをあまり使いたくなくなっていく</span></span></li>
+                    <li><i class="fa-solid fa-download amber-icon"></i><span>Webアプリの<span class="keyword-tag amber">会話履歴エクスポート機能</span>を使えば、過去のログをClaude Codeに移行することも可能</span></li>
+                    <li><i class="fa-solid fa-laptop amber-icon"></i><span>ただしClaude Codeは<span class="highlight amber">ログが直接ローカルに溜まる</span>ので、エクスポートの手間が不要</span></li>
+                    <li><i class="fa-solid fa-lock"></i><span><span class="keyword-tag purple">ローカル完結</span>でプライバシーも安心。外部サービスに依存しないのが最大の魅力</span></li>
+                </ul>
+            </div>
+        </div>
+        <!-- ⑮ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-calendar-days fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑮Claude Desktopルーティンで定期実行</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-rotate"></i><span>興味は日々変わるので<span class="highlight">interest.mdを定期的に更新</span>する必要がある</span></li>
+                    <li><i class="fa-solid fa-desktop amber-icon"></i><span>推奨は<span class="keyword-tag amber">Claude Desktopアプリのルーティン機能</span>を使う方法</span></li>
+                    <li><i class="fa-solid fa-clock amber-icon"></i><span>好きな時間に<span class="highlight amber">interest-profile syncを自動実行</span>するスケジュールを設定可能</span></li>
+                    <li><i class="fa-solid fa-power-off"></i><span>Desktopアプリの<span class="keyword-tag purple">スタートアップ時に実行</span>をオンにすれば、PCを開くだけで自動起動</span></li>
+                </ul>
+                <pre>ルーティン設定例：
+「/interest-profile sync を実行して、
+情報収集や動画のネタを考える際に
+参考になるコンテキストを作成する」</pre>
+            </div>
+        </div>
+        <!-- ⑯ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-gear fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑯定期実行のその他の方法と注意点</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-terminal"></i><span>claudeコマンドの<span class="keyword-tag">loopコマンド</span>もあるが、毎回セッションを立ち上げる必要があって面倒</span></li>
+                    <li><i class="fa-solid fa-server amber-icon"></i><span>cronなどを使った定期実行も検討したが、<span class="highlight amber">Claudeの認証情報が期限付きで切れる</span>問題があった</span></li>
+                    <li><i class="fa-solid fa-check-circle amber-icon"></i><span>結果的に<span class="highlight">Claude Desktopアプリのルーティンが一番確実</span>との結論</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span>Desktopアプリは認証済みのセッションを使うため、<span class="keyword-tag purple">認証切れのリスクなし</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-3"><span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color:#EF4444"></i> cronでやろうとしたら認証で失敗した…Desktopアプリならその問題もクリア！</span></div>
+            </div>
+        </div>
+        <!-- ⑰ -->
+        <div class="section-card purple-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-users-viewfinder fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite" aria-hidden="true"></i>
+                <h2>⑰個人AIエージェント時代の展望</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-trending-up"></i><span>ChatGPTから<span class="keyword-tag">Claude Code</span><span class="keyword-tag">Codex</span>など、<span class="highlight">コーディングエージェントへの関心が移ってきている</span></span></li>
+                    <li><i class="fa-solid fa-robot amber-icon"></i><span>技術好きな人は<span class="keyword-tag amber">OpenClaw</span>や<span class="keyword-tag amber">LM Studio</span>など、自分にパーソナライズしたAIエージェントが流行中</span></li>
+                    <li><i class="fa-solid fa-flask amber-icon"></i><span>最近の論文では、Claude Codeのハーネス設定より<span class="highlight amber">OpenClawやLM Studioの方が性能が高い</span>という結果も出ている</span></li>
+                    <li><i class="fa-solid fa-gift"></i><span><span class="keyword-tag purple">2026年6月15日</span>からサードパーティ製ツールをClaudeのサブスクで使えるようになる予定</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color:var(--ui-color-1)"></i> 個人AIエージェントの時代が到来！自分だけのAIを育てるのがこれからの常識になるかも！</span></div>
+            </div>
+        </div>
+        <!-- ⑱ -->
+        <div class="section-card amber-accent fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-flag-checkered fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite" aria-hidden="true"></i>
+                <h2>⑱まとめ：Claude Codeを育てる3つのステップ</h2>
+            </div>
+            <div class="card-content">
+                <div class="flow-steps">
+                    <div class="flow-step"><span class="step-num">1</span><span class="step-text"><span class="keyword-tag purple">日々の対話</span>をClaude Codeで行い、会話ログを溜める</span></div>
+                    <div class="flow-step"><span class="step-num">2</span><span class="step-text"><span class="keyword-tag amber">interest-profile sync</span>で興味関心を抽出・プロファイル化</span></div>
+                    <div class="flow-step"><span class="step-num">3</span><span class="step-text"><span class="keyword-tag purple">Desktopルーティン</span>で定期実行し、interest.mdを自動更新</span></div>
+                </div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-nodes"></i><span>活用例: <span class="keyword-tag">情報収集</span><span class="keyword-tag">学習問題集</span><span class="keyword-tag">ネタ探し</span><span class="keyword-tag">業務サポート</span></span></li>
+                    <li><i class="fa-solid fa-key amber-icon"></i><span>最小限のコードは<span class="highlight amber">GitHubで公開済み</span>。少しハードルが高いが、手元で試せる</span></li>
+                    <li><i class="fa-solid fa-chart-line amber-icon"></i><span>Claude Codeの<span class="highlight">無料利用枠が50%増加中</span>。今が試すチャンス</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-hand-point-right fa-lg" style="color:var(--ui-color-1)"></i> 自分だけのAIアシスタントを育ててみたい人は、ぜひGitHubのコードを手元で動かしてみよう！</span></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        🎬 動画: <a href="https://youtu.be/2JOLh8vtJS0" target="_blank">にゃんたのAIチャンネル</a> | 📂 GitHub: <a href="https://github.com/nyanta012/cc-personalize/tree/main" target="_blank">cc-personalize</a> | 📅 2026年5月31日作成
+    </footer>
+</div>
+</body>
+</html>

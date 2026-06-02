@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Beyond Request-Response — ストリーミング・リアルタイム・コンテキストでAIエージェントが自律化する</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #0A1628;
+            --ui-color-2: #00D4FF;
+            --ui-color-3: #1A1A3E;
+            --ui-color-4: #00FF88;
+            --ui-color-5: #FF2E97;
+            --accent-cyan: #00D4FF;
+            --accent-magenta: #FF2E97;
+            --accent-lime: #00FF88;
+            --accent-purple: #A855F7;
+            --bg-dark: #060D1A;
+            --bg-card: #0F1A2E;
+            --text-light: #E8EDF5;
+            --text-muted: #8899BB;
+            --border-subtle: rgba(0,212,255,0.15);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            font-family: 'Kaisei Decol', serif;
+            color: var(--text-light);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #0A1628 0%, #1A1A3E 40%, #0A1628 100%);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0,212,255,0.15), inset 0 0 60px rgba(0,212,255,0.05);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(0,212,255,0.06) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px rgba(0,212,255,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.85;
+            font-family: 'Yomogi', cursive;
+            color: var(--accent-cyan);
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.6;
+            margin-top: 10px;
+        }
+
+        .header .vs-label {
+            display: inline-block;
+            margin-top: 15px;
+            background: rgba(0,212,255,0.1);
+            border: 1px solid rgba(0,212,255,0.3);
+            padding: 8px 24px;
+            border-radius: 20px;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        .cyan-label { color: var(--accent-cyan); }
+        .magenta-label { color: var(--accent-magenta); }
+        .lime-label { color: var(--accent-lime); }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0,212,255,0.15);
+            border-color: rgba(0,212,255,0.3);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+        }
+
+        .section-card.magenta-accent::before {
+            background: linear-gradient(90deg, var(--accent-magenta), var(--accent-purple));
+        }
+
+        .section-card.lime-accent::before {
+            background: linear-gradient(90deg, var(--accent-lime), var(--accent-cyan));
+        }
+
+        .section-card.purple-accent::before {
+            background: linear-gradient(90deg, var(--accent-purple), var(--accent-magenta));
+        }
+
+        /* Mega Icon */
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.1em;
+            color: var(--accent-cyan);
+            margin-top: 10px;
+        }
+
+        /* Card Content */
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+            color: var(--text-light);
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--accent-cyan);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-list li .magenta-icon { color: var(--accent-magenta); }
+        .keyword-list li .lime-icon { color: var(--accent-lime); }
+        .keyword-list li .purple-icon { color: var(--accent-purple); }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: rgba(0,212,255,0.15);
+            color: var(--accent-cyan);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+            border: 1px solid rgba(0,212,255,0.3);
+        }
+
+        .keyword-tag.magenta {
+            background-color: rgba(255,46,151,0.15);
+            color: var(--accent-magenta);
+            border-color: rgba(255,46,151,0.3);
+        }
+
+        .keyword-tag.lime {
+            background-color: rgba(0,255,136,0.15);
+            color: var(--accent-lime);
+            border-color: rgba(0,255,136,0.3);
+        }
+
+        .keyword-tag.purple {
+            background-color: rgba(168,85,247,0.15);
+            color: var(--accent-purple);
+            border-color: rgba(168,85,247,0.3);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(0,212,255,0.25) 60%);
+            font-weight: bold;
+        }
+
+        .highlight.magenta {
+            background: linear-gradient(transparent 60%, rgba(255,46,151,0.25) 60%);
+        }
+
+        .highlight.lime {
+            background: linear-gradient(transparent 60%, rgba(0,255,136,0.25) 60%);
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: rgba(0,212,255,0.05);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.2);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -11px;
+            left: 20px;
+            border-width: 10px 7px 0;
+            border-style: solid;
+            border-color: var(--accent-cyan) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -11px;
+            border-width: 0 7px 10px;
+        }
+
+        .speech-bubble.variant-1 {
+            background: rgba(255,46,151,0.08);
+            border-color: var(--accent-magenta);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--accent-magenta) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: rgba(0,255,136,0.08);
+            border-color: var(--accent-lime);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--accent-lime) transparent;
+        }
+
+        .speech-bubble.variant-3 {
+            background: rgba(168,85,247,0.08);
+            border-color: var(--accent-purple);
+            transform: rotate(0.5deg);
+        }
+
+        .speech-bubble.variant-3::after {
+            border-color: var(--accent-purple) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: var(--text-light);
+        }
+
+        /* Protocol Stack Visual */
+        .protocol-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .protocol-layer {
+            padding: 12px 15px;
+            border-radius: 10px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 15px;
+            position: relative;
+        }
+
+        .protocol-layer.layer3 {
+            background: linear-gradient(90deg, rgba(0,212,255,0.2), rgba(0,212,255,0.1));
+            border: 2px solid var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+
+        .protocol-layer.layer2 {
+            background: linear-gradient(90deg, rgba(168,85,247,0.2), rgba(168,85,247,0.1));
+            border: 2px solid var(--accent-purple);
+            color: var(--accent-purple);
+        }
+
+        .protocol-layer.layer1 {
+            background: linear-gradient(90deg, rgba(255,46,151,0.2), rgba(255,46,151,0.1));
+            border: 2px solid var(--accent-magenta);
+            color: var(--accent-magenta);
+        }
+
+        .protocol-arrow {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        /* Feature Table */
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .feature-table th {
+            background: linear-gradient(90deg, var(--accent-cyan), var(--accent-magenta));
+            color: white;
+            padding: 8px 6px;
+            font-size: 13px;
+        }
+
+        .feature-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px solid rgba(0,212,255,0.1);
+            color: var(--text-light);
+        }
+
+        .feature-table tr:nth-child(even) {
+            background: rgba(0,212,255,0.05);
+        }
+
+        .feature-highlight {
+            font-weight: bold;
+            color: var(--accent-cyan);
+        }
+
+        /* Fade In Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Section Divider */
+        .section-divider {
+            text-align: center;
+            padding: 25px 20px;
+            margin: 10px 0 20px;
+            position: relative;
+        }
+
+        .section-divider h2 {
+            font-size: 1.5em;
+            color: var(--accent-cyan);
+            display: inline-block;
+            padding: 0 30px;
+            background: var(--bg-dark);
+            position: relative;
+            z-index: 1;
+        }
+
+        .section-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+        }
+
+        .section-divider .divider-icon {
+            color: var(--accent-magenta);
+            margin-right: 10px;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+
+        .badge-cyan {
+            background: linear-gradient(135deg, #0891B2, #00D4FF);
+            color: white;
+        }
+
+        .badge-magenta {
+            background: linear-gradient(135deg, #BE185D, #FF2E97);
+            color: white;
+        }
+
+        .badge-lime {
+            background: linear-gradient(135deg, #059669, #00FF88);
+            color: white;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-subtle);
+        }
+
+        footer a {
+            color: var(--accent-cyan);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-satellite-dish fa-7x" aria-hidden="true"></i></div>
+            <h1>MCP Beyond Request-Response:<br>ストリーミング・リアルタイム・コンテキストでAIエージェントが自律化する</h1>
+            <div class="subtitle">プロンプトベースの対話からイベント駆動の自律型エージェントへ — AI通信プロトコルのパラダイムシフト</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月2日</div>
+            <div class="vs-label">
+                <span class="magenta-label"><i class="fas fa-comment"></i> Request-Response</span>
+                <span style="margin: 0 10px; color: var(--accent-lime);">→</span>
+                <span class="cyan-label"><i class="fas fa-stream"></i> Streaming Context</span>
+                <span style="margin: 0 10px; color: var(--text-muted);">×</span>
+                <span class="lime-label"><i class="fas fa-layer-group"></i> 3層プロトコル</span>
+            </div>
+        </div>
+
+        <!-- ===== Section 1: MCPの現在と進化 (Cards 1-4) ===== -->
+        <div class="section-divider">
+            <h2><i class="fas fa-microchip divider-icon"></i>Section 1: MCPの現在と進化</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--accent-cyan); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① MCPとは — AIと外部世界をつなぐUSB端子</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building" style="color: var(--accent-cyan);"></i><span><span class="highlight">Anthropic</span>が2024年11月に導入した<span class="keyword-tag">オープン標準</span></span></li>
+                        <li><i class="fa-solid fa-handshake lime-icon"></i><span>2025年12月に<span class="keyword-tag lime">Linux Foundation</span>の<span class="highlight">AAIF</span>（Agentic AI Foundation）に寄贈</span></li>
+                        <li><i class="fa-solid fa-link magenta-icon"></i><span>AIエージェントと<span class="keyword-tag magenta">外部ツール</span>・データソースの接続を標準化</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece" style="color: var(--accent-cyan);"></i><span><span class="highlight">「N×M問題」</span>を解決 — 各ツールごとのカスタムコネクタが不要に</span></li>
+                        <li><i class="fa-solid fa-circle-info lime-icon"></i><span>「AIの世界の<span class="keyword-tag">USB端子</span>」— プラグアンドプレイでツール接続</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent-cyan);"></i>
+                            MCPがあれば、AIはどんなツールにも<br>
+                            <span class="keyword-tag">標準手順</span>で接続できる。<br>
+                            カスタム連携開発が過去のものに！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale magenta-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="color: var(--accent-magenta); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 2026年の普及状況 — 全社採用のde facto standard</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-globe magenta-icon"></i><span><span class="highlight">Anthropic</span>・<span class="highlight">OpenAI</span>・<span class="highlight">Google</span>・<span class="highlight">Microsoft</span>・<span class="highlight">Amazon</span>の<span class="keyword-tag magenta">全主要企業</span>が採用</span></li>
+                        <li><i class="fa-solid fa-download" style="color: var(--accent-cyan);"></i><span>月間<span class="keyword-tag">数百万SDKダウンロード</span> — 急成長を記録</span></li>
+                        <li><i class="fa-solid fa-crown magenta-icon"></i><span>企業のAIエージェント統合における<span class="highlight">de facto standard</span>に</span></li>
+                        <li><i class="fa-solid fa-code-branch lime-icon"></i><span><span class="keyword-tag lime">Python</span>・<span class="keyword-tag lime">TypeScript</span>・<span class="keyword-tag lime">Go</span>など主要言語で公式SDKが利用可能</span></li>
+                        <li><i class="fa-solid fa-server" style="color: var(--accent-cyan);"></i><span>オープンソースのMCPサーバーが数千の<span class="keyword-tag">ツール統合</span>を提供</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--accent-magenta);"></i>
+                            2024年の誕生からわずか1年半で<br>
+                            <span class="keyword-tag magenta">業界標準</span>に。<br>
+                            Linux Foundationへの寄贈が決定打！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-network-wired fa-5x" style="color: var(--accent-lime); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ N×M問題の解決 — 連携手工の終焉</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-xmark magenta-icon"></i><span><span class="keyword-tag magenta">従来</span>: N個のAIモデル × M個のツール = N×M個の<span class="highlight">カスタム連携</span>が必要</span></li>
+                        <li><i class="fa-solid fa-check lime-icon"></i><span><span class="keyword-tag lime">MCP導入後</span>: ツール側に1つのMCPサーバーを用意するだけで<span class="highlight">全AI対応</span></span></li>
+                        <li><i class="fa-solid fa-arrows-to-circle" style="color: var(--accent-cyan);"></i><span>開発者は<span class="keyword-tag">個別のAPIラッパー</span>を書かずに済むようになった</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left magenta-icon"></i><span>これまで数週間かかった連携開発が<span class="highlight">数時間</span>に短縮</span></li>
+                        <li><i class="fa-solid fa-scale-balanced lime-icon"></i><span>「AI側」ではなく<span class="keyword-tag lime">「ツール側」</span>に統合の責任が移るパラダイム</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--accent-lime);"></i>
+                            N×M → N+Mに。<br>
+                            <span class="keyword-tag lime">拡張性の革命</span>だ。<br>
+                            新しいツールを追加するだけで、<br>
+                            全てのAIエージェントが利用可能に！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale purple-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--accent-purple); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ MCPがもたらすビジネスインパクト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-handshake" style="color: var(--accent-cyan);"></i><span><span class="keyword-tag">オープン標準</span>による<span class="highlight">ベンダーロックイン回避</span> — どのAIモデルにも切り替え可能</span></li>
+                        <li><i class="fa-solid fa-timeline magenta-icon"></i><span>AIツールチェーンの<span class="keyword-tag magenta">構築スピード</span>が劇的に向上</span></li>
+                        <li><i class="fa-solid fa-users-gear lime-icon"></i><span>エコシステムの形成 — <span class="keyword-tag lime">コミュニティ主導</span>でツール統合が爆発的に増加</span></li>
+                        <li><i class="fa-solid fa-shield-halved purple-icon"></i><span><span class="highlight">ガバナンス</span>・<span class="highlight">セキュリティ</span>がプロトコルレベルで統一</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i><span>企業は<span class="keyword-tag">社内データへのAIアクセス</span>を安全かつ標準的に提供可能に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--accent-purple);"></i>
+                            MCPの真の価値は「接続」じゃなくて<br>
+                            <span class="keyword-tag purple">「標準化」</span>にある。<br>
+                            世界中のツールが同じ言語を話す！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Section 2: 従来のRequest-Responseの限界 (Cards 5-7) ===== -->
+        <div class="section-divider">
+            <h2><i class="fas fa-triangle-exclamation divider-icon"></i>Section 2: 従来のRequest-Responseの限界</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comment-slash fa-5x" style="color: var(--accent-magenta); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 古いパラダイム — リクエスト・レスポンスの限界</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user magenta-icon"></i><span>ユーザーがプロンプトを送信 → AIが応答。<span class="keyword-tag magenta">1回きりの対話</span></span></li>
+                        <li><i class="fa-solid fa-database" style="color: var(--accent-cyan);"></i><span>バッチ処理中心のデータ → <span class="highlight">古い情報</span>に基づく応答でハルシネーション発生</span></li>
+                        <li><i class="fa-solid fa-link-slash magenta-icon"></i><span><span class="keyword-tag magenta">ステートレス</span> — 会話の文脈が途切れ、継続的なタスクが不可能</span></li>
+                        <li><i class="fa-solid fa-robot" style="color: var(--accent-cyan);"></i><span><span class="highlight">単一エージェント</span> — 複数エージェントの協調や複雑なワークフローに不向き</span></li>
+                        <li><i class="fa-solid fa-clock lime-icon"></i><span><span class="keyword-tag lime">リアルタイム性なし</span> — 動的に変化する環境に対応できない</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--accent-magenta);"></i>
+                            「聞かれたことだけ答える」AI。<br>
+                            <span class="keyword-tag magenta">今起きていること</span>に<br>
+                            全く気づいていない。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale magenta-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-ghost fa-5x" style="color: var(--accent-magenta); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ データの鮮度問題 — AIの最大の弱点</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hourglass-end magenta-icon"></i><span><span class="keyword-tag magenta">RAGの限界</span>: インデックスされたデータは取得時点で<span class="highlight">既に古い</span></span></li>
+                        <li><i class="fa-solid fa-chart-line" style="color: var(--accent-cyan);"></i><span>在庫数が変化 → 注文が入る → 顧客がクレーム。<span class="keyword-tag">AIは気づかない</span></span></li>
+                        <li><i class="fa-solid fa-bug lime-icon"></i><span><span class="highlight">ハルシネーション</span>の根本原因の多くは<span class="keyword-tag lime">情報の古さ</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate magenta-icon"></i><span>バッチ更新を頻繁にしても<span class="keyword-tag magenta">ミリ秒レベルの鮮度</span>は不可能</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i><span>リアルタイムビジネスでは<span class="highlight">「数分遅れのデータ」</span>は致命的</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--accent-cyan);"></i>
+                            AIが「賢い」だけではダメ。<br>
+                            <span class="keyword-tag magenta">「今この瞬間」</span>のデータが<br>
+                            なきゃ正しい判断ができない！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-unlock fa-5x" style="color: var(--accent-lime); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ ステートレスの壁 — 持続的なタスク実行が不可能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrows-split-up-and-left magenta-icon"></i><span>リクエストごとに<span class="keyword-tag magenta">コンテキストがリセット</span> — 継続タスクが断絶</span></li>
+                        <li><i class="fa-solid fa-list-check" style="color: var(--accent-cyan);"></i><span>「在庫を監視して閾値を下回ったら発注」のような<span class="highlight">継続的タスク</span>を実装不能</span></li>
+                        <li><i class="fa-solid fa-users lime-icon"></i><span>複数人での<span class="keyword-tag lime">共同作業</span>や<span class="keyword-tag lime">段階的承認</span>フローにも対応できない</span></li>
+                        <li><i class="fa-solid fa-gears magenta-icon"></i><span>サーバー側に<span class="highlight">セッション状態</span>を保持する仕組みが必要</span></li>
+                        <li><i class="fa-solid fa-arrow-right" style="color: var(--accent-cyan);"></i><span>→ これこそが<span class="keyword-tag">Streamable HTTP Transport</span>が解決する問題</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-key fa-lg" style="color: var(--accent-lime);"></i>
+                            AIが「記憶」と「継続性」を持てば<br>
+                            <span class="keyword-tag lime">監視・判断・実行</span>の<br>
+                            ループを自律的に回せる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Section 3: ストリーミング・リアルタイム・コンテキスト (Cards 8-12) ===== -->
+        <div class="section-divider">
+            <h2><i class="fas fa-satellite-dish divider-icon"></i>Section 3: ストリーミング・リアルタイム・コンテキスト</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--accent-cyan); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ リアルタイムコンテキストエンジンとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-server" style="color: var(--accent-cyan);"></i><span><span class="keyword-tag">DeltaStream RTContext</span> / <span class="keyword-tag">Confluent Real-Time Context Engine</span></span></li>
+                        <li><i class="fa-solid fa-gauge-high lime-icon"></i><span><span class="highlight">ミリ秒レイテンシ</span>で運用データ・状態・シグナルをAIに直接ストリーム</span></li>
+                        <li><i class="fa-solid fa-boxes-stacked magenta-icon"></i><span>在庫・注文・顧客情報・システムイベントなどを<span class="keyword-tag magenta">ライブ</span>で提供</span></li>
+                        <li><i class="fa-solid fa-brain" style="color: var(--accent-cyan);"></i><span>AIが<span class="highlight">「今この瞬間」</span>の状況に基づいて意思決定できるようになる</span></li>
+                        <li><i class="fa-solid fa-arrows-to-circle lime-icon"></i><span>イベントストリーム → コンテキストエンジン → <span class="keyword-tag lime">AIエージェント</span>のデータフロー</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-zap fa-lg" style="color: var(--accent-cyan);"></i>
+                            「AIに質問する」のではなく<br>
+                            <span class="keyword-tag">リアルタイムデータ</span>が<br>
+                            AIに「今の状況」を教える。<br>
+                            受動から<span class="keyword-tag lime">能動</span>へ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale magenta-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-tower-broadcast fa-5x" style="color: var(--accent-magenta); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ Streamable HTTP Transport — MCPの次世代トランスポート</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-signal magenta-icon"></i><span>MCPの<span class="keyword-tag magenta">新しいトランスポート層</span> — 長時間接続をサポート</span></li>
+                        <li><i class="fa-solid fa-spinner" style="color: var(--accent-cyan);"></i><span><span class="highlight">プログレス更新</span>をストリーム — 長時間実行タスクの進捗をリアルタイム通知</span></li>
+                        <li><i class="fa-solid fa-fingerprint lime-icon"></i><span><span class="keyword-tag lime">セッション管理</span>でステートフルな対話を実現 — 文脈が途切れない</span></li>
+                        <li><i class="fa-solid fa-user-shield magenta-icon"></i><span><span class="highlight">Elicitation機能</span>: センシティブ操作の前に<span class="keyword-tag magenta">人間の承認</span>を求める仕組み</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right" style="color: var(--accent-cyan);"></i><span><span class="keyword-tag">双方向通信</span>: サーバーからクライアントへのプッシュも可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--accent-magenta);"></i>
+                            HTTPベースだからファイアウォールも<br>
+                            <span class="keyword-tag magenta">通りやすい</span>。<br>
+                            企業導入の大きなアドバンテージ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--accent-lime); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ コンテキストエンジニアリングの台頭</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-timeline" style="color: var(--accent-cyan);"></i><span><span class="keyword-tag">プロンプトエンジニアリング</span> → <span class="keyword-tag">RAG</span> → <span class="highlight">コンテキストエンジニアリング</span>へ進化</span></li>
+                        <li><i class="fa-solid fa-database lime-icon"></i><span>AIへの<span class="keyword-tag lime">リッチでガバナンスされた</span>リアルタイムデータ提供が基盤</span></li>
+                        <li><i class="fa-solid fa-ranking-star magenta-icon"></i><span><span class="highlight">データの質・鮮度・ガバナンス</span>がAI性能の決定要因に</span></li>
+                        <li><i class="fa-solid fa-screwdriver-wrench" style="color: var(--accent-cyan);"></i><span>「どんなデータを・いつ・どの形式で」AIに渡すかが<span class="keyword-tag">新たな職種スキル</span></span></li>
+                        <li><i class="fa-solid fa-circle-info lime-icon"></i><span>プロンプトの最適化より<span class="highlight">コンテキストの設計</span>の方が遥かにインパクトが大きい</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--accent-lime);"></i>
+                            「プロンプト職人」は過去の職業。<br>
+                            次は<span class="keyword-tag lime">「コンテキスト設計者」</span>が<br>
+                            AIの性能を握る！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale purple-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--accent-purple); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ Elicitation — AIと人間の協調の新たなパターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-shield purple-icon"></i><span>AIが<span class="keyword-tag purple">センシティブ操作</span>を実行する前に人間の承認を求める仕組み</span></li>
+                        <li><i class="fa-solid fa-comments" style="color: var(--accent-cyan);"></i><span><span class="highlight">対話型の承認フロー</span> — 単なるYes/Noではなく、条件付き承認も可能</span></li>
+                        <li><i class="fa-solid fa-scale-balanced magenta-icon"></i><span><span class="keyword-tag magenta">ガバナンス</span>と<span class="keyword-tag magenta">自律性</span>のバランスを取るための重要な概念</span></li>
+                        <li><i class="fa-solid fa-shield-halved lime-icon"></i><span>金額の閾値・対象範囲などで<span class="keyword-tag lime">自動/手動</span>を動的に切り替え</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i><span>「AIに任せすぎる」問題への<span class="highlight">実用的な解決策</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-handshake fa-lg" style="color: var(--accent-purple);"></i>
+                            AIが勝手に動くのは怖い？<br>
+                            <span class="keyword-tag purple">大事な時だけ人間に聞く</span>。<br>
+                            これがElicitationの考案。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--accent-cyan); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ Request-Response vs Streaming — 比較</h2>
+                </div>
+                <div class="card-content">
+                    <table class="feature-table">
+                        <tr><th>項目</th><th>Request-Response</th><th>Streaming Context</th></tr>
+                        <tr><td>通信方式</td><td>1回きり</td><td class="feature-highlight">継続ストリーム</td></tr>
+                        <tr><td>データ鮮度</td><td>バッチ更新</td><td class="feature-highlight">ミリ秒レベル</td></tr>
+                        <tr><td>状態管理</td><td>ステートレス</td><td class="feature-highlight">ステートフル</td></tr>
+                        <tr><td>AIの役割</td><td>応答生成</td><td class="feature-highlight">自律的意思決定</td></tr>
+                        <tr><td>人間の役割</td><td>毎回プロンプト</td><td class="feature-highlight">例外時のみ介入</td></tr>
+                    </table>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-right magenta-icon"></i><span><span class="keyword-tag magenta">パラダイムシフト</span>: AIが「待っている」状態から「常に監視・判断」する状態へ</span></li>
+                        <li><i class="fa-solid fa-circle-check lime-icon"></i><span>Streamable HTTP Transportがこの<span class="highlight">移行を技術的に実現</span></span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-table fa-lg" style="color: var(--accent-cyan);"></i>
+                            「聞かれたら答える」から<br>
+                            <span class="keyword-tag">「気づいたら動く」</span>へ。<br>
+                            AIの存在感が<span class="highlight lime">根本的に変わる</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Section 4: 3層プロトコルスタック (Cards 13-15) ===== -->
+        <div class="section-divider">
+            <h2><i class="fas fa-layer-group divider-icon"></i>Section 4: 3層プロトコルスタック</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--accent-cyan); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 2026年のAIエージェント通信 — 3層プロトコルスタック</h2>
+                </div>
+                <div class="card-content">
+                    <div class="protocol-stack">
+                        <div class="protocol-layer layer3">
+                            <i class="fa-solid fa-globe"></i> Layer 3: <span class="highlight">WebMCP</span> — 構造化ウェブアクセス
+                        </div>
+                        <div class="protocol-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                        <div class="protocol-layer layer2">
+                            <i class="fa-solid fa-people-arrows"></i> Layer 2: <span class="highlight">A2A (Agent-to-Agent)</span> — マルチエージェント協調
+                        </div>
+                        <div class="protocol-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                        <div class="protocol-layer layer1">
+                            <i class="fa-solid fa-plug"></i> Layer 1: <span class="highlight">MCP</span> — エージェント ↔ ツール通信
+                        </div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i><span><span class="keyword-tag">MCP</span>: AIと外部ツール・データの標準インターフェース</span></li>
+                        <li><i class="fa-solid fa-circle-info purple-icon"></i><span><span class="keyword-tag purple">A2A</span>: エージェント同士が自律的に協調・交渉するプロトコル</span></li>
+                        <li><i class="fa-solid fa-circle-info magenta-icon"></i><span><span class="keyword-tag magenta">WebMCP</span>: ウェブ上の構造化データにAIが直接アクセス</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-sitemap fa-lg" style="color: var(--accent-cyan);"></i>
+                            3つの層が積み重なって<br>
+                            <span class="keyword-tag">AIエージェントの通信インフラ</span>を<br>
+                            完成させる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale magenta-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-arrows fa-5x" style="color: var(--accent-magenta); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ A2Aプロトコル — エージェント同士の自律協調</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot magenta-icon"></i><span><span class="highlight">Agent-to-Agent</span>: Googleが提唱する<span class="keyword-tag magenta">エージェント間通信</span>の標準</span></li>
+                        <li><i class="fa-solid fa-handshake" style="color: var(--accent-cyan);"></i><span>エージェント同士が<span class="keyword-tag">能力・可用性</span>を宣言し、自律的に<span class="highlight">タスクを割り振り</span></span></li>
+                        <li><i class="fa-solid fa-comments lime-icon"></i><span>人間の仲介なしで<span class="keyword-tag lime">ネゴシエーション</span>や<span class="keyword-tag lime">タスク委譲</span>を実行</span></li>
+                        <li><i class="fa-solid fa-diagram-project magenta-icon"></i><span><span class="keyword-tag magenta">マルチエージェントシステム</span>の実装を劇的に簡略化</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i><span>MCP（Layer 1）と組み合わせて<span class="highlight">完全なエージェント生態系</span>を形成</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-users fa-lg" style="color: var(--accent-magenta);"></i>
+                            「Aさんにお願いして、Bさんに伝えて…」<br>
+                            <span class="keyword-tag magenta">もう人間が橋渡し不要</span>。<br>
+                            AI同士で勝手にチーム組む！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-merge fa-5x" style="color: var(--accent-lime); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ ハイブリッドアーキテクチャ — 確定性×非確定性の融合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain" style="color: var(--accent-cyan);"></i><span><span class="highlight">非確定性入力</span>をAIが解釈 → コンテキストに応じた<span class="keyword-tag">意思決定</span></span></li>
+                        <li><i class="fa-solid fa-gears lime-icon"></i><span><span class="keyword-tag lime">従来の確定的API</span>アクションと相補 — 両者の長所を活用</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right magenta-icon"></i><span>AIが<span class="keyword-tag magenta">判断</span>し、確定的システムが<span class="keyword-tag magenta">実行</span>する<span class="highlight">ハイブリッド型</span></span></li>
+                        <li><i class="fa-solid fa-shield-halved" style="color: var(--accent-cyan);"></i><span>金融取引・注文処理などは<span class="keyword-tag">確定的API</span>で安全に実行</span></li>
+                        <li><i class="fa-solid fa-rocket lime-icon"></i><span><span class="highlight">次世代AIシステム</span>は両アプローチを統合したアーキテクチャが主流に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent-lime);"></i>
+                            「AIだけ」でも「APIだけ」でもダメ。<br>
+                            <span class="keyword-tag lime">AIが判断してAPIが実行</span>。<br>
+                            この融合が鍵！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== Section 5: リアルタイムエージェントのユースケース (Cards 16-18) ===== -->
+        <div class="section-divider">
+            <h2><i class="fas fa-briefcase divider-icon"></i>Section 5: リアルタイムエージェントのユースケース</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cart-shopping fa-5x" style="color: var(--accent-magenta); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 自律的ビジネスエージェント — リアルタイム意思決定</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-boxes-stacked magenta-icon"></i><span><span class="keyword-tag magenta">在庫変動</span>・<span class="keyword-tag magenta">市場価格</span>・<span class="keyword-tag magenta">顧客行動</span>をリアルタイムで常時監視</span></li>
+                        <li><i class="fa-solid fa-gavel" style="color: var(--accent-cyan);"></i><span>設定されたルールに基づき<span class="highlight">自動で意思決定・アクション実行</span></span></li>
+                        <li><i class="fa-solid fa-bell lime-icon"></i><span><span class="keyword-tag lime">人間が介入すべき例外</span>のみ通知 — ノイズのないアラート</span></li>
+                        <li><i class="fa-solid fa-chart-line magenta-icon"></i><span>例: 価格変動を検知 → <span class="highlight">自動で発注・価格調整</span>を実行</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan);"></i><span>24時間365日稼働の<span class="keyword-tag">自律型ビジネスオペレーター</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-store fa-lg" style="color: var(--accent-magenta);"></i>
+                            夜中に在庫が尽きても<br>
+                            <span class="keyword-tag magenta">AIが自動発注</span>。<br>
+                            朝起きたら解決済み、<br>
+                            って世界が来る！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--accent-lime); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 運用コパイロット — SRE/DevOpsのパラダイム変革</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-display lime-icon"></i><span><span class="keyword-tag lime">システムイベント</span>・<span class="keyword-tag lime">アラート</span>・<span class="keyword-tag lime">メトリクス</span>を継続的にストリーム</span></li>
+                        <li><i class="fa-solid fa-bug magenta-icon"></i><span><span class="highlight">インシデント対応</span>・<span class="highlight">根本原因分析</span>を自律的に実行</span></li>
+                        <li><i class="fa-solid fa-wrench" style="color: var(--accent-cyan);"></i><span>異常検知 → <span class="keyword-tag">自動診断</span> → <span class="keyword-tag">修復提案</span> → <span class="keyword-tag">実行</span>まで一気通貫</span></li>
+                        <li><i class="fa-solid fa-clock magenta-icon"></i><span>人間が対応していた<span class="keyword-tag magenta">数時間の障害対応</span>をAIが<span class="highlight">数分</span>に</span></li>
+                        <li><i class="fa-solid fa-circle-info lime-icon"></i><span>SRE・DevOpsの<span class="keyword-tag lime">パラダイム</span>を<span class="highlight">根本から変革</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire-extinguisher fa-lg" style="color: var(--accent-lime);"></i>
+                            凌晨3時の障害アラート…<br>
+                            <span class="keyword-tag lime">AIが起きてるから</span><br>
+                            寝てて大丈夫。<br>
+                            朝起きたら直ってる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale purple-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--accent-purple); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ 開発者エージェント — コーディングのリアルタイム支援</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-code purple-icon"></i><span>コード変更・ビルド結果・テスト出力を<span class="keyword-tag purple">リアルタイムでフィードバック</span></span></li>
+                        <li><i class="fa-solid fa-laptop-code" style="color: var(--accent-cyan);"></i><span><span class="keyword-tag">Claude Code</span> / <span class="keyword-tag">Codex</span>が進行状況をストリームしながら開発</span></li>
+                        <li><i class="fa-solid fa-user-check lime-icon"></i><span>人間は<span class="highlight">承認ポイントのみ</span>で介入 — 「レビュー」に集中できる</span></li>
+                        <li><i class="fa-solid fa-bug magenta-icon"></i><span>ビルド失敗 → AIが<span class="keyword-tag magenta">自動で原因特定</span> → 修正案を<span class="keyword-tag magenta">即座に提示</span></span></li>
+                        <li><i class="fa-solid fa-rocket purple-icon"></i><span>開発スピードが<span class="highlight">数倍</span>に — 人間は<span class="keyword-tag purple">設計と意思決定</span>に集中</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--accent-purple);"></i>
+                            「コードを書く」から<br>
+                            <span class="keyword-tag purple">「コードをレビューする」</span>へ。<br>
+                            <span class="highlight">Beyond Request-Response</span>、<br>
+                            これが2026年のAIエージェント！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Header -->
+        <div class="section-divider">
+            <h2><i class="fas fa-flag-checkered divider-icon"></i>まとめ: Beyond Request-Response</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 19 (Bonus Summary) -->
+            <div class="section-card fade-in-scale" style="max-width: 920px; flex: 0 0 auto;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--accent-cyan); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2 style="color: var(--accent-cyan);">Beyond Request-Response — AIエージェントの新時代</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-check lime-icon"></i><span>2026年はAIエージェントが<span class="highlight">実験段階から本格ビジネス統合</span>へ移行する年</span></li>
+                        <li><i class="fa-solid fa-arrow-right" style="color: var(--accent-cyan);"></i><span>プロンプトベースの対話 → <span class="keyword-tag">イベント駆動の自律型エージェント</span>へ</span></li>
+                        <li><i class="fa-solid fa-layer-group magenta-icon"></i><span><span class="keyword-tag magenta">MCP</span> + <span class="keyword-tag magenta">A2A</span> + <span class="keyword-tag magenta">WebMCP</span> の<span class="highlight">3層プロトコル</span>が通信基盤を完成</span></li>
+                        <li><i class="fa-solid fa-satellite-dish lime-icon"></i><span><span class="highlight">リアルタイムストリーミング</span>がAIに「今この瞬間」の視座を与える</span></li>
+                        <li><i class="fa-solid fa-shield-halved purple-icon"></i><span><span class="keyword-tag purple">Elicitation</span>でガバナンスを担保しながら<span class="highlight">自律性</span>を最大化</span></li>
+                        <li><i class="fa-solid fa-circle-check" style="color: var(--accent-cyan);"></i><span><span class="highlight">「AIが反応する」</span>から<span class="highlight lime">「AIが自律的に管理する」</span>への決定的な転換</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--accent-lime);"></i>
+                        Request-Responseは<span class="keyword-tag">過去の遺物</span>。<br>
+                        <span class="keyword-tag lime">Streaming Context</span>こそが<br>
+                        AIエージェントを<span class="highlight">自律化</span>する鍵！<br>
+                        2026年、その扉が開く。
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://www.youtube.com/watch?v=i0Fh0fOnsE8" target="_blank">MCP Beyond Request-Response: Streaming Real-Time Context to AI Agents - YouTube</a> | 📅 2026年6月2日<br>
+            📺 テーマ: Model Context Protocol (MCP) × リアルタイムストリーミング × AIエージェント自律化<br>
+            🔑 キーワード: MCP | Streamable HTTP Transport | A2A | WebMCP | Context Engineering | Elicitation
+        </footer>
+
+    </div>
+</body>
+</html>

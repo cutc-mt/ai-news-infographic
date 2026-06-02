@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI-Anything × Opus 4.8でdraw.ioをCLI化！AIが図解を自動生成するデモ</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #1A5C2E;
+            --ui-color-2: #84CC16;
+            --ui-color-3: #DCFCE7;
+            --ui-color-4: #0A2E14;
+            --ui-color-5: #06B6D4;
+            --accent: #22D3EE;
+            --bg: #F0FFF4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg);
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4) 0%, var(--ui-color-1) 40%, var(--ui-color-5) 100%);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.2em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.2em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+        .header .vs-label {
+            display: inline-block;
+            margin-top: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 1.05em;
+            font-weight: bold;
+        }
+        .lime-label { color: #A3E635; }
+        .cyan-label { color: var(--accent); }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .section-card.cyan-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-5), var(--accent));
+        }
+
+        .section-card.lime-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-2), #A3E635);
+        }
+
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.15em; color: var(--ui-color-4); margin-top: 10px; }
+
+        .card-content { padding: 0 10px 15px; }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-1);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-list li .cyan-icon { color: var(--ui-color-5); }
+        .keyword-list li .lime-icon { color: var(--ui-color-2); }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.cyan {
+            background-color: #CFFAFE;
+            color: #155E75;
+        }
+
+        .keyword-tag.lime {
+            background-color: #ECFCCB;
+            color: #365314;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+
+        .speech-bubble.variant-1 {
+            background: #F0FDFA;
+            border-color: var(--ui-color-5);
+            transform: rotate(1deg);
+        }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-5) transparent; }
+
+        .speech-bubble.variant-2 {
+            background: var(--ui-color-3);
+            border-color: var(--ui-color-1);
+            transform: rotate(-2deg);
+        }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-1) transparent; }
+
+        .speech-bubble.variant-3 {
+            background: #FFF7ED;
+            border-color: #F59E0B;
+            transform: rotate(0.5deg);
+        }
+        .speech-bubble.variant-3::after { border-color: #F59E0B transparent; }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(26,92,46,0.2) 60%);
+            font-weight: bold;
+        }
+
+        .highlight.cyan {
+            background: linear-gradient(transparent 60%, rgba(6,182,212,0.25) 60%);
+        }
+
+        .highlight.lime {
+            background: linear-gradient(transparent 60%, rgba(132,204,22,0.25) 60%);
+        }
+
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .feature-table th {
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-5));
+            color: white;
+            padding: 8px 6px;
+            font-size: 13px;
+        }
+
+        .feature-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .feature-table tr:nth-child(even) { background: #f9f9f9; }
+        .feature-highlight { font-weight: bold; color: var(--ui-color-1); }
+
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        .flow-arrow {
+            text-align: center;
+            font-size: 2em;
+            color: var(--ui-color-2);
+            margin: 5px 0;
+            animation: fa-beat-fade 1.5s infinite;
+        }
+
+        .flow-step {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            background: var(--ui-color-3);
+            border-radius: 12px;
+            margin: 4px;
+            min-width: 100px;
+        }
+
+        .flow-step i { font-size: 1.5em; color: var(--ui-color-1); margin-bottom: 5px; }
+        .flow-step span { font-size: 13px; font-weight: bold; color: var(--ui-color-4); }
+
+        .flow-container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            margin: 15px 0;
+            gap: 5px;
+        }
+
+        .flow-arrow-inline {
+            color: var(--ui-color-2);
+            font-size: 1.5em;
+            animation: fa-bounce 1.5s infinite;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a { color: var(--ui-color-1); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+
+        .badge-green {
+            background: linear-gradient(135deg, #1A5C2E, #84CC16);
+            color: white;
+        }
+
+        .badge-cyan {
+            background: linear-gradient(135deg, #0891B2, #22D3EE);
+            color: white;
+        }
+
+        .badge-lime {
+            background: linear-gradient(135deg, #65A30D, #A3E635);
+            color: white;
+        }
+
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-terminal fa-7x" aria-hidden="true"></i></div>
+            <h1>Claude Code × CLI-Anything × Opus 4.8<br>draw.ioをCLI化してAIが図解を自動生成！</h1>
+            <div class="subtitle">自然言語で指示するだけ。AIエージェントがCLI経由でGUIアプリを操作し、フローチャートやアーキテクチャ図を自動で作成する実践デモ</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月2日</div>
+            <div class="vs-label">
+                <span class="lime-label"><i class="fas fa-terminal"></i> CLI-Anything</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="cyan-label"><i class="fas fa-brain"></i> Claude Opus 4.8</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="lime-label"><i class="fas fa-diagram-project"></i> draw.io</span>
+            </div>
+        </div>
+
+        <!-- ===== Section 1: CLI-Anythingとは（5カード） ===== -->
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① CLI-Anythingとは？あらゆるGUIをCLIに変換</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--ui-color-5);"></i><span><span class="highlight">あらゆるGUIソフトウェアをCLIツールに変換</span>する画期的なフレームワーク</span></li>
+                        <li><i class="fa-solid fa-plug lime-icon"></i><span><span class="keyword-tag lime">Claude Codeのプラグイン（Skill）</span>として直接機能し、シームレスに統合</span></li>
+                        <li><i class="fa-solid fa-image" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag cyan">GIMP</span>・<span class="keyword-tag cyan">Blender</span>・<span class="keyword-tag cyan">draw.io</span>など、あらゆるGUIアプリをCLI化可能</span></li>
+                        <li><i class="fa-solid fa-bullseye" style="color: var(--ui-color-5);"></i><span>目標：<span class="highlight">「あらゆるソフトウェアをAIエージェントネイティブにする」</span></span></li>
+                        <li><i class="fa-solid fa-link lime-icon"></i><span><span class="keyword-tag lime">MCP（Model Context Protocol）</span>との統合も対応、エージェント間連携が強力に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+                            GUIアプリをCLIに変換？<br>
+                            <span class="keyword-tag lime">魔法みたい</span>だけど<br>
+                            実際に動く技術！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale cyan-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cogs fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② CLI-Anythingの仕組み：GUI操作をCLIで抽象化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-display" style="color: var(--ui-color-1);"></i><span>GUIアプリの<span class="highlight">操作をCLIコマンドとして抽象化</span>するレイヤーを提供</span></li>
+                        <li><i class="fa-solid fa-robot cyan-icon"></i><span>AIエージェントが<span class="keyword-tag cyan">ターミナルからGUIアプリを直接操作</span>可能に</span></li>
+                        <li><i class="fa-solid fa-arrow-right lime-icon"></i><span>プロンプトで自然言語指示 → <span class="keyword-tag lime">CLI-Anythingが中継</span> → GUIアプリに操作を実行</span></li>
+                        <li><i class="fa-solid fa-layer-group" style="color: var(--ui-color-1);"></i><span>Claude CodeのSkillとして動作するため、<span class="highlight">追加の設定なしで利用可能</span></span></li>
+                        <li><i class="fa-solid fa-circle-info cyan-icon"></i><span>裏側では<span class="keyword-tag cyan">Playwright等の自動化技術</span>がGUI操作を実行</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            人間がマウスでクリックする操作を<br>
+                            <span class="keyword-tag cyan">CLIコマンド</span>に翻訳。<br>
+                            AIが裏側でGUIを動かす！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-star fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ 急速に注目を集める背景：GitHubスター急増</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-calendar" style="color: var(--ui-color-1);"></i><span><span class="highlight">2026年5月以降</span>に急速にコミュニティで注目を集め、GitHubスターが急増中</span></li>
+                        <li><i class="fa-solid fa-code-branch cyan-icon"></i><span>オープンソースで公開され、<span class="keyword-tag cyan">誰でも拡張可能</span>な設計</span></li>
+                        <li><i class="fa-solid fa-users" style="color: var(--ui-color-1);"></i><span>開発者コミュニティが<span class="keyword-tag lime">新しいSkillを作成・共有</span>するエコシステムが形成</span></li>
+                        <li><i class="fa-solid fa-trophy lime-icon"></i><span>AIエージェントが<span class="highlight">PC上のGUIアプリを使える</span>という需要に直撃</span></li>
+                        <li><i class="fa-solid fa-rocket" style="color: var(--ui-color-5);"></i><span>AnthropicのClaude Codeエコシステム拡大と<span class="keyword-tag cyan">連動して成長</span></span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-chart-line fa-lg" style="color: var(--ui-color-2);"></i>
+                            5月からスター爆増。<br>
+                            <span class="keyword-tag lime">「GUIはもう人間専用じゃない」</span><br>
+                            この認識の広がりが速い！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale cyan-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ CLI-Anythingで何ができる？対応アプリ例</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-paintbrush" style="color: #E11D48;"></i><span><span class="keyword-tag lime">GIMP</span> → AI画像編集：<span class="highlight">自然言語で写真加工・レタッチ</span></span></li>
+                        <li><i class="fa-solid fa-cube" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag cyan">Blender</span> → AI 3Dモデリング：<span class="highlight">自然言語で3Dオブジェクト作成</span></span></li>
+                        <li><i class="fa-solid fa-diagram-project lime-icon"></i><span><span class="keyword-tag lime">draw.io</span> → AI図解生成：<span class="highlight">自然言語でフローチャート・UMLを自動作成</span></span></li>
+                        <li><i class="fa-solid fa-ellipsis" style="color: var(--ui-color-5);"></i><span>その他<span class="keyword-tag cyan">あらゆるGUIツール</span>がCLI化の対象になり得る</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece cyan-icon"></i><span>新しいアプリへの対応は<span class="keyword-tag lime">Skillを追加するだけ</span>で拡張可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-palette fa-lg" style="color: #E11D48;"></i>
+                            GIMPで写真加工、Blenderで3D、<br>
+                            <span class="keyword-tag cyan">draw.ioで図解</span>。<br>
+                            全部テキストで指示できる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-link fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ MCP統合でエージェント間連携も強力に</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-network-wired" style="color: var(--ui-color-1);"></i><span><span class="highlight">MCP（Model Context Protocol）</span>との統合で、複数AIエージェントが協調可能に</span></li>
+                        <li><i class="fa-solid fa-people-arrows cyan-icon"></i><span>エージェントAがGUIアプリを操作 → <span class="keyword-tag cyan">結果をエージェントBが受け取る</span>ようなパイプライン構築</span></li>
+                        <li><i class="fa-solid fa-server lime-icon"></i><span>CLI-Anythingが<span class="keyword-tag lime">MCPサーバーとしても機能</span>、他のAIエージェントから呼び出し可能</span></li>
+                        <li><i class="fa-solid fa-circle-check" style="color: var(--ui-color-1);"></i><span><span class="highlight">「AIがPC上のあらゆる操作を自律実行」</span>する未来への第一歩</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            MCPで繋がれば<br>
+                            <span class="keyword-tag lime">エージェントのチーム作業</span>も<br>
+                            自動化できる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== Section 2: draw.io CLI化（4カード） ===== -->
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ draw.ioとは？世界最人気の図解ツール</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-globe" style="color: var(--ui-color-1);"></i><span><span class="highlight">世界最人気の図解ツール</span>。フローチャート・UML・アーキテクチャ図等に対応</span></li>
+                        <li><i class="fa-solid fa-display cyan-icon"></i><span>通常は<span class="keyword-tag cyan">GUIベースのブラウザ/デスクトップアプリ</span>として利用</span></li>
+                        <li><i class="fa-solid fa-file-code lime-icon"></i><span>出力形式：<span class="keyword-tag lime">SVG</span>・<span class="keyword-tag lime">PNG</span>・<span class="keyword-tag lime">PDF</span>など幅広いフォーマットに対応</span></li>
+                        <li><i class="fa-solid fa-users" style="color: var(--ui-color-1);"></i><span>エンジニアからビジネス層まで<span class="highlight">幅広い層に利用</span>されている定番ツール</span></li>
+                        <li><i class="fa-solid fa-lock" cyan-icon></i><span>無料で利用可能（オープンソース派生）で<span class="keyword-tag cyan">導入障壁が低い</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbtack fa-lg" style="color: var(--ui-color-1);"></i>
+                            技術文書の図解といえば<br>
+                            <span class="keyword-tag cyan">draw.io</span>。<br>
+                            これをCLI化するのが画期的！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale cyan-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ draw.ioをCLI化する仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-plus" style="color: var(--ui-color-2);"></i><span><span class="highlight">ノード追加・削除・編集</span>をCLIコマンドで実行可能</span></li>
+                        <li><i class="fa-solid fa-arrow-right-long cyan-icon"></i><span><span class="highlight">エッジ（接続線）</span>の追加・ラベル設定をCLI経由で操作</span></li>
+                        <li><i class="fa-solid fa-table-cells lime-icon"></i><span><span class="keyword-tag lime">レイアウト調整（自動配置）</span>をコマンドで指定</span></li>
+                        <li><i class="fa-solid fa-palette cyan-icon"></i><span><span class="keyword-tag cyan">フォント・スタイル・色の変更</span>もCLIから一括制御</span></li>
+                        <li><i class="fa-solid fa-file-export lime-icon"></i><span><span class="keyword-tag lime">SVG/PNG/PDFへのエクスポート</span>をCLIで自動化</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-terminal fa-lg" style="color: var(--ui-color-1);"></i>
+                            もともとGUIでマウス操作するだけの<br>
+                            draw.ioが<span class="keyword-tag cyan">CLIコマンドで</span><br>
+                            全部操作できるようになる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 「テキストで指示するだけで図ができる」状態へ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain" style="color: var(--ui-color-5);"></i><span>Claude Codeが自然言語で<span class="highlight">図の構造を理解</span>し、CLIコマンドを自動生成</span></li>
+                        <li><i class="fa-solid fa-message lime-icon"></i><span>例：<span class="keyword-tag lime">「マイクロサービスの通信フロー図を作って」</span>と指示するだけ</span></li>
+                        <li><i class="fa-solid fa-bolt cyan-icon"></i><span>AIがノード配置・接続・スタイリングを<span class="highlight">全自動で実行</span></span></li>
+                        <li><i class="fa-solid fa-clock" style="color: var(--ui-color-1);"></i><span>手動で<span class="keyword-tag cyan">30分かかる図解作成</span>が<span class="keyword-tag lime">数分で完成</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate" style="color: var(--ui-color-5);"></i><span>修正も自然言語で<span class="highlight">「このノードを右に移動して」</span>と指示可能</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-2);"></i>
+                            マウスを握る手間が<span class="keyword-tag lime">ゼロ</span>。<br>
+                            言葉で図が描ける世界が<br>
+                            ついに来た！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ デモフロー：自然言語 → 図生成の全行程</h2>
+                </div>
+                <div class="card-content">
+                    <div class="flow-container">
+                        <div class="flow-step">
+                            <i class="fa-solid fa-message"></i>
+                            <span>① 自然言語で<br>指示</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right flow-arrow-inline"></i>
+                        <div class="flow-step">
+                            <i class="fa-solid fa-brain"></i>
+                            <span>② Opus 4.8が<br>図構造を計画</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right flow-arrow-inline"></i>
+                        <div class="flow-step">
+                            <i class="fa-solid fa-terminal"></i>
+                            <span>③ CLI-Anything<br>経由でコマンド送信</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right flow-arrow-inline"></i>
+                        <div class="flow-step">
+                            <i class="fa-solid fa-diagram-project"></i>
+                            <span>④ draw.ioが<br>図を自動生成</span>
+                        </div>
+                        <i class="fa-solid fa-arrow-right flow-arrow-inline"></i>
+                        <div class="flow-step">
+                            <i class="fa-solid fa-file-export"></i>
+                            <span>⑤ SVG/PNG<br>としてエクスポート</span>
+                        </div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1" style="color: var(--ui-color-5);"></i><span>Claude Codeに<span class="keyword-tag cyan">自然言語で図の指示</span>を入力</span></li>
+                        <li><i class="fa-solid fa-2" style="color: var(--ui-color-1);"></i><span>Opus 4.8が<span class="keyword-tag lime">ノード・接続・レイアウト</span>を計画</span></li>
+                        <li><i class="fa-solid fa-3" style="color: var(--ui-color-5);"></i><span>CLI-Anything経由でdraw.ioに<span class="keyword-tag cyan">CLIコマンドを送信</span></span></li>
+                        <li><i class="fa-solid fa-4" style="color: var(--ui-color-1);"></i><span>draw.ioが図を<span class="keyword-tag lime">自動生成</span>、SVG/PNGに<span class="highlight">エクスポート</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-5);"></i>
+                            全自動5ステップ。<br>
+                            <span class="keyword-tag cyan">人間がするのは</span>最初の<br>
+                            <span class="keyword-tag lime">「図の指示」だけ！</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+            <!-- ===== Section 3: Opus 4.8実演デモ（5カード） ===== -->
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale cyan-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ Claude Opus 4.8の性能が鍵</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-expand lime-icon"></i><span><span class="highlight">100万トークンのコンテキストウィンドウ</span>で複雑な図の仕様を正確に理解</span></li>
+                        <li><i class="fa-solid fa-bullseye" style="color: var(--ui-color-1);"></i><span><span class="highlight">高度な命令追従</span>で意図したとおりの正確な図を生成</span></li>
+                        <li><i class="fa-solid fa-diagram-successor cyan-icon"></i><span>複数ノード・複数接続の<span class="keyword-tag cyan">複雑な図</span>でも正確に配置を実現</span></li>
+                        <li><i class="fa-solid fa-microchip lime-icon"></i><span>図の構造を<span class="keyword-tag lime">論理的に計画</span>してからCLIコマンドを生成する能力に優れる</span></li>
+                        <li><i class="fa-solid fa-gauge-high" style="color: var(--ui-color-5);"></i><span>Claude Codeの<span class="highlight">Dynamic Workflows</span>と組み合わせて<span class="keyword-tag cyan">数百の並列サブエージェント</span>で同時生成も可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            Opus 4.8の<span class="keyword-tag cyan">100万トークン</span>。<br>
+                            複雑な図の仕様も<br>
+                            全部一発で理解する。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ 実演：マイクロサービスアーキテクチャ図の自動生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-message" style="color: var(--ui-color-5);"></i><span>指示：<span class="keyword-tag cyan">「マイクロサービスアーキテクチャ図を作って」</span></span></li>
+                        <li><i class="fa-solid fa-brain" style="color: var(--ui-color-1);"></i><span>Opus 4.8が<span class="highlight">サービスの種類・通信関係・階層構造</span>を自動で計画</span></li>
+                        <li><i class="fa-solid fa-cubes lime-icon"></i><span>API Gateway・Auth Service・User Serviceなど<span class="keyword-tag lime">複数ノード</span>を正確に配置</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right cyan-icon"></i><span>サービス間の<span class="keyword-tag cyan">接続線とラベル</span>も自動で描画</span></li>
+                        <li><i class="fa-solid fa-file-image lime-icon"></i><span>最終的に<span class="highlight">SVGとしてエクスポート</span>され、そのままドキュメントに利用可能</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+                            一文投げたら<br>
+                            <span class="keyword-tag lime">本格的なアーキテクチャ図</span>が<br>
+                            数分で出来上がる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bug fa-5x" style="color: #DC2626; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ ハマりポイントと解決策</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-font" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag cyan">フォントが反映されない</span> → スタイル設定を<span class="highlight">明示的に指定</span>して解決</span></li>
+                        <li><i class="fa-solid fa-arrow-up-from-bracket" style="color: #DC2626;"></i><span><span class="keyword-tag cyan">矢印がラベルと被る</span> → <span class="highlight">レイアウト調整パラメータ</span>の最適化で解決</span></li>
+                        <li><i class="fa-solid fa-text-width lime-icon"></i><span><span class="keyword-tag cyan">テキストが意図しない改行をする</span> → <span class="highlight">ノード幅の調整</span>で解決</span></li>
+                        <li><i class="fa-solid fa-wrench" style="color: var(--ui-color-5);"></i><span>いずれも<span class="keyword-tag lime">自然言語で追加指示</span>すればAIが自動修正可能</span></li>
+                        <li><i class="fa-solid fa-lightbulb" style="color: var(--ui-color-2);"></i><span>GUIで手直しするより<span class="highlight">テキストで微調整</span>する方が効率的</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-meh fa-lg" style="color: #DC2626;"></i>
+                            ハマるポイントはあるけど<br>
+                            <span class="keyword-tag lime">「この部分を直して」</span>って<br>
+                            言えばAIが勝手に直す。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale cyan-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users-gear fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ Dynamic Workflowsで大量の図を同時生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-people-group" style="color: var(--ui-color-1);"></i><span><span class="highlight">数百の並列サブエージェント</span>で複数の図を同時に生成可能</span></li>
+                        <li><i class="fa-solid fa-layer-group cyan-icon"></i><span>大規模システムの<span class="keyword-tag cyan">全体アーキテクチャ図</span>を<span class="keyword-tag lime">複数のサブ図</span>に分割して並列生成</span></li>
+                        <li><i class="fa-solid fa-clock" style="color: var(--ui-color-1);"></i><span>1つの図を数分で作るのが<span class="highlight">数十の図を同時並行</span>でこなす</span></li>
+                        <li><i class="fa-solid fa-gears lime-icon"></i><span>親エージェントが<span class="keyword-tag lime">全体を統括</span>し、子エージェントが各図を担当</span></li>
+                        <li><i class="fa-solid fa-chart-bar cyan-icon"></i><span>ドキュメント整備の<span class="highlight">圧倒的な時間短縮</span>を実現</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-explosion fa-lg" style="color: var(--ui-color-5);"></i>
+                            1つの図じゃなくて<br>
+                            <span class="keyword-tag cyan">システム全体の図解群</span>を<br>
+                            一気に自動生成！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gauge fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ Opus 4.8 vs 他モデル：図解生成の精度比較</h2>
+                </div>
+                <div class="card-content">
+                    <table class="feature-table">
+                        <tr><th>能力</th><th>Opus 4.8</th><th>他モデル</th></tr>
+                        <tr><td>コンテキスト</td><td class="feature-highlight">100万トークン</td><td>最大20万程度</td></tr>
+                        <tr><td>命令追従</td><td class="feature-highlight">極めて高い</td><td>中程度</td></tr>
+                        <tr><td>複雑な図</td><td class="feature-highlight">正確に配置</td><td>崩れやすい</td></tr>
+                        <tr><td>並列生成</td><td class="feature-highlight">Dynamic Workflows</td><td>未対応</td></tr>
+                    </table>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-trophy lime-icon"></i><span><span class="highlight">Claude Opus 4.8が最適</span>：コンテキストの広さと命令追従の高さが決定的</span></li>
+                        <li><i class="fa-solid fa-circle-info cyan-icon"></i><span>他モデルでも動くが<span class="keyword-tag cyan">複雑な図での精度に差</span>が出やすい</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-2);"></i>
+                            <span class="keyword-tag lime">Opus 4.8の一強</span>。<br>
+                            100万トークン × 高命令追従で<br>
+                            図解生成の最適解。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+            <!-- ===== Section 4: 実用性と応用範囲（4カード） ===== -->
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-briefcase fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 実用例：技術ドキュメントの図解を自動生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines" style="color: var(--ui-color-1);"></i><span><span class="highlight">技術ドキュメントの図解を自動生成</span>し、作成工数を大幅削減</span></li>
+                        <li><i class="fa-solid fa-diagram-project cyan-icon"></i><span><span class="keyword-tag cyan">アーキテクチャ図</span>・<span class="keyword-tag cyan">フローチャート</span>・<span class="keyword-tag cyan">UML</span>の自動作成</span></li>
+                        <li><i class="fa-solid fa-display lime-icon"></i><span><span class="keyword-tag lime">プレゼン資料の図解</span>も自然言語から高速生成</span></li>
+                        <li><i class="fa-solid fa-network-wired" style="color: var(--ui-color-5);"></i><span><span class="keyword-tag cyan">ネットワークトポロジ図</span>の自動生成でインフラ可視化も効率化</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left" style="color: var(--ui-color-1);"></i><span>仕様変更時も<span class="highlight">自然言語で修正指示</span>するだけで図を更新</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-pen-ruler fa-lg" style="color: var(--ui-color-2);"></i>
+                            技術ドキュメントの<span class="keyword-tag lime">図解作成</span>は<br>
+                            エンジニアの大きな負担。<br>
+                            これが<span class="keyword-tag cyan">自動化</span>で解決！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale cyan-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ CLI-Anythingの応用：GUIアプリ全般をCLI化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-paintbrush" style="color: #E11D48;"></i><span><span class="keyword-tag lime">GIMP</span> → <span class="highlight">AI画像編集</span>：自然言語で写真加工・レタッチを実行</span></li>
+                        <li><i class="fa-solid fa-cube" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag cyan">Blender</span> → <span class="highlight">AI 3Dモデリング</span>：自然言語で3Dオブジェクトを生成</span></li>
+                        <li><i class="fa-solid fa-diagram-project lime-icon"></i><span><span class="keyword-tag lime">draw.io</span> → <span class="highlight">AI図解生成</span>：自然言語でフローチャート等を自動作成</span></li>
+                        <li><i class="fa-solid fa-plus cyan-icon"></i><span>その他<span class="keyword-tag cyan">あらゆるGUIツール</span>がCLI化の対象に</span></li>
+                        <li><i class="fa-solid fa-arrows-to-dot" style="color: var(--ui-color-5);"></i><span>「<span class="highlight">GUIの知識が不要</span>」でツールを活用できるパラダイムの誕生</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i>
+                            写真加工も3Dモデリングも<br>
+                            <span class="keyword-tag cyan">全部テキストで指示</span>。<br>
+                            GUIの壁がなくなる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 未来展望：AIエージェントがPC操作を自律実行</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-handshake lime-icon"></i><span><span class="highlight">CLI-Anything + Claude Code + MCP</span>の組み合わせで<span class="keyword-tag lime">自律実行エージェント</span>を実現</span></li>
+                        <li><i class="fa-solid fa-desktop cyan-icon"></i><span>AIエージェントが<span class="keyword-tag cyan">PC上のあらゆるGUIアプリを使える</span>ようになる</span></li>
+                        <li><i class="fa-solid fa-layer-group" style="color: var(--ui-color-1);"></i><span>エージェント同士が<span class="highlight">協調して複雑なタスク</span>を完結するエコシステム</span></li>
+                        <li><i class="fa-solid fa-eye" style="color: var(--ui-color-5);"></i><span>「<span class="keyword-tag lime">画面を見て操作する</span>」から「<span class="keyword-tag cyan">裏側で自動実行</span>」への転換</span></li>
+                        <li><i class="fa-solid fa-rocket" style="color: var(--ui-color-2);"></i><span>2026年のAI開発における<span class="highlight">パラダイムシフト</span>の象徴的な技術</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-eye-slash fa-lg" style="color: var(--ui-color-1);"></i>
+                            人間はもう<br>
+                            <span class="keyword-tag lime">マウスを握らなくていい</span>。<br>
+                            AIが裏側で全部やる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale lime-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ：エージェントがGUIを使える時代が来た</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-check" style="color: var(--ui-color-1);"></i><span>CLI-Anythingが<span class="highlight">GUIアプリをCLI化</span>し、AIエージェントが利用可能に</span></li>
+                        <li><i class="fa-solid fa-brain" style="color: var(--ui-color-5);"></i><span>Claude Opus 4.8の<span class="keyword-tag cyan">100万トークン</span>が<span class="highlight">複雑な図の仕様</span>を正確に理解</span></li>
+                        <li><i class="fa-solid fa-terminal lime-icon"></i><span>draw.ioのCLI化で<span class="keyword-tag lime">「テキストで指示するだけで図ができる」</span>を実現</span></li>
+                        <li><i class="fa-solid fa-globe" style="color: var(--ui-color-1);"></i><span>GIMP・Blenderなど<span class="highlight">あらゆるGUIツール</span>が同じパラダイムでCLI化可能</span></li>
+                        <li><i class="fa-solid fa-forward" style="color: var(--ui-color-5);"></i><span><span class="highlight">2026年のパラダイムシフト</span>：エージェントが<span class="keyword-tag cyan">GUIアプリを使える</span>ようになる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i>
+                            GUIはもう<span class="keyword-tag lime">人間専用じゃない</span>。<br>
+                            AIエージェントがCLI経由で<br>
+                            あらゆるアプリを操る。<br>
+                            <span class="keyword-tag cyan">2026年の革命</span>がここにある！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/i7qQnq4Wh2A" target="_blank" style="color: var(--ui-color-1);">【CLI-Anything×Opus4.8実演】ClaudeCodeでdraw.ioをCLI化してAIが図解を作成するデモ</a> | 📅 2026年6月2日<br>
+            🎥 チャンネル: AI系YouTuber<br>
+            🔗 ソース: <a href="https://youtu.be/i7qQnq4Wh2A" target="_blank" style="color: var(--ui-color-1);">https://youtu.be/i7qQnq4Wh2A</a>
+        </footer>
+
+    </div>
+</body>
+</html>

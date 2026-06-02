@@ -1,0 +1,1123 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Agentic Stackで長時間稼働エージェントを構築 | The Agent Factory</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #0C4A6E;
+            --ui-color-2: #0D9488;
+            --ui-color-3: #059669;
+            --ui-color-4: #134E4A;
+            --ui-color-5: #EA580C;
+            --bg: #F0F9FF;
+            --card-accent: linear-gradient(90deg, #0C4A6E, #0D9488, #059669);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--bg);
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #0C4A6E 0%, #0D9488 40%, #059669 70%, #134E4A 100%);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .header .vs-label {
+            display: inline-block;
+            margin-top: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .teal-label { color: #5EEAD4; }
+        .orange-label { color: #FDBA74; }
+        .green-label { color: #6EE7B7; }
+
+        /* Section divider */
+        .section-divider {
+            display: flex;
+            align-items: center;
+            margin: 30px 0 20px;
+            padding: 0 20px;
+        }
+
+        .section-divider .line {
+            flex: 1;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--ui-color-2), transparent);
+        }
+
+        .section-divider .label {
+            padding: 8px 25px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            border-radius: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+            white-space: nowrap;
+            margin: 0 15px;
+            box-shadow: 0 3px 10px rgba(13,148,136,0.3);
+        }
+
+        /* Cards */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: var(--card-accent);
+        }
+
+        .section-card.teal-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-2), var(--ui-color-3));
+        }
+
+        .section-card.orange-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-5), #F59E0B);
+        }
+
+        .section-card.green-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-3), var(--ui-color-4));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.1em;
+            color: var(--ui-color-1);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-list li .orange-icon {
+            color: var(--ui-color-5);
+        }
+
+        .keyword-list li .teal-icon {
+            color: var(--ui-color-2);
+        }
+
+        .keyword-list li .green-icon {
+            color: var(--ui-color-3);
+        }
+
+        .keyword-tag {
+            background-color: #CCFBF1;
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.teal {
+            background-color: #CCFBF1;
+            color: var(--ui-color-4);
+        }
+
+        .keyword-tag.orange {
+            background-color: #FFF7ED;
+            color: #9A3412;
+        }
+
+        .keyword-tag.green {
+            background-color: #DCFCE7;
+            color: #166534;
+        }
+
+        .keyword-tag.blue {
+            background-color: #DBEAFE;
+            color: #1E40AF;
+        }
+
+        /* Speech bubbles */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-2);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-2) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF7ED;
+            border-color: var(--ui-color-5);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #CCFBF1;
+            border-color: var(--ui-color-2);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-3 {
+            background: #DCFCE7;
+            border-color: var(--ui-color-3);
+            transform: rotate(0.5deg);
+        }
+
+        .speech-bubble.variant-3::after {
+            border-color: var(--ui-color-3) transparent;
+        }
+
+        .speech-bubble.variant-4 {
+            background: #DBEAFE;
+            border-color: var(--ui-color-1);
+            transform: rotate(-1.5deg);
+        }
+
+        .speech-bubble.variant-4::after {
+            border-color: var(--ui-color-1) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(13,148,136,0.25) 60%);
+            font-weight: bold;
+        }
+
+        .highlight.orange {
+            background: linear-gradient(transparent 60%, rgba(234,88,12,0.25) 60%);
+        }
+
+        .highlight.green {
+            background: linear-gradient(transparent 60%, rgba(5,150,105,0.25) 60%);
+        }
+
+        .highlight.blue {
+            background: linear-gradient(transparent 60%, rgba(12,74,110,0.25) 60%);
+        }
+
+        /* Architecture flow */
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            margin: 15px 0;
+            flex-wrap: wrap;
+        }
+
+        .arch-flow .arch-node {
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .arch-flow .arch-arrow {
+            color: var(--ui-color-5);
+            font-size: 18px;
+        }
+
+        /* Feature table */
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .feature-table th {
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            padding: 8px 6px;
+            font-size: 13px;
+        }
+
+        .feature-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .feature-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+
+        .badge-teal {
+            background: linear-gradient(135deg, #0D9488, #14B8A6);
+            color: white;
+        }
+
+        .badge-orange {
+            background: linear-gradient(135deg, #EA580C, #F97316);
+            color: white;
+        }
+
+        .badge-green {
+            background: linear-gradient(135deg, #059669, #10B981);
+            color: white;
+        }
+
+        .badge-blue {
+            background: linear-gradient(135deg, #0C4A6E, #0284C7);
+            color: white;
+        }
+
+        /* Step number */
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        /* Animations */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Pulse animation for live indicators */
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(5,150,105,0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(5,150,105,0); }
+        }
+
+        .live-dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--ui-color-3);
+            animation: pulse-green 2s infinite;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-2);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- ====== HEADER ====== -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-robot fa-7x" aria-hidden="true"></i></div>
+            <h1>Google Agentic Stackで長時間稼働エージェントを構築する</h1>
+            <div class="subtitle">数時間〜数日継続するAIエージェント — セッション永続化・Human-in-the-Loop・Gemini Spark — The Agent Factory</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月1日</div>
+            <div class="vs-label">
+                <span class="teal-label"><i class="fas fa-microchip"></i> Gemini 3.5 Flash</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="orange-label"><i class="fas fa-gears"></i> ADK 2.0</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="green-label"><i class="fas fa-clock"></i> 長時間稼働</span>
+            </div>
+        </div>
+
+        <!-- ====== SECTION 1: Google Agentic Stackとは ====== -->
+        <div class="section-divider">
+            <div class="line"></div>
+            <div class="label"><i class="fas fa-layer-group"></i> SECTION 1: Google Agentic Stackとは</div>
+            <div class="line"></div>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 1: 概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Google Agentic Stackの概要</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-calendar-check teal-icon"></i><span><span class="highlight">Google Cloud Next 2026</span>で発表された包括的なエージェント開発スタック</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots orange-icon"></i><span>Vertex AIを後継する<span class="keyword-tag blue">Gemini Enterprise Agent Platform</span>として進化</span></li>
+                        <li><i class="fa-solid fa-bolt teal-icon"></i><span><span class="keyword-tag green">Gemini 3.5 Flash</span>を搭載し、高速・高精度な推論を実現</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles orange-icon"></i><span>低コードの<span class="highlight">自然言語インターフェース</span>とコードファースト開発の両対応</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece teal-icon"></i><span>エージェントの設計から運用までを<span class="keyword-tag teal">エンドツーエンド</span>でサポート</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i>
+                            Vertex AIの次世代版。<br>
+                            エージェント開発の<span class="keyword-tag orange">「全部入り」</span>！<br>
+                            設計→開発→デプロイ→監視まで。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: 主要コンポーネント -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cubes fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 主要コンポーネント一覧</h2>
+                </div>
+                <div class="card-content">
+                    <div class="arch-flow">
+                        <span class="arch-node">Agent Studio</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">ADK 2.0</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">Agent Runtime</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">Agent Identity</span>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-paintbrush teal-icon"></i><span><span class="keyword-tag teal">Agent Studio</span>: 協調的エージェント作成環境（ビジュアル＋コード）</span></li>
+                        <li><i class="fa-solid fa-screwdriver-wrench green-icon"></i><span><span class="keyword-tag green">ADK 2.0</span>: オープンソース開発キット（Python/Go/Java）</span></li>
+                        <li><i class="fa-solid fa-server orange-icon"></i><span><span class="keyword-tag orange">Agent Runtime</span>: 長時間実行・セッション永続化対応の実行環境</span></li>
+                        <li><i class="fa-solid fa-id-card teal-icon"></i><span><span class="keyword-tag blue">Agent Identity</span> / <span class="keyword-tag blue">Registry</span> / <span class="keyword-tag blue">Gateway</span>: 管理・監査・ルーティング</span></li>
+                        <li><i class="fa-solid fa-gauge-high green-icon"></i><span>各コンポーネントが<span class="highlight">独立しつつ連携</span>するモジュラー設計</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-link fa-lg" style="color: var(--ui-color-2);"></i>
+                            4つのコンポーネントが<br>
+                            <span class="keyword-tag green">シームレスに連携</span>。<br>
+                            必要なものだけ組み合わせて使える！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: Agent Studio -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-paintbrush fa-5x" style="color: var(--ui-color-3); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ Agent Studio: エージェント作成環境</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-users-rectangle green-icon"></i><span><span class="highlight">複数エージェントを協調的</span>に設計・構成できるビジュアル環境</span></li>
+                        <li><i class="fa-solid fa-message teal-icon"></i><span>自然言語でエージェントの<span class="keyword-tag teal">振る舞いを記述</span>する低コードインターフェース</span></li>
+                        <li><i class="fa-solid fa-code orange-icon"></i><span>コードファーストの開発者には<span class="keyword-tag orange">ADK</span>で直接プログラミングも可能</span></li>
+                        <li><i class="fa-solid fa-diagram-project green-icon"></i><span>エージェント間の<span class="highlight">フロー図・依存関係</span>を視覚的に設計</span></li>
+                        <li><i class="fa-solid fa-plug teal-icon"></i><span>MCPツールやA2A通信を<span class="keyword-tag green">ドラッグ＆ドロップ</span>で統合</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-hand-pointer fa-lg" style="color: var(--ui-color-3);"></i>
+                            「エージェント間でこう連携して」<br>
+                            と<span class="keyword-tag teal">自然言語で指定</span>するだけ。<br>
+                            プロトタイプが秒速で完成！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: Agent Identity / Registry / Gateway -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ Agent Identity / Registry / Gateway</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-fingerprint orange-icon"></i><span><span class="highlight">Agent Identity</span>: エージェントの識別・認証・権限管理</span></li>
+                        <li><i class="fa-solid fa-rectangle-list teal-icon"></i><span><span class="keyword-tag teal">Agent Registry</span>: 組織内の全エージェントを<span class="highlight">一元管理</span>するカタログ</span></li>
+                        <li><i class="fa-solid fa-network-wired green-icon"></i><span><span class="keyword-tag green">Agent Gateway</span>: エージェントへの外部アクセスを統合・ルーティング</span></li>
+                        <li><i class="fa-solid fa-clipboard-check orange-icon"></i><span>エージェントの<span class="keyword-tag orange">監査ログ・コンプライアンス</span>対応</span></li>
+                        <li><i class="fa-solid fa-lock teal-icon"></i><span>エンタープライズ環境での<span class="highlight">セキュリティ・ガバナンス</span>を確保</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-building fa-lg" style="color: var(--ui-color-1);"></i>
+                            企業導入に必須の<span class="keyword-tag blue">ガバナンス層</span>。<br>
+                            誰が・何のエージェントを使えるかを<br>
+                            しっかり管理できる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 5: Gemini 3.5 Flash -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt-lightning fa-5x" style="color: #F59E0B; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ Gemini 3.5 Flash搭載</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge-high orange-icon"></i><span>スタックの頭脳として<span class="highlight">Gemini 3.5 Flash</span>を標準搭載</span></li>
+                        <li><i class="fa-solid fa-coins teal-icon"></i><span>高速推論と低コストの<span class="keyword-tag teal">ベストバランス</span>を実現</span></li>
+                        <li><i class="fa-solid fa-brain green-icon"></i><span>長時間稼働に必要な<span class="keyword-tag green">コンテキスト理解</span>能力に優れる</span></li>
+                        <li><i class="fa-solid fa-arrows-spin orange-icon"></i><span>ステートレスな従来モデルとは異なり、<span class="highlight">セッションを維持</span>した推論</span></li>
+                        <li><i class="fa-solid fa-globe teal-icon"></i><span>多言語対応・マルチモーダルで<span class="keyword-tag orange">日本語も自然に処理</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-4">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i>
+                            速さ・安さ・賢さの<span class="keyword-tag orange">三冠</span>。<br>
+                            長時間のエージェント実行でも<br>
+                            コストを抑えられるのが鍵！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end section 1 layout -->
+
+        <!-- ====== SECTION 2: 長時間稼働エージェントの仕組み ====== -->
+        <div class="section-divider">
+            <div class="line"></div>
+            <div class="label"><i class="fas fa-clock"></i> SECTION 2: 長時間稼働エージェントの仕組み</div>
+            <div class="line"></div>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 6: ステートレス限界の突破 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-unlock fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ ステートレスAIモデルの限界を突破</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban orange-icon"></i><span>従来のAIは<span class="highlight">ステートレス</span>：リクエストごとに記憶がリセットされる</span></li>
+                        <li><i class="fa-solid fa-clock teal-icon"></i><span>長時間のタスク（数時間〜数日）では<span class="keyword-tag orange">コンテキスト喪失</span>が致命的</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots green-icon"></i><span>Google Agentic Stackは<span class="highlight">状態を永続化</span>する新しいパラダイム</span></li>
+                        <li><i class="fa-solid fa-database teal-icon"></i><span>外部ストレージに<span class="keyword-tag teal">セッション状態</span>を保存・復元する仕組み</span></li>
+                        <li><i class="fa-solid fa-timeline orange-icon"></i><span>時間をまたいだ<span class="keyword-tag green">継続的なタスク実行</span>を可能にする</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            従来: 「毎回最初から」<br>
+                            Agentic Stack: <span class="keyword-tag orange">「続きから再開」</span><br>
+                            この差は大きい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7: セッション永続化 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-infinity fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ セッション永続化の仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hard-drive teal-icon"></i><span><span class="highlight">状態とコンテキスト</span>を外部ストレージに長期間保持</span></li>
+                        <li><i class="fa-solid fa-rotate green-icon"></i><span>エージェントが<span class="keyword-tag teal">途中で停止しても</span>、再開時に正確に状態を復元</span></li>
+                        <li><i class="fa-solid fa-layer-group orange-icon"></i><span><span class="keyword-tag orange">履歴・判断・進捗</span>の完全なトレーサビリティ</span></li>
+                        <li><i class="fa-solid fa-code-branch teal-icon"></i><span>並行稼働の複数エージェントが<span class="highlight">独立したセッション</span>を維持</span></li>
+                        <li><i class="fa-solid fa-cloud-arrow-up green-icon"></i><span>Cloud Spanner等の<span class="keyword-tag green">マネージドDB</span>に自動保存</span></li>
+                    </ul>
+                    <div class="arch-flow">
+                        <span class="arch-node">実行中</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">保存</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">停止</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">復元</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">再開</span>
+                    </div>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-save fa-lg" style="color: var(--ui-color-2);"></i>
+                            人間の「仕事を途中で保存」<br>
+                            と同じ。エージェントにも<br>
+                            <span class="keyword-tag teal">「続きから」</span>ができる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: イベント駆動のスリープ/ウェイクアップ -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-moon fa-5x" style="color: var(--ui-color-3); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ イベント駆動のスリープ＆ウェイクアップ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-moon green-icon"></i><span>アイドル時にエージェントは<span class="highlight">「スリープ」状態</span>に入る</span></li>
+                        <li><i class="fa-solid fa-sun orange-icon"></i><span>外部イベント（メール受信・API応答等）で<span class="keyword-tag orange">「ウェイクアップ」</span></span></li>
+                        <li><i class="fa-solid fa-bolt teal-icon"></i><span><span class="keyword-tag teal">イベント駆動アーキテクチャ</span>でリソースを効率的に活用</span></li>
+                        <li><i class="fa-solid fa-compress green-icon"></i><span>スリープ中は<span class="highlight">コンピューティングコストがほぼゼロ</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate orange-icon"></i><span>Pub/SubやCloud Tasksで<span class="keyword-tag green">外部トリガー</span>と連携</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bed fa-lg" style="color: var(--ui-color-3);"></i>
+                            待つ間は<span class="keyword-tag green">寝て待つ</span>。<br>
+                            何かあったら<span class="keyword-tag orange">起こして</span>。<br>
+                            省コストで賢い設計！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9: Human-in-the-Loop Inbox -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-check fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ Human-in-the-Loop (HITL) Inbox</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hand orange-icon"></i><span><span class="highlight">制限アクション</span>（送信・削除・決済等）でエージェントが自動一時停止</span></li>
+                        <li><i class="fa-solid fa-inbox teal-icon"></i><span>人間に<span class="keyword-tag teal">承認リクエスト</span>をInboxに通知</span></li>
+                        <li><i class="fa-solid fa-circle-check green-icon"></i><span>人間が<span class="keyword-tag green">承認すると自動的に実行再開</span></span></li>
+                        <li><i class="fa-solid fa-briefcase orange-icon"></i><span><span class="highlight">HRオンボーディング</span>・営業アプローチなど<span class="keyword-tag orange">数日〜数週間のタスク</span>に対応</span></li>
+                        <li><i class="fa-solid fa-scale-balanced teal-icon"></i><span>自律性と人間の管理を<span class="highlight">最適なバランス</span>で両立</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-shield fa-lg" style="color: var(--ui-color-1);"></i>
+                            「勝手に送信しないで」<br>
+                            → 人間がOKを出してから<br>
+                            <span class="keyword-tag blue">実行再開</span>。安心安全！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: Gemini Spark -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fire-flame-curved fa-5x" style="color: #EF4444; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ Gemini Spark: 常時稼働する自律エージェント</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-cloud orange-icon"></i><span>Cloud VM上で<span class="highlight">24/7常時稼働</span>する自律エージェント</span></li>
+                        <li><i class="fa-solid fa-tasks teal-icon"></i><span>バックグラウンドで<span class="keyword-tag teal">継続的なタスク処理</span>を実行</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation orange-icon"></i><span><span class="keyword-tag orange">異常検知・フラグ機能</span>で問題を自動検出</span></li>
+                        <li><i class="fa-solid fa-bell green-icon"></i><span>重要事象を人間に<span class="keyword-tag green">通知</span>して判断を委ねる</span></li>
+                        <li><i class="fa-solid fa-rotate-right teal-icon"></i><span>自己修復・リトライ機能で<span class="highlight">耐障害性</span>を確保</span></li>
+                    </ul>
+                    <div class="arch-flow">
+                        <span class="arch-node"><span class="live-dot"></span>常時稼働</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">タスク処理</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">異常検知</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">人間通知</span>
+                    </div>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: #EF4444;"></i>
+                            エージェントが<span class="keyword-tag orange">朝から晩まで</span><br>
+                            自律的に仕事を進める。<br>
+                            まるで<span class="keyword-tag green">AIの社員</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: Antigravity 2.0 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ Antigravity 2.0: 能力拡張フレームワーク</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-up-right-and-down-left-from-center teal-icon"></i><span>エージェントの<span class="highlight">能力を拡張</span>するためのフレームワーク</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece green-icon"></i><span><span class="keyword-tag green">カスタムツール</span>・<span class="keyword-tag green">スキル</span>をモジュラーに追加</span></li>
+                        <li><i class="fa-solid fa-code-branch orange-icon"></i><span>サードパーティ製の<span class="keyword-tag orange">拡張機能</span>エコシステムを活用</span></li>
+                        <li><i class="fa-solid fa-wrench teal-icon"></i><span>ドメイン固有の<span class="highlight">専門知識・ワークフロー</span>を組み込み可能</span></li>
+                        <li><i class="fa-solid fa-arrows-to-dot green-icon"></i><span>エージェントに<span class="keyword-tag teal">「人間以上の能力」</span>を付与するブースター</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+                            基本エージェントに<br>
+                            <span class="keyword-tag green">プラグイン</span>を追加するだけで<br>
+                            専門家に早変わり！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end section 2 layout -->
+
+        <!-- ====== SECTION 3: ADK 2.0 × Cloud Run ====== -->
+        <div class="section-divider">
+            <div class="line"></div>
+            <div class="label"><i class="fas fa-code"></i> SECTION 3: ADK 2.0 × Cloud Run デプロイ</div>
+            <div class="line"></div>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 12: ADK 2.0概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ ADK 2.0: オープンソース開発キット</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-branch teal-icon"></i><span><span class="highlight">オープンソース</span>で<span class="keyword-tag teal">モデル非依存</span>のフレームワーク</span></li>
+                        <li><i class="fa-brands fa-python orange-icon"></i><span><span class="keyword-tag green">Python</span> <span class="keyword-tag orange">Go</span> <span class="keyword-tag blue">Java</span>の3言語に対応</span></li>
+                        <li><i class="fa-solid fa-robot green-icon"></i><span>Geminiだけでなく、<span class="highlight">OpenAI・Anthropic等</span>のモデルも利用可能</span></li>
+                        <li><i class="fa-solid fa-graduation-cap orange-icon"></i><span><span class="keyword-tag orange">組み込み評価フレームワーク</span>でエージェント品質を自動テスト</span></li>
+                        <li><i class="fa-brands fa-github teal-icon"></i><span>GitHubで公開され、<span class="keyword-tag green">コミュニティ貢献</span>も活発</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-4">
+                        <span class="handwritten">
+                            <i class="fa-brands fa-github fa-lg" style="color: var(--ui-color-1);"></i>
+                            モデルに縛られない<span class="keyword-tag blue">自由度</span>。<br>
+                            今の好きなモデルから始めて<br>
+                            必要に応じて切り替えられる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13: マルチエージェントアーキテクチャ -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-3); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ マルチエージェントアーキテクチャ</h2>
+                </div>
+                <div class="card-content">
+                    <div class="arch-flow">
+                        <span class="arch-node">シーケンシャル</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">パラレル</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">ループ</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">LLMルーティング</span>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-down-1-9 green-icon"></i><span><span class="keyword-tag green">シーケンシャル</span>: 順番にエージェントがタスクを引き継ぐ</span></li>
+                        <li><i class="fa-solid fa-arrows-split-up-and-left teal-icon"></i><span><span class="keyword-tag teal">パラレル</span>: 複数エージェントが同時に並行処理</span></li>
+                        <li><i class="fa-solid fa-repeat orange-icon"></i><span><span class="keyword-tag orange">ループ</span>: 条件を満たすまでエージェントが反復実行</span></li>
+                        <li><i class="fa-solid fa-brain green-icon"></i><span><span class="highlight">LLM駆動の動的ルーティング</span>: AIが次にどのエージェントを呼ぶかを判断</span></li>
+                        <li><i class="fa-solid fa-diagram-project teal-icon"></i><span>複雑なワークフローを<span class="keyword-tag blue">宣言的に記述</span>可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-sitemap fa-lg" style="color: var(--ui-color-2);"></i>
+                            1人じゃ重い作業も<br>
+                            <span class="keyword-tag green">チームで分担</span>。<br>
+                            エージェント版の「分業」！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: 組み込み評価フレームワーク -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-vial-circle-check fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 組み込み評価フレームワーク</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flask orange-icon"></i><span>エージェントの<span class="highlight">品質・性能</span>を自動的に評価する組み込みツール</span></li>
+                        <li><i class="fa-solid fa-chart-bar teal-icon"></i><span><span class="keyword-tag teal">精度・速度・コスト</span>など多角的な指標で測定</span></li>
+                        <li><i class="fa-solid fa-rotate green-icon"></i><span><span class="keyword-tag green">回帰テスト</span>で変更後のデグレを自動検出</span></li>
+                        <li><i class="fa-solid fa-bullseye orange-icon"></i><span>A/Bテストで<span class="highlight">プロンプト・ツールの効果</span>を比較</span></li>
+                        <li><i class="fa-solid fa-timeline teal-icon"></i><span>CI/CDパイプラインに<span class="keyword-tag orange">統合</span>して継続的な品質管理</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-check-double fa-lg" style="color: var(--ui-color-5);"></i>
+                            「エージェントが正しく動くか」<br>
+                            を<span class="keyword-tag orange">自動テスト</span>。<br>
+                            信頼性がグッと上がる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: Cloud Runデプロイ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cloud-arrow-up fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ Cloud Runへのデプロイ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-box-open teal-icon"></i><span>ソースコードから<span class="highlight">コンテナイメージを自動ビルド</span></span></li>
+                        <li><i class="fa-solid fa-expand orange-icon"></i><span>サーバーレスで<span class="keyword-tag orange">自動スケーリング</span>（ゼロから数千リクエストまで）</span></li>
+                        <li><i class="fa-solid fa-link green-icon"></i><span><span class="keyword-tag green">Managed Agents API</span>との統合で管理も簡単</span></li>
+                        <li><i class="fa-solid fa-money-bill-wave teal-icon"></i><span><span class="highlight">従量課金</span>なので実行時のみコスト発生</span></li>
+                        <li><i class="fa-solid fa-gauge simple"></i><span>Cold Startの最適化で<span class="keyword-tag teal">高速起動</span>を実現</span></li>
+                    </ul>
+                    <div class="arch-flow">
+                        <span class="arch-node">ソースコード</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">ビルド</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">Cloud Run</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-right"></i></span>
+                        <span class="arch-node">Managed API</span>
+                    </div>
+                    <div class="speech-bubble variant-4">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-1);"></i>
+                            <span class="keyword-tag blue">`git push`</span> するだけで<br>
+                            デプロイ完了。サーバー管理は<br>
+                            Googleに任せちゃおう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end section 3 layout -->
+
+        <!-- ====== SECTION 4: MCP & A2A通信プロトコル ====== -->
+        <div class="section-divider">
+            <div class="line"></div>
+            <div class="label"><i class="fas fa-network-wired"></i> SECTION 4: MCP & A2A通信プロトコル</div>
+            <div class="line"></div>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 16: MCP -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ MCP: Model Context Protocol</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plug teal-icon"></i><span>エージェントと<span class="highlight">外部ツール・データソース</span>を接続する標準プロトコル</span></li>
+                        <li><i class="fa-solid fa-database green-icon"></i><span>ファイルシステム・API・DBなど<span class="keyword-tag green">あらゆるツール</span>に統一アクセス</span></li>
+                        <li><i class="fa-solid fa-universal-access orange-icon"></i><span><span class="keyword-tag orange">オープン標準</span>なので、独自のツールも簡単に追加</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass teal-icon"></i><span>エージェントが<span class="highlight">自ら必要なツールを発見・選択</span>して利用</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece green-icon"></i><span>「ツールごとに自前の連携」を<span class="keyword-tag teal">不要にする</span></span></li>
+                    </ul>
+                    <div class="arch-flow">
+                        <span class="arch-node">エージェント</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">MCP</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">ツール群</span>
+                    </div>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-plug fa-lg" style="color: var(--ui-color-2);"></i>
+                            USBみたいに<span class="keyword-tag teal">繋ぐだけ</span>。<br>
+                            エージェントの能力が<br>
+                            ツールの分だけ広がる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 17: A2A -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-handshake fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ A2A: Agent-to-Agent Protocol</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-people-arrows orange-icon"></i><span>エージェント同士が<span class="highlight">直接通信・協調</span>するための標準プロトコル</span></li>
+                        <li><i class="fa-solid fa-comments teal-icon"></i><span>メッセージの<span class="keyword-tag teal">送受信・タスク委任・結果共有</span>を標準化</span></li>
+                        <li><i class="fa-solid fa-circle-nodes green-icon"></i><span>異なるフレームワークで作られたエージェントとも<span class="keyword-tag green">相互運用</span></span></li>
+                        <li><i class="fa-solid fa-globe orange-icon"></i><span>組織の壁を越えた<span class="highlight">エージェントのオーケストレーション</span></span></li>
+                        <li><i class="fa-solid fa-shield-halved teal-icon"></i><span>認証・権限・監査ログで<span class="keyword-tag orange">セキュアな通信</span>を保証</span></li>
+                    </ul>
+                    <div class="arch-flow">
+                        <span class="arch-node">エージェントA</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">A2A</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">エージェントB</span>
+                    </div>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-5);"></i>
+                            エージェント同士が<span class="keyword-tag orange">話し合う</span>。<br>
+                            「お前はこれやって」「サムネ」<br>
+                            みたいな<span class="keyword-tag teal">チームワーク</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18: オーケストレーション全体図 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ 複雑なマルチエージェントのオーケストレーション</h2>
+                </div>
+                <div class="card-content">
+                    <div class="arch-flow" style="margin-bottom: 15px;">
+                        <span class="arch-node">外部ツール</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-up"></i></span>
+                        <span class="arch-node">MCP</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-up"></i></span>
+                        <span class="arch-node">エージェント群</span>
+                        <span class="arch-arrow"><i class="fas fa-arrows-left-right"></i></span>
+                        <span class="arch-node">A2A</span>
+                        <span class="arch-arrow"><i class="fas fa-arrow-up"></i></span>
+                        <span class="arch-node">Runtime</span>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-nodes teal-icon"></i><span>MCPで<span class="keyword-tag teal">ツール接続</span>、A2Aで<span class="keyword-tag orange">エージェント協調</span>を統合</span></li>
+                        <li><i class="fa-solid fa-cogs green-icon"></i><span>Agent Runtimeが<span class="highlight">全体のライフサイクル</span>を管理</span></li>
+                        <li><i class="fa-solid fa-timeline orange-icon"></i><span><span class="keyword-tag green">数日間のタスク</span>もセッション永続化で途切れず実行</span></li>
+                        <li><i class="fa-solid fa-user-check teal-icon"></i><span>HITL Inboxで<span class="keyword-tag blue">人の判断を適切なタイミング</span>で介入</span></li>
+                        <li><i class="fa-solid fa-star green-icon"></i><span>Google Agentic Stackの<span class="highlight">真の価値</span>は「全体がシームレスに連携」すること</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-3);"></i>
+                            <span class="keyword-tag green">長時間稼働</span>×<span class="keyword-tag teal">協調</span>×<span class="keyword-tag orange">人間の管理</span>。<br>
+                            この3つが揃って<br>
+                            はじめて<span class="keyword-tag blue">本物のエージェント</span>になる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div><!-- end section 4 layout -->
+
+        <!-- ====== FOOTER ====== -->
+        <footer>
+            <p>🎬 動画: <a href="https://youtu.be/VGpfnbr7rso" target="_blank">Google Cloud Tech | The Agent Factory</a></p>
+            <p style="margin-top: 8px;"><i class="fas fa-calendar"></i> 2026年6月1日公開 | <i class="fas fa-robot"></i> AIニュースインフォグラフィック</p>
+        </footer>
+
+    </div>
+</body>
+</html>

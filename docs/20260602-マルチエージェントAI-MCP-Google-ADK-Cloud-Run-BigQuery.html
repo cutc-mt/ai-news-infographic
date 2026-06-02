@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチエージェントAIでプロジェクト管理を自動化（MCP × Google ADK × Cloud Run × BigQuery）</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #1A73E8;
+            --ui-color-2: #F9AB00;
+            --ui-color-3: #E8F0FE;
+            --ui-color-4: #0D47A1;
+            --ui-color-5: #34A853;
+            --ui-color-6: #EA4335;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F8FBFF;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4) 0%, var(--ui-color-1) 50%, var(--ui-color-5) 100%);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .header .tech-labels {
+            display: inline-block;
+            margin-top: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .blue-label { color: #90CAF9; }
+        .orange-label { color: #FFE082; }
+        .green-label { color: #A5D6A7; }
+        .red-label { color: #EF9A9A; }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .section-card.blue-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-4), var(--ui-color-1));
+        }
+
+        .section-card.green-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-5), #81C784);
+        }
+
+        .section-card.orange-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-2), #FFD54F);
+        }
+
+        .section-card.red-accent::before {
+            background: linear-gradient(90deg, var(--ui-color-6), #EF9A9A);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.15em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-1);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-list li .orange-icon { color: var(--ui-color-2); }
+        .keyword-list li .green-icon { color: var(--ui-color-5); }
+        .keyword-list li .red-icon { color: var(--ui-color-6); }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.orange {
+            background-color: #FFF8E1;
+            color: #E65100;
+        }
+
+        .keyword-tag.green {
+            background-color: #E8F5E9;
+            color: #2E7D32;
+        }
+
+        .keyword-tag.red {
+            background-color: #FFEBEE;
+            color: #C62828;
+        }
+
+        .keyword-tag.blue {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF8E1;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: var(--ui-color-3);
+            border-color: var(--ui-color-1);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-1) transparent;
+        }
+
+        .speech-bubble.variant-3 {
+            background: #FFEBEE;
+            border-color: var(--ui-color-6);
+            transform: rotate(0.5deg);
+        }
+
+        .speech-bubble.variant-3::after {
+            border-color: var(--ui-color-6) transparent;
+        }
+
+        .speech-bubble.variant-green {
+            background: #E8F5E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-1.5deg);
+        }
+
+        .speech-bubble.variant-green::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(26,115,232,0.25) 60%);
+            font-weight: bold;
+        }
+
+        .highlight.orange {
+            background: linear-gradient(transparent 60%, rgba(249,171,0,0.3) 60%);
+        }
+
+        .highlight.green {
+            background: linear-gradient(transparent 60%, rgba(52,168,83,0.25) 60%);
+        }
+
+        .highlight.red {
+            background: linear-gradient(transparent 60%, rgba(234,67,53,0.25) 60%);
+        }
+
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .feature-table th {
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            padding: 8px 6px;
+            font-size: 13px;
+        }
+
+        .feature-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .feature-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .feature-highlight {
+            font-weight: bold;
+        }
+
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+
+        .badge-blue {
+            background: linear-gradient(135deg, #1A73E8, #64B5F6);
+            color: white;
+        }
+
+        .badge-orange {
+            background: linear-gradient(135deg, #E65100, #FFB74D);
+            color: white;
+        }
+
+        .badge-green {
+            background: linear-gradient(135deg, #2E7D32, #81C784);
+            color: white;
+        }
+
+        .badge-red {
+            background: linear-gradient(135deg, #C62828, #EF9A9A);
+            color: white;
+        }
+
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            margin-right: 8px;
+            flex-shrink: 0;
+        }
+
+        pre {
+            background: #F1F5F9;
+            padding: 10px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+            line-height: 1.5;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-robot fa-7x" aria-hidden="true"></i></div>
+            <h1>マルチエージェントAIでプロジェクト管理を自動化</h1>
+            <div class="subtitle">MCP × Google ADK × Cloud Run × BigQuery — 自然言語でプロジェクトの要望を伝えるだけで、AIが自動的に要件整理・リソース評価・提案生成まで完結する</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月2日</div>
+            <div class="tech-labels">
+                <span class="blue-label"><i class="fas fa-brain"></i> Google ADK</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="orange-label"><i class="fas fa-plug"></i> MCP</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="green-label"><i class="fas fa-cloud"></i> Cloud Run</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="blue-label"><i class="fas fa-database"></i> BigQuery</span>
+            </div>
+        </div>
+
+        <!-- Row 1: Overview + Architecture + ADK + MCP -->
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-film fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① 動画のテーマ: マルチエージェントAI × プロジェクト自動化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-check green-icon"></i><span>Google Cloud Techが公開した<span class="highlight">マルチエージェントAIによるプロジェクト intake（要件受付）自動化</span>の実装解説</span></li>
+                        <li><i class="fa-solid fa-comments" style="color: var(--ui-color-1);"></i><span>ユーザーが<span class="keyword-tag blue">自然言語でプロジェクトの要望</span>を入力するだけで、複数のAIエージェントが協調して処理を自動化</span></li>
+                        <li><i class="fa-solid fa-layer-group orange-icon"></i><span>技術スタック4本柱：<span class="keyword-tag blue">Google ADK</span>・<span class="keyword-tag orange">MCP</span>・<span class="keyword-tag green">Cloud Run</span>・<span class="keyword-tag blue">BigQuery</span></span></li>
+                        <li><i class="fa-solid fa-bolt" style="color: var(--ui-color-6);"></i><span>自前のMCPサーバーを構築せず、<span class="highlight">Cloud API RegistryのマネージドMCP</span>でBigQueryに直接アクセス可能</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--ui-color-1);"></i><span>Python依存は<span class="keyword-tag green">たった2つ</span>。シンプルさと強力さを両立した構成</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            「エージェントを自作して<br>
+                            プロジェクト管理を自動化」<br>
+                            <span class="keyword-tag orange">これが次の常識</span>になる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale blue-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② アーキテクチャ概要: エンドツーエンドのデータフロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user" style="color: var(--ui-color-1);"></i><span><span class="highlight">ユーザー（自然言語入力）</span>: 日本語や英語でプロジェクト要件を話しかけるだけ</span></li>
+                        <li><i class="fa-solid fa-arrow-right orange-icon"></i><span><span class="keyword-tag green">Cloud Run / Agent Engine</span>: エージェントをホストするサーバーレス環境</span></li>
+                        <li><i class="fa-solid fa-arrow-right orange-icon"></i><span><span class="keyword-tag blue">Google ADK（エージェントフレームワーク）</span>: LLM + ツール + 会話フローを統合管理</span></li>
+                        <li><i class="fa-solid fa-arrow-right orange-icon"></i><span><span class="keyword-tag orange">MCP接続</span>: Cloud API Registry経由でマネージドMCPサーバーに接続</span></li>
+                        <li><i class="fa-solid fa-arrow-right orange-icon"></i><span><span class="keyword-tag blue">BigQuery</span>: プロジェクト関連データの中央リポジトリ。エージェントの意思決定ログも保存</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-diagram-project fa-lg" style="color: var(--ui-color-1);"></i>
+                            ユーザー → ADK → MCP → BigQuery<br>
+                            <span class="keyword-tag blue">全部パイプで繋がる</span><br>
+                            人間は話しかけるだけ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ Google ADK（Agent Development Kit）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code green-icon"></i><span>Googleが開発した<span class="highlight">オープンソースのAIエージェントフレームワーク</span>（Python製）</span></li>
+                        <li><i class="fa-solid fa-cube" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag blue">LlmAgent</span>クラスでLLM + ツール + 会話フローを<span class="highlight">1つのオブジェクトに統合</span></span></li>
+                        <li><i class="fa-solid fa-microchip orange-icon"></i><span>推論モデルには<span class="keyword-tag orange">Gemini 2.5 Flash</span>を採用。高速かつ低コストで動作</span></li>
+                        <li><i class="fa-solid fa-users-rectangle" style="color: var(--ui-color-1);"></i><span>複数エージェントの<span class="keyword-tag green">役割分担</span>が可能：要件収集・リソース評価・提案生成など</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--ui-color-1);"></i><span>各エージェントに<span class="keyword-tag blue">instruction（システムプロンプト）</span>を渡して専門性を定義</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-green">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i>
+                            LlmAgent 1つで<br>
+                            <span class="keyword-tag green">LLM + ツール + 会話</span><br>
+                            が全部まとまる。超シンプル。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ MCP（Model Context Protocol）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-usb" style="color: var(--ui-color-1);"></i><span>AIエージェントが<span class="highlight">外部ツールと標準的に通信する</span>ためのオープンプロトコル</span></li>
+                        <li><i class="fa-solid fa-server green-icon"></i><span><span class="keyword-tag green">Cloud API Registry</span>経由でBigQueryの<span class="highlight">マネージドMCPサーバー</span>に接続可能</span></li>
+                        <li><i class="fa-solid fa-circle-xmark red-icon"></i><span><span class="keyword-tag red">自前MCPサーバー不要</span>。Google側が管理済みのサーバーを提供</span></li>
+                        <li><i class="fa-solid fa-wrench orange-icon"></i><span>利用可能なツール：<span class="keyword-tag blue">execute_sql</span>・<span class="keyword-tag blue">get_table_info</span>・<span class="keyword-tag blue">list_dataset_ids</span>・<span class="keyword-tag blue">list_table_ids</span>・<span class="keyword-tag blue">get_dataset_info</span></span></li>
+                        <li><i class="fa-solid fa-handshake" style="color: var(--ui-color-1);"></i><span>エージェントはMCPツールを<span class="highlight">API Registryのget_toolset()</span>で簡単取得</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i>
+                            自前でMCPサーバーを<br>
+                            <span class="keyword-tag red">立てなくてOK</span>。<br>
+                            Googleがマネージドで用意済み！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Cloud Run + BigQuery + Code + Natural Language SQL -->
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale blue-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cloud fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ Cloud Run: サーバーレスでエージェントをデプロイ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-box" style="color: var(--ui-color-1);"></i><span>エージェントを<span class="highlight">Dockerコンテナ化</span>してサーバーレスにデプロイ</span></li>
+                        <li><i class="fa-solid fa-terminal orange-icon"></i><span><span class="keyword-tag blue">adk api_server</span>コマンドでREST APIを<span class="highlight">自動公開</span></span></li>
+                        <li><i class="fa-solid fa-moon" style="color: var(--ui-color-4);"></i><span><span class="keyword-tag green">ゼロスケール対応</span>でアイドル時は<span class="highlight">コストゼロ</span>。リクエストに応じて自動スケール</span></li>
+                        <li><i class="fa-solid fa-book green-icon"></i><span><span class="keyword-tag orange">Swagger UI（/docs）</span>が自動生成。APIのテストと確認が手軽</span></li>
+                        <li><i class="fa-solid fa-gear" style="color: var(--ui-color-1);"></i><span>自前でスケーリング・監視を管理。シンプルで<span class="keyword-tag blue">低コスト</span>な運用が可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                            Dockerに詰めてCloud Runに<br>
+                            <span class="keyword-tag green">ポン</span>。ゼロスケールで<br>
+                            使わない時はコスト0円！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-database fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ BigQuery: データの中央リポジトリ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-warehouse" style="color: var(--ui-color-1);"></i><span>プロジェクト関連データの<span class="highlight">中央リポジトリ</span>として活用</span></li>
+                        <li><i class="fa-solid fa-chart-line orange-icon"></i><span>エージェントの<span class="keyword-tag blue">意思決定ログ</span>・<span class="keyword-tag blue">運用状態</span>・<span class="keyword-tag blue">分析データ</span>を保存</span></li>
+                        <li><i class="fa-solid fa-language green-icon"></i><span>ユーザーの<span class="keyword-tag orange">自然言語入力を自動的にSQLに変換</span>してBigQueryを操作</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass" style="color: var(--ui-color-1);"></i><span>過去のプロジェクト履歴データを照会して、<span class="highlight">リソース評価や提案に活用</span></span></li>
+                        <li><i class="fa-solid fa-shield-halved" style="color: var(--ui-color-5);"></i><span>MCP経由でアクセスするため、<span class="keyword-tag green">認証・権限管理も一元化</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-green">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-table fa-lg" style="color: var(--ui-color-5);"></i>
+                            「過去の類似案件は<br>
+                            どんな規模だった？」<br>
+                            <span class="keyword-tag orange">日本語で聞くだけで</span><br>
+                            自動でSQLが走る。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ コード例: わずか数行でエージェント完成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-code" style="color: var(--ui-color-1);"></i><span>Pythonの<span class="highlight">コード量が極めて少ない</span>。ADKとAPI Registryの組み合わせだけで構築可能</span></li>
+                        <li><i class="fa-solid fa-box-open orange-icon"></i><span>Python依存は<span class="keyword-tag green">google-adk</span>と<span class="keyword-tag green">google-cloud-aiplatform</span>の<span class="highlight">2つだけ</span></span></li>
+                    </ul>
+                    <pre>from google.adk.agents import LlmAgent
+from google.adk.integrations.api_registry import ApiRegistry
+
+tool_registry = ApiRegistry(PROJECT_ID, location="global")
+toolset = tool_registry.get_toolset(
+  f"projects/{PROJECT_ID}/locations/global/"
+  f"mcpServers/google-bigquery.googleapis.com-mcp"
+)
+
+agent = LlmAgent(
+  model="gemini-2.5-flash",
+  name="project_intake_agent",
+  instruction=SYSTEM_INSTRUCTION,
+  tools=[toolset],
+)</pre>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            たった<span class="keyword-tag orange">10行程度</span>で<br>
+                            BigQueryにアクセスできる<br>
+                            AIエージェントが完成！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale blue-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-language fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 自然言語 → 自動SQL生成の仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-comment-dots" style="color: var(--ui-color-1);"></i><span>ユーザーは<span class="highlight">日本語で話しかけるだけ</span>。LLMが自動的にBigQueryのSQLに変換</span></li>
+                        <li><i class="fa-solid fa-database orange-icon"></i><span>MCPツールの<span class="keyword-tag blue">execute_sql</span>で変換されたSQLをBigQuery上で実行</span></li>
+                        <li><i class="fa-solid fa-circle-info green-icon"></i><span><span class="keyword-tag orange">get_table_info</span>・<span class="keyword-tag orange">list_table_ids</span>でテーブル構造を自動取得し、LLMが適切なSQLを生成</span></li>
+                        <li><i class="fa-solid fa-gears" style="color: var(--ui-color-1);"></i><span>LLMが<span class="highlight">スキーマ情報を理解した上で</span>、意図通りのクエリを組み立てる</span></li>
+                        <li><i class="fa-solid fa-user-check" style="color: var(--ui-color-5);"></i><span>エンジニアでなくても<span class="keyword-tag green">データ分析が可能</span>。ビジネスユーザーの自律性が向上</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-green">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i>
+                            「過去3ヶ月の平均<br>
+                            プロジェクト規模を教えて」<br>
+                            <span class="keyword-tag blue">→ 自動でSQL変換 → 実行</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Multi-Agent Flow -->
+        <div class="section-layout">
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users-robot fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ マルチエージェント協調フロー: 全体像</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><span class="step-number">1</span><span>ユーザーが<span class="keyword-tag blue">自然言語</span>でプロジェクト要件を入力</span></li>
+                        <li><span class="step-number">2</span><span><span class="highlight">要件収集エージェント</span>が入力情報を整理・構造化</span></li>
+                        <li><span class="step-number">3</span><span><span class="highlight">リソース評価エージェント</span>がBigQueryの履歴データを照会</span></li>
+                        <li><span class="step-number">4</span><span><span class="highlight">提案生成エージェント</span>が初期プロジェクト提案を作成</span></li>
+                        <li><span class="step-number">5</span><span>全エージェントが<span class="keyword-tag green">協調</span>して<span class="highlight">意思決定を自動化</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-people-group fa-lg" style="color: var(--ui-color-1);"></i>
+                            1つのエージェントじゃなく<br>
+                            <span class="keyword-tag blue">専門家チーム</span>が連携。<br>
+                            だから賢い判断ができる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale blue-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-list fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 要件収集エージェント: インプットの整理</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ear-listen" style="color: var(--ui-color-1);"></i><span>ユーザーの<span class="highlight">自然言語入力を解釈</span>して、プロジェクト要件を構造化</span></li>
+                        <li><i class="fa-solid fa-list-check orange-icon"></i><span>必要な情報が<span class="keyword-tag orange">不足している場合</span>、自動的に質問を生成して追加収集</span></li>
+                        <li><i class="fa-solid fa-diagram-project green-icon"></i><span>要件を<span class="keyword-tag blue">カテゴリ別</span>（技術スタック・チーム規模・予算・スケジュールなど）に整理</span></li>
+                        <li><i class="fa-solid fa-arrows-turn-to-dots" style="color: var(--ui-color-1);"></i><span>整理した要件を<span class="highlight">次のエージェント</span>（リソース評価）に引き渡す</span></li>
+                        <li><i class="fa-solid fa-circle-info" style="color: var(--ui-color-5);"></i><span>LLMの<span class="keyword-tag green">対話能力</span>を活用した、人間らしいインタラクションを実現</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-green">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-message fa-lg" style="color: var(--ui-color-5);"></i>
+                            「予算はいくらですか？」<br>
+                            <span class="keyword-tag orange">足りない情報を</span><br>
+                            自動で聞いてくれる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-bar fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ リソース評価エージェント: BigQueryで過去データ分析</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database" style="color: var(--ui-color-1);"></i><span>要件収集エージェントから渡された情報を基に、<span class="highlight">BigQueryの履歴データを照会</span></span></li>
+                        <li><i class="fa-solid fa-code-branch orange-icon"></i><span>MCP経由で<span class="keyword-tag blue">execute_sql</span>を呼び出し、<span class="keyword-tag orange">過去の類似プロジェクト</span>のデータを取得</span></li>
+                        <li><i class="fa-solid fa-scale-balanced" style="color: var(--ui-color-1);"></i><span>チーム規模・工数・予算・成功/失敗パターンを<span class="highlight">定量的に評価</span></span></li>
+                        <li><i class="fa-solid fa-chart-pie green-icon"></i><span>分析結果を<span class="keyword-tag green">次のエージェント</span>（提案生成）に渡して提案の精度を高める</span></li>
+                        <li><i class="fa-solid fa-circle-check" style="color: var(--ui-color-5);"></i><span><span class="highlight">データ駆動</span>の意思決定。勘や経験ではなく<span class="keyword-tag blue">過去の実績に基づく</span>提案</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-magnifying-glass-chart fa-lg" style="color: var(--ui-color-1);"></i>
+                            「類似プロジェクトの<br>
+                            平均工数は<span class="keyword-tag orange">45人日</span>」<br>
+                            データで裏付けられた提案！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-signature fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ 提案生成エージェント: 初期プロジェクト提案を作成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--ui-color-2);"></i><span>要件収集とリソース評価の結果を統合して、<span class="highlight">初期プロジェクト提案</span>を生成</span></li>
+                        <li><i class="fa-solid fa-list-ol" style="color: var(--ui-color-1);"></i><span>提案内容：<span class="keyword-tag blue">プロジェクトスケジュール</span>・<span class="keyword-tag blue">リソース計画</span>・<span class="keyword-tag blue">リスク評価</span>・<span class="keyword-tag blue">マイルストーン</span></span></li>
+                        <li><i class="fa-solid fa-user-pen green-icon"></i><span>ユーザーが<span class="keyword-tag orange">フィードバック</span>を入力すると、提案を<span class="highlight">動的に修正</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate" style="color: var(--ui-color-1);"></i><span>各エージェントとの<span class="keyword-tag green">反復的なやり取り</span>で提案を段階的にブラッシュアップ</span></li>
+                        <li><i class="fa-solid fa-file-export" style="color: var(--ui-color-5);"></i><span>最終的な提案は<span class="highlight">構造化されたドキュメント</span>として出力可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-pen-nib fa-lg" style="color: var(--ui-color-2);"></i>
+                            要件もデータも揃ったら<br>
+                            <span class="keyword-tag orange">提案書を自動生成</span>。<br>
+                            「修正して」で即対応。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: Deployment comparison + Key points -->
+        <div class="section-layout">
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale blue-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cloud-arrow-up fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ デプロイ方式 ①: Cloud Run（直接API）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-docker" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag blue">Dockerコンテナ</span>としてデプロイ。<span class="highlight">adk api_server</span>でREST APIを公開</span></li>
+                        <li><i class="fa-solid fa-dollar-sign green-icon"></i><span>ゼロスケール対応で<span class="keyword-tag green">コスト最適化</span>。使われていない時は課金ゼロ</span></li>
+                        <li><i class="fa-solid fa-up-right-and-down-left-from-center orange-icon"></i><span>リクエストに応じて<span class="keyword-tag orange">自動スケーリング</span>。トラフィック急増にも対応</span></li>
+                        <li><i class="fa-solid fa-gauge" style="color: var(--ui-color-1);"></i><span>自前でスケーリング・監視・ロギングを管理する<span class="keyword-tag blue">完全な制御権</span></span></li>
+                        <li><i class="fa-solid fa-circle-check green-icon"></i><span>シンプルで安い。<span class="highlight">小規模〜中規模</span>のエージェント運用に最適</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-check-double fa-lg" style="color: var(--ui-color-1);"></i>
+                            <span class="keyword-tag green">一番おすすめ</span>の方式。<br>
+                            安くてシンプルで<br>
+                            コントロールも自由自在。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gamepad fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ デプロイ方式 ②: Agent Engine（マネージド）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shield-halved" style="color: var(--ui-color-1);"></i><span>Googleが<span class="highlight">完全マネージド</span>でエージェントをホストするサービス</span></li>
+                        <li><i class="fa-solid fa-palette orange-icon"></i><span><span class="keyword-tag orange">Playground UI</span>が標準搭載。ブラウザ上でエージェントのテストが可能</span></li>
+                        <li><i class="fa-solid fa-lock" style="color: var(--ui-color-1);"></i><span>監視・スケーリング・インフラ管理を<span class="keyword-tag blue">Googleが全部やってくれる</span></span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation red-icon"></i><span><span class="keyword-tag red">パブリックAPIがない</span>ため、外部からのアクセスには<span class="highlight">プロキシが必要</span></span></li>
+                        <li><i class="fa-solid fa-code-branch green-icon"></i><span>Cloud Runより<span class="keyword-tag orange">運用負荷は低い</span>が、API連携の柔軟性ではCloud Runに軍配</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-6);"></i>
+                            Playgroundで<span class="keyword-tag orange">お試し</span>するなら<br>
+                            Agent Engineが便利。<br>
+                            でも本番は<span class="keyword-tag blue">Cloud Run推奨</span>。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-table-columns fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ デプロイ方式の比較</h2>
+                </div>
+                <div class="card-content">
+                    <table class="feature-table">
+                        <tr><th>項目</th><th>Cloud Run</th><th>Agent Engine</th></tr>
+                        <tr><td>管理方式</td><td>セルフマネージド</td><td class="feature-highlight">マネージド</td></tr>
+                        <tr><td>API</td><td class="feature-highlight">REST（公開）</td><td>プロキシ必要</td></tr>
+                        <tr><td>コスト</td><td class="feature-highlight">ゼロスケール対応</td><td>従量課金</td></tr>
+                        <tr><td>Playground</td><td>Swagger UI</td><td class="feature-highlight">専用UI付</td></tr>
+                        <tr><td>柔軟性</td><td class="feature-highlight">高い</td><td>やや制限</td></tr>
+                    </table>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye" style="color: var(--ui-color-1);"></i><span>用途に応じて<span class="keyword-tag blue">選択可能</span>。開発時はAgent Engine、本番はCloud Runなど併用もアリ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-1);"></i>
+                            <span class="keyword-tag blue">安くて自由</span>か<span class="keyword-tag orange">楽で安全</span>か。<br>
+                            プロジェクトのフェーズで<br>
+                            使い分けるのが正解。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale green-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-check fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 重要ポイント: なぜこの構成が優れているのか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-xmark red-icon"></i><span><span class="highlight">自前MCPサーバー不要</span>。Cloud API Registryで<span class="keyword-tag blue">マネージドMCPサーバー</span>を利用。インフラ管理の手間ゼロ</span></li>
+                        <li><i class="fa-solid fa-box-open orange-icon"></i><span>Python依存は<span class="keyword-tag green">google-adk</span>と<span class="keyword-tag green">google-cloud-aiplatform</span>の<span class="highlight">たった2つ</span>。学習コストが低い</span></li>
+                        <li><i class="fa-solid fa-language" style="color: var(--ui-color-1);"></i><span><span class="highlight">自然言語→自動SQL生成</span>。ユーザーはSQLを知らなくてもBigQueryを操作可能</span></li>
+                        <li><i class="fa-solid fa-moon" style="color: var(--ui-color-4);"></i><span><span class="keyword-tag green">サーバーレスでゼロスケール</span>。使わない時はコストゼロ。<span class="highlight">コスパ最強</span></span></li>
+                        <li><i class="fa-solid fa-code-branch green-icon"></i><span><span class="keyword-tag orange">CI/CD完備</span>。Docker Bake + Cloud Buildで<span class="highlight">自動デプロイ</span>も構築済み</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-green">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-5);"></i>
+                            自前サーバー不要・依存2つ・<br>
+                            ゼロスケール・自然言語対応。<br>
+                            <span class="keyword-tag green">理想の構成</span>が実現した！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: MCP tools + CI/CD + Use case + Summary -->
+        <div class="section-layout">
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ MCP経由のBigQueryツール一覧</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag blue">execute_sql</span>: SQLクエリを実行。自然言語から自動生成されたSQLをBigQueryで実行</span></li>
+                        <li><i class="fa-solid fa-table" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag blue">get_table_info</span>: テーブルのスキーマ情報を取得。LLMが適切なSQLを組むために活用</span></li>
+                        <li><i class="fa-solid fa-folder-open orange-icon"></i><span><span class="keyword-tag blue">list_dataset_ids</span>: プロジェクト内の<span class="keyword-tag orange">データセット一覧</span>を取得</span></li>
+                        <li><i class="fa-solid fa-list" style="color: var(--ui-color-1);"></i><span><span class="keyword-tag blue">list_table_ids</span>: データセット内の<span class="keyword-tag orange">テーブル一覧</span>を取得</span></li>
+                        <li><i class="fa-solid fa-circle-info green-icon"></i><span><span class="keyword-tag blue">get_dataset_info</span>: データセットの<span class="keyword-tag green">メタデータ</span>を取得。エージェントがデータ構造を理解するのに利用</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-plug fa-lg" style="color: var(--ui-color-2);"></i>
+                            5つのツールで<br>
+                            BigQueryを<span class="keyword-tag blue">完全操作</span>。<br>
+                            MCPが全部標準化してくれる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale blue-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ: AIエージェントでプロジェクト管理の未来が変わる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-check green-icon"></i><span><span class="highlight">Google ADK + MCP + Cloud Run + BigQuery</span>で<span class="keyword-tag blue">実用的なマルチエージェントシステム</span>が構築可能</span></li>
+                        <li><i class="fa-solid fa-users-rectangle" style="color: var(--ui-color-1);"></i><span>複数エージェントが<span class="keyword-tag orange">要件収集・リソース評価・提案生成</span>を<span class="highlight">自動で協調実行</span></span></li>
+                        <li><i class="fa-solid fa-hand-sparkles orange-icon"></i><span>自前サーバー不要・依存最少・ゼロスケール。<span class="keyword-tag green">誰でも始められる</span>低ハードル</span></li>
+                        <li><i class="fa-solid fa-language" style="color: var(--ui-color-1);"></i><span><span class="highlight">自然言話だけで</span>BigQueryを操作。技術的知識がなくてもAIが<span class="keyword-tag blue">裏側で処理</span></span></li>
+                        <li><i class="fa-solid fa-rocket" style="color: var(--ui-color-5);"></i><span>マルチエージェントAIの<span class="keyword-tag green">実践的な実装パターン</span>として<span class="highlight">業界標準になりうる</span>構成</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-green">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-5);"></i>
+                            話しかけるだけでAIが<br>
+                            <span class="keyword-tag orange">要件整理</span>→<span class="keyword-tag blue">データ分析</span>→<span class="keyword-tag green">提案生成</span><br>
+                            プロジェクト管理の常識が変わる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/okx6dUzDPRY" target="_blank" style="color: var(--ui-color-1);">Google Cloud Tech</a> | 📅 2026年6月2日<br>
+            📺 タイトル: Automate project intake with multi-agent AI using MCP, Google ADK, Cloud Run, and BigQuery<br>
+            🔗 URL: <a href="https://youtu.be/okx6dUzDPRY" target="_blank" style="color: var(--ui-color-1);">https://youtu.be/okx6dUzDPRY</a>
+        </footer>
+
+    </div>
+</body>
+</html>

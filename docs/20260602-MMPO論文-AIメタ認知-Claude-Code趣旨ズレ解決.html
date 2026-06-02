@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIが自分の物忘れを自覚し始めた｜MMPO論文徹底解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #1B3A5C;
+            --ui-color-2: #0D9488;
+            --ui-color-3: #E8EDF3;
+            --ui-color-4: #0F172A;
+            --ui-color-5: #F97316;
+            --accent-orange: #F97316;
+            --accent-teal: #0D9488;
+            --dark-indigo: #1E1B4B;
+            --light-gray: #F1F5F9;
+            --card-bg: #FFFFFF;
+            --card-border: #CBD5E1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0F172A;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 50px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--dark-indigo) 0%, var(--ui-color-1) 40%, var(--accent-teal) 100%);
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .header .vs-label {
+            display: inline-block;
+            margin-top: 15px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 20px;
+            border-radius: 20px;
+            font-size: 1em;
+            font-weight: bold;
+        }
+
+        .teal-label { color: #5EEAD4; }
+        .orange-label { color: #FDBA74; }
+        .indigo-label { color: #A5B4FC; }
+
+        .section-title-bar {
+            margin: 30px 0 15px;
+            padding: 12px 25px;
+            border-radius: 15px;
+            color: white;
+            font-size: 1.4em;
+            font-weight: 900;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .section-title-bar.teal { background: linear-gradient(90deg, var(--accent-teal), #14B8A6); }
+        .section-title-bar.indigo { background: linear-gradient(90deg, var(--dark-indigo), var(--ui-color-1)); }
+        .section-title-bar.orange { background: linear-gradient(90deg, #C2410C, var(--accent-orange)); }
+        .section-title-bar.dark { background: linear-gradient(90deg, #1E293B, #334155); }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--accent-teal), var(--dark-indigo));
+        }
+
+        .section-card.orange-accent::before {
+            background: linear-gradient(90deg, var(--accent-orange), #FB923C);
+        }
+
+        .section-card.teal-accent::before {
+            background: linear-gradient(90deg, var(--accent-teal), #2DD4BF);
+        }
+
+        .section-card.indigo-accent::before {
+            background: linear-gradient(90deg, var(--dark-indigo), #4338CA);
+        }
+
+        .section-card.dark-accent::before {
+            background: linear-gradient(90deg, #1E293B, #475569);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.15em;
+            color: var(--dark-indigo);
+            margin-top: 10px;
+            line-height: 1.5;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--accent-teal);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        .keyword-list li .orange-icon {
+            color: var(--accent-orange);
+        }
+
+        .keyword-list li .indigo-icon {
+            color: var(--dark-indigo);
+        }
+
+        .keyword-tag {
+            background-color: #E0F2FE;
+            color: #0C4A6E;
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .keyword-tag.teal {
+            background-color: #CCFBF1;
+            color: #115E59;
+        }
+
+        .keyword-tag.orange {
+            background-color: #FFF7ED;
+            color: #9A3412;
+        }
+
+        .keyword-tag.indigo {
+            background-color: #E0E7FF;
+            color: #3730A3;
+        }
+
+        .keyword-tag.dark {
+            background-color: #E2E8F0;
+            color: #1E293B;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--accent-teal);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--accent-teal) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFFBEB;
+            border-color: var(--accent-orange);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--accent-orange) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #EEF2FF;
+            border-color: var(--dark-indigo);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--dark-indigo) transparent;
+        }
+
+        .speech-bubble.variant-3 {
+            background: #FEE2E2;
+            border-color: #DC2626;
+            transform: rotate(0.5deg);
+        }
+
+        .speech-bubble.variant-3::after {
+            border-color: #DC2626 transparent;
+        }
+
+        .speech-bubble.variant-teal {
+            background: #F0FDFA;
+            border-color: var(--accent-teal);
+            transform: rotate(1.5deg);
+        }
+
+        .speech-bubble.variant-teal::after {
+            border-color: var(--accent-teal) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(13,148,136,0.25) 60%);
+            font-weight: bold;
+        }
+
+        .highlight.orange {
+            background: linear-gradient(transparent 60%, rgba(249,115,22,0.25) 60%);
+        }
+
+        .highlight.indigo {
+            background: linear-gradient(transparent 60%, rgba(30,27,75,0.25) 60%);
+        }
+
+        .flow-diagram {
+            background: #F8FAFC;
+            border: 2px solid #CBD5E1;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 12px 0;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent-teal);
+            font-size: 14px;
+        }
+
+        .flow-step.orange-border { border-left-color: var(--accent-orange); }
+        .flow-step.indigo-border { border-left-color: var(--dark-indigo); }
+
+        .flow-step .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent-teal), var(--dark-indigo));
+            color: white;
+            font-weight: bold;
+            font-size: 13px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .flow-step .step-num.orange-bg {
+            background: linear-gradient(135deg, var(--accent-orange), #FB923C);
+        }
+
+        .flow-arrow {
+            text-align: center;
+            color: var(--accent-teal);
+            font-size: 20px;
+            margin: 4px 0;
+        }
+
+        .feature-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        .feature-table th {
+            background: linear-gradient(90deg, var(--dark-indigo), var(--accent-teal));
+            color: white;
+            padding: 8px 6px;
+            font-size: 13px;
+        }
+
+        .feature-table td {
+            padding: 6px;
+            text-align: center;
+            border-bottom: 1px dashed #eee;
+        }
+
+        .feature-table tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .feature-highlight {
+            font-weight: bold;
+            color: var(--dark-indigo);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin-left: 5px;
+        }
+
+        .badge-teal {
+            background: linear-gradient(135deg, #0D9488, #2DD4BF);
+            color: white;
+        }
+
+        .badge-orange {
+            background: linear-gradient(135deg, #EA580C, #FB923C);
+            color: white;
+        }
+
+        .badge-indigo {
+            background: linear-gradient(135deg, #3730A3, #6366F1);
+            color: white;
+        }
+
+        .badge-red {
+            background: linear-gradient(135deg, #DC2626, #F87171);
+            color: white;
+        }
+
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #94A3B8;
+            border-top: 2px dashed #475569;
+        }
+
+        footer a {
+            color: var(--accent-teal);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-brain fa-7x" aria-hidden="true"></i></div>
+            <h1>AIが自分の物忘れを自覚し始めた</h1>
+            <div class="subtitle">MMPO論文徹底解説 — Claude Codeが長いタスクで趣旨をズラす理由とメタ認知的解決</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年5月29日 | arXiv: 2605.30159</div>
+            <div class="vs-label">
+                <span class="indigo-label"><i class="fas fa-memory"></i> 記憶劣化</span>
+                <span style="margin: 0 10px;">→</span>
+                <span class="teal-label"><i class="fas fa-eye"></i> メタ認知</span>
+                <span style="margin: 0 10px;">×</span>
+                <span class="orange-label"><i class="fas fa-bullseye"></i> Target Drift</span>
+            </div>
+        </div>
+
+        <!-- ========== Section 1: 問題提起 ========== -->
+        <div class="section-title-bar indigo">
+            <i class="fas fa-triangle-exclamation"></i> セクション1：Claude Codeが趣旨をズラす理由
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale indigo-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-branch fa-5x" style="color: var(--dark-indigo); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Claude Codeの「趣旨ズレ」現象</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-exclamation orange-icon"></i><span>Claude Codeで<span class="highlight">長いタスク</span>を任せると、途中から<span class="keyword-tag orange">趣旨がズレる</span>現象が起きる</span></li>
+                        <li><i class="fa-solid fa-list-check indigo-icon"></i><span>例えば「コードのリファクタリング」を頼んだのに、<span class="highlight orange">途中で機能追加を始めてしまう</span></span></li>
+                        <li><i class="fa-solid fa-clock orange-icon"></i><span>タスクが長くなるほど、<span class="keyword-tag indigo">本来の目的から遠ざかる</span>確率が高まる</span></li>
+                        <li><i class="fa-solid fa-user-gear" style="color: var(--accent-teal);"></i><span>ユーザーは<span class="highlight">「なぜAIが道を見失うのか」</span>と戸惑う場面が多い</span></li>
+                        <li><i class="fa-solid fa-robot indigo-icon"></i><span>これはLLMエージェントに共通する<span class="keyword-tag teal">構造的な問題</span>である</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-confused fa-lg" style="color: #DC2626;"></i>
+                            「これ、頼んでないよ…」<br>
+                            Claude Code使いなら<br>
+                            <span class="keyword-tag orange">一度は経験</span>があるはず！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--accent-orange); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 根本原因：中間記憶の劣化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database indigo-icon"></i><span>エージェントはタスクの進行中に<span class="highlight">重要な情報を忘れていく</span></span></li>
+                        <li><i class="fa-solid fa-arrow-trend-down orange-icon"></i><span><span class="keyword-tag orange">中間記憶の劣化</span>：長時間タスクでは記憶容量が限界を迎える</span></li>
+                        <li><i class="fa-solid fa-compress indigo-icon"></i><span><span class="highlight">情報圧縮の過程</span>で重要な細部が失われる</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece orange-icon"></i><span>要約すればするほど、<span class="keyword-tag indigo">元のニュアンスや文脈が欠落</span>していく</span></li>
+                        <li><i class="fa-solid fa-layer-group" style="color: var(--accent-teal);"></i><span>記憶が「薄っぺらになる」ことで、<span class="highlight">判断の質が低下</span>する</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-magnifying-glass-minus fa-lg" style="color: var(--accent-orange);"></i>
+                            情報をギュッと詰めるから<br>
+                            <span class="keyword-tag orange">大事なピースが</span><br>
+                            落ちてしまうんだ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye-slash fa-5x" style="color: var(--accent-teal); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ 最も重要な点：AIが「忘れたことに気づいていない」</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban orange-icon"></i><span><span class="highlight orange">AIは「自分が忘れていること」に気づいていない</span></span></li>
+                        <li><i class="fa-solid fa-face-smile-wink indigo-icon"></i><span>自分の記憶の不足や劣化を<span class="keyword-tag indigo">自覚する能力がない</span></span></li>
+                        <li><i class="fa-solid fa-masks-theater" style="color: var(--accent-teal);"></i><span>人間なら「あれ、なんか忘れてるかも」と<span class="keyword-tag teal">メタ認知が働く</span></span></li>
+                        <li><i class="fa-solid fa-ghost orange-icon"></i><span>AIは忘れたことすら忘れているので、<span class="highlight">自信たっぷりに間違った方向へ進む</span></span></li>
+                        <li><i class="fa-solid fa-lightbulb indigo-icon"></i><span>これこそが<span class="keyword-tag orange">「趣旨ズレ」の真犯人</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-eye fa-lg" style="color: var(--dark-indigo);"></i>
+                            「忘れたことを忘れる」<br>
+                            <span class="keyword-tag indigo">これが一番怖い。</span><br>
+                            人間なら気づけるのに！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullseye fa-5x" style="color: var(--accent-orange); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ Target Drift ＆ コンテキスト制約</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-crosshairs orange-icon"></i><span><span class="highlight orange">Target Drift</span>：本来の目的から<span class="keyword-tag orange">徐々に離れていく</span>現象</span></li>
+                        <li><i class="fa-solid fa-window-maximize indigo-icon"></i><span>コンテキストウィンドウの制約：<span class="keyword-tag indigo">1Mトークン</span>でも長時間タスクでは足りない</span></li>
+                        <li><i class="fa-solid fa-floppy-disk" style="color: var(--accent-teal);"></i><span>過去のやり取りを要約して保存するが、<span class="highlight">要約自体が情報を失う</span></span></li>
+                        <li><i class="fa-solid fa-chart-line orange-icon"></i><span>タスク時間が<span class="keyword-tag teal">長いほど</span>ドリフトは大きくなる傾向がある</span></li>
+                        <li><i class="fa-solid fa-arrows-spin indigo-icon"></i><span><span class="highlight">悪循環</span>：記憶劣化 → 誤判断 → 余計な作業 → さらなる記憶圧迫</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-dizzy fa-lg" style="color: var(--accent-orange);"></i>
+                            100万トークンあっても<br>
+                            <span class="keyword-tag orange">長時間タスクでは</span><br>
+                            どんどんコンテキストが
+                            酷くなるの。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Section 2: MMPOとは ========== -->
+        <div class="section-title-bar teal">
+            <i class="fas fa-microscope"></i> セクション2：MMPO — メタ認知記憶政策最適化
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flask fa-5x" style="color: var(--accent-teal); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ MMPO = Meta-Cognitive Memory Policy Optimization</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines" style="color: var(--accent-teal);"></i><span><span class="highlight">2026年5月29日</span>にarXivで公開された<span class="keyword-tag teal">研究論文</span>（arXiv: 2605.30159）</span></li>
+                        <li><i class="fa-solid fa-language indigo-icon"></i><span>正式名称：<span class="keyword-tag indigo">Meta-Cognitive Memory Policy Optimization</span></span></li>
+                        <li><i class="fa-solid fa-bolt orange-icon"></i><span>LLMエージェントの<span class="highlight">記憶管理にメタ認知</span>を導入する<span class="keyword-tag orange">革新的アプローチ</span></span></li>
+                        <li><i class="fa-solid fa-sitemap" style="color: var(--accent-teal);"></i><span>長期間タスクで<span class="keyword-tag teal">記憶の品質を維持</span>しながら目的を達成する仕組み</span></li>
+                        <li><i class="fa-solid fa-shield-halved indigo-icon"></i><span>AIが「自分の限界を知り」、<span class="highlight">自律的に記憶を改善</span>できる画期的な設計</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-teal">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--accent-teal);"></i>
+                            AIに<span class="keyword-tag teal">「メタ認知」</span>を<br>
+                            教える論文！<br>
+                            人間のように「自分の状態」を
+                            把握できるようになる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale indigo-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-heart-pulse fa-5x" style="color: var(--dark-indigo); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 核心イノベーション：Belief Entropy（信念エントロピー）</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-atom orange-icon"></i><span><span class="highlight indigo">Belief Entropy（信念エントロピー）</span>という概念を導入</span></li>
+                        <li><i class="fa-solid fa-gauge-high" style="color: var(--accent-teal);"></i><span>AIが現在の記憶に基づいて<span class="keyword-tag teal">「タスクの状態をどれくらい確信しているか」</span>を自己評価</span></li>
+                        <li><i class="fa-solid fa-exclamation-circle orange-icon"></i><span><span class="keyword-tag orange">不確実性が高い記憶</span> ＝ 品質の悪い要約 → <span class="highlight">ペナルティを与える</span></span></li>
+                        <li><i class="fa-solid fa-lightbulb indigo-icon"></i><span>AIが<span class="keyword-tag indigo">「自分の物忘れを自覚」</span>できる仕組みを初めて実現</span></li>
+                        <li><i class="fa-solid fa-chart-bar" style="color: var(--accent-teal);"></i><span>エントロピーが低い記憶ほど<span class="highlight">信頼性が高い</span>と判定</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-brain fa-lg" style="color: var(--dark-indigo);"></i>
+                            <span class="keyword-tag indigo">「自分が何を覚えていて<br>
+                            何を忘れているか」</span>を<br>
+                            AIが<span class="keyword-tag orange">自分で</span>評価する！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--accent-orange); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 従来手法 vs MMPO の違い</h2>
+                </div>
+                <div class="card-content">
+                    <table class="feature-table">
+                        <tr><th>項目</th><th>従来手法</th><th>MMPO</th></tr>
+                        <tr><td>記憶管理</td><td>定期的に要約</td><td class="feature-highlight">メタ認知で評価＋改善</td></tr>
+                        <tr><td>品質評価</td><td>なし</td><td class="feature-highlight">Belief Entropyで自動</td></tr>
+                        <tr><td>自己評価</td><td>不可能</td><td class="feature-highlight">記憶の確信度を測定</td></tr>
+                        <tr><td>監督信号</td><td>タスク結果のみ</td><td class="feature-highlight">記憶ごとにきめ細かく</td></tr>
+                        <tr><td>ドリフト対策</td><td>手動チェック</td><td class="feature-highlight">自動検出＋修正</td></tr>
+                    </table>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-xmark orange-icon"></i><span>従来：<span class="keyword-tag orange">定期的に記憶を要約するだけ</span>（品質評価なし）</span></li>
+                        <li><i class="fa-solid fa-circle-check" style="color: var(--accent-teal);"></i><span>MMPO：<span class="keyword-tag teal">要約の品質を自己評価し、改善する</span>（メタ認知的アプローチ）</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrows-left-right fa-lg" style="color: var(--accent-orange);"></i>
+                            「ただ要約」から<br>
+                            <span class="keyword-tag teal">「要約を評価して直す」</span>へ。<br>
+                            この差は圧倒的！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--accent-teal); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 記憶特有のきめ細かい監督</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-microscope" style="color: var(--accent-teal);"></i><span><span class="keyword-tag teal">Fine-grained, memory-specific supervision</span></span></li>
+                        <li><i class="fa-solid fa-cubes indigo-icon"></i><span>タスク全体の結果だけでなく、<span class="highlight">個々の記憶の品質</span>を個別に評価</span></li>
+                        <li><i class="fa-solid fa-crosshairs orange-icon"></i><span>どの記憶が劣化したかを<span class="keyword-tag indigo">ピンポイントで特定</span>できる</span></li>
+                        <li><i class="fa-solid fa-screwdriver-wrench" style="color: var(--accent-teal);"></i><span>不良な記憶のみを<span class="highlight">ターゲットにした改善</span>が可能</span></li>
+                        <li><i class="fa-solid fa-graduation-cap indigo-icon"></i><span>自己教師ありプロキシ（<span class="keyword-tag orange">self-supervised proxy</span>）として機能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-teal">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-search-plus fa-lg" style="color: var(--accent-teal);"></i>
+                            「全部まとめて評価」ではなく<br>
+                            <span class="keyword-tag indigo">「この記憶が悪い」</span>と<br>
+                            個別にピンポイントで分かる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale indigo-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--dark-indigo); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ MMPOの全体アーキテクチャ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot" style="color: var(--accent-teal);"></i><span>LLMエージェントがタスクを実行中、<span class="keyword-tag teal">継続的に記憶を管理</span></span></li>
+                        <li><i class="fa-solid fa-gears indigo-icon"></i><span>記憶要約ポリシーが<span class="highlight">Belief Entropy</span>で<span class="keyword-tag indigo">最適化</span>される</span></li>
+                        <li><i class="fa-solid fa-rotate orange-icon"></i><span><span class="keyword-tag orange">フィードバックループ</span>：評価 → ペナルティ → ポリシー改善 → 再評価</span></li>
+                        <li><i class="fa-solid fa-shield" style="color: var(--accent-teal);"></i><span>メタ認知レイヤーが<span class="highlight">記憶層の上に重なる</span>二層構造</span></li>
+                        <li><i class="fa-solid fa-circle-check indigo-icon"></i><span>結果として<span class="keyword-tag teal">Target Driftを大幅に低減</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-sitemap fa-lg" style="color: var(--dark-indigo);"></i>
+                            AIに<span class="keyword-tag indigo">「上から自分の記憶を<br>
+                            点検する視点」</span>を<br>
+                            与える仕組み。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Section 3: Belief Entropyの仕組み ========== -->
+        <div class="section-title-bar orange">
+            <i class="fas fa-cogs"></i> セクション3：Belief Entropyの仕組み
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wave-square fa-5x" style="color: var(--accent-orange); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ Belief Entropy：自己教師ありプロキシ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-server indigo-icon"></i><span><span class="keyword-tag indigo">自己教師ありプロキシ</span>（self-supervised proxy）として機能</span></li>
+                        <li><i class="fa-solid fa-graduation-cap" style="color: var(--accent-teal);"></i><span>外部の監督信号が<span class="highlight">不要</span>。AI自身が評価基準を内包</span></li>
+                        <li><i class="fa-solid fa-signal orange-icon"></i><span>記憶の<span class="keyword-tag orange">「確信の度合い」</span>を定量化する数理的フレームワーク</span></li>
+                        <li><i class="fa-solid fa-balance-scale indigo-icon"></i><span>情報理論の<span class="highlight">エントロピー概念</span>をエージェントの記憶評価に応用</span></li>
+                        <li><i class="fa-solid fa-plug" style="color: var(--accent-teal);"></i><span>既存のエージェントフレームワークに<span class="keyword-tag teal">プラグイン可能</span>な設計</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-chart-area fa-lg" style="color: var(--accent-orange);"></i>
+                            <span class="keyword-tag orange">外部の先生</span>がいなくても<br>
+                            AIが<span class="keyword-tag teal">自分で自分を<br>
+                            採点</span>できる仕組み！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale indigo-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-stairs fa-5x" style="color: var(--dark-indigo); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ Belief Entropyの4段階フロー</h2>
+                </div>
+                <div class="card-content">
+                    <div class="flow-diagram">
+                        <div class="flow-step">
+                            <span class="step-num">1</span>
+                            <span><span class="keyword-tag indigo">推定</span>：現在の記憶状態からタスクの潜在状態を推定する</span>
+                        </div>
+                        <div class="flow-arrow"><i class="fas fa-arrow-down"></i></div>
+                        <div class="flow-step">
+                            <span class="step-num">2</span>
+                            <span><span class="keyword-tag teal">計算</span>：その推定の不確実性（エントロピー）を計算する</span>
+                        </div>
+                        <div class="flow-arrow"><i class="fas fa-arrow-down"></i></div>
+                        <div class="flow-step orange-border">
+                            <span class="step-num orange-bg">3</span>
+                            <span><span class="keyword-tag orange">判定</span>：エントロピーが高い ＝ 記憶が不十分 or 品質が悪い</span>
+                        </div>
+                        <div class="flow-arrow"><i class="fas fa-arrow-down"></i></div>
+                        <div class="flow-step indigo-border">
+                            <span class="step-num">4</span>
+                            <span><span class="keyword-tag indigo">学習</span>：高エントロピーの要約にペナルティ → より良い記憶政策を学習</span>
+                        </div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-infinity" style="color: var(--accent-teal);"></i><span>このサイクルを<span class="highlight">繰り返すことで</span>記憶の品質が向上していく</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-recycle fa-lg" style="color: var(--dark-indigo);"></i>
+                            推定→計算→判定→学習の<br>
+                            <span class="keyword-tag indigo">4ステップを回す</span>ことで<br>
+                            記憶がどんどん賢くなる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye fa-5x" style="color: var(--accent-teal); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ AIが「自分の記憶をメタ認知」する</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain orange-icon"></i><span>実質的にAIが<span class="highlight">「自分が何を覚えていて、何を忘れているか」</span>をメタ認知する</span></li>
+                        <li><i class="fa-solid fa-user-check" style="color: var(--accent-teal);"></i><span>人間の<span class="keyword-tag teal">「あれ、なんか違う気がする」</span>と同じ感覚をAIに付与</span></li>
+                        <li><i class="fa-solid fa-compass indigo-icon"></i><span>低エントロピーの記憶に<span class="keyword-tag indigo">自信を持ち</span>、高エントロピーの記憶に<span class="keyword-tag orange">警戒する</span></span></li>
+                        <li><i class="fa-solid fa-hand-point-right orange-icon"></i><span>記憶が曖昧な時は<span class="highlight">安全策をとる</span>よう学習する</span></li>
+                        <li><i class="fa-solid fa-heart-pulse" style="color: var(--accent-teal);"></i><span>AIの<span class="keyword-tag teal">自己認識能力</span>を根本的に底上げするアプローチ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-teal">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-smile-beam fa-lg" style="color: var(--accent-teal);"></i>
+                            <span class="keyword-tag teal">「これ、自信ないな…」</span><br>
+                            そう思えるAIこそが<br>
+                            信頼できるエージェントになる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-expand fa-5x" style="color: var(--accent-orange); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ 超大規模コンテキストでの性能維持</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-maximize orange-icon"></i><span><span class="highlight orange">175万トークン</span>の超大規模コンテキストでも高い性能を維持</span></li>
+                        <li><i class="fa-solid fa-chart-line indigo-icon"></i><span>コンテキスト長が増えても<span class="keyword-tag indigo">Belief Entropyが記憶品質を担保</span></span></li>
+                        <li><i class="fa-solid fa-gauge-high" style="color: var(--accent-teal);"></i><span>従来手法は長いタスクほど<span class="keyword-tag orange">性能劣化</span>が顕著だが、MMPOは<span class="highlight">安定</span></span></li>
+                        <li><i class="fa-solid fa-database indigo-icon"></i><span>コンテキストが大きいほど<span class="keyword-tag teal">MMPOの優位性が大きくなる</span></span></li>
+                        <li><i class="fa-solid fa-rocket orange-icon"></i><span>実用エージェントへの<span class="highlight">即応用が可能</span>なレベルに到達</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-trophy fa-lg" style="color: var(--accent-orange);"></i>
+                            <span class="keyword-tag orange">175万トークン</span>でも<br>
+                            ぶれない。<br>
+                            長いほど差がつくのが
+                            MMPOの強み！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Section 4: 実験結果と実用性 ========== -->
+        <div class="section-title-bar dark">
+            <i class="fas fa-chart-bar"></i> セクション4：実験結果と実用性
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale dark-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-ranking-star fa-5x" style="color: #334155; animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 一貫して凌駕する性能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-trophy orange-icon"></i><span>従来の記憶強化手法を<span class="highlight orange">一貫して凌駕する</span>性能を達成</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots" style="color: var(--accent-teal);"></i><span><span class="keyword-tag teal">長いタスクほどMMPOの優位性が顕著</span>になる</span></li>
+                        <li><i class="fa-solid fa-vial indigo-icon"></i><span>複数のベンチマークで<span class="highlight">統計的に有意な改善</span>を確認</span></li>
+                        <li><i class="fa-solid fa-bullseye orange-icon"></i><span><span class="keyword-tag orange">Target Driftの発生率を大幅に低減</span></span></li>
+                        <li><i class="fa-solid fa-circle-check" style="color: var(--accent-teal);"></i><span>175万トークンのコンテキスト長でも<span class="keyword-tag indigo">高精度を維持</span></span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-medal fa-lg" style="color: #F59E0B;"></i>
+                            ただの「ちょっと改善」じゃない。<br>
+                            <span class="keyword-tag orange">あらゆる条件で</span><br>
+                            従来手法を上回っている。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--accent-teal); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ Claude Code等への実用応用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal indigo-icon"></i><span>Claude Codeなどの<span class="keyword-tag indigo">実用的エージェントツール</span>への応用可能性</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left orange-icon"></i><span><span class="keyword-tag orange">セッションをまたいだ記憶の永続化</span>が実現可能に</span></li>
+                        <li><i class="fa-solid fa-satellite-dish" style="color: var(--accent-teal);"></i><span>タスクの<span class="highlight">「趣旨ズレ」を自動検出・修正</span>する仕組み</span></li>
+                        <li><i class="fa-solid fa-gear indigo-icon"></i><span><span class="keyword-tag teal">自己評価に基づく記憶の最適化</span>で信頼性が向上</span></li>
+                        <li><i class="fa-solid fa-hammer orange-icon"></i><span>Claudeの<span class="keyword-tag indigo">ネイティブメモリ機能</span>（Anthropic公式）との統合も期待</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-teal">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--accent-teal);"></i>
+                            Claude Codeが<span class="keyword-tag teal">「あ、これ<br>
+                            違う方向に進んでる」</span>と<br>
+                            気づけるようになる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-toolbox fa-5x" style="color: var(--accent-orange); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 実用解決策：外部記憶レイヤー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-memory" style="color: var(--accent-teal);"></i><span><span class="keyword-tag teal">Claudeのネイティブメモリ機能</span>（Anthropic公式）</span></li>
+                        <li><i class="fa-solid fa-cube indigo-icon"></i><span><span class="keyword-tag indigo">Mem0</span> / <span class="keyword-tag indigo">Zep</span> / <span class="keyword-tag indigo">LangMem</span> / <span class="keyword-tag indigo">Supermemory</span> などの外部記憶レイヤー</span></li>
+                        <li><i class="fa-solid fa-file-code orange-icon"></i><span><span class="keyword-tag orange">CLAUDE.md</span>による知識の永続化（Anthropic公式メカニズム）</span></li>
+                        <li><i class="fa-solid fa-folder-tree" style="color: var(--accent-teal);"></i><span><span class="highlight">プロジェクト間の記憶分離</span>でコンテキスト汚染を防止</span></li>
+                        <li><i class="fa-solid fa-link indigo-icon"></i><span>MMPOの思想を外部ツールに<span class="keyword-tag teal">組み込む</span>ことで実用化が加速</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--accent-orange);"></i>
+                            MMPOの「メタ認知」思想を<br>
+                            <span class="keyword-tag teal">外部メモリツール</span>に<br>
+                            組み込めば最強に！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== Section 5: 今後の展望 ========== -->
+        <div class="section-title-bar teal">
+            <i class="fas fa-rocket"></i> セクション5：今後の展望と実践的アドバイス
+        </div>
+
+        <div class="section-layout">
+
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale teal-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-satellite fa-5x" style="color: var(--accent-teal); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ AIのメタ認知がもたらす未来</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-up-right-and-down-left-from-center" style="color: var(--accent-teal);"></i><span>AIの<span class="highlight">メタ認知能力の進化</span>がエージェントの<span class="keyword-tag teal">信頼性を飛躍的に向上</span></span></li>
+                        <li><i class="fa-solid fa-building-columns indigo-icon"></i><span><span class="keyword-tag indigo">Santa Fe研究所</span>が人間-AIチームのメタ認知情報交換を研究</span></li>
+                        <li><i class="fa-solid fa-lightbulb orange-icon"></i><span>AIが<span class="highlight">「自分の限界を知る」</span>ことの重要性が学術的に注目されている</span></li>
+                        <li><i class="fa-solid fa-handshake" style="color: var(--accent-teal);"></i><span>人間とAIが<span class="keyword-tag teal">メタ認知を共有</span>することでチーム全体のパフォーマンスが向上</span></li>
+                        <li><i class="fa-solid fa-star indigo-icon"></i><span>MMPOはその<span class="keyword-tag orange">最初の重要な一歩</span>となる論文</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-teal">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-forward fa-lg" style="color: var(--accent-teal);"></i>
+                            AIが<span class="keyword-tag teal">「自分の限界を知る」</span>。<br>
+                            これができるだけで<br>
+                            信頼度は革命的に変わる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale orange-accent">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--accent-orange); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ Claude Codeユーザーへの実践的アドバイス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scissors orange-icon"></i><span><span class="keyword-tag orange">タスクを小さく分割する</span>：長時間タスクは短く切るほど安全</span></li>
+                        <li><i class="fa-solid fa-file-pen indigo-icon"></i><span><span class="keyword-tag indigo">重要な決定をCLAUDE.mdに記録させる</span>：記憶の外部化が鍵</span></li>
+                        <li><i class="fa-solid fa-flag-checkered" style="color: var(--accent-teal);"></i><span><span class="keyword-tag teal">中間チェックポイントで進捗を確認する</span>：ドリフトの早期発見</span></li>
+                        <li><i class="fa-solid fa-message" orange-icon></i><span>定期的に<span class="highlight">「元の目的を再確認」</span>するプロンプトを挟む</span></li>
+                        <li><i class="fa-solid fa-circle-info indigo-icon"></i><span>MMPOが実装されれば<span class="keyword-tag teal">これらの手間が自動化</span>される日も近い</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-hand-point-up fa-lg" style="color: var(--accent-orange);"></i>
+                            今は<span class="keyword-tag orange">手動で工夫</span>が必要。<br>
+                            でもMMPOが実装されれば<br>
+                            <span class="keyword-tag teal">自動でドリフト防止</span>が<br>
+                            できるようになるよ！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/HfK9nDHdb0I" target="_blank">AIが自分の物忘れを自覚し始めた｜MMPO論文徹底解説 - Claude Codeが長いタスクで趣旨をズラす理由とメタ認知的解決</a><br>
+            📄 論文: <a href="https://arxiv.org/abs/2605.30159" target="_blank">arXiv: 2605.30159 — Meta-Cognitive Memory Policy Optimization (MMPO)</a><br>
+            📅 2026年6月2日 | インフォグラフィック作成
+        </footer>
+
+    </div>
+</body>
+</html>

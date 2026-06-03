@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synapse AI — 決定論DAG×14LLMの非ロックイン調整層を徹底解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #2D7D46;
+            --ui-color-2: #8B5CF6;
+            --ui-color-3: #ECFDF5;
+            --ui-color-4: #1A1A2E;
+            --ui-color-5: #E74C6F;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F0FFF4;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.25em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #F5F0FF;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFF0F3;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(139,92,246,0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* VS Badge */
+        .vs-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--ui-color-5), var(--ui-color-2));
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+            margin: 0 5px;
+        }
+
+        /* Comparison Table */
+        .comparison-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ddd;
+            font-size: 15px;
+        }
+
+        .comparison-row:last-child {
+            border-bottom: none;
+        }
+
+        .comp-left, .comp-right {
+            flex: 1;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .comp-center {
+            flex: 0 0 40%;
+            text-align: center;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .winner {
+            color: var(--ui-color-1);
+            font-weight: 900;
+        }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Stagger animation delays */
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+
+        /* Full width card */
+        .full-width {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-project-diagram fa-7x" aria-hidden="true"></i></div>
+            <h1>Synapse AI — 決定論DAG×14LLM</h1>
+            <div class="subtitle">非ロックイン調整層で業務AIを本番に乗せる時代が来た</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月3日</div>
+        </div>
+
+        <!-- Row 1: Overview -->
+        <div class="section-layout">
+
+            <!-- Card 1: 数字パンチ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hashtag fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① まず数字でガツンと殴る</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-rocket"></i><span><span class="keyword-tag">V1.6</span>が2026年5月27日にリリース。つい先日の最新バージョン</span></li>
+                        <li><i class="fa-solid fa-tags"></i><span><span class="keyword-tag">48回のリリース</span>と<span class="keyword-tag">535コミット</span>。OSSとしては異常な活発さ</span></li>
+                        <li><i class="fa-solid fa-server"></i><span>対応するLLMプロバイダーが<span class="highlight">14個以上</span>。月1ペースでは全然追いつかないスピード</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>ライセンスは<span class="keyword-tag">AGPL 3.0</span>。社内利用なら問題ないが、SaaSで提供する場合は要確認</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            48リリースって月1ペースで追えない。
+                            <span class="keyword-tag">完全に走ってる最中</span>のプロジェクトです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: Synapse AIとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② Synapse AIってそもそも何?</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bullseye"></i><span>ワンライナーで言うと<span class="highlight">「決定論DAGマルチLLM対応のローカルファースト・オーケストレーター」</span></span></li>
+                        <li><i class="fa-solid fa-quote-left"></i><span>公式スローガン: <span class="keyword-tag">Build AI agents that actually work</span>（実際に仕事をするエージェントを作れ）</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>公式のキャッチフレーズ: <span class="keyword-tag">Frozen Exact Path</span>。あなたが設計したパターンの通りに走る</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>Twitterではキラキラなのに社内に入れたら3日で詰まる — そんな<span class="highlight">PoCの墓場</span>問題を解決するポジション</span></li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            「すごいけど業務じゃ動かないAI」を
+                            実際に<span class="keyword-tag">本番運用</span>に乗せるための調整層です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: 開発元と技術スタック -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ 開発元と技術スタック</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-github"></i><span>GitHub組織名は<span class="keyword-tag">SynapseOKAI</span>。オープンな開発で数字もすべて見える状態</span></li>
+                        <li><i class="fa-brands fa-python"></i><span>言語構成: <span class="keyword-tag">Python 53%</span> + <span class="keyword-tag">TypeScript 43%</span>のハイブリッド構成</span></li>
+                        <li><i class="fa-solid fa-layer-group"></i><span>バックエンドはPython、フロントエンドはTypeScriptで明確に分かれている珍しい設計</span></li>
+                        <li><i class="fa-brands fa-docker"></i><span>配布手段: <span class="keyword-tag">Docker / npm / pip</span>の全てに対応。社内の標準スタックに合わせて選べる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: var(--ui-color-2);"></i>
+                            OSSなのに<span class="keyword-tag">エンタープライズ目線</span>がある。
+                            守備範囲が広い設計ですね。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: 調整層の立ち位置 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ なぜ「調整層」として注目されるのか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gears"></i><span>前回の動画で「核エージェントは強いが、それを束ねて業務に流す<strong>仕組み</strong>がない」という課題を提起</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>その束ねる層を<span class="highlight">独自の世界観なしで自由にやろう</span>というのがSynapse AIのポジション</span></li>
+                        <li><i class="fa-solid fa-train"></i><span>Synapse AI自体は<span class="keyword-tag">線路を引く側</span>。何を走らせるかは利用者次第という分離設計</span></li>
+                        <li><i class="fa-solid fa-map"></i><span>LangGraphは線路＋車両セット販売、CrewAIは車両だけ自由に選びたい層。線路だけ作るポジションは<span class="highlight">ずっと放置されていた</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                            ノンロックイン思想で14のLLMに
+                            HITL付きで実現。<br>
+                            <span class="keyword-tag">意外と開いていたポジション</span>を狙い撃ち。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: 3軸の解説 -->
+        <div class="section-layout">
+
+            <!-- Card 5: 決定論DAG -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-route fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 軸1: 決定論DAG — 脱線しない電車</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-right-long"></i><span><span class="keyword-tag">DAG</span> = Directed Acyclic Graph（有効非巡回グラフ）。矢印が逆流しないネットワーク</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>あらかじめ<span class="highlight">設計した線路の上しか走らない</span>電車。同じ入力なら同じ経路・同じ出力が保証される</span></li>
+                        <li><i class="fa-solid fa-road"></i><span>自動車で言えば<span class="keyword-tag">ガードレールの内側しか走れない</span>ように物理的に制約する設計</span></li>
+                        <li><i class="fa-solid fa-file-invoice"></i><span>業務システムなら「3回やったら3回とも同じ手順で動いてほしい」。<span class="highlight">監査で崩壊しない</span>ことが担保される</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            決済APIに勝手なリクエストを
+                            飛ばされたら泣くしかない。<br>
+                            <span class="keyword-tag">ガードレールが経営への説明</span>になる！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: ReAct系との比較 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-left-right fa-5x" style="color: var(--ui-color-2); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 決定論 vs ReAct — 安全面の違い</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shuffle"></i><span><span class="keyword-tag">ReAct系</span>は毎回その場で次の手を考えるスタイル。柔軟性が売りだが、出発するまでどこに行くか分からない</span></li>
+                        <li><i class="fa-solid fa-person-hiking"></i><span>いわば<span class="highlight">ヒッチハイカー</span>。たまにいい寄り道してくれる時もあれば、突然砂漠に向かい始めることもある</span></li>
+                        <li><i class="fa-solid fa-ghost"></i><span><span class="keyword-tag">ハルシネーション経路</span>の問題。AIが妄想で別の道を作ってしまう。金融系なら一発でアウト</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>決定論DAGは<span class="highlight">矢印が引かれていないところには物理的に行けない</span>。理由がないからこそ安全という構造</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            ガードレール＋非常停止ボタン＋
+                            運転士のレビュー = <span class="keyword-tag">3重の安心構造</span>。
+                            社内倫理審査も通しやすい。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7: マルチLLM -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cubes fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 軸2: マルチLLMオーケストレーション</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-sliders"></i><span>ノードごとに<span class="highlight">LLMを変えられる</span>。ルーティング処理は爆速のHaiku、文章生成は重めのOpusみたいな割り当てが可能</span></li>
+                        <li><i class="fa-solid fa-baseball"></i><span>まるで野球の<span class="keyword-tag">継投システム</span>。先発・中継ぎ・抑えで役割とモデルを分けられる</span></li>
+                        <li><i class="fa-solid fa-shuffle"></i><span>対応プロバイダー14個以上: <span class="keyword-tag">OpenAI / Anthropic / Google / Gemini / xAI / Groq / AWS Bedrock / Ollama</span>など</span></li>
+                        <li><i class="fa-solid fa-exchange-alt"></i><span>プロバイダー間のAPI差異はSynapse側が<span class="highlight">吸収</span>。新モデルが出たらLLM指定だけ書き換えれば移行完了</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-2);"></i>
+                            LLMの世代交代が早すぎる時代に
+                            めっちゃフィット。<br>
+                            <span class="keyword-tag">コード書き換えの地獄</span>から解放。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: ローカルファースト -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-house-laptop fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 軸3: ローカルファーストとノンロックイン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wifi-slash"></i><span>Ollamaと組み合わせれば<span class="highlight">ネット切断状態でも100%ローカルで動かせる</span>。社秘データを触る現場に刺さる</span></li>
+                        <li><i class="fa-solid fa-code-merge"></i><span><span class="keyword-tag">ハイブリッド構成</span>が同じDAGの中で組める。機密書類の処理はOllama、最終確認だけAnthropicにするなど</span></li>
+                        <li><i class="fa-solid fa-door-open"></i><span>バックインなし = 独自の流儀を覚えないとかけない。<span class="highlight">LangGraphのような学習コストの壁</span>が低い</span></li>
+                        <li><i class="fa-solid fa-unlock"></i><span>抜けたくなったら抜ける自由がある。ノードに何を置くかは完全に利用者の自由</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-robot fa-lg" style="color: var(--ui-color-1);"></i>
+                            中身は外に出さないけど品質だけ
+                            任せる。<span class="keyword-tag">上層が頷く</span>構成が
+                            AWS Bedrock対応で実現。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: HITL & 業務統合 -->
+        <div class="section-layout">
+
+            <!-- Card 9: HITL -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hand-pointer fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ HITL — 人間の介入ポイントを設計</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-pause"></i><span><span class="keyword-tag">HITL</span> = ワークフローを途中で一時停止して人間がレビューし、OKなら再開する仕組み</span></li>
+                        <li><i class="fa-solid fa-bell"></i><span>ベルトコンベアの途中に<span class="highlight">品質チェック担当者</span>がいるイメージ。完全自動と完全手動の中間を自然に設計できる</span></li>
+                        <li><i class="fa-solid fa-play-circle"></i><span>Synapse AIではHITLが<span class="keyword-tag">標準機能</span>として組み込まれている。後付けのレビュー画面ではなく、最初から止める前提で組める</span></li>
+                        <li><i class="fa-solid fa-square-full"></i><span>決定論DAGが<span class="keyword-tag">ガードレール</span>、HITLが<span class="keyword-tag">非常停止ボタン</span>という関係。エージェントの暴走を物理的に止める安全装置</span></li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            最初からHITLを入れた状態で
+                            組み始められる。<br>
+                            <span class="keyword-tag">設計し直しが不要</span>なのが大きい。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: 承認チャネル -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 承認チャネル — 普段使う場所で承認</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brands fa-slack"></i><span>承認手段として<span class="keyword-tag">UI / Slack / Telegram</span>が用意されている。普段使っているツールで承認できる</span></li>
+                        <li><i class="fa-solid fa-bell-slash"></i><span>ワークフローが止まった瞬間にSlackに通知 → ボタン押せば再開という体系が構築可能</span></li>
+                        <li><i class="fa-brands fa-microsoft"></i><span>通知チャネルも幅広く<span class="keyword-tag">Discord / Microsoft Teams</span>もサポート。日系大企業案件で聞きそうなラインナップ</span></li>
+                        <li><i class="fa-brands fa-whatsapp"></i><span><span class="keyword-tag">WhatsApp</span>が入ってるあたり、海外の現場運用も意識。現場の人にWhatsAppで承認依頼を飛ばすのも普通に組める</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-mobile-screen fa-lg" style="color: var(--ui-color-2);"></i>
+                            出張先にスマホからポチっと。
+                            <span class="keyword-tag">モバイル承認</span>が
+                            日常の延長でできる。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: REST API & Cron -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ REST API × Cron × Webhook — 業務システムと連携</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-globe"></i><span><span class="keyword-tag">REST API</span>を公開することで、社内の業務システムからエンドポイントを叩いてSynapse AIのDAGを起動できる</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>内蔵の<span class="keyword-tag">Cron</span>機能で決まった時間にワークフローを自動起動するのも標準サポート</span></li>
+                        <li><i class="fa-solid fa-link-slash"></i><span>逆方向も対応。DAGの中から外部APIを叩くノードもWebhookもOK。<span class="highlight">双方向で既存システムに繋がる</span></span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>Synapse AIは<span class="keyword-tag">閉じたAIツールではなく業務システムの部品</span>として振る舞える設計。エンタープライズ目線で入り込みやすい</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            PoCで動いたものが半年眠るリポジ
+                            トリに溜まる……。これが<span class="keyword-tag">墓場問題</span>。
+                            Synapse AIは<span class="keyword-tag">最初から本番</span>の部品が揃う。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: PoC→本番 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-road-to fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ PoCから本番へのハードルを下げる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hammer"></i><span><span class="keyword-tag">DAGで設計</span> → <span class="keyword-tag">HITLで審査</span> → <span class="keyword-tag">Cronで自動起動</span> → <span class="keyword-tag">REST APIで連携</span> → <span class="keyword-tag">通知で可視化</span>。フルセットが揃っている</span></li>
+                        <li><i class="fa-solid fa-drafting-compass"></i><span>最初から<span class="highlight">本番想定の設計</span>ができる。PoCが終わってから設計し直す手間がゼロ</span></li>
+                        <li><i class="fa-solid fa-server"></i><span>「AIがすごいけど業務じゃ動かない」から「AIが実際に仕事をする」への橋渡し役</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>DAG + HITL + Cron + REST + 通知。これらが<span class="highlight">PoCの墓場から脱出するキット</span>として機能する</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                            未マージのPRブランチが30本も
+                            眠ってる……。<br>
+                            <span class="keyword-tag">PoCの墓場</span>脱出の候補が
+                            やっと見つかったかもしれない。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: ユースケース -->
+        <div class="section-layout">
+
+            <!-- Card 13: コンテンツライティング -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-pen-nib fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ ユースケース1: コンテンツライティングの自動化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span>フロー: <span class="keyword-tag">調査</span> → <span class="keyword-tag">執筆</span> → <span class="keyword-tag">レビュー</span> → <span class="keyword-tag">Google Docsに共有</span>まで1本のDAGで通す</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>途中にHITLを入れて<span class="highlight">構成案だけ人間が叩く</span>運用も可能。AIが書いたものを最終チェックしてから共有</span></li>
+                        <li><i class="fa-brands fa-google"></i><span>公開先がGoogle Docsなのも面白い。社内レビューやコメント機能とそのまま接続できる</span></li>
+                        <li><i class="fa-solid fa-building"></i><span>完全に既存の<span class="keyword-tag">オフィスワーカーの作業の延長線</span>として組まれている設計</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrow-right fa-lg" style="color: var(--ui-color-2);"></i>
+                            調査だけAI、書くのは人間とか
+                            中途半端なやつじゃなくて、<br>
+                            <span class="keyword-tag">最初から最後までDAGで繋ぐ</span>。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: 自立コード開発 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ ユースケース2: HITL付き自立コード開発</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-pull-request"></i><span><span class="highlight">HITL付きマルチエージェント</span>が連携して、リポジトリに来るクエストを作成するところまで自動実行</span></li>
+                        <li><i class="fa-solid fa-code-merge"></i><span><span class="keyword-tag">マージは人間</span>。ここがHITLとして組み込まれているポイント。自動生成されたPRをレビューしてマージするだけ</span></li>
+                        <li><i class="fa-solid fa-user-gear"></i><span><span class="keyword-tag">Claude Code</span>は個人の手元の相棒。Synapse AIのコードDAGは<span class="highlight">チームの開発工程の一部</span></span></li>
+                        <li><i class="fa-solid fa-people-group"></i><span>個人のリスクと組織のリスクは違うという設計で表現。<span class="keyword-tag">ガードレールとしての決定論とHITLが両方必須</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            一人で動かすのではなく
+                            <span class="keyword-tag">ラインに組み込む</span>イメージ。<br>
+                            レイヤーが全然違う。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: AI Builder -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ ユースケース3: AI Builder — 自然言語からDAG生成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot"></i><span><span class="keyword-tag">AI Builder</span>は自然言語からDAGを設計する<span class="highlight">メタエージェント</span>。DAGを作るためのDAGみたいな存在</span></li>
+                        <li><i class="fa-solid fa-language"></i><span>「こういうワークフローが欲しい」を日本語で書くだけで叩き台が生成される。<span class="highlight">DSLすら書かなくていい</span></span></li>
+                        <li><i class="fa-solid fa-screwdriver-wrench"></i><span>LLMの配置までAIがやってくれる。例: 問い合わせメールの仕分け・テンプレ作成・人間への確認送信など</span></li>
+                        <li><i class="fa-solid fa-pen-to-square"></i><span>出来上がったものはコードでもグラフでも編集できる。<span class="keyword-tag">AIに叩き台を作らせて人間が直す</span>が普通になるかも</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-pen-ruler fa-lg" style="color: var(--ui-color-2);"></i>
+                            これからはツールの書き方を
+                            覚えるのではなく、<br>
+                            <span class="keyword-tag">AIに設計させて直す</span>が普通に。
+                            前提が変わるやつです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16: LangGraph vs CrewAI vs Synapse -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 競合との住み分け — 対立ではなく地図を描く</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-trophy"></i><span><span class="keyword-tag">LangGraph</span>: エコシステムの規模は頭1つ抜けている。Chainの資産が丸ごと使える。ただし構文が独特で学習コストが高い</span></li>
+                        <li><i class="fa-solid fa-people-group"></i><span><span class="keyword-tag">CrewAI</span>: 役割ベースで組む。プロトタイプの爆速さはリーチだが、決定論で動かしたい業務用途では制御しにくい</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span><span class="keyword-tag">Hermes</span>: 自己改善のエージェント。失敗を記憶して次は同じ失敗をしない。個体の強さを上げる方向</span></li>
+                        <li><i class="fa-solid fa-database"></i><span><span class="keyword-tag">OpenManus</span>: エージェントの記憶レイヤーにフォーカス。コールドスタート解消。脳に外付けメモリを足すイメージ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-map fa-lg" style="color: var(--ui-color-2);"></i>
+                            どれが勝つかじゃなく
+                            <span class="keyword-tag">どう住み分けるか</span>。<br>
+                            戦争じゃなく共存が鍵です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: 強み・弱点・まとめ -->
+        <div class="section-layout">
+
+            <!-- Card 17: Synapse AIの立ち位置 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-industry fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ Synapse AIの立ち位置 — 工場のレイアウト図</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-layer-group"></i><span>Synapse AIはHermesやOpenManusの<span class="highlight">競合ではなく、それらをノードとして抱える調整層</span></span></li>
+                        <li><i class="fa-solid fa-map"></i><span>工場で言うとSynapse AIは<span class="keyword-tag">レイアウト図と配線設計</span>。各エージェントは個別の機械</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>個別の機械を磨くフェーズから<span class="highlight">工場全体を設計するフェーズ</span>へ。単体エージェント時代は終わり、層の時代が来る</span></li>
+                        <li><i class="fa-solid fa-handshake"></i><span>LangGraphで個別エージェントを書きつつSynapse AIで束ねる組み合わせもあり。<span class="keyword-tag">共存がエージェント後半戦の合言葉</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                            「LangGraphもCrewAIもいらない」の
+                            答えは<span class="keyword-tag">使い分ければ全部いる</span>。
+                            層の高さが違うから直接競合じゃない。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18: 強み・弱点・始め方 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ 強み・弱点・始め方 — 30分で試せる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">強み</span>: 決定論×マルチLLM×HITLの3重構造。POCから本番への移行パスが最初から用意されている</span></li>
+                        <li><i class="fa-solid fa-xmark"></i><span><span class="keyword-tag">弱点</span>: スター数がまだ少ない。エコシステムの規模ではLangGraphに勝てない。AGPL 3.0のSaaS注意点あり</span></li>
+                        <li><i class="fa-solid fa-terminal"></i><span>インストールは<span class="highlight">2コマンド</span>: Macはcurlでsetup.shをbashにパイプ、WindowsはPowerShellのIRM | IEX</span></li>
+                        <li><i class="fa-solid fa-shoe-prints"></i><span>おすすめ: ①Ollamaをローカルで立てる → ②AI Builderに自然言語を投げる → ③出てきた叩き台を手直し → ④実際に動かして確認</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-forward fa-lg" style="color: var(--ui-color-1);"></i>
+                            まずOllamaでAPI代ゼロで試して、
+                            後でクラウドモデルに差し替える。<br>
+                            <span class="keyword-tag">コストと品質のチューニング</span>が
+                            同じUIで完結するのが強い。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=-o27slH1Y48" target="_blank">【Synapse AI】LangGraphもCrewAIも要らない？決定論DAG×14LLMの非ロックイン調整層を徹底解説</a></p>
+            <p style="margin-top: 5px;">📅 2026年6月3日</p>
+            <p style="margin-top: 5px; font-size: 12px; color: #999;">Synapse AI — 決定論DAG×14LLM非ロックイン調整層 インフォグラフィック | 2026年6月3日作成</p>
+        </footer>
+
+    </div>
+</body>
+</html>

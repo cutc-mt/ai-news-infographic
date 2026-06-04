@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google ADKでマルチエージェント構築 — M365からGoogle Workspace移行を自動化 | Google Cloud Tech</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #0F52BA;
+            --ui-color-2: #2563EB;
+            --ui-color-3: #DBEAFE;
+            --ui-color-4: #1E1B4B;
+            --ui-color-5: #1D4ED8;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #F0F5FF; font-family: 'Kaisei Decol', serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-5)); border-radius: 30px; color: white; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); animation: headerGlow 8s ease-in-out infinite; }
+        @keyframes headerGlow { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(20px,20px); } }
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.4em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.3em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .card { flex: 1; min-width: 280px; max-width: 450px; background-color: white; border-radius: 20px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2)); }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.3em; color: var(--ui-color-4); margin-top: 10px; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 10px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 12px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #DBEAFE; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .highlight { background: linear-gradient(transparent 60%, rgba(37,99,235,0.3) 60%); font-weight: bold; }
+        .fade-in-scale { opacity: 0; transform: scale(0.9); animation: fadeInScale 0.5s ease forwards; }
+        @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } }
+        footer { text-align: center; padding: 20px; margin-top: 20px; font-family: 'Yomogi', cursive; color: #666; font-size: 14px; }
+        footer a { color: var(--ui-color-2); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .card { width: 100%; min-width: auto; } .header h1 { font-size: 1.6em; } }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<div class="header fade-in-scale">
+    <div class="header-icon"><i class="fa-solid fa-robot"></i></div>
+    <h1>Google ADKでマルチエージェント構築</h1>
+    <div class="subtitle">M365からGoogle Workspaceへの移行を自動化する実践ガイド</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年6月5日 | Google Cloud Tech</div>
+</div>
+
+<div class="section-layout">
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-building fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>①エンタープライズ移行の課題: 手作業の苦痛</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-circle-info"></i><span><span class="keyword-tag">Microsoft 365</span>から<span class="keyword-tag">Google Workspace</span>への移行評価は企業にとって大きな負担</span></li>
+            <li><i class="fa-solid fa-clock"></i><span>ドキュメントを読んで機能マッピングを整理するのに<span class="highlight">数日かかる</span></span></li>
+            <li><i class="fa-solid fa-file-lines"></i><span>ライセンスとアドオンを一つ一つ手作業で比較する純粋な肉体労働</span></li>
+            <li><i class="fa-solid fa-triangle-exclamation"></i><span>マッピング、最新の変更、クリーンな出力の整形...すべて手動</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--ui-color-5);"></i> 数日かかる退屈な作業...これをAIに任せたい！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+        <h2>②動画の主題: ADKで信頼性のあるエージェント構築</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-gear"></i><span>AIエージェントの構築は<span class="highlight">巨大で脆いプロンプトとの格闘</span>になりがち</span></li>
+            <li><i class="fa-solid fa-shuffle"></i><span>出力結果が予測不能で、運用に耐えないことが多い</span></li>
+            <li><i class="fa-solid fa-lightbulb"></i><span><span class="keyword-tag">Google Agent Development Kit</span>で信頼性の高いエージェントを構築可能</span></li>
+            <li><i class="fa-solid fa-check-circle"></i><span>実際のワークフロー自動化のデモを通じて解説</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i> 巨大プロンプトに別れを告げよう！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s;"></i>
+        <h2>③エージェント構築の3原則: 地面のルール</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-database"></i><span><span class="keyword-tag">状態管理</span>（State Management）— データの流れを明確に制御</span></li>
+            <li><i class="fa-solid fa-route"></i><span><span class="keyword-tag">ルーティング</span>（Routing）— 適切な処理に振り分ける仕組み</span></li>
+            <li><i class="fa-solid fa-shield-halved"></i><span><span class="keyword-tag">ガードレール</span>（Guardrails）— 危険な出力や誤動作を防止</span></li>
+        </ul>
+        <p style="margin-top:10px; font-size:14px; color:#666;">これら3つが信頼性のあるエージェントの核となる要素。</p>
+    </div>
+    <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> APIを叩くだけじゃダメ！設計が大事！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-right-arrow-left fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>④デモ概要: ライセンス移行マッピングエージェント</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-contract"></i><span>Microsoft 365のライセンスを<span class="highlight">Google Workspaceの同等機能にマッピング</span></span></li>
+            <li><i class="fa-solid fa-book-open"></i><span>結果として<span class="keyword-tag">10チャプターのレポート</span>を出力</span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>ADKのオーケストレーションパイプラインで自動化</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i> 数日の作業が数分に！魔法みたい！</span>
+    </div>
+</div>
+</div>
+
+<div class="section-layout">
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-file-import fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+        <h2>⑤パイプライン入力: テキストまたは画像</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-keyboard"></i><span><span class="keyword-tag">テキスト</span> — ソフトウェアライセンスの一覧を直接入力</span></li>
+            <li><i class="fa-solid fa-image"></i><span><span class="keyword-tag">画像</span> — ライセンス一覧のスクリーンショットも対応</span></li>
+            <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>入力後にリサーチフェーズが自動で実行される</span></li>
+            <li><i class="fa-solid fa-table"></i><span>最終的に構造化されたデータとして出力される</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-camera fa-lg" style="color: var(--ui-color-2);"></i> スクショを投げるだけでOK！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>⑥マルチエージェント: 巨大プロンプトの終焉</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-ban"></i><span>1つの巨大プロンプトではなく<span class="highlight">複数の特化型エージェント</span>に分割</span></li>
+            <li><i class="fa-solid fa-link"></i><span>ADKの<span class="keyword-tag">Sequential Agent</span>で直列に接続</span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>ワークロードを focused なサブエージェントに分解</span></li>
+            <li><i class="fa-solid fa-layer-group"></i><span>それぞれが独立したシステムプロンプトを持つ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-people-arrows fa-lg" style="color: var(--ui-color-2);"></i> 分担作業で efficiency up！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s;"></i>
+        <h2>⑦入力パーサー: ライセンスデータの抽出</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-scissors"></i><span>テキストや画像から<span class="highlight">ライセンス情報を正確に抽出</span></span></li>
+            <li><i class="fa-solid fa-filter"></i><span>ノイズを除去して構造化フォーマットに変換</span></li>
+            <li><i class="fa-solid fa-arrows-turn-to-dots"></i><span>次のエージェントに渡せる形にデータを整形</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-scissors fa-lg" style="color: var(--ui-color-5);"></i> ゴミを取って綺麗にしてくれる！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microscope fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+        <h2>⑧リサーチャー: ドキュメント検索と照合</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-search"></i><span>抽出されたライセンスに基づいて<span class="highlight">社内ドキュメントを検索</span></span></li>
+            <li><i class="fa-solid fa-scale-balanced"></i><span>Microsoft 365とGoogle Workspaceの機能を比較</span></li>
+            <li><i class="fa-solid fa-circle-check"></i><span>正確なマッピング情報を収集して次に渡す</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-book fa-lg" style="color: var(--ui-color-2);"></i> ドキュメントを読んで比較...地味だけど重要！</span>
+    </div>
+</div>
+</div>
+
+<div class="section-layout">
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-newspaper fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>⑨レポーター: 10チャプターのレポート生成</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-lines"></i><span>リサーチ結果をもとに<span class="highlight">整形された10チャプターのレポート</span>を作成</span></li>
+            <li><i class="fa-solid fa-heading"></i><span>章立てされた構造で読みやすい出力を実現</span></li>
+            <li><i class="fa-solid fa-user"></i><span>エンドユーザーに意味のある情報として提示</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-pen-fancy fa-lg" style="color: var(--ui-color-2);"></i> プロのレポーターが書いたみたい！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+        <h2>⑩ハルシネーション対策: 特化で削減</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-bullseye"></i><span>各エージェントが<span class="highlight">非常に具体的なタスク</span>だけを担当</span></li>
+            <li><i class="fa-solid fa-message"></i><span>独立したシステムプロンプトで役割が明確</span></li>
+            <li><i class="fa-solid fa-arrow-trend-down"></i><span>もっともらしい嘘を大幅に削減</span></li>
+            <li><i class="fa-solid fa-bug"></i><span>デバッグも格段にやりやすくなる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-smile-beam fa-lg" style="color: var(--ui-color-5);"></i> 嘘が減る！開発者も嬉しい！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s;"></i>
+        <h2>⑪自己修正サイクル: Loop Agentの活用</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-triangle-exclamation"></i><span>ワンショットで<span class="highlight">完璧なレポートを出すのはほぼ不可能</span></span></li>
+            <li><i class="fa-solid fa-rotate"></i><span><span class="keyword-tag">Loop Agent</span>でMapperとReviewerをループ構成に</span></li>
+            <li><i class="fa-solid fa-magnifying-glass"></i><span>レビューアーが機能の欠落やフォーマット崩れをチェック</span></li>
+            <li><i class="fa-solid fa-arrow-rotate-left"></i><span>問題があればMapperに戻して修正。完了まで繰り返す</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-infinity fa-lg" style="color: var(--ui-color-2);"></i> 自己修復ループ！これが本物のエージェント！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-user-check fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>⑫レビューアー: 品質チェックとフィードバック</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-magnifying-glass-minus"></i><span><span class="highlight">欠落した機能</span>がないかを確認</span></li>
+            <li><i class="fa-solid fa-broom"></i><span>不要な絵文字や<span class="keyword-tag">フォーマットの崩れ</span>を検出</span></li>
+            <li><i class="fa-solid fa-comment-dots"></i><span>問題箇所を特定してMapperにフィードバック</span></li>
+            <li><i class="fa-solid fa-circle-check"></i><span>品質基準を満たすまで修正を繰り返す</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-2);"></i> 絵文字が混ざってたら修正される！</span>
+    </div>
+</div>
+</div>
+
+<div class="section-layout">
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+        <h2>⑬データソース: Search＋ナレッジベース</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-brands fa-google"></i><span><span class="keyword-tag">Google Search</span>をリアルタイムのグラウンディングツールとして活用</span></li>
+            <li><i class="fa-solid fa-hard-drive"></i><span>ローカルに保存された<span class="highlight">エンタープライズ機能マトリックス</span>のナレッジベース</span></li>
+            <li><i class="fa-solid fa-shuffle"></i><span>2つのソースを組み合わせることで正確性を担保</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-check-double fa-lg" style="color: var(--ui-color-5);"></i> リアルタイム＋自社データの最強コンボ！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-explosion fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>⑭コンテキストウィンドウの課題: 巨大CSV問題</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-csv"></i><span>大量のローカルCSVを<span class="highlight">毎回プロンプトに注入</span>すると大問題</span></li>
+            <li><i class="fa-solid fa-expand"></i><span>コンテキストウィンドウを消費してしまう</span></li>
+            <li><i class="fa-solid fa-dollar-sign"></i><span>APIコストが急激に上昇する</span></li>
+            <li><i class="fa-solid fa-ban"></i><span>本番運用では許容できない問題</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-wallet fa-lg" style="color: var(--ui-color-2);"></i> お財布に優しくない...！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s;"></i>
+        <h2>⑮コンテキストキャッシュ: ADKの built-in 解決策</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-download"></i><span>ナレッジベースを<span class="highlight">1回だけロード</span>してキャッシュ</span></li>
+            <li><i class="fa-solid fa-clock-rotate-left"></i><span>ADKが<span class="keyword-tag">TTL（Time To Live）</span>とトークン制限を自動管理</span></li>
+            <li><i class="fa-solid fa-gauge-high"></i><span>レイテンシを削減して毎回の実行コストを節約</span></li>
+            <li><i class="fa-solid fa-hand-sparkles"></i><span>開発者は何もしなくても自動で最適化される</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i> 1回ロードすればOK！速い！安い！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+        <h2>⑯ロギングと可観測性: プラグインで簡単</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-plug"></i><span><span class="keyword-tag">ロギングプラグイン</span>を追加するだけでプロンプトとレスポンスのデータをストリーミング</span></li>
+            <li><i class="fa-solid fa-satellite-dish"></i><span>ロギングシンクへ直接データを送信可能</span></li>
+            <li><i class="fa-solid fa-eye"></i><span>本番環境での<span class="highlight">可観測性（Observability）</span>をサポート</span></li>
+            <li><i class="fa-solid fa-gear"></i><span>後から問題の追跡やデバッグが容易になる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-satellite-dish fa-lg" style="color: var(--ui-color-5);"></i> 本番でも安心！何が起きたか全部見える！</span>
+    </div>
+</div>
+</div>
+
+<div class="section-layout">
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud-arrow-up fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+        <h2>⑰本番へのデプロイ: Agent Engineで1コマンド</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-laptop-code"></i><span>ローカルIDEから<span class="highlight">本番環境への移行が超簡単</span></span></li>
+            <li><i class="fa-solid fa-docker"></i><span>カスタムDockerファイルを書く必要がない</span></li>
+            <li><i class="fa-solid fa-server"></i><span>複雑なホスティングインフラの構築も不要</span></li>
+            <li><i class="fa-brands fa-google"></i><span><span class="keyword-tag">Google Agent Engine</span>へのデプロイは literally 1コマンド</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-terminal fa-lg" style="color: var(--ui-color-2);"></i> 1コマンドでデプロイ！夢みたい！</span>
+    </div>
+</div>
+
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-ranking-star fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s;"></i>
+        <h2>⑱HTTP 429対策: 優先推論（Priority Inference）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-fire"></i><span><span class="highlight">HTTP 429リソース枯渇エラー</span>は構築中の最大の学び</span></li>
+            <li><i class="fa-solid fa-plus"></i><span>たった<span class="keyword-tag">2つのHTTPヘッダー</span>を追加するだけの解決策</span></li>
+            <li><i class="fa-solid fa-ranking-star"></i><span>優先推論（Priority Inference）を利用可能に</span></li>
+            <li><i class="fa-solid fa-circle-check"></i><span>モデルエンドポイントで<span class="highlight">保証された優先スロット</span>を取得</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-2);"></i> 2つのヘッダー追加だけで解決！<br>知っておくと超便利！</span>
+    </div>
+</div>
+</div>
+
+<footer>
+    🎬 動画: <a href="https://www.youtube.com/watch?v=9BwFgEFVLOk" target="_blank">Google Cloud Tech — Automate M365 to Google Workspace Migrations with ADK multi-agents</a> | 📅 2026年6月5日
+</footer>
+
+</div>
+</body>
+</html>

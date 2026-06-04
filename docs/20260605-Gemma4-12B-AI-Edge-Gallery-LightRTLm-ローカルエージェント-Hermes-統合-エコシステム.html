@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemma 4 12B 徹底解説 — エンコーダーフリー・ローカルエージェント・統合エコシステム</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #0D7377;
+            --ui-color-2: #14BDAC;
+            --ui-color-3: #D6F5F0;
+            --ui-color-4: #094344;
+            --ui-color-5: #32E0C4;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #F0FAFA;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header {
+            text-align: center; padding: 40px 20px; margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1));
+            border-radius: 30px; color: white; position: relative; overflow: hidden;
+        }
+        .header::before {
+            content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+        @keyframes headerGlow { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(20px,20px); } }
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.4em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.3em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .section-card {
+            flex: 1; min-width: 280px; max-width: 450px; background-color: white;
+            border-radius: 20px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .section-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-5));
+        }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.3em; color: var(--ui-color-4); margin-top: 10px; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 10px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag {
+            background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px;
+            border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px;
+        }
+        .highlight { background: linear-gradient(transparent 60%, rgba(20,189,172,0.3) 60%); font-weight: bold; }
+        .speech-bubble {
+            position: relative; background: #fff; border: 3px solid var(--ui-color-1);
+            border-radius: 20px; padding: 12px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -13px; left: 20px;
+            border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent;
+            display: block; width: 0;
+        }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #F0FAFA; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #E8FFF7; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .fade-in-scale { opacity: 0; transform: scale(0.9); animation: fadeInScale 0.5s ease forwards; }
+        @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } }
+        .section-card:nth-child(1) .fade-in-scale { animation-delay: 0.1s; }
+        .section-card:nth-child(2) .fade-in-scale { animation-delay: 0.2s; }
+        .section-card:nth-child(3) .fade-in-scale { animation-delay: 0.3s; }
+        .section-card:nth-child(4) .fade-in-scale { animation-delay: 0.4s; }
+        .footer {
+            text-align: center; padding: 30px; margin-top: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1));
+            border-radius: 30px; color: white; font-size: 1.1em;
+        }
+        .footer a { color: var(--ui-color-5); text-decoration: none; font-weight: bold; }
+        .footer a:hover { text-decoration: underline; }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon"><i class="fa-solid fa-microchip"></i></div>
+            <h1>Gemma 4 12B 徹底解説</h1>
+            <div class="subtitle">エンコーダーフリー・マルチモーダル・ローカルエージェントの実用的な統合エコシステム</div>
+            <div class="date">📅 2026年6月5日</div>
+        </div>
+
+        <!-- 1 -->
+        <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>①Gemma 4 12B の発表: ローカルAIの新時代</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-calendar-days"></i><span><span class="keyword-tag">2026年6月3日</span> にGoogleから正式発表</span></li>
+                    <li><i class="fa-solid fa-bullseye"></i><span><span class="highlight">ラップトップで動くエージェント用マルチモーダルモデル</span>として設計</span></li>
+                    <li><i class="fa-solid fa-note-sticky"></i><span>ベンチマークだけのモデルではなく、実用的なローカル実行に特化</span></li>
+                    <li><i class="fa-solid fa-download"></i><span>Gemma 4 ファミリー全体で <span class="keyword-tag">1億5000万ダウンロード</span> を突破</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 単なるチャットモデルじゃない！<br>エージェントワークフローをローカルで動かすための本気のモデル 💪</span>
+            </div>
+        </div>
+
+        <!-- 2 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>②エンコーダーフリー統合アーキテクチャ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-eye"></i><span>従来モデルは<span class="keyword-tag">画像エンコーダー</span>・<span class="keyword-tag">音声エンコーダー</span>が別々に存在</span></li>
+                    <li><i class="fa-solid fa-compress"></i><span>Gemma 4 12B はその分離を排除し、<span class="highlight">1つの統合モデルでテキスト・画像・音声を処理</span></span></li>
+                    <li><i class="fa-solid fa-image"></i><span>視覚: 大きなビジョンエンコーダーの代わりに<span class="keyword-tag">軽量埋め込みモジュール</span>を採用</span></li>
+                    <li><i class="fa-solid fa-volume-high"></i><span>音声: 別の音声エンコーダーを排除し、<span class="keyword-tag">生の音声信号を直接テキストトークン空間に射影</span></span></li>
+                    <li><i class="fa-solid fa-gauge-high"></i><span>レイテンシ・メモリ使用量・コンポーネント数の削減を実現</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i> 大きなモデル＋別の視覚モデル＋別の音声モデル → これを全部1つにまとめた！<br>シンプルで美しい設計 🎨</span>
+            </div>
+        </div>
+
+        <!-- 3 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-laptop fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;"></i>
+                <h2>③16GB VRAMで動く実用的なサイズ感</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-memory"></i><span><span class="highlight">VRAMまたは統合メモリ16GBの消費者向けラップトップで実行可能</span></span></li>
+                    <li><i class="fa-solid fa-apple-whole"></i><span>Apple Silicon Mac・ゲーミングラップトップ・デスクトップGPUに対応</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i><span>すべてが最大設定で快適に動くわけではないが、<span class="keyword-tag">実用的な運用ゾーン</span>に入る</span></li>
+                    <li><i class="fa-solid fa-ban"></i><span>「技術的にオープンだけど実質データセンターが必要」なフェイクではない</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-2">
+                <span class="handwritten"><i class="fa-solid fa-check fa-lg" style="color: var(--ui-color-5);"></i> 12Bというサイズが重要！<br>2B/4Bより強力で、26B/31Bより軽い<br>まさに<span class="keyword-tag">実用サイズの中央値</span> ✨</span>
+            </div>
+        </div>
+
+        <!-- 4 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 1.5s;"></i>
+                <h2>④MTPドラフターで応答速度を高速化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-forward-fast"></i><span><span class="highlight">Multi-Token Prediction ドラフター</span>を搭載してレイテンシを低減</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>ローカルモデルにとって<span class="keyword-tag">応答速度</span>は重要 — 遅いと日常使いされない</span></li>
+                    <li><i class="fa-solid fa-chart-line"></i><span>より大きな26B MoEモデルに近いベンチマーク性能を<span class="keyword-tag">半分以下のメモリ</span>で実現</span></li>
+                    <li><i class="fa-solid fa-scale-balanced"></i><span>ベンチマークは話半分に聞くべき — 実際の使用感が重要</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-person-running fa-lg" style="color: var(--ui-color-2);"></i> 技術的には高性能でも<br>応答が遅いと使われない…<br>だから<span class="keyword-tag">速度対策</span>が大事なの！🏃</span>
+            </div>
+        </div>
+        </div>
+
+        <!-- 5 -->
+        <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑤Gemma 4 ファミリーの中での立ち位置</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-minimize"></i><span>エッジモデル: <span class="keyword-tag">2B</span>・<span class="keyword-tag">4B</span> — 軽量だが能力は限定的</span></li>
+                    <li><i class="fa-solid fa-circle-dot"></i><span><span class="highlight">12B — 今回の主役。実用性と性能の最適なバランス</span></span></li>
+                    <li><i class="fa-solid fa-maximize"></i><span>大型モデル: <span class="keyword-tag">26B MoE</span>・<span class="keyword-tag">31B Dense</span> — 高性能だが実行ハードルが高い</span></li>
+                    <li><i class="fa-solid fa-trophy"></i><span>12Bは26B MoEに近い性能を<span class="keyword-tag">半分以下のメモリ</span>で実現すると主張</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> 12Bのポジショニングが絶妙！<br>小さすぎず大きすぎず<br>まさに<span class="keyword-tag">ゴールデンサイズ</span> 🌟</span>
+            </div>
+        </div>
+
+        <!-- 6 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-lock-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>⑥Apache 2.0 ライセンスで商用利用も自由</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-shield"></i><span><span class="highlight">Apache 2.0 ライセンス</span>でリリース — 開発者にとって朗報</span></li>
+                    <li><i class="fa-solid fa-building"></i><span>商用利用・改変・配布が自由に可能</span></li>
+                    <li><i class="fa-solid fa-code-branch"></i><span>奇妙な制限なしに<span class="keyword-tag">製品への組み込み</span>も安心</span></li>
+                    <li><i class="fa-solid fa-users-gear"></i><span>開発者が心配なくツールを構築できる環境が整っている</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-5);"></i> ライセンスがApache 2.0なのは大きい！<br>「オープン」と言いつつ制限が多いモデルも<br>あるからね… 😅</span>
+            </div>
+        </div>
+
+        <!-- 7 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑦対応プラットフォームとツール一覧</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-desktop"></i><span><span class="keyword-tag">LM Studio</span> — GUIで簡単にローカル実行</span></li>
+                    <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">Ollama</span> — `ollama run gemma:4-12b` で即起動</span></li>
+                    <li><i class="fa-solid fa-server"></i><span><span class="keyword-tag">LightRTLm</span> — OpenAI互換ローカルサーバー</span></li>
+                    <li><i class="fa-brands fa-apple"></i><span><span class="keyword-tag">AI Edge Gallery</span> — macOSアプリとしてのローカル体験</span></li>
+                    <li><i class="fa-brands fa-python"></i><span><span class="keyword-tag">Hugging Face</span>・<span class="keyword-tag">MLX</span>・<span class="keyword-tag">llama.cpp</span>・<span class="keyword-tag">vLLM</span> にも対応</span></li>
+                    <li><i class="fa-brands fa-google"></i><span><span class="keyword-tag">Google Cloud</span> でも利用可能</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-list-check fa-lg" style="color: var(--ui-color-2);"></i> 選択肢が多いのがいい！<br>自分の環境に合わせて<br>好きな方法を選べる 🎯</span>
+            </div>
+        </div>
+
+        <!-- 8 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-mobile-screen fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;"></i>
+                <h2>⑧Google AI Edge Gallery: 最も簡単な導入</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-download"></i><span><span class="keyword-tag">Android</span>・<span class="keyword-tag">iOS</span>・<span class="keyword-tag">macOS</span> 用アプリが利用可能</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span><span class="highlight">プライベート・オフライン・オンデバイス</span>のAI体験を提供</span></li>
+                    <li><i class="fa-solid fa-eye"></i><span>テキスト・視覚・音声・<span class="keyword-tag">マルチモーダル</span>ワークフローに対応</span></li>
+                    <li><i class="fa-solid fa-gauge"></i><span>ベンチマーク機能や<span class="keyword-tag">独自モデルのインポート</span>もサポート</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-1">
+                <span class="handwritten"><i class="fa-solid fa-hand-pointer fa-lg" style="color: var(--ui-color-2);"></i> 「重みファイルはここにあるから<br>あとは頑張って」じゃない！<br>ちゃんとアプリ体験を提供してる 💯</span>
+            </div>
+        </div>
+        </div>
+
+        <!-- 9 -->
+        <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑨ローカルコーディングデモ: Pythonの実行まで</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-code"></i><span>AI Edge Gallery上で<span class="highlight">Pythonコードの生成と実行</span>がローカルで可能</span></li>
+                    <li><i class="fa-solid fa-chart-bar"></i><span>デモ: 2つのテキストファイルから<span class="keyword-tag">名前データの比較チャート</span>を生成</span></li>
+                    <li><i class="fa-solid fa-lock"></i><span>安全な<span class="keyword-tag">サンドボックスPython実行ループ</span>でコードを実行</span></li>
+                    <li><i class="fa-solid fa-diagram-project"></i><span>科学的チャートのプロットまでチャット内で完結</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top variant-2">
+                <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> 「詩を書いて」じゃない！<br>ファイルを読んでコードを書いて<br>実行して結果を出力する — まさに<span class="keyword-tag">ローカルエージェント</span> 🔥</span>
+            </div>
+        </div>
+
+        <!-- 10 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>⑩LightRTLm: OpenAI互換のローカルサーバー</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-terminal"></i><span>Google公式の<span class="highlight">LightRTLm CLI</span>でローカルサーバーを起動</span></li>
+                    <li><i class="fa-solid fa-link"></i><span><span class="keyword-tag">OpenAI API互換</span>のHTTPサーバー — `localhost:9379/v1`</span></li>
+                    <li><i class="fa-solid fa-plug"></i><span>Hermes・OpenCode・OpenClaw・Aider・Continue などが<span class="highlight">そのまま接続可能</span></span></li>
+                    <li><i class="fa-brands fa-linux"></i><span><span class="keyword-tag">Linux</span>・<span class="keyword-tag">macOS</span>・<span class="keyword-tag">Windows</span>・<span class="keyword-tag">Raspberry Pi</span> に対応</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-plug-circle-check fa-lg" style="color: var(--ui-color-2);"></i> OpenAI互換エンドポイントがあれば<br>ツールの選択肢が一気に広がる！<br>これが<span class="keyword-tag">開発者にとって最も重要</span> 🔗</span>
+            </div>
+        </div>
+
+        <!-- 11 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;"></i>
+                <h2>⑪Hermes × Gemma 4 12B: エージェントワークフロー</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-gear"></i><span>Hermesの<span class="keyword-tag">カスタムOpenAI互換プロバイダー</span>としてGemma 4 12Bを設定</span></li>
+                    <li><i class="fa-solid fa-circle-dot"></i><span>Base URL: <span class="keyword-tag">http://localhost:9379/v1</span></span></li>
+                    <li><i class="fa-solid fa-key"></i><span>API Key: ダミー値でOK（ローカルサーバーは検証しない）</span></li>
+                    <li><i class="fa-solid fa-microchip"></i><span>Model: <span class="keyword-tag">gemma-4-12b-gpu</span> を指定</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>スキル・ツール・ローカルタスクが<span class="highlight">自分のマシン上で完結</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-5);"></i> これが一番ワクワクする構成！<br>AI Edge Galleryは体験用。<br>LightRTLm + Hermesは<span class="keyword-tag">実戦用</span> 🚀</span>
+            </div>
+        </div>
+
+        <!-- 12 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-brands fa-ox-gemini fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑫Ollama + Hermes: 最短のエージェント構築</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-play"></i><span>基本コマンド: <span class="keyword-tag">ollama run gemma:4</span></span></li>
+                    <li><i class="fa-solid fa-rocket"></i><span>Hermes起動: <span class="keyword-tag">ollama launch hermes --model gemma:4</span></span></li>
+                    <li><i class="fa-solid fa-bolt"></i><span>Ollama生態系にいる人には<span class="highlight">最も簡単なセットアップ</span></span></li>
+                    <li><i class="fa-solid fa-tag"></i><span>注意: <span class="keyword-tag">gemma-4-12b-mlx</span> タグはテキスト入力のみの場合あり</span></li>
+                    <li><i class="fa-solid fa-code-branch"></i><span>OpenClaw・OpenCode・Codeex・Claude Code なども<span class="keyword-tag">Ollama経由で起動</span>可能</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top variant-2">
+                <span class="handwritten"><i class="fa-solid fa-face-grin-stars fa-lg" style="color: var(--ui-color-2);"></i> Ollama入れてGemma引いて<br>Hermes起動 — これだけ！<br>数分でエージェント環境が完成 ⚡</span>
+            </div>
+        </div>
+        </div>
+
+        <!-- 13 -->
+        <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-compass fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>⑬3つのセットアップパス: 用途で選べる</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1"></i><span><span class="highlight">🟢 アプリパス</span>: AI Edge Gallery for macOS — 一番簡単・ビジュアル重視</span></li>
+                    <li><i class="fa-solid fa-2"></i><span><span class="highlight">🔵 サーバーパス</span>: LightRTLm serve — 開発者向け・ツール連携重視</span></li>
+                    <li><i class="fa-solid fa-3"></i><span><span class="highlight">🟣 エージェントパス</span>: Ollama + Hermes — エージェントワークフロー重視</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span>パス間の切り替えも自由 — <span class="keyword-tag">用途に応じて最適な方法を選択</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-route fa-lg" style="color: var(--ui-color-2);"></i> どれも1つの目的じゃない！<br>遊ぶなら①、開発するなら②、<br>エージェントを動かすなら③ 🎯</span>
+            </div>
+        </div>
+
+        <!-- 14 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑭プライバシーとコスト削減のメリット</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-user-shield"></i><span><span class="highlight">オフラインで完結するからプライバシーが保護される</span></span></li>
+                    <li><i class="fa-solid fa-coins"></i><span>ファイルを処理するたびに<span class="keyword-tag">トークン課金</span>が発生しない</span></li>
+                    <li><i class="fa-solid fa-graduation-cap"></i><span>学生やローカルツール好きな人にとって<span class="keyword-tag">大きなメリット</span></span></li>
+                    <li><i class="fa-solid fa-file-lines"></i><span>ローカルデータ分析・小さなスクリプト・ドキュメント処理に最適</span></li>
+                    <li><i class="fa-solid fa-wifi"></i><span>インターネット接続なしでも<span class="keyword-tag">完全にオフラインで動作</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-piggy-bank fa-lg" style="color: var(--ui-color-5);"></i> 小さなタスクのたびに<br>高いトークン代を払わなくていい！<br>お財布に優しいAI 💰</span>
+            </div>
+        </div>
+
+        <!-- 15 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-shuffle fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;"></i>
+                <h2>⑮ローカルとクラウドのハイブリッド運用</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-house-laptop"></i><span><span class="highlight">ローカル: プライバシーが気になるタスク・日常的な小タスク</span></span></li>
+                    <li><i class="fa-solid fa-cloud"></i><span><span class="highlight">クラウド: 難しいタスク・大規模コードベース・高度な処理</span></span></li>
+                    <li><i class="fa-solid fa-arrows-rotate"></i><span>Hermesは<span class="keyword-tag">プロバイダーの柔軟な切り替え</span>に優れている</span></li>
+                    <li><i class="fa-solid fa-lightbulb"></i><span>「ローカルで十分ならローカル、本気ならクラウド」が<span class="keyword-tag">理想のAI運用</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-2);"></i> 全部ローカルにする必要はない！<br>全部クラウドにする必要もない！<br><span class="keyword-tag">賢い使い分け</span>が正解 ⚖️</span>
+            </div>
+        </div>
+
+        <!-- 16 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>⑯ローカルモデルの限界と現実的な期待</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-phone-slash"></i><span>ツール呼び出しの精度は<span class="keyword-tag">クラウドモデルに劣る</span>場合がある</span></li>
+                    <li><i class="fa-solid fa-hourglass-half"></i><span>長期間のタスク（ロングホライズン）での安定性に課題あり</span></li>
+                    <li><i class="fa-solid fa-shuffle"></i><span>強力なクラウドモデルでは起きない<span class="keyword-tag">ランダムな失敗</span>が発生することがある</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass"></i><span>ベンチマークは<span class="highlight">実使用感を保証しない</span> — 過去のGemmaモデルの教訓</span></li>
+                    <li><i class="fa-solid fa-vial"></i><span>実際のコーディングとエージェントテストでの<span class="keyword-tag">実証が待たれる</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-1">
+                <span class="handwritten"><i class="fa-solid fa-face-meh fa-lg" style="color: var(--ui-color-2);"></i> 発表時はすごそうに見えるけど<br>実際に使うと「いまいち…」<br>というモデルも多いからね 😐</span>
+            </div>
+        </div>
+        </div>
+
+        <!-- 17 -->
+        <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-check-double fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑰Gemma 4 12B の強みまとめ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">統合マルチモーダル</span> — テキスト・画像・音声を1つのモデルで処理</span></li>
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">音声入力対応</span> — 中規模Gemmaモデルでは初めて</span></li>
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">16GBクラスのマシン</span>で実行可能な実用的なサイズ</span></li>
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">Apache 2.0</span> — 開発者に優しいライセンス</span></li>
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">AI Edge Gallery</span> — 一般ユーザー向けアプリ</span></li>
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">LightRTLm</span> — 開発者向けローカルサーバー</span></li>
+                    <li><i class="fa-solid fa-check"></i><span><span class="keyword-tag">エージェント統合</span> — OpenAI互換で各種ツールに接続</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-5);"></i> 単に「重みを公開しました」<br>ではなく<span class="keyword-tag">本物のエコシステム</span>を<br>提供しているのが素晴らしい！🏆</span>
+            </div>
+        </div>
+
+        <!-- 18 -->
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>⑱総評: ローカルAIに必要なのは「エコシステム」</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-star"></i><span>12Bは<span class="highlight">最大のモデルを目指すのではなく、最も実用的なローカルモデルを目指している</span></span></li>
+                    <li><i class="fa-solid fa-diagram-project"></i><span>アプリ・CLI・サーバー・<span class="keyword-tag">エージェント統合</span>の4つの導入パスを用意</span></li>
+                    <li><i class="fa-solid fa-circle-question"></i><span>真の評価は<span class="keyword-tag">実際の使用感</span>次第 — 発表を見るだけでは判断できない</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up"></i><span>方向性は非常に良い。実用性能が伴えば<span class="keyword-tag">最も有用なローカルモデルの一つ</span>に</span></li>
+                    <li><i class="fa-solid fa-road"></i><span>仮にモデルの性能が期待外れでも、<span class="highlight">AI Edgeスタック自体は正しい方向に進んでいる</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-2">
+                <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-5);"></i> ローカルAIに必要なのは<br>重みファイルだけじゃない！<br><span class="keyword-tag">アプリもCLIも統合も</span> —<br>それが本物のエコシステム 💚</span>
+            </div>
+        </div>
+        </div>
+
+        <div class="footer">
+            🎬 動画: <a href="https://www.youtube.com/watch?v=1uypL1oNChI" target="_blank">Gemma 4 12B — The Local Model Google Actually Built An Ecosystem For</a> | 📅 2026年6月5日作成
+        </div>
+    </div>
+</body>
+</html>

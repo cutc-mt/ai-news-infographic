@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLMをスキップするマルチエージェント設計 - 1000エージェントマラソン</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #0D7377;
+            --ui-color-2: #14A3A8;
+            --ui-color-3: #D6EFF0;
+            --ui-color-4: #0A4F52;
+            --ui-color-5: #FF6B6B;
+            --accent: #44D7B6;
+            --bg: #F0FFFE;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: var(--bg); font-family: 'Kaisei Decol', serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 50px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1), var(--ui-color-2)); border-radius: 30px; color: white; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%); animation: headerGlow 10s ease-in-out infinite; }
+        @keyframes headerGlow { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(30px, 20px); } }
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.4em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.3em; opacity: 0.95; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .section-card { flex: 1; min-width: 280px; max-width: 450px; background-color: white; border-radius: 20px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.08); position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(13,115,119,0.15); }
+        .section-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2), var(--accent)); }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.25em; color: var(--ui-color-4); margin-top: 10px; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 12px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.08); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+        .speech-bubble.variant-1 { background: #E8FFF5; border-color: var(--accent); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--accent) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .highlight { background: linear-gradient(transparent 60%, rgba(13,115,119,0.25) 60%); font-weight: bold; }
+        .fade-in-scale { opacity: 0; transform: scale(0.95); animation: fadeInScale 0.6s ease forwards; }
+        @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } }
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.15s; }
+        .section-card:nth-child(3) { animation-delay: 0.2s; }
+        .section-card:nth-child(4) { animation-delay: 0.25s; }
+        footer { text-align: center; padding: 30px 20px; margin-top: 30px; font-size: 14px; color: #777; border-top: 2px dashed #ccc; }
+        footer a { color: var(--ui-color-1); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon"><i class="fa-solid fa-robot fa-7x"></i></div>
+            <h1>LLMをスキップするマルチエージェント設計</h1>
+            <p class="subtitle">1000のAIエージェントがマラソンを走る — そのほとんどはAIを使わない</p>
+            <p class="date">📅 2026年6月7日 | Google Cloud Tech「Hands-On AI」</p>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;"></i>
+                <h2>①「Race Condition」プロジェクトとは</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-person-running fa-lg"></i><span><span class="keyword-tag">オープンソース</span>で<span class="highlight">1000のAIエージェントがマラソンを同時に走る</span>システム</span></li>
+                    <li><i class="fa-solid fa-eye fa-lg"></i><span>3D可視化でリアルタイムに全ランナーの動きを確認できる</span></li>
+                    <li><i class="fa-solid fa-map-location-dot fa-lg"></i><span>ラスベガスを舞台に<span class="highlight">26.2マイル（約42.2km）</span>のコースを構築</span></li>
+                    <li><i class="fa-brands fa-google fa-lg"></i><span>Google Cloud Techの<span class="keyword-tag">Annie</span>と、システム構築を主導した<span class="keyword-tag">Casey Vest</span>が解説</span></li>
+                    <li><i class="fa-solid fa-code-branch fa-lg"></i><span>Googleの<span class="keyword-tag">ADK（Agent Development Kit）</span>で構築された実プロジェクト</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 前回はアーキテクチャ構築、今回は<span class="highlight">「LLMをいつ使うか」</span>という核心に迫る！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;"></i>
+                <h2>②設計の核心: LLM vs 決定論的ロジック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-brain fa-lg"></i><span>最重要判断：<span class="highlight">「いつLLMに任せ、いつコードを書くか」</span></span></li>
+                    <li><i class="fa-solid fa-location-dot fa-lg"></i><span>この判断は<span class="keyword-tag">3つの場所</span>で行われた</span></li>
+                    <li><i class="fa-solid fa-map fa-lg"></i><span><span class="keyword-tag">① プランナー</span> — マラソンルートの計画</span></li>
+                    <li><i class="fa-solid fa-gamepad fa-lg"></i><span><span class="keyword-tag">② シミュレーター</span> — レースシミュレーションの実行</span></li>
+                    <li><i class="fa-solid fa-person-running fa-lg"></i><span><span class="keyword-tag">③ ランナー</span> — 個々のランナーの行動</span></li>
+                    <li><i class="fa-solid fa-circle-check fa-lg"></i><span>共通パターン：<span class="highlight">LLMが得意なところで使い、そうでないところではスキップ</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i> フルLLMがベストではない！Googleの面接でも同じ結論が出るらしい...</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-map-marked-alt fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;"></i>
+                <h2>③マラソンルート計画の制約</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-ruler fa-lg"></i><span>正確に<span class="highlight">26.2188マイル</span>のコースを作らなければならない</span></li>
+                    <li><i class="fa-solid fa-road fa-lg"></i><span>市の<span class="keyword-tag">承認済み道路ネットワーク</span>上でのみ構築</span></li>
+                    <li><i class="fa-solid fa-building fa-lg"></i><span>ラスベガスの全道路をモデリングできない — 一部データのみ使用可能</span></li>
+                    <li><i class="fa-solid fa-car fa-lg"></i><span>Google Mapsの<span class="highlight">車ルート</span>は一方通行を考慮して不適切</span></li>
+                    <li><i class="fa-solid fa-person-walking fa-lg"></i><span>歩行ルートは<span class="highlight">橋や建物の中を通る</span>問題があった</span></li>
+                    <li><i class="fa-solid fa-location-dot fa-lg"></i><span>GeoJSON形式で道路の<span class="keyword-tag">座標データ</span>を管理</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i> マラソンは道路を閉鎖できるから一方通行は関係ない！Google Mapsは全く使えなかった</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>④最短経路はNP困難問題</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-atom fa-lg"></i><span>ルート構築は<span class="highlight">NP困難問題</span> — CSで最も難しい問題の一つ</span></li>
+                    <li><i class="fa-solid fa-brain fa-lg"></i><span>LLMだと<span class="keyword-tag">ノイズが多く</span>、コンテキストの維持が困難</span></li>
+                    <li><i class="fa-solid fa-calculator fa-lg"></i><span>制約が増えるほどLLMは混乱し精度が劇的に低下</span></li>
+                    <li><i class="fa-solid fa-vial fa-lg"></i><span>決定論的なら<span class="keyword-tag">ユニットテスト可能</span>で結果が常に正確</span></li>
+                    <li><i class="fa-solid fa-book fa-lg"></i><span>数十年の<span class="keyword-tag">既存のCSアルゴリズム</span>を使うのが正解</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--ui-color-5);"></i> 「これがGeminiを使わず決定論的にした最大の理由！全部CSのアルゴリズムだから」— Casey</span>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-route fa-5x" style="color: var(--accent); animation: fa-bounce 2.5s infinite;"></i>
+                <h2>⑤採用アルゴリズム: Spine &amp; Sprout</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1 fa-lg"></i><span><span class="keyword-tag">フェーズ1: Dijkstra法</span> — Haversine距離で加重された辺でランドマークを接続</span></li>
+                    <li><i class="fa-solid fa-2 fa-lg"></i><span><span class="keyword-tag">フェーズ2: 蛇行ウェイポイント</span> — 経路を蛇行パターンで拡張</span></li>
+                    <li><i class="fa-solid fa-3 fa-lg"></i><span><span class="keyword-tag">フェーズ3: トリミング</span> — 最終セグメントを調整して<span class="highlight">正確に26.2188マイル</span>に</span></li>
+                    <li><i class="fa-solid fa-check-double fa-lg"></i><span>処理は<span class="highlight">完全に決定論的</span> — 実行のたびに同じ結果</span></li>
+                    <li><i class="fa-solid fa-globe fa-lg"></i><span><span class="keyword-tag">Haversine距離</span>は地球表面の球面距離を計算する公式</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-code fa-lg" style="color: var(--ui-color-2);"></i> 「複雑な数学だからこそ、決定論的にしてユニットテストできることが重要」— Casey</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-magnifying-glass fa-5x" style="color: var(--ui-color-1); animation: fa-spin 3s infinite;"></i>
+                <h2>⑥AIはルート構築で使ったか？ — 設計時のみ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-wand-magic-sparkles fa-lg"></i><span>LLMは<span class="highlight">アルゴリズムの選定</span>に活用 — どのアルゴリズムを使うべきかの調査</span></li>
+                    <li><i class="fa-brands fa-google fa-lg"></i><span><span class="keyword-tag">Google AI Studio</span>を使用 — 高速で使いやすかった</span></li>
+                    <li><i class="fa-solid fa-code fa-lg"></i><span><span class="keyword-tag">コード実行</span>を有効化 — GeminiがPythonを書いて動かせる</span></li>
+                    <li><i class="fa-solid fa-search fa-lg"></i><span><span class="keyword-tag">Google検索</span>で最新ルーティングアルゴリズムを調査</span></li>
+                    <li><i class="fa-solid fa-file-code fa-lg"></i><span>GeoJSONと制約条件をプロンプトに渡して出発点を生成</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--accent);"></i> AI Studioの成果物をGemini CLIに渡して「ユニットテスト可能にして、深いコードレビューして」と指示！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrows-spin fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑦研究→決定論的コードへの変換フロー</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1 fa-lg"></i><span>AI Studioで<span class="keyword-tag">アルゴリズム調査 + プロトタイプ生成</span></span></li>
+                    <li><i class="fa-solid fa-2 fa-lg"></i><span>Gemini CLIで<span class="highlight">制約適用 + ユニットテスト化</span></span></li>
+                    <li><i class="fa-solid fa-3 fa-lg"></i><span><span class="keyword-tag">深いコードレビュー</span>で品質を向上</span></li>
+                    <li><i class="fa-solid fa-rotate fa-lg"></i><span>このプロセスを<span class="highlight">何度も反復</span>して完成度を高めた</span></li>
+                    <li><i class="fa-solid fa-users fa-lg"></i><span>非開発者もAI Studioで<span class="keyword-tag">アルゴリズム調査</span>に参加できた</span></li>
+                    <li><i class="fa-solid fa-lightbulb fa-lg"></i><span>「次からこの方法でリサーチする！」— Annieも大賛成</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> <span class="highlight">「LLMは設計時」</span>で<span class="highlight">「実行時は完全に決定論的」</span>というパターン！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gamepad fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 1.5s infinite;"></i>
+                <h2>⑧シミュレーターの内部設計</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-server fa-lg"></i><span><span class="keyword-tag">ゲーム開発由来のティック</span>を活用 — 数ミリ秒ごとに状態計算</span></li>
+                    <li><i class="fa-solid fa-clock fa-lg"></i><span>毎ティックで<span class="highlight">システム全体の状態</span>を追跡</span></li>
+                    <li><i class="fa-solid fa-gamepad fa-lg"></i><span>シミュレーター＝ゲームサーバー、ランナー＝ゲームプレイヤー</span></li>
+                    <li><i class="fa-solid fa-location-crosshairs fa-lg"></i><span>全ランナーの<span class="keyword-tag">位置・状態・プロパティ</span>を継続監視</span></li>
+                    <li><i class="fa-solid fa-sitemap fa-lg"></i><span>ADKの<span class="keyword-tag">ワークフローエージェント</span> — ループ、シーケンシャル構成</span></li>
+                    <li><i class="fa-solid fa-layer-group fa-lg"></i><span>マルチエージェントで<span class="highlight">サブエージェント</span>を含む構成</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top variant-1">
+                <span class="handwritten"><i class="fa-solid fa-chess-board fa-lg" style="color: var(--accent);"></i> 全エージェントの中で最も<span class="highlight">洗練された設計</span>！ゲームエンジンのアプローチを採用</span>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑨秘密兵器: before_model コールバック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-shield-halved fa-lg"></i><span>ADKの<span class="highlight">before_model コールバック</span>が全ての呼び出しをインターセプト</span></li>
+                    <li><i class="fa-solid fa-ban fa-lg"></i><span>モデルは<span class="keyword-tag">作成に必須</span>だが<span class="highlight">一度も呼ばれない</span></span></li>
+                    <li><i class="fa-solid fa-gears fa-lg"></i><span>代わりに<span class="keyword-tag">決定論的ツール呼び出し</span>を直接返す</span></li>
+                    <li><i class="fa-solid fa-list-check fa-lg"></i><span><span class="keyword-tag">Pre-race</span>: 環境セットアップ — ツール呼び出しが固定</span></li>
+                    <li><i class="fa-solid fa-forward fa-lg"></i><span><span class="keyword-tag">Tick</span>: 「ティックを進める」→「レース完了確認」の2呼び出しのみ</span></li>
+                    <li><i class="fa-solid fa-clock fa-lg"></i><span>毎回同じ処理ならLLM不要 — <span class="highlight">でもエージェントの恩恵は維持したい</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-face-grin-stars fa-lg" style="color: var(--ui-color-5);"></i> 「モデルは必要だけど一度も呼ばない」— これぞハイブリッド設計の真骨頂！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-chart-pie fa-5x" style="color: var(--ui-color-2); animation: fa-spin 4s infinite;"></i>
+                <h2>⑩LLMスキップの3大メリット</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-dollar-sign fa-lg"></i><span><span class="highlight">💰 コスト削減</span> — 不要なAPI呼び出し排除でトークン消費を大幅抑制</span></li>
+                    <li><i class="fa-solid fa-gauge-high fa-lg"></i><span><span class="highlight">⚡ レイテンシ低減</span> — LLM応答待ちがなくなりミリ秒単位で実行</span></li>
+                    <li><i class="fa-solid fa-shield-check fa-lg"></i><span><span class="highlight">🔒 信頼性保証</span> — 決定論的処理は常に同じ結果を返す</span></li>
+                    <li><i class="fa-solid fa-tower-broadcast fa-lg"></i><span><span class="keyword-tag">ライフサイクル管理</span>・コールバック・テレメトリーは維持</span></li>
+                    <li><i class="fa-solid fa-eye fa-lg"></i><span>ショートサーキットで自前実装すると<span class="highlight">可視性が失われる</span>ので注意</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i> コールバック方式ならADKの<span class="highlight">全恩恵を維持</span>したままLLMだけスキップできる！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-person-running fa-5x" style="color: var(--accent); animation: fa-bounce 1.5s infinite;"></i>
+                <h2>⑪オートパイロット: 1000人をミリ秒で</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-expand fa-lg"></i><span><span class="keyword-tag">AutopilotRunner</span> — RunnerAgentを継承して<span class="highlight">LLMをヒューリスティクスに置換</span></span></li>
+                    <li><i class="fa-solid fa-database fa-lg"></i><span>行動データは<span class="keyword-tag">Gemini Deep Research</span>から収集したヒューリスティクス</span></li>
+                    <li><i class="fa-solid fa-code fa-lg"></i><span>全て<span class="highlight">コードベース</span>の決定論的処理 — LLMは呼ばれない</span></li>
+                    <li><i class="fa-solid fa-gauge-high fa-lg"></i><span><span class="keyword-tag">ミリ秒単位</span>で実行 — 1000人の同時動作を実現</span></li>
+                    <li><i class="fa-solid fa-server fa-lg"></i><span>バックエンドは<span class="highlight">最大10,000セッション</span>をサポート</span></li>
+                    <li><i class="fa-solid fa-display fa-lg"></i><span>フロントエンドは<span class="keyword-tag">Chrome制約</span>で1000表示が限界</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i> 「AIが決定し、コードが実行する」ランナーを増やしても<span class="highlight">トークンは増えない</span>！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-coins fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑫トークン使用量: 約35万の現実</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-hashtag fa-lg"></i><span><span class="keyword-tag">Gemini 3 Flash Preview</span>で<span class="highlight">約350,000トークン</span>使用</span></li>
+                    <li><i class="fa-solid fa-calculator fa-lg"></i><span>ルート計算の<span class="highlight">数学的処理からのトークンはゼロ</span></span></li>
+                    <li><i class="fa-solid fa-brain fa-lg"></i><span>トークンは<span class="keyword-tag">AIの判断</span>に使用：ランドマーク選定、タイミング確認、安全性評価</span></li>
+                    <li><i class="fa-solid fa-clock fa-lg"></i><span>モデルは<span class="highlight">レース前に一度だけ推論</span>し、後は1000人が自律動作</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-down fa-lg"></i><span>ランナー追加でも<span class="highlight">トークンは増えない</span> — スケーラビリティの秘密</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-2);"></i> 「AIは判断し、コードが実行する」明確な分離がコスト効率最大化の鍵</span>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑬テレメトリーダッシュボード</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-desktop fa-lg"></i><span>組み込みの<span class="keyword-tag">開発者ツールUI</span> — エージェントのライフサイクルを可視化</span></li>
+                    <li><i class="fa-solid fa-table-list fa-lg"></i><span>各行が<span class="highlight">リアルなADKイベント</span> — starting/finished/model start等</span></li>
+                    <li><i class="fa-solid fa-fingerprint fa-lg"></i><span><span class="keyword-tag">セッションID</span>でグループ化しメッセージ順序を追跡</span></li>
+                    <li><i class="fa-solid fa-tower-broadcast fa-lg"></i><span><span class="highlight">Pub/Sub</span> → <span class="keyword-tag">WebSocket</span>でフロントエンドにリアルタイム配信</span></li>
+                    <li><i class="fa-solid fa-gauge fa-lg"></i><span>レイテンシ、総イベント数、<span class="keyword-tag">総トークン数</span>をリアルタイム確認</span></li>
+                    <li><i class="fa-solid fa-bug fa-lg"></i><span>67ターン目など各ランナーの<span class="keyword-tag">実行状況</span>をデバッグ可能</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-satellite-dish fa-lg" style="color: var(--accent);"></i> Pub/Sub→WebSocketで1000セッションを<span class="highlight">リアルタイムストリーミング</span>！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-cloud fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s infinite;"></i>
+                <h2>⑭Cloud Runでのスケーリング: 50インスタンス</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-brands fa-google fa-lg"></i><span><span class="keyword-tag">Google Cloud Run</span>上でステートレスに実行</span></li>
+                    <li><i class="fa-solid fa-server fa-lg"></i><span>ランナー用に<span class="highlight">50+のサーバープロセス</span>が稼働</span></li>
+                    <li><i class="fa-solid fa-circle-nodes fa-lg"></i><span>ロードバランサーが<span class="keyword-tag">どのインスタンスに割り当てるかは不定</span></span></li>
+                    <li><i class="fa-solid fa-database fa-lg"></i><span>最大の課題：<span class="highlight">セッション状態をどこに保存するか？</span></span></li>
+                    <li><i class="fa-solid fa-link fa-lg"></i><span>50の<span class="keyword-tag">ステートレスインスタンス</span>間で状態を共有する必要</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation fa-lg"></i><span>これが<span class="highlight">最初に壊れた部分</span> — スケール時の状態管理は最難関</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-explosion fa-lg" style="color: var(--ui-color-5);"></i> スケールを上げたら真っ先に壊れたのは状態共有！誰もが直面する壁</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-hard-drive fa-5x" style="color: var(--ui-color-4); animation: fa-flip 3s infinite;"></i>
+                <h2>⑮セッションストア: 3つの選択肢の問題点</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-memory fa-lg"></i><span><span class="keyword-tag">① インメモリ</span> — <span class="highlight">複数インスタンスで使えない</span>（状態がローカルに閉じる）</span></li>
+                    <li><i class="fa-solid fa-database fa-lg"></i><span><span class="keyword-tag">② AlloyDB/Cloud SQL</span> — SQLオーバーヘッドが<span class="highlight">遅すぎてボトルネック</span></span></li>
+                    <li><i class="fa-solid fa-robot fa-lg"></i><span><span class="keyword-tag">③ Agent Platform</span> — Cloud RunではなくAgent Runtimeが必要で不適合</span></li>
+                    <li><i class="fa-solid fa-xmark fa-lg"></i><span>どのデフォルトオプションも<span class="highlight">要件を満たせなかった</span></span></li>
+                    <li><i class="fa-solid fa-lightbulb fa-lg"></i><span>既に<span class="keyword-tag">Memory Store（Redis）</span>をアーキテクチャで使用中だった</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--ui-color-1);"></i> 「インメモリは×、DBは遅い、Platformは使えない...どうする？！ 」</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt-lightning fa-5x" style="color: var(--accent); animation: fa-bounce 1.5s infinite;"></i>
+                <h2>⑯解決策: Redis + コミュニティの力</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-brands fa-github fa-lg"></i><span><span class="highlight">Google ADK Community</span>リポジトリに<span class="keyword-tag">コミュニティ製Redis Session Service</span>を発見！</span></li>
+                    <li><i class="fa-solid fa-wrench fa-lg"></i><span>サブクラス化して<span class="highlight">イベントプルーニング + ブロブ成長防止</span>を追加</span></li>
+                    <li><i class="fa-solid fa-gauge-high fa-lg"></i><span><span class="keyword-tag">極低レイテンシ</span>と<span class="highlight">スケーラブルなセッション管理</span>が実現</span></li>
+                    <li><i class="fa-solid fa-paper-plane fa-lg"></i><span>1000セッションに<span class="keyword-tag">Pub/Sub</span>で一斉送信 → 全レスポンスを高速収集</span></li>
+                    <li><i class="fa-solid fa-heart fa-lg"></i><span>コミュニティコントリビューターに大感謝！<span class="highlight">オープンソースの力で壁を突破</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-2);"></i> ADK CommunityはGoogleがメンテナンス。OSSエコシステムが実プロジェクトを支える！</span>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Row 5 (last 2 cards) -->
+        <div class="section-layout">
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-folder-open fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑰AIスキル付きオープンソース</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-graduation-cap fa-lg"></i><span>プロジェクトに<span class="keyword-tag">AIハーネス用スキル</span>が同梱されている</span></li>
+                    <li><i class="fa-solid fa-compass fa-lg"></i><span><span class="keyword-tag">"Exploring the Codebase"スキル</span> — AIにコード構造を解説</span></li>
+                    <li><i class="fa-solid fa-terminal fa-lg"></i><span>Gemini CLIやCursor等でコードベースを<span class="highlight">直接質問</span>できる</span></li>
+                    <li><i class="fa-solid fa-code fa-lg"></i><span>例：「極低レイテンシのRedisセッションサービスはどう実現した？」</span></li>
+                    <li><i class="fa-brands fa-github fa-lg"></i><span>レポは<span class="keyword-tag">GitHub</span>で完全公開 — 誰でも探索可能</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i> AIコーディングツールに<span class="highlight">スキルを読み込ませる</span>だけで、
+                巨大コードベースでも迷子にならない！</span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑱学びとベストプラクティスまとめ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1 fa-lg"></i><span><span class="highlight">「LLMが得意なこと」</span>と<span class="keyword-tag">「決定論的コードが得意なこと」</span>を明確に分ける</span></li>
+                    <li><i class="fa-solid fa-2 fa-lg"></i><span>LLMは<span class="highlight">設計・調査時に使い、実行時はスキップする</span></span></li>
+                    <li><i class="fa-solid fa-3 fa-lg"></i><span>ADKの<span class="keyword-tag">before_model コールバック</span>でハイブリッド設計を実現</span></li>
+                    <li><i class="fa-solid fa-4 fa-lg"></i><span>エージェントの<span class="highlight">テレメトリー・可視性</span>を犠牲にしない</span></li>
+                    <li><i class="fa-solid fa-5 fa-lg"></i><span>スケーリングでは<span class="keyword-tag">セッション状態の保存先</span>が最難関</span></li>
+                    <li><i class="fa-solid fa-6 fa-lg"></i><span><span class="highlight">コミュニティリソース</span>を活用 — Google ADK Communityは必見</span></li>
+                    <li><i class="fa-solid fa-circle-check fa-lg"></i><span>「<span class="highlight">AIが決定し、コードが実行する</span>」がマルチエージェント設計の最適解</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-5);"></i> 1000エージェントが走るマラソンで学んだ<span class="highlight">本番スケールの知見</span>を
+                全てオープンソースで共有！これは必見です！</span>
+            </div>
+        </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://youtu.be/Fzd0BWMH65s" target="_blank">Google Cloud Tech</a> | 📅 2026年6月7日</p>
+            <p style="margin-top: 5px;"> Hands-On AI「How to design a multi-agent system that skips the LLM」| Casey Vest &amp; Annie</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIエージェントのループ設計 完全ガイド | インフォグラフィック</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --color-1: #6C3FC5;
+    --color-2: #4A1F8E;
+    --color-3: #EDE4F9;
+    --color-4: #1A0A3E;
+    --color-5: #D4BBF0;
+    --color-accent: #FF6B35;
+    --color-highlight: #FF9F1C;
+    --bg-canvas: #F9F5FF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg-canvas);
+    color: #333;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 40px 20px 30px;
+    background: linear-gradient(135deg, var(--color-2), var(--color-1), #9B6FE6);
+    border-radius: 24px;
+    margin-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+    color: #fff;
+  }
+
+  .header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    animation: rotate-bg 20s linear infinite;
+  }
+
+  @keyframes rotate-bg {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .header-icon {
+    font-size: 5rem;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+    animation: fa-bounce 3s ease-in-out infinite;
+  }
+
+  .header h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 8px;
+    position: relative;
+    z-index: 1;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  }
+
+  .header .subtitle {
+    font-size: 1.1rem;
+    opacity: 0.9;
+    position: relative;
+    z-index: 1;
+    font-weight: 300;
+  }
+
+  .header .date {
+    font-size: 0.9rem;
+    margin-top: 10px;
+    opacity: 0.8;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Grid Layout */
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+
+  /* Card */
+  .card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 450px;
+    background: #fff;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+  }
+
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 5px;
+    background: linear-gradient(90deg, var(--color-1), var(--color-accent));
+  }
+
+  .card-icon {
+    text-align: center;
+    margin: 10px 0 15px;
+  }
+
+  .card-icon i {
+    font-size: 3.5rem;
+    color: var(--color-1);
+    animation: fa-beat-fade 3s ease-in-out infinite;
+  }
+
+  .card h2 {
+    font-size: 1.2rem;
+    color: var(--color-2);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--color-3);
+    line-height: 1.4;
+  }
+
+  .card p {
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: #444;
+    margin-bottom: 8px;
+  }
+
+  .highlight {
+    background: linear-gradient(120deg, var(--color-3), var(--color-5));
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 700;
+    color: var(--color-4);
+  }
+
+  /* Speech Bubbles */
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--color-1);
+    border-radius: 20px;
+    padding: 12px 16px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: #333;
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+
+  .speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--color-accent);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after {
+    border-color: var(--color-accent) transparent;
+  }
+
+  .speech-bubble.variant-2 {
+    background: #FFE9E9;
+    border-color: #E05555;
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after {
+    border-color: #E05555 transparent;
+  }
+
+  /* Keyword Tags */
+  .keyword-tag {
+    background: var(--color-3);
+    color: var(--color-4);
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    display: inline-block;
+    margin: 2px 3px;
+    font-size: 0.85rem;
+  }
+
+  .keyword-tag.accent {
+    background: #FFF3E0;
+    color: #E65100;
+  }
+
+  .keyword-tag.highlight-tag {
+    background: linear-gradient(120deg, var(--color-accent), var(--color-highlight));
+    color: #fff;
+  }
+
+  /* Lists */
+  .info-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0;
+  }
+
+  .info-list li {
+    padding: 6px 0;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .info-list li i {
+    color: var(--color-1);
+    min-width: 18px;
+    margin-top: 4px;
+    font-size: 0.85rem;
+  }
+
+  /* Code Preview */
+  .code-preview {
+    background: #1E1E2E;
+    color: #CDD6F4;
+    padding: 12px;
+    border-radius: 10px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.8rem;
+    margin: 10px 0;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+
+  .code-preview .keyword { color: #CBA6F7; }
+  .code-preview .string { color: #A6E3A1; }
+  .code-preview .comment { color: #6C7086; }
+  .code-preview .func { color: #89B4FA; }
+
+  /* Number Badge */
+  .num-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(135deg, var(--color-1), var(--color-2));
+    color: #fff;
+    border-radius: 50%;
+    font-weight: 800;
+    font-size: 0.9rem;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+
+  /* Arrow Connector */
+  .arrow-connector {
+    text-align: center;
+    color: var(--color-1);
+    font-size: 1.5rem;
+    margin: 5px 0;
+  }
+
+  /* Section Divider */
+  .section-divider {
+    width: 100%;
+    text-align: center;
+    padding: 15px;
+    margin: 10px 0;
+    position: relative;
+  }
+
+  .section-divider h3 {
+    font-size: 1.3rem;
+    color: var(--color-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #fff;
+    padding: 8px 24px;
+    border-radius: 30px;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  }
+
+  .section-divider h3 i {
+    color: var(--color-accent);
+  }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 30px 20px;
+    margin-top: 30px;
+    color: #666;
+    font-size: 0.9rem;
+    line-height: 1.8;
+  }
+
+  footer a {
+    color: var(--color-1);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  footer a:hover {
+    text-decoration: underline;
+  }
+
+  /* Animations */
+  .fade-in-scale {
+    animation: fadeInScale 0.6s ease-out forwards;
+    opacity: 0;
+  }
+
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .fade-in-scale:nth-child(1) { animation-delay: 0.1s; }
+  .fade-in-scale:nth-child(2) { animation-delay: 0.15s; }
+  .fade-in-scale:nth-child(3) { animation-delay: 0.2s; }
+  .fade-in-scale:nth-child(4) { animation-delay: 0.25s; }
+  .fade-in-scale:nth-child(5) { animation-delay: 0.3s; }
+  .fade-in-scale:nth-child(6) { animation-delay: 0.35s; }
+  .fade-in-scale:nth-child(7) { animation-delay: 0.4s; }
+  .fade-in-scale:nth-child(8) { animation-delay: 0.45s; }
+  .fade-in-scale:nth-child(9) { animation-delay: 0.5s; }
+  .fade-in-scale:nth-child(10) { animation-delay: 0.55s; }
+  .fade-in-scale:nth-child(11) { animation-delay: 0.6s; }
+  .fade-in-scale:nth-child(12) { animation-delay: 0.65s; }
+  .fade-in-scale:nth-child(13) { animation-delay: 0.7s; }
+  .fade-in-scale:nth-child(14) { animation-delay: 0.75s; }
+  .fade-in-scale:nth-child(15) { animation-delay: 0.8s; }
+  .fade-in-scale:nth-child(16) { animation-delay: 0.85s; }
+  .fade-in-scale:nth-child(17) { animation-delay: 0.9s; }
+  .fade-in-scale:nth-child(18) { animation-delay: 0.95s; }
+
+  /* Responsive */
+  @media (max-width: 1600px) {
+    .card { min-width: 280px; }
+  }
+
+  @media (max-width: 1200px) {
+    .card { min-width: 320px; }
+  }
+
+  @media (max-width: 900px) {
+    .card { min-width: 380px; }
+  }
+
+  @media (max-width: 768px) {
+    .grid { flex-direction: column; }
+    .card { width: 100%; min-width: auto; }
+    .header h1 { font-size: 1.5rem; }
+  }
+
+  /* Timeline */
+  .timeline-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 10px 0;
+    padding: 8px 0;
+  }
+
+  .timeline-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--color-1);
+    flex-shrink: 0;
+    margin-top: 6px;
+    position: relative;
+  }
+
+  .timeline-dot::after {
+    content: '';
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 3px;
+    height: 30px;
+    background: var(--color-3);
+  }
+
+  .timeline-item:last-child .timeline-dot::after {
+    display: none;
+  }
+
+  .timeline-content {
+    flex: 1;
+  }
+
+  .timeline-year {
+    font-weight: 800;
+    color: var(--color-2);
+    font-size: 1rem;
+  }
+
+  .timeline-desc {
+    font-size: 0.85rem;
+    color: #555;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-icon">
+      <i class="fas fa-sync-alt"></i>
+    </div>
+    <h1>AIエージェントは「ループ設計」の時代</h1>
+    <div class="subtitle">完全自律で回すためのループ設計の4ポイントと5つのテクニック</div>
+    <div class="date"><i class="far fa-calendar-alt"></i> 2026年6月9日</div>
+  </div>
+
+  <!-- Card Grid -->
+  <div class="grid">
+
+    <!-- Card 1: オープニング -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-play-circle" style="animation: fa-bounce 2s infinite;"></i>
+      </div>
+      <h2>①オープニング: ループ設計とは何か</h2>
+      <p>2026年6月、AI界隈で<span class="highlight">「エージェントのループ設計」</span>が大きな話題になっている。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-user"></i> OpenClawを開発した<span class="keyword-tag">Peter Steinberger</span>さんが提唱</li>
+        <li><i class="fas fa-lightbulb"></i> 「エージェントにプロンプトを与えるのではなく、<span class="highlight">ループそのものを設計する</span>べきだ」と主張</li>
+        <li><i class="fas fa-fire"></i> Claude Codeの中の人もインタビューで言及し、さらに注目が集まっている</li>
+      </ul>
+      <div class="speech-bubble">
+        <i class="fas fa-quote-left" style="color: var(--color-accent);"></i>
+        これからはプロンプトではなく、ループを設計する時代だ！
+      </div>
+    </div>
+
+    <!-- Card 2: エージェント進化の歴史 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-history" style="animation: fa-beat-fade 3s infinite;"></i>
+      </div>
+      <h2>②エージェント進化の歴史: 3世代の変遷</h2>
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-year">第1世代（2023年）</div>
+          <div class="timeline-desc">人間が手でコードを書くのが普通だった時代</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <div class="timeline-year">第2世代（2024年）</div>
+          <div class="timeline-desc"><span class="keyword-tag">タブ補完</span>が中心。CursorのComposer β版が登場し「これヤバい」と話題に</div>
+        </div>
+      </div>
+      <div class="timeline-item">
+        <div class="timeline-dot" style="background: var(--color-accent);"></div>
+        <div class="timeline-content">
+          <div class="timeline-year">第3世代（2026年）</div>
+          <div class="timeline-desc"><span class="keyword-tag accent">ループ設計の時代</span>。エージェントにタスクを任せ、ループで回すのが当たり前に</div>
+        </div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        Opus 4.5が分岐点だったと感じる — モデルの自立性が急激に高まった
+      </div>
+    </div>
+
+    <!-- Card 3: なぜループ設計が重要なのか -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-question-circle" style="animation: fa-flip 3s infinite;"></i>
+      </div>
+      <h2>③なぜ今ループ設計が重要なのか</h2>
+      <p>より完全自律に向けて進化していく中で、<span class="highlight">振り返りとフィードバック</span>が不可欠になっている。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-expand"></i> <span class="keyword-tag">コンテキストウィンドウ</span>が伸び、より多くの情報を保持できるように</li>
+        <li><i class="fas fa-bullseye"></i> 指示追従性が向上し、エージェントが意図を正確に理解できるように</li>
+        <li><i class="fas fa-brain"></i> ロングコンテキストでも<span class="highlight">情報を失いづらくなった</span></li>
+        <li><i class="fas fa-rocket"></i> モデルの自律性が高まり、ループを回すだけで良い仕事ができるように</li>
+      </ul>
+    </div>
+
+    <!-- Card 4: ループ設計の4ポイント概要 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-cogs" style="animation: fa-spin 4s linear infinite;"></i>
+      </div>
+      <h2>④ループ設計の4つのポイント: 概要</h2>
+      <p>ループを設計する上で押さえるべき<span class="highlight">4つの要素</span>がある。</p>
+      <ul class="info-list">
+        <li><span class="num-badge">1</span> <strong>ゴールの明確化</strong> — 計測できる形で目標を設定</li>
+        <li><span class="num-badge">2</span> <strong>エージェントの割り当て</strong> — スキルやサブエージェントを定義</li>
+        <li><span class="num-badge">3</span> <strong>進捗の確認</strong> — Todoリストやタスク管理で進行を把握</li>
+        <li><span class="num-badge">4</span> <strong>継続条件の判定</strong> — 合格基準を満たすまでリトライ</li>
+      </ul>
+      <div class="speech-bubble top">
+        <i class="fas fa-exclamation-triangle" style="color: var(--color-accent);"></i>
+        変なゴールや変な検証機を作ると、意図からずれていくので注意！
+      </div>
+    </div>
+
+    <!-- Card 5: ポイント1 - ゴールの明確化 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-bullseye" style="animation: fa-bounce 2.5s infinite;"></i>
+      </div>
+      <h2>⑤ポイント1: ゴールを明確にする</h2>
+      <p>ループ設計の最初のステップは、<span class="highlight">計測できる形でゴールを設定</span>すること。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-check-circle"></i> LLMジャッジで合格を判定する方法も有効</li>
+        <li><i class="fas fa-users"></i> <span class="keyword-tag">3体のLLM</span>が合格と言うまで繰り返す手法も存在</li>
+        <li><i class="fas fa-chart-bar"></i> ゴール条件の質が、<span class="highlight">成果物の品質に直結</span>する</li>
+      </ul>
+      <div class="code-preview">
+        <span class="comment">// ゴール設定の例</span>
+        <span class="keyword">goal</span>: {
+          <span class="string">"quality_score"</span>: <span class="func">>= 90</span>,
+          <span class="string">"llm_judge"</span>: <span class="func">3体中3体合格</span>,
+          <span class="string">"max_retries"</span>: <span class="func">5</span>
+        }
+      </div>
+    </div>
+
+    <!-- Card 6: ポイント2 - エージェントの割り当て -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-users-cog" style="animation: fa-beat-fade 2s infinite;"></i>
+      </div>
+      <h2>⑥ポイント2: エージェントを割り当てる</h2>
+      <p>目標に対して、<span class="highlight">どのエージェントに何を実行させるか</span>を定義する。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-puzzle-piece"></i> <span class="keyword-tag">スキル定義</span> — エージェントが実行できる機能を明確化</li>
+        <li><i class="fas fa-project-diagram"></i> <span class="keyword-tag">サブエージェント</span> — タスクを分割して複数のエージェントに割り当て</li>
+        <li><i class="fas fa-exchange-alt"></i> エージェント間の連携と役割分担を設計</li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <i class="fas fa-lightbulb" style="color: var(--color-accent);"></i>
+        スキルとサブエージェントの定義が、ループの品質を左右するよ！
+      </div>
+    </div>
+
+    <!-- Card 7: ポイント3 & 4 - 進捗確認と継続条件 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-tasks" style="animation: fa-flip 2.5s infinite;"></i>
+      </div>
+      <h2>⑦ポイント3&4: 進捗確認と継続条件</h2>
+      <p>エージェントの進捗を確認し、<span class="highlight">継続するかどうかの条件</span>でループを制御する。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-list-check"></i> Todoリストやタスク管理ツールで進捗を可視化</li>
+        <li><i class="fas fa-redo"></i> <span class="keyword-tag">70点</span>なら不合格 → 自動でリトライが走る仕組み</li>
+        <li><i class="fas fa-flag-checkered"></i> 合格基準を満たしたらループを終了</li>
+      </ul>
+      <div class="code-preview">
+        <span class="keyword">while</span> (!goal.met()) {
+          result = agent.<span class="func">execute</span>(task);
+          score = <span class="func">evaluate</span>(result);
+          <span class="keyword">if</span> (score >= threshold) {
+            <span class="keyword">break</span>; <span class="comment">// 合格!</span>
+          }
+          task = <span class="func">refine</span>(result, feedback);
+        }
+      </div>
+    </div>
+
+    <!-- Card 8: Boris Chernyの5テクニック概要 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-user-astronaut" style="animation: fa-bounce 2s infinite;"></i>
+      </div>
+      <h2>⑧Boris Chernyさんが語る自律化の5テクニック</h2>
+      <p><span class="keyword-tag">Claude Codeの中の人</span>であるBoris Chernyさんが、<span class="highlight">完全自律に向けた5つのテクニック</span>を公開。</p>
+      <ul class="info-list">
+        <li><span class="num-badge">1</span> オートモード（自動承認）</li>
+        <li><span class="num-badge">2</span> ダイナミックワークフロー</li>
+        <li><span class="num-badge">3</span> ループコマンド＋スリープ防止</li>
+        <li><span class="num-badge">4</span> 自己検証ツールの搭載</li>
+        <li><span class="num-badge">5</span> Ralphループの活用</li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <i class="fas fa-star" style="color: #E05555;"></i>
+        これらを組み合わせることで、長時間の自律実行が可能になる！
+      </div>
+    </div>
+
+    <!-- Card 9: テクニック1 - オート承認 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-check-double" style="animation: fa-beat-fade 2s infinite;"></i>
+      </div>
+      <h2>⑨テクニック1: オート承認モード</h2>
+      <p>エージェントをより自律的に動かすための第一歩は、<span class="highlight">自動承認（オートパーミッション）</span>の設定。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-lock-open"></i> エージェントがファイルの読み書きやコマンド実行を自動で承認</li>
+        <li><i class="fas fa-bolt"></i> 人間の介入を最小限にして、<span class="keyword-tag">連続的な処理</span>を可能にする</li>
+        <li><i class="fas fa-shield-alt"></i> セキュリティを考慮しつつ、許可する操作の範囲を設定</li>
+      </ul>
+      <div class="speech-bubble">
+        <i class="fas fa-key" style="color: var(--color-accent);"></i>
+        承認を自動化するだけで、エージェントの動きが劇的に変わる！
+      </div>
+    </div>
+
+    <!-- Card 10: テクニック2 - ダイナミックワークフロー -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-project-diagram" style="animation: fa-spin 3s linear infinite;"></i>
+      </div>
+      <h2>⑩テクニック2: ダイナミックワークフロー</h2>
+      <p>最近登場した<span class="highlight">ダイナミックワークフロー</span>は、エージェントの能力を飛躍的に高める。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-code-branch"></i> Claude Codeで<span class="keyword-tag">ultracode</span>などのモードを呼び出せる</li>
+        <li><i class="fas fa-users"></i> <span class="keyword-tag accent">大量のサブエージェント</span>が並列で動く仕組み</li>
+        <li><i class="fas fa-gem"></i> ロングランのタスクで<span class="highlight">より高品質な成果物</span>を生み出す</li>
+      </ul>
+      <div class="speech-bubble variant-1 right">
+        <i class="fas fa-rocket" style="color: var(--color-accent);"></i>
+        サブエージェントが大群で動くのは、かなり強力なパターンだ！
+      </div>
+    </div>
+
+    <!-- Card 11: テクニック3 - ループコマンドとスリープ防止 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-terminal" style="animation: fa-bounce 2s infinite;"></i>
+      </div>
+      <h2>⑪テクニック3: ループコマンド＋スリープ防止</h2>
+      <p>エージェントが<span class="highlight">止まらずに動き続ける</span>ための環境を整えることも重要。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-clock"></i> <span class="keyword-tag">ループコマンド</span> — 60分間隔などで定期実行を設定</li>
+        <li><i class="fas fa-cloud"></i> クラウド版のClaude Codeを使う方法</li>
+        <li><i class="fas fa-laptop"></i> ローカルでは<span class="keyword-tag accent">Amphetamine</span>というMacアプリがおすすめ</li>
+        <li><i class="fas fa-moon"></i> MacBookを閉じても稼働し続ける設定が可能</li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <i class="fas fa-bed" style="color: #E05555;"></i>
+        スリープ対策をしないと、長時間ループが途中で止まってしまう！
+      </div>
+    </div>
+
+    <!-- Card 12: テクニック4 - 自己検証ツール -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-search-plus" style="animation: fa-beat-fade 2.5s infinite;"></i>
+      </div>
+      <h2>⑫テクニック4: 自己検証ツールを持たせる</h2>
+      <p>Claude公式も推奨する<span class="highlight">「自分自身で検証できるツールを渡す」</span>という手法。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-camera"></i> <span class="keyword-tag">スクリーンショット</span>を取らせて、自分のミスに気づかせる</li>
+        <li><i class="fas fa-eye"></i> レイアウトが崩れているスクショを見れば「100点」とは言えない</li>
+        <li><i class="fas fa-tools"></i> エージェントが<span class="highlight">正しい仕事をしているか自己確認</span>する仕組み</li>
+      </ul>
+      <div class="speech-bubble top">
+        <i class="fas fa-eye" style="color: var(--color-accent);"></i>
+        視覚的なフィードバックを与えることで、エージェントの勘違いを大幅に減らせる！
+      </div>
+    </div>
+
+    <!-- Card 13: テクニック5 - Ralphループ -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-redo-alt" style="animation: fa-spin 2s linear infinite;"></i>
+      </div>
+      <h2>⑬テクニック5: Ralphループ</h2>
+      <p>最近話題になっている<span class="highlight">Ralphループ</span>は、Claudeのプラグインにも登場している。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-plug"></i> オフィシャルプラグインとして簡単に導入可能</li>
+        <li><i class="fas fa-play"></i> ループ設計を手軽に体感できる</li>
+        <li><i class="fas fa-infinity"></i> 定期的な間隔でタスクを自動実行する仕組み</li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <i class="fas fa-plug" style="color: var(--color-accent);"></i>
+        プラグインに入れるだけですぐにループ設計を試せる！
+      </div>
+    </div>
+
+    <!-- Card 14: ゴールとループの違い -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-code-compare" style="animation: fa-flip 3s infinite;"></i>
+      </div>
+      <h2>⑭ゴールとループの違いを理解する</h2>
+      <p><span class="keyword-tag">ループ</span>と<span class="keyword-tag accent">ゴール</span>は似ているが、動き方が違う。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-sync"></i> <span class="keyword-tag">ループ</span>: 定期的な間隔でもとにタスクを繰り返す仕組み</li>
+        <li><i class="fas fa-flag-checkered"></i> <span class="keyword-tag accent">ゴール</span>: 別モデルがゴール条件を定義し、満たしているかを判定</li>
+        <li><i class="fas fa-star"></i> <span class="highlight">エージェントループ</span> = 目標から継続条件で繰り返す新しい概念</li>
+      </ul>
+      <div class="code-preview">
+        <span class="comment">// ループ: 定期実行</span>
+        loop.<span class="func">run</span>(task, interval=<span class="string">"60min"</span>)
+
+        <span class="comment">// ゴール: 条件達成まで</span>
+        goal.<span class="func">achieve</span>(target, judge=<span class="string">"model"</span>)
+
+        <span class="comment">// エージェントループ: 両方の融合</span>
+        agent_loop.<span class="func">run</span>(goal, retry_on=<span class="string">"fail"</span>)
+      </div>
+    </div>
+
+    <!-- Card 15: コミュニティの指摘 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-comments" style="animation: fa-bounce 2.5s infinite;"></i>
+      </div>
+      <h2>⑮コミュニティの指摘と残る課題</h2>
+      <p>Peter Steinbergerさんの発言に対し、<span class="highlight">コミュニティから鋭い指摘</span>も上がっている。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-robot"></i> 「<span class="keyword-tag">ループを設計するエージェント</span>自体が欲しい」という意見</li>
+        <li><i class="fas fa-brain"></i> ループはエージェントの動き方を直すが、<span class="highlight">知っている内容は直さない</span>という問題</li>
+        <li><i class="fas fa-layer-group"></i> <span class="keyword-tag accent">知識レイヤー</span>が欠けていると、ループもうまく機能しない</li>
+        <li><i class="fas fa-exclamation-circle"></i> 本質的に様々な課題が残っている</li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <i class="fas fa-brain" style="color: #E05555;"></i>
+        ループ設計だけでなく、知識の質も重要という鋭い指摘！
+      </div>
+    </div>
+
+    <!-- Card 16: Opus 4.5が分岐点 -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-gem" style="animation: fa-beat-fade 3s infinite;"></i>
+      </div>
+      <h2>⑯Opus 4.5が分岐点だった理由</h2>
+      <p>ループ設計が現実的になったのは、<span class="highlight">Opus 4.5</span>の登場が大きな転換点だった。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-chart-line"></i> モデルの<span class="keyword-tag">自立性</span>が急激に高まった</li>
+        <li><i class="fas fa-arrow-up"></i> その後<span class="keyword-tag accent">Opus 4.6 → 4.7 → 4.8</span>と順調に進化</li>
+        <li><i class="fas fa-sync-alt"></i> 自立的に動いて品質を保てるレベルに到達</li>
+        <li><i class="fas fa-exclamation-triangle"></i> 進化のスピードが予想をはるかに超えている</li>
+      </ul>
+      <div class="speech-bubble">
+        <i class="fas fa-bolt" style="color: var(--color-accent);"></i>
+        AIの進化が自分の予想以上に速くて驚きを隠せない！
+      </div>
+    </div>
+
+    <!-- Card 17: 完全自律に向けて -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-rocket" style="animation: fa-bounce 2s infinite;"></i>
+      </div>
+      <h2>⑰結論: 完全自律に向けたループ設計</h2>
+      <p>ループを設計しておけば、<span class="highlight">エージェントが自立的に回っていく</span>時代が来ている。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-check"></i> モデルが十分賢くなったので、あまり縛らなくても動く</li>
+        <li><i class="fas fa-sliders-h"></i> 適度な制約をつけることで、<span class="keyword-tag">高品質な自律動作</span>が可能に</li>
+        <li><i class="fas fa-search"></i> <span class="highlight">検証ツールを自分で作る</span>ことで、さらに精度が向上</li>
+        <li><i class="fas fa-hand-paper"></i> エージェントに指示を出さなくても勝手に動くように</li>
+      </ul>
+      <div class="speech-bubble variant-1 top">
+        <i class="fas fa-trophy" style="color: var(--color-accent);"></i>
+        完全自律の切り口があってこそ、より高度なハーネスが作り込める！
+      </div>
+    </div>
+
+    <!-- Card 18: まとめ -->
+    <div class="card fade-in-scale">
+      <div class="card-icon">
+        <i class="fas fa-clipboard-check" style="animation: fa-beat-fade 2.5s infinite;"></i>
+      </div>
+      <h2>⑱まとめ: 自分の手をどこまで離せるか</h2>
+      <p>最終的な目標は、<span class="highlight">どれだけ自分が手を離して、高品質にエージェントを動かせるか</span>を追求すること。</p>
+      <ul class="info-list">
+        <li><i class="fas fa-sync-alt"></i> ループ設計の<span class="keyword-tag">4つのポイント</span>を押さえる</li>
+        <li><i class="fas fa-tools"></i> 自律化の<span class="keyword-tag accent">5つのテクニック</span>を組み合わせる</li>
+        <li><i class="fas fa-lightbulb"></i> ループを意識してハーネスを作り、日常的に活用する</li>
+        <li><i class="fas fa-arrow-right"></i> <span class="highlight">完全自律に向けて継続的に改善</span>していく</li>
+      </ul>
+      <div class="speech-bubble variant-2 right">
+        <i class="fas fa-heart" style="color: #E05555;"></i>
+        この動画が面白かったら、チャンネル登録と高評価をよろしくね！
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div style="margin-bottom: 10px;">
+      <span style="font-size: 1.2rem;"><i class="fas fa-film"></i></span>
+      動画: <a href="https://www.youtube.com/watch?v=xBeCUFPrvuQ" target="_blank">【必見】AI エージェントは「ループ設計」の時代！完全自律で回す5つのポイント含め解説します</a>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <span style="font-size: 1.2rem;"><i class="fas fa-user"></i></span>
+      チャンネル: <a href="https://www.youtube.com/@ai_masaou" target="_blank">まさおAIじっくり解説ch</a>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <span style="font-size: 1.2rem;"><i class="fas fa-calendar-alt"></i></span>
+      2026年6月8日公開
+    </div>
+    <div style="margin-top: 15px; font-size: 0.8rem; color: #999;">
+      出典:
+      <a href="https://x.com/steipete/status/2063697162748260627" target="_blank">Peter Steinberger (@steipete)</a> |
+      <a href="https://x.com/bcherny/status/2063792263067754658" target="_blank">Boris Cherny (@bcherny)</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

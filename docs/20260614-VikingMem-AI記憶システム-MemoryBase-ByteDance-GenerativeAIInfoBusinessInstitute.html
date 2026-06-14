@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VikingMem解説 | AIエージェントに本物の記憶を持たせるByteDanceの技術</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #FFF8F5; font-family: 'Segoe UI', sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 40px 20px 30px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-4)); border-radius: 25px; color: white; }
+        header .main-icon { font-size: 5em; color: var(--ui-color-2); margin-bottom: 15px; animation: fa-shake 2s infinite; }
+        header h1 { font-family: 'Kaisei Decol', serif; font-size: 36px; color: #fff; margin-bottom: 8px; }
+        header .date { font-size: 16px; color: var(--ui-color-3); }
+        header .subtitle { font-size: 14px; color: var(--ui-color-2); margin-top: 8px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 30px; }
+        .section-card { flex: 1; min-width: 220px; max-width: 450px; background-color: white; border-radius: 20px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; }
+        .section-card:hover { transform: translateY(-3px); box-shadow: 8px 8px 20px rgba(0,0,0,0.15); transition: all 0.3s; }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .highlight { color: var(--ui-color-5); font-weight: bold; }
+        .section-card h2 { font-family: 'Kaisei Decol', serif; font-size: 20px; color: var(--ui-color-4); margin: 10px 0 5px; }
+        pre { background: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; overflow-x: auto; font-family: 'Courier New', monospace; }
+        footer { text-align: center; padding: 20px; color: #777; font-size: 14px; border-top: 1px solid #eee; margin-top: 30px; }
+        footer a { color: inherit; text-decoration: none; } footer a:hover { text-decoration: underline; }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out both; }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="main-icon"><i class="fa-solid fa-brain"></i></div>
+        <h1>VikingMem: AIエージェントに本物の記憶を</h1>
+        <p class="date">2026年6月14日 / Generative AI and InfoBusiness Institute</p>
+        <p class="subtitle">ByteDance × 浙江大学の論文 / VLDB2026採択 / 記憶をデータベースとして設計する新パラダイム</p>
+    </header>
+
+    <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-circle-question fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>① なぜAIは忘れるのか</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-info"></i><span>先週話したことをまた1から説明しなければならない</span></li>
+                    <li><i class="fa-solid fa-face-sad-tear"></i><span>昨日教えた<span class="keyword-tag">好み</span>を今日は忘れている</span></li>
+                    <li><i class="fa-solid fa-repeat"></i><span>何度も同じ質問をしてくる</span></li>
+                    <li><i class="fa-solid fa-lightbulb"></i><span>これはAIの<span class="highlight">アーキテクチャの根本的な問題</span></span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i> コンテキストウィンドウを広げても一時的な記憶に過ぎない⚡</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scroll fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                <h2>② VLDB2026採択の重要性</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-award"></i><span>データベース分野の<span class="keyword-tag">最高峰会議</span>に採択</span></li>
+                    <li><i class="fa-solid fa-database"></i><span>VLDB = Very Large Data Bases（超大型データ処理）</span></li>
+                    <li><i class="fa-solid fa-circle-check"></i><span>世界最先端の<span class="highlight">査読を通過した実証システム</span>の証</span></li>
+                    <li><i class="fa-solid fa-calendar"></i><span>2026年5月28日にarXiv投稿</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i> 単なるアイデアではなく実際に動くシステムとして認められた🏆</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;"></i>
+                <h2>③ 1日10億トークンの現実</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-chart-line"></i><span>最大テナントが1日に<span class="keyword-tag">10億トークン</span>生成</span></li>
+                    <li><i class="fa-solid fa-calculator"></i><span>Geminiの200万トークン窓の<span class="highlight">500倍</span></span></li>
+                    <li><i class="fa-solid fa-dollar-sign"></i><span>コンテキストは有限で高コストなリソース</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i><span>全てを詰め込むアプローチは現実離れ</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> バイトダンス本番環境の極限データから生まれた🔥</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-database fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>④ 既存手法の3つの限界</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-box-archive"></i><span><span class="keyword-tag">生ログ保存</span>: ノイズで検索制度が低下</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass"></i><span><span class="keyword-tag">RAG</span>: 動的な状態変化を捉えられない</span></li>
+                    <li><i class="fa-solid fa-diagram-project"></i><span><span class="keyword-tag">ナレッジグラフ</span>: ビルド時コストが高すぎる</span></li>
+                    <li><i class="fa-solid fa-ban"></i><span>特定ユースケースへの<span class="highlight">過剰特化問題</span></span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i> 従来手法は会話記憶には根本的に不向き❗</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-stopwatch fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑤ ミリックスの25秒問題</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-clock"></i><span>ミリックスのP95レイテンシが<span class="keyword-tag">25.76秒</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-end"></i><span>LongMemEval評価が<span class="highlight">24時間以内に終わらない</span></span></li>
+                    <li><i class="fa-solid fa-xmark"></i><span>精度が高くても実運用には使えない</span></li>
+                    <li><i class="fa-solid fa-mobile-screen"></i><span>リアルタイムアプリには実用的でない</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-turtle fa-lg" style="color: var(--ui-color-2);"></i> ユーザーが10秒以上待つAIは実用にならない🐢</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-eye fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;"></i>
+                <h2>⑥ バイトダンスの3つの産業観察</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">生ストリームの低シグナル</span>・ノイズ比が高い</span></li>
+                    <li><i class="fa-solid fa-2"></i><span><span class="keyword-tag">状態の動的な性質</span>: ユーザーは常に進化</span></li>
+                    <li><i class="fa-solid fa-3"></i><span><span class="keyword-tag">アーキテクチャの断片化</span>: ユースケース別に異なる</span></li>
+                    <li><i class="fa-solid fa-arrow-right"></i><span>これらが<span class="highlight">設計思想の出発点</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-5);"></i> 現場の豊富な経験から導き出された本質的観察👀</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑦ MemoryBaseという新概念</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-database"></i><span>記憶を<span class="keyword-tag">データベース</span>として設計する新パラダイム</span></li>
+                    <li><i class="fa-solid fa-cubes"></i><span>イベントとエンティティで記憶を管理</span></li>
+                    <li><i class="fa-solid fa-gem"></i><span><span class="highlight">Memory + DBMS = MemoryBase</span></span></li>
+                    <li><i class="fa-solid fa-table"></i><span>RDBがテーブルで管理するように統一</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> DBMSの地見をAI記憶に応用した画期的アプローチ💡</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-filter fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑧ 原則1: 選択的情報抽出</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-bullseye"></i><span>最細粒度の<span class="keyword-tag">セグメンテーション</span>を採用</span></li>
+                    <li><i class="fa-solid fa-volume-low"></i><span>低密度ストリームを価値ある信号に変換</span></li>
+                    <li><i class="fa-solid fa-piggy-bank"></i><span>トークンコストを最小化しながら精度向上</span></li>
+                    <li><i class="fa-solid fa-chart-pie"></i><span>RAG比で<span class="highlight">83.18%のストレージ削減</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-scissors fa-lg" style="color: var(--ui-color-2);"></i> 全て保存せず、価値ある情報だけを取り出す✂️</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrows-spin fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;"></i>
+                <h2>⑨ 原則2: 固有の状態性と進化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-heart-pulse"></i><span>記憶を<span class="keyword-tag">生きたライフサイクル</span>として扱う</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left"></i><span>時間的重み付けで直近コンテキストを優先</span></li>
+                    <li><i class="fa-solid fa-recycle"></i><span>永続的エンティティの継続的な更新</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up"></i><span><span class="highlight">静的蓄積ではなく進化し続ける</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-seedling fa-lg" style="color: var(--ui-color-5);"></i> 学生から社会人になる変化も追跡できる🌱</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-cubes fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑩ 原則3: 汎用的な設計パラダイム</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-puzzle-piece"></i><span>JSON風のスキーマで<span class="keyword-tag">設定可能</span></span></li>
+                    <li><i class="fa-solid fa-network-wired"></i><span>単一インフラで多様なメモリタイプを表現</span></li>
+                    <li><i class="fa-solid fa-tools"></i><span>ビジネスルールからロジックを分離</span></li>
+                    <li><i class="fa-solid fa-layer-group"></i><span>最小限の再設定で<span class="highlight">異なるタスクに対応</span></span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-1);"></i> 1つのアーキテクチャで多様なユースケースに対応⚙️</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑪ Event-Entityモデル: 2層構造</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-receipt"></i><span><span class="keyword-tag">Event</span>: タイムスタンプ付きエピソード記録</span></li>
+                    <li><i class="fa-solid fa-user-tag"></i><span><span class="keyword-tag">Entity</span>: 永続的で進化する状態表現</span></li>
+                    <li><i class="fa-solid fa-database"></i><span>Event Store = 汎用ログ</span></li>
+                    <li><i class="fa-solid fa-eye"></i><span>Entity = <span class="highlight">マテリアライズドビュー</span></span></li>
+                </ul>
+                <pre>entity = SELECT content
+FROM event
+WHERE type = '...' </pre>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-code fa-lg" style="color: var(--ui-color-2);"></i> SQL的クエリでイベントとエンティティの関係を定義💻</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;"></i>
+                <h2>⑫ オペレーターライブラリ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-calculator"></i><span>統計系: <span class="keyword-tag">SUM/AVG/MAX/COUNT</span></span></li>
+                    <li><i class="fa-solid fa-brain"></i><span>LLM系: <span class="keyword-tag">LLM_Merge</span>で意味的統合</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left"></i><span><span class="keyword-tag">Time_Compress</span>: 時系列圧縮</span></li>
+                    <li><i class="fa-solid fa-handshake"></i><span>状態更新を管理する<span class="highlight">関数群</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-toolbox fa-lg" style="color: var(--ui-color-5);"></i> シナリオ別に適切な演算を選べる🧰</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt-lightning fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑬ シングルパス抽出の革新</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-repeat"></i><span>従来はNタイプに<span class="keyword-tag">N回のLLM呼び出し</span></span></li>
+                    <li><i class="fa-solid fa-1"></i><span>VikingMemは<span class="highlight">1回のパスで全タイプ抽出</span></span></li>
+                    <li><i class="fa-solid fa-dollar-sign"></i><span>コスト<span class="keyword-tag">$0.35→$0.07</span>に5分の1削減</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>処理時間も11.2秒→7.42秒に短縮</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-1);"></i> 精度は88.86%→88.77%でほぼ同等⚡</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑭ EUA: エンティティ更新アルゴリズム</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-pen"></i><span><span class="keyword-tag">Search-Replace</span>形式のパッチを出力</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>編集距離ベースの近似検索で適用</span></li>
+                    <li><i class="fa-solid fa-code"></i><span>コード編集技術からインスパイア</span></li>
+                    <li><i class="fa-solid fa-list-check"></i><span>上位5件候補だけ取得で<span class="highlight">LLM呼び出し削減</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i> コーディング技術が記憶更新に応用された✨</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scissors fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;"></i>
+                <h2>⑮ IMSM: インテリジェント・セグメンテーション</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1"></i><span>Phase1: <span class="keyword-tag">意味サリエンスフィルタ</span></span></li>
+                    <li><i class="fa-solid fa-2"></i><span>Phase2: <span class="keyword-tag">イベント中心パーティショニング</span></span></li>
+                    <li><i class="fa-solid fa-broom"></i><span>挨拶などの会話的フィラーを除去</span></li>
+                    <li><i class="fa-solid fa-trophy"></i><span>除去すると<span class="highlight">5.32ポイント低下</span>の最重要要素</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-gem fa-lg" style="color: var(--ui-color-5);"></i> 検索時追加コストほぼ0で最大精度貢献💎</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑯ マルチパス検索とリランキング</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-magnifying-glass"></i><span>プライマリ: <span class="keyword-tag">意味+語彙ハイブリッド</span></span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>時間減衰スコア + ビジネススコア</span></li>
+                    <li><i class="fa-solid fa-diagram-project"></i><span>補助: <span class="keyword-tag">キーワードグラフ</span>検索</span></li>
+                    <li><i class="fa-solid fa-arrow-down-wide-short"></i><span>ColBERT風<span class="highlight">リランキング</span>で精度強化</span></li>
+                </ul>
+                <pre>score = w_s × semantic
+       + w_t × time
+       + w_p × popularity</pre>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-bullseye fa-lg" style="color: var(--ui-color-1);"></i> 多角的な検索で精度を確保🎯</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑰ 実験結果: 圧倒的性能</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-medal"></i><span>LoCoMo: <span class="keyword-tag">88.83%〜90.12%</span>で首位</span></li>
+                    <li><i class="fa-solid fa-gauge-high"></i><span>P95レイテンシ: <span class="highlight">0.39秒</span>で最低水準</span></li>
+                    <li><i class="fa-solid fa-database"></i><span>ストレージ: <span class="keyword-tag">83.18%削減</span></span></li>
+                    <li><i class="fa-solid fa-arrow-up"></i><span>精度がベースライン比<span class="highlight">最大38%向上</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> 少ない情報量で精度が上がる逆説を実証⭐</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;"></i>
+                <h2>⑱ OpenVikingでオープンソース化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">OpenViking</span>として一部を公開</span></li>
+                    <li><i class="fa-solid fa-industry"></i><span>5つの産業シナリオで実証済み</span></li>
+                    <li><i class="fa-solid fa-users"></i><span>教育・コンパニオン・自律エージェント等</span></li>
+                    <li><i class="fa-solid fa-heart"></i><span><span class="highlight">AIと人間の関係そのものが変わる</span>未来へ</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-globe fa-lg" style="color: var(--ui-color-5);"></i> 1日10億トークン本番技術が世界中の開発者に🌍</span></div>
+            </div>
+        </div>
+
+    </div>
+
+    <footer>
+        🎬 動画: <a href="https://youtu.be/OuoUWoV2Rs4" target="_blank" style="color: inherit;">Generative AI and InfoBusiness Institute</a> | 📅 2026年6月13日<br>
+        📄 論文: <a href="https://arxiv.org/abs/2605.29640" target="_blank" style="color: inherit;">VikingMem (arXiv)</a> | 💻 実装: <a href="https://github.com/bytedance/OpenViking" target="_blank" style="color: inherit;">OpenViking (GitHub)</a>
+    </footer>
+</div>
+</body>
+</html>

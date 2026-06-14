@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自分の声をAIで再現 Irodori-TTS + LoRA | カレーちゃんのAI道場</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #DB2777;
+            --ui-color-2: #06B6D4;
+            --ui-color-3: #FCE7F3;
+            --ui-color-4: #831843;
+            --ui-color-5: #F59E0B;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background-color: #FFF8F5; font-family: 'Segoe UI', sans-serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        header { text-align: center; padding: 40px 20px 30px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-4)); border-radius: 25px; color: white; }
+        header .main-icon { font-size: 5em; color: var(--ui-color-2); margin-bottom: 15px; animation: fa-bounce 2s infinite; }
+        header h1 { font-family: 'Kaisei Decol', serif; font-size: 36px; color: #fff; margin-bottom: 8px; }
+        header .date { font-size: 16px; color: var(--ui-color-3); }
+        header .subtitle { font-size: 14px; color: var(--ui-color-2); margin-top: 8px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 30px; }
+        .section-card { flex: 1; min-width: 220px; max-width: 450px; background-color: white; border-radius: 20px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; }
+        .section-card:hover { transform: translateY(-3px); box-shadow: 8px 8px 20px rgba(0,0,0,0.15); transition: all 0.3s; }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .highlight { color: var(--ui-color-1); font-weight: bold; }
+        .section-card h2 { font-family: 'Kaisei Decol', serif; font-size: 20px; color: var(--ui-color-4); margin: 10px 0 5px; }
+        pre { background: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; overflow-x: auto; }
+        footer { text-align: center; padding: 20px; color: #777; font-size: 14px; border-top: 1px solid #eee; margin-top: 30px; }
+        footer a { color: inherit; text-decoration: none; } footer a:hover { text-decoration: underline; }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out both; }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <div class="main-icon"><i class="fa-solid fa-microphone-lines"></i></div>
+        <h1>自分の声をAIで再現したら本人すぎてビビった</h1>
+        <p class="date">2026年6月14日 / カレーちゃんのAI道場</p>
+        <p class="subtitle">Irodori-TTS + LoRA でわずか数分の学習で声クローンが完成する時代へ</p>
+    </header>
+
+    <div class="section-layout">
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>① 声クローンが魔法みたいに簡単に</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-microphone"></i><span>自分の声を<span class="keyword-tag">AIで再現</span>できる時代に突入</span></li>
+                    <li><i class="fa-solid fa-bolt"></i><span>特別な装置やスタジオは<span class="highlight">一切不要</span></span></li>
+                    <li><i class="fa-solid fa-laptop"></i><span>PCとマイクがあれば誰でも挑戦できる</span></li>
+                    <li><i class="fa-solid fa-face-surprise"></i><span>本人すぎて「ビビった」と感想を漏らすレベル</span></li>
+                    <li><i class="fa-solid fa-rocket"></i><span>音声合成の<span class="highlight">敷居が劇的に下がった</span></span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> ついに個人でも声のクローン作成が現実になりました！🎙️</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>② Irodori-TTS で音声合成体験</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-tag"></i><span><span class="keyword-tag">Irodori-TTS</span>がメインのツール</span></li>
+                    <li><i class="fa-solid fa-headphones"></i><span>テキストから自然な音声を生成するTTSモデル</span></li>
+                    <li><i class="fa-solid fa-sliders"></i><span>参照音声を与えるだけで声色を再現</span></li>
+                    <li><i class="fa-solid fa-language"></i><span>日本語の<span class="highlight">自然な韻律</span>もこなす</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece"></i><span>LoRAと組み合わせて精度を高められる</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i> 配信テーマは「音声合成をしましょう」🎤</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-stopwatch fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s infinite;"></i>
+                <h2>③ たった10秒で声を参照させる</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-record-vinyl"></i><span>自分の声を<span class="keyword-tag">10秒録音</span>するだけ</span></li>
+                    <li><i class="fa-solid fa-link"></i><span>その音声をモデルに<span class="highlight">参照させる</span></span></li>
+                    <li><i class="fa-solid fa-play"></i><span>すぐに自分らしい声で文章を読み上げる</span></li>
+                    <li><i class="fa-solid fa-thumbs-up"></i><span>クオリティは「そこそこ似てる」レベル</span></li>
+                    <li><i class="fa-solid fa-bolt"></i><span>準備時間は<span class="highlight">実質ゼロ</span>に等しい手軽さ</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> 10秒録画して参照させるだけで、もう声が作れます⚡</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-cube fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>④ ETS500mv3 を参照モデルに</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-database"></i><span>参照先は<span class="keyword-tag">ETS500mv3</span>というモデル</span></li>
+                    <li><i class="fa-solid fa-quote-right"></i><span>「まずETS500mv3ってのを参照させて話させた」</span></li>
+                    <li><i class="fa-solid fa-microchip"></i><span>事前学習済みの強力な音声モデル</span></li>
+                    <li><i class="fa-solid fa-wand-sparkles"></i><span>少量サンプルでも<span class="highlight">声質を模倣</span>できる設計</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span>個人利用のベースとして最適</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 強力なベースモデルのおかげで少データでも再現度高め🧠</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-user-group fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑤ 本人と聞き比べて「全然似てる」</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-ear-listen"></i><span>生成音声を聞いて<span class="highlight">「全然似てますね」</span>と即答</span></li>
+                    <li><i class="fa-solid fa-comments"></i><span>「おはようございます。今日の配信のテーマは…」</span></li>
+                    <li><i class="fa-solid fa-volume-high"></i><span>話し方の<span class="keyword-tag">クセや声色</span>まで再現</span></li>
+                    <li><i class="fa-solid fa-check-double"></i><span>10秒参照でも合格点のクオリティ</span></li>
+                    <li><i class="fa-solid fa-star"></i><span>驚きと興奮が止まらない瞬間</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-1);"></i> 自分の声が勝手に喋り出す感動は異常です😆</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrow-trend-up fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;"></i>
+                <h2>⑥ 10秒から5分へ精度を上げる</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-stopwatch-20"></i><span>10秒参照はあくまで<span class="keyword-tag">入門編</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-half"></i><span>次は<span class="highlight">5分程度の音声</span>を学習データに</span></li>
+                    <li><i class="fa-solid fa-chart-line"></i><span>データ量が増えるほど<span class="highlight">再現度が跳ね上がる</span></span></li>
+                    <li><i class="fa-solid fa-gauge-high"></i><span>実用レベルの品質へ一気に到達</span></li>
+                    <li><i class="fa-solid fa-layers"></i><span>5分なら録音負担もほぼ無し</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i> 5分の音声でグッと実用度が上がります📈</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑦ LoRAで重み自体を学習</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-tags"></i><span><span class="keyword-tag">LoRA</span>でモデルの重みを直接調整</span></li>
+                    <li><i class="fa-solid fa-code-branch"></i><span>参照方式ではなく<span class="highlight">学習方式</span>に切り替え</span></li>
+                    <li><i class="fa-solid fa-microchip"></i><span>少量データで効率的にファインチューニング</span></li>
+                    <li><i class="fa-solid fa-fingerprint"></i><span>個人の声質を<span class="highlight">モデル内に定着</span></span></li>
+                    <li><i class="fa-solid fa-bolt-lightning"></i><span>毎回参照音声を渡す必要がなくなる</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> LoRA学習済みなら参照なしでサクサク生成できます🚀</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-moon fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑧ 昨夜すすっとLoRA学習を完了</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-calendar-xmark"></i><span>昨日の配信時点では<span class="highlight">まだ未完成</span></span></li>
+                    <li><i class="fa-solid fa-bed"></i><span>夜の間に<span class="keyword-tag">LoRA学習</span>を一気に進行</span></li>
+                    <li><i class="fa-solid fa-check"></i><span>翌日には配信で使える状態に</span></li>
+                    <li><i class="fa-solid fa-couch"></i><span>寝ている間にモデルが仕上がる手軽さ</span></li>
+                    <li><i class="fa-solid fa-eye"></i><span>起きたらもう自分声が手元に</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i> 寝て起きたら自分の声モデルが完成している魔法🌙</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-newspaper fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s infinite;"></i>
+                <h2>⑨ 実際にニュース原稿を読ませる</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-megaphone"></i><span>「今日のトップニュースが…」と実読</span></li>
+                    <li><i class="fa-solid fa-landmark"></i><span>ネタは<span class="keyword-tag">アンソロピックAIが政府に止められた</span>件</span></li>
+                    <li><i class="fa-solid fa-microphone"></i><span>配信風の読み上げを再現</span></li>
+                    <li><i class="fa-solid fa-ear-listen"></i><span>実用性を<span class="highlight">リアルな原稿</span>で検証</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span>本物の配信と聞き分けがつかない場面も</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i> 配信そのもののような自然さでニュース原稿を読み上げます📢</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bug fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑩ ちょっとバグる瞬間も発生</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-triangle-exclamation"></i><span>読み上げ中に<span class="highlight">「ちょっとバグってます」</span>場面も</span></li>
+                    <li><i class="fa-solid fa-shuffle"></i><span>「非数」という不可解な出力が混入</span></li>
+                    <li><i class="fa-solid fa-wrench"></i><span>ファインチューニング直後の<span class="keyword-tag">過渡期</span>あるある</span></li>
+                    <li><i class="fa-solid fa-face-laugh-squint"></i><span>「まあ、うん」と笑って許容</span></li>
+                    <li><i class="fa-solid fa-arrows-rotate"></i><span>追加学習やパラメータ調整で改善見込み</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> まだバグはあるけど「本人度」は圧倒的🐛</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑪ LoRA版と参照版を聞き比べ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span>ETS500mv3参照版 vs <span class="keyword-tag">LoRA版</span></span></li>
+                    <li><i class="fa-solid fa-thought-bubble"></i><span>「やっぱローラ版の方がちょっといいすか?」</span></li>
+                    <li><i class="fa-solid fa-star-half-stroke"></i><span>自然さと声質の深みで<span class="highlight">LoRAに軍配</span></span></li>
+                    <li><i class="fa-solid fa-people-arrows"></i><span>音声安定性はまだ参照版が上の場合も</span></li>
+                    <li><i class="fa-solid fa-flask"></i><span>用途によって使い分けがおすすめ</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i> 参照版と学習版、それぞれの強みを実感できる比較⚖️</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gauge-simple-high fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;"></i>
+                <h2>⑫ 読むスピードが重要だと発見</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-hourglass-start"></i><span>生成音声が<span class="highlight">「すごい遅かった」</span>と気づく</span></li>
+                    <li><i class="fa-solid fa-book-open"></i><span>原因は<span class="keyword-tag">学習音声を読んだスピード</span></span></li>
+                    <li><i class="fa-solid fa-bullseye"></i><span>ゆっくり読むと生成も遅くなる</span></li>
+                    <li><i class="fa-solid fa-forward"></i><span>「もっと早く話せばよかった」と反省</span></li>
+                    <li><i class="fa-solid fa-lightbulb"></i><span>用途に合わせて<span class="highlight">録音テンポ</span>を調整</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 学習データの読み速度が出力にそのまま反映されます⏱️</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-arrow-rotate-right fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑬ 早口で読み直して再学習を決意</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-comment-dots"></i><span>「もう1回学習してみますか」と即提案</span></li>
+                    <li><i class="fa-solid fa-forward-fast"></i><span>今度は<span class="keyword-tag">早口で読み直す</span>方針に</span></li>
+                    <li><i class="fa-solid fa-repeat"></i><span>テンポを変えて再度学習データを作成</span></li>
+                    <li><i class="fa-solid fa-tools"></i><span>「Discordのやつの方がいいかも」と再評価</span></li>
+                    <li><i class="fa-solid fa-rotate"></i><span>フィードバックループで<span class="highlight">精度向上</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> 試して直してを繰り返すだけでどんどん良くなります🔄</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-clock-rotate-left fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑭ 3年前は1時間以上の録音が必要</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-calendar-day"></i><span>3年前は<span class="keyword-tag">1時間以上</span>の音声データが必須</span></li>
+                    <li><i class="fa-solid fa-book"></i><span>しかも<span class="highlight">「わけのわからない文」</span>を読まされる</span></li>
+                    <li><i class="fa-solid fa-database"></i><span>データ化だけでも一苦労の世界</span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench"></i><span>前処理や調整も手作業が大量</span></li>
+                    <li><i class="fa-solid fa-face-tired"></i><span>個人ユーザーには現実的でない壁</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i> ひどい文章を1時間以上延々と読む苦行があったんです…😅</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-feather-pointed fa-5x" style="color: var(--ui-color-1); animation: fa-flip 2s infinite;"></i>
+                <h2>⑮ 今は数分で済む「夢のような」時代</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-star"></i><span>「もう夢のようですね」と何度も強調</span></li>
+                    <li><i class="fa-solid fa-stopwatch"></i><span>必要なのは<span class="keyword-tag">わずか数分</span>の録音</span></li>
+                    <li><i class="fa-solid fa-bolt-lightning"></i><span>学習から生成まで<span class="highlight">同じ日のうち</span>に完了</span></li>
+                    <li><i class="fa-solid fa-heart"></i><span>「本当ね」と感動を分かち合う</span></li>
+                    <li><i class="fa-solid fa-rocket"></i><span>TTSの民主化が一気に進んだ</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 1時間苦行 → 数分録音。進化がすごすぎます✨</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;"></i>
+                <h2>⑯ 学習も行動も全くコードを書かず</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-code"></i><span>「学習も行動もね、<span class="highlight">全く書いてないです</span>」</span></li>
+                    <li><i class="fa-solid fa-laptop-code"></i><span>プログラミング不要で完結</span></li>
+                    <li><i class="fa-solid fa-hand-pointer"></i><span>UIをポチポチするだけの操作性</span></li>
+                    <li><i class="fa-solid fa-terminal"></i><span>複雑なスクリプトを書く必要なし</span></li>
+                    <li><i class="fa-solid fa-user-graduate"></i><span>非エンジニアでも<span class="keyword-tag">即実践</span>可能</span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> コードを1行も書かずに自分の声モデルが作れる革命🙌</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-podcast fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                <h2>⑰ 個人配信者にとっての強力な味方</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-video"></i><span>YouTube配信者の<span class="keyword-tag">読み上げ作業</span>を効率化</span></li>
+                    <li><i class="fa-solid fa-headphones-simple"></i><span>体調不良時も<span class="highlight">自分の声</span>で配信継続</span></li>
+                    <li><i class="fa-solid fa-language"></i><span>多言語展開や読み上げ原稿の自動化</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>録音時間を大幅に節約</span></li>
+                    <li><i class="fa-solid fa-users"></i><span>切り抜きや副音声の量産も視野に</span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i> コンテンツクリエイターの生産性を根底から変えます📺</span></div>
+            </div>
+        </div>
+
+        <div class="section-card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gem fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s infinite;"></i>
+                <h2>⑱ 自分の声を資産に変える新時代</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-fingerprint"></i><span>声質そのものが<span class="keyword-tag">デジタル資産</span>に</span></li>
+                    <li><i class="fa-solid fa-layer-group"></i><span>個人のブランド価値を<span class="highlight">音声領域</span>でも確立</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span>取り扱いには倫理と著作権の配慮が必要</span></li>
+                    <li><i class="fa-solid fa-arrows-up-to-line"></i><span>価値ある声モデルをどう育てるかが鍵</span></li>
+                    <li><i class="fa-solid fa-seedling"></i><span>数分の録音から始まる<span class="highlight">新しい表現</span></span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 自分の声をAI資産として使いこなす時代が始まりました💎</span></div>
+            </div>
+        </div>
+    </div>
+
+    <footer>🎬 動画: <a href="https://youtu.be/3Vxcq0zxhT4" target="_blank" style="color: inherit;">カレーちゃんのAI道場【切り抜き】</a> | 📅 2026年6月14日</footer>
+</div>
+</body>
+</html>

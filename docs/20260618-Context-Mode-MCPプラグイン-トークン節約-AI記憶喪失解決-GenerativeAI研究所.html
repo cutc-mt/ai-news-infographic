@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Context Mode - AIのトークン節約と記憶喪失を解決するMCPプラグイン</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --ui-color-1: #0D7377;
+            --ui-color-2: #C75C1B;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #1A1A2E;
+            --ui-color-5: #E74C3C;
+            --bg-main: #FFF8F5;
+            --color-primary: #0D7377;
+            --color-secondary: #14919B;
+            --color-accent: #C75C1B;
+            --color-dark: #045E62;
+            --color-light: #E0F2F1;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: var(--bg-main);
+            color: #333;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+            border: 1px solid rgba(13,115,119,0.15);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 8px 8px 25px rgba(13,115,119,0.15);
+            border-color: rgba(13,115,119,0.4);
+        }
+
+        .card-icon-wrapper {
+            width: 64px;
+            height: 64px;
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 12px;
+            flex-shrink: 0;
+        }
+
+        .card-icon-wrapper i {
+            color: white;
+            font-size: 28px;
+        }
+
+        .highlight {
+            color: var(--color-primary);
+            font-weight: 700;
+            background: linear-gradient(135deg, rgba(13,115,119,0.1), rgba(20,145,155,0.1));
+            padding: 1px 6px;
+            border-radius: 4px;
+        }
+
+        .tag {
+            background: var(--color-light);
+            color: var(--color-dark);
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+            margin: 2px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #FFF;
+            border: 2.5px solid var(--color-primary);
+            border-radius: 18px;
+            padding: 10px 14px;
+            margin: 12px 5px;
+            font-family: 'Yomogi', cursive;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.06);
+            transform: rotate(-0.8deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -11px;
+            left: 20px;
+            border-width: 10px 7px 0;
+            border-style: solid;
+            border-color: var(--color-primary) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(12deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-accent);
+            transform: rotate(0.8deg);
+        }
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-accent) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-1.5deg);
+        }
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, rgba(13,115,119,0.08), rgba(20,145,155,0.12));
+            border: 1px solid rgba(13,115,119,0.2);
+            border-radius: 12px;
+            padding: 12px 16px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--color-primary);
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.95) translateY(15px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.5s ease-out forwards;
+            opacity: 0;
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+            gap: 12px;
+        }
+
+        .section-header i {
+            font-size: 28px;
+            color: var(--color-primary);
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: 'Courier New', monospace;
+            margin-top: 10px;
+            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #777;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: var(--color-primary);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div class="container mx-auto px-4 py-8" style="max-width: 1600px;">
+
+        <!-- Header -->
+        <header class="text-center mb-12 fade-in-scale">
+            <div class="mb-4">
+                <i class="fas fa-brain" style="font-size: 72px; color: var(--color-primary);"></i>
+            </div>
+            <h1 class="text-4xl font-bold mb-3 gradient-text" style="font-family: 'Kaisei Decol', serif;">
+                Context Mode 徹底解説
+            </h1>
+            <p class="text-lg text-gray-600 mb-2">
+                Claude Code / Codex の<span class="highlight">トークン節約</span>と<span class="highlight">AIの記憶喪失問題</span>を解決する革命的MCPプラグイン
+            </p>
+            <p class="text-gray-400 text-sm">GitHubトレンド1位獲得 ★17,600+</p>
+            <div class="w-40 h-1 mx-auto rounded-full mt-4" style="background: linear-gradient(90deg, var(--color-primary), var(--color-accent));"></div>
+            <p class="text-gray-500 mt-3">📅 2026年6月18日</p>
+        </header>
+
+        <!-- Grid Layout -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            <!-- Card 1: 概要 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="card-icon-wrapper">
+                    <i class="fas fa-fire"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">①GitHubトレンド1位を獲得</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-trophy text-yellow-500 mr-2"></i><span class="highlight">GitHubトレンド1位</span>を獲得したオープンソースMCPプラグイン</li>
+                    <li><i class="fas fa-star text-yellow-400 mr-2"></i>★17,600以上のスターを獲得中</li>
+                    <li><i class="fas fa-users mr-2" style="color: var(--color-secondary);"></i><span class="highlight">24万3,000人以上</span>の開発者が導入済み</li>
+                    <li><i class="fas fa-building mr-2 text-gray-500"></i>MicrosoftやGoogleなど大手企業も採用</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fas fa-lightbulb" style="color: var(--color-accent);"></i> 分散する多国籍チームによって開発されたプロジェクトです</span>
+                </div>
+            </div>
+
+            <!-- Card 2: 2大課題 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.15s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, var(--color-accent), #E67E22);">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">②AIが抱える2大課題</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-coins mr-2 text-yellow-600"></i><strong>課題1: トークンコストの高騰</strong> — 開発者が実費でトークンを購入する「隠れ言及状態」に陥っている</li>
+                    <li><i class="fas fa-brain mr-2" style="color: var(--color-primary);"></i><strong>課題2: モデルの記憶喪失</strong> — セッションが長引くと大事な情報を忘れてしまう</li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fas fa-face-sad-tear" style="color: var(--ui-color-5);"></i> 経費で落とせないのに、自分でAIを使ってる開発者が増加中…</span>
+                </div>
+            </div>
+
+            <!-- Card 3: 30分の壁 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #8E44AD, #9B59B6);">
+                    <i class="fas fa-hourglass-half"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">③「30分の壁」とは？</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-clock mr-2" style="color: #8E44AD;"></i>通常セッションは<span class="highlight">約30分で有効記憶が消失</span></li>
+                    <li><i class="fas fa-compress-arrows-alt mr-2 text-gray-500"></i>記憶の圧縮により10分前に決めた変数名すら霧のように消える</li>
+                    <li><i class="fas fa-database mr-2" style="color: var(--color-primary);"></i>コンテキストウィンドウの物理的限界がクリエイティビティを制約</li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fas fa-circle-info" style="color: var(--color-primary);"></i> Claude CodeやCodexにはコンパクション機能があるけど、必ずしも有効には機能しない…</span>
+                </div>
+            </div>
+
+            <!-- Card 4: トークン貧困 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.25s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, var(--ui-color-5), #C0392B);">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">④トークン貧困問題</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-arrow-up mr-2 text-red-500"></i>無駄なデータ送信が<span class="highlight">思考に使うべきトークン</span>を浪費する</li>
+                    <li><i class="fas fa-wallet mr-2 text-yellow-600"></i>個人開発者にとって実質的なコスト高を招く深刻問題</li>
+                    <li><i class="fas fa-file-code mr-2 text-gray-500"></i>Webスナップショット、git diff、サーバーログなどで大量消費</li>
+                    <li><i class="fas fa-chart-pie mr-2" style="color: var(--color-secondary);"></i>たった数回の読み込みで<span class="highlight">AIの許容量の70%以上</span>が消費される</li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fas fa-face-angry" style="color: var(--ui-color-5);"></i> ノイズだらけだとアウトプットや思考の質も落ちる！</span>
+                </div>
+            </div>
+
+            <!-- Card 5: コスト削減効果 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #27AE60, #2ECC71);">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑤脅威的な削減効果</h2>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                    <div class="stat-box">
+                        <div class="stat-number">98%</div>
+                        <div class="text-xs text-gray-600 mt-1">コスト削減率</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number">3h+</div>
+                        <div class="text-xs text-gray-600 mt-1">有効記憶延長</div>
+                    </div>
+                </div>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-check-circle mr-2" style="color: #27AE60;"></i>30分の壁を<span class="highlight">3時間以上</span>に大幅延長</li>
+                    <li><i class="fas fa-piggy-bank mr-2 text-pink-400"></i>トークンコストを最大98%削減</li>
+                </ul>
+            </div>
+
+            <!-- Card 6: メカニズム概要 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.35s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #2980B9, #3498DB);">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑥3つのコアメカニズム</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-cube mr-2" style="color: #2980B9;"></i><span class="tag">①サンドボックス</span> — AIとOS間に仮想作業場を配置</li>
+                    <li><i class="fas fa-camera mr-2" style="color: var(--color-secondary);"></i><span class="tag">②チェックポイント</span> — ファイルと実行記録をローカルに安全保管</li>
+                    <li><i class="fas fa-code mr-2" style="color: var(--color-accent);"></i><span class="tag">③Think-in-Code</span> — コードで思考する新しいパラダイム</li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fas fa-lightbulb" style="color: var(--color-accent);"></i> この3つが組み合わさって圧倒的な効果を生み出します！</span>
+                </div>
+            </div>
+
+            <!-- Card 7: サンドボックス詳解 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.4s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #16A085, #1ABC9C);">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑦サンドボックス防波堤</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-shield-halved mr-2" style="color: #16A085;"></i>AIとOSの間に<span class="highlight">仮想的な作業場</span>を配置</li>
+                    <li><i class="fas fa-lock mr-2 text-gray-500"></i>膨大なデータがコンテキストに直接流れ込むのを防止</li>
+                    <li><i class="fas fa-folder-closed mr-2" style="color: var(--color-secondary);"></i>全てのファイルと実行記録をローカルに安全保管</li>
+                    <li><i class="fas fa-filter mr-2 text-yellow-600"></i>必要な情報だけをコンテキストに流し込む仕組み</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fas fa-book" style="color: var(--color-accent);"></i> 全ての書類を図書館に保管し、手元には作品だけを置くイメージ</span>
+                </div>
+            </div>
+
+            <!-- Card 8: SQLite -->
+            <div class="card fade-in-scale" style="animation-delay: 0.45s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #5DADE2, #85C1E9);">
+                    <i class="fas fa-database"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑧SQLiteでデータを図書館化</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-book-open mr-2" style="color: #5DADE2;"></i>データを<span class="highlight">図書館のように整理</span>して高速全文検索</li>
+                    <li><i class="fas fa-search mr-2 text-gray-500"></i>インデックスを蓄積し、AIの手元にはインデックスだけを配置</li>
+                    <li><i class="fas fa-bolt mr-2 text-yellow-500"></i>新しいパラダイム — 56kBの書類全体を読む必要なし</li>
+                    <li><i class="fas fa-link mr-2" style="color: var(--color-primary);"></i>関連部分だけを瞬時に抽出してAIに伝える</li>
+                </ul>
+            </div>
+
+            <!-- Card 9: Think-in-Code -->
+            <div class="card fade-in-scale" style="animation-delay: 0.5s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, var(--color-accent), #D35400);">
+                    <i class="fas fa-lightbulb"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑨Think-in-Codeパラダイム</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-brain mr-2" style="color: var(--color-accent);"></i>AIをデータ処理マシンではなく<span class="highlight">コード生成器</span>として扱う</li>
+                    <li><i class="fas fa-code mr-2 text-blue-500"></i>データをまるまる渡すのではなく、<span class="highlight">処理用のコードを生成</span>させる</li>
+                    <li><i class="fas fa-play mr-2 text-green-500"></i>そのプログラムを実行した上で、結果だけをコンテキストに渡す</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fas fa-rocket" style="color: var(--color-accent);"></i> 1つのスクリプトが100倍の記憶を節約し、思考能力を最大限に引き出す！</span>
+                </div>
+            </div>
+
+            <!-- Card 10: 圧縮率データ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.55s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #E74C3C, #EC7063);">
+                    <i class="fas fa-compress-arrows-alt"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑩圧縮率の実データ</h2>
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between p-2 rounded-lg" style="background: rgba(13,115,119,0.05);">
+                        <div class="text-sm"><i class="fas fa-globe mr-2" style="color: var(--color-primary);"></i>Webスナップショット</div>
+                        <div class="font-bold" style="color: var(--color-primary);">56kB → 0.29kB <span class="tag text-xs">99.5%</span></div>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded-lg" style="background: rgba(199,92,27,0.05);">
+                        <div class="text-sm"><i class="fas fa-file-code mr-2" style="color: var(--color-accent);"></i>6ファイル500件</div>
+                        <div class="font-bold" style="color: var(--color-accent);">45kB → 0.155kB <span class="tag text-xs">99.7%</span></div>
+                    </div>
+                    <div class="flex items-center justify-between p-2 rounded-lg" style="background: rgba(39,174,96,0.05);">
+                        <div class="text-sm"><i class="fab fa-github mr-2 text-green-600"></i>GitHub 1周20件</div>
+                        <div class="font-bold text-green-600">59kB → 1.1kB <span class="tag text-xs">98%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: ノイズからシグナルへ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.6s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #8E44AD, #A569BD);">
+                    <i class="fas fa-signal"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑪ノイズからシグナルへ</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-volume-xmark mr-2 text-red-400"></i>無駄なコンテキスト・ノイズ情報の流入を遮断</li>
+                    <li><i class="fas fa-bullseye mr-2" style="color: var(--color-accent);"></i><span class="highlight">本当に必要な情報だけ</span>を抽出してコンテキストに流し込む</li>
+                    <li><i class="fas fa-arrow-up-right-dots mr-2 text-blue-500"></i>アウトプットと思考の質が向上する</li>
+                    <li><i class="fas fa-sparkles mr-2 text-yellow-500"></i>AIのクリエイティビティが物理的限界に縛られない</li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fas fa-wand-magic-sparkles" style="color: #8E44AD;"></i> ノイズのないクリアなコンテキスト＝質の高い出力！</span>
+                </div>
+            </div>
+
+            <!-- Card 12: RTKとの比較 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.65s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #2C3E50, #34495E);">
+                    <i class="fas fa-scale-balanced"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑫RTKとの比較</h2>
+                <div class="space-y-2 text-sm">
+                    <div class="p-3 rounded-lg" style="background: rgba(13,115,119,0.06); border-left: 3px solid var(--color-primary);">
+                        <div class="font-bold mb-1" style="color: var(--color-primary);"><i class="fas fa-plug mr-1"></i> Context Mode</div>
+                        <p class="text-gray-600">コンテキストウィンドウに<span class="highlight">インプットする時</span>に介入。文脈を送る前にアクションを起こす。</p>
+                    </div>
+                    <div class="p-3 rounded-lg" style="background: rgba(199,92,27,0.06); border-left: 3px solid var(--color-accent);">
+                        <div class="font-bold mb-1" style="color: var(--color-accent);"><i class="fas fa-terminal mr-1"></i> RTK</div>
+                        <p class="text-gray-600"><span class="highlight">コマンドを実行する時</span>に介入。自立型エージェントで特に効果を発揮する。</p>
+                    </div>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fas fa-handshake" style="color: var(--color-primary);"></i> 介入タイミングが違うから理論上は<span class="highlight">共存可能</span>！</span>
+                </div>
+            </div>
+
+            <!-- Card 13: 対応ツール -->
+            <div class="card fade-in-scale" style="animation-delay: 0.7s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #F39C12, #F1C40F);">
+                    <i class="fas fa-puzzle-piece"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑬幅広いツール対応</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-check mr-2 text-green-500"></i><span class="tag">Claude Code</span></li>
+                    <li><i class="fas fa-check mr-2 text-green-500"></i><span class="tag">Cursor</span></li>
+                    <li><i class="fas fa-check mr-2 text-green-500"></i><span class="tag">VS Code</span></li>
+                    <li><i class="fas fa-check mr-2 text-green-500"></i><span class="tag">GenCLI</span></li>
+                    <li><i class="fas fa-check mr-2 text-green-500"></i><span class="tag">Windsurf</span></li>
+                    <li><i class="fas fa-check mr-2 text-green-500"></i><span class="tag">Codex CLI</span></li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fas fa-feather" style="color: var(--color-primary);"></i> 軽量コンパクトなMCPプラグインで導入が超簡単！</span>
+                </div>
+            </div>
+
+            <!-- Card 14: 導入方法 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.75s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #1ABC9C, #16A085);">
+                    <i class="fas fa-terminal"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑭簡単導入手順</h2>
+                <p class="text-sm text-gray-600 mb-2">MCPプラグインとして追加するだけ。GitHubに手順が記載されています。</p>
+                <pre>npx @contextmode/mcp@latest</pre>
+                <ul class="space-y-2 text-sm text-gray-700 mt-3">
+                    <li><i class="fas fa-bolt mr-2 text-yellow-500"></i>数コマンドで完了する手軽さ</li>
+                    <li><i class="fas fa-hand-holding-dollar mr-2" style="color: #27AE60;"></i><span class="highlight">個人開発者は無料</span>で利用可能</li>
+                    <li><i class="fas fa-building mr-2 text-blue-500"></i>企業向けは有料のインサイトサービスあり</li>
+                </ul>
+            </div>
+
+            <!-- Card 15: インサイトサービス -->
+            <div class="card fade-in-scale" style="animation-delay: 0.8s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #9B59B6, #8E44AD);">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑮企業向けインサイトサービス</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-building mr-2" style="color: #9B59B6;"></i>企業向けに<span class="highlight">AIの費用効果を測定</span>するサービスを開始</li>
+                    <li><i class="fas fa-chart-pie mr-2 text-blue-400"></i>トークン消費の可視化・最適化提案</li>
+                    <li><i class="fas fa-hand-holding-dollar mr-2" style="color: #27AE60;"></i>ROIを正確に把握できる仕組み</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fas fa-briefcase" style="color: var(--color-accent);"></i> 個人は無料、企業向けは別途サービス。使い分けが明確！</span>
+                </div>
+            </div>
+
+            <!-- Card 16: コンパクションとの違い -->
+            <div class="card fade-in-scale" style="animation-delay: 0.85s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #E67E22, #D35400);">
+                    <i class="fas fa-arrows-rotate"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑯従来のコンパクションとの違い</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-compress mr-2 text-gray-400"></i><strong>従来:</strong> コンテキストが膨らむと自動圧縮 — でも情報が欠落する</li>
+                    <li><i class="fas fa-filter mr-2" style="color: var(--color-primary);"></i><strong>Context Mode:</strong> <span class="highlight">最初から無駄を送らない</span>アプローチ</li>
+                    <li><i class="fas fa-database mr-2 text-blue-400"></i>SQLiteベースの高速全文検索で必要なものだけを取出す</li>
+                    <li><i class="fas fa-code mr-2" style="color: var(--color-accent);"></i>Think-in-Codeでデータ処理をLLMの外で行う</li>
+                </ul>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fas fa-face-smile-beam" style="color: var(--ui-color-5);"></i> 「圧縮する」ではなく「最初から絞り込む」が肝！</span>
+                </div>
+            </div>
+
+            <!-- Card 17: 今後の展望 -->
+            <div class="card fade-in-scale" style="animation-delay: 0.9s;">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, #2ECC71, #27AE60);">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3">⑰今後の展望と活用戦略</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-code-branch mr-2" style="color: #2ECC71;"></i>RTKと<span class="highlight">理論上は共存可能</span> — 異なる介入タイミング</li>
+                    <li><i class="fas fa-flask mr-2 text-blue-500"></i>まずはClaude Code以外（Codex等）で導入テスト</li>
+                    <li><i class="fas fa-chart-line mr-2 text-green-500"></i>効果測定 → 最適な組み合わせを模索</li>
+                    <li><i class="fas fa-users-gear mr-2" style="color: var(--color-primary);"></i>コミュニティの活発な開発・改良が期待される</li>
+                </ul>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fas fa-star" style="color: var(--color-accent);"></i> 悪いことない、いいとこづくめのツール！</span>
+                </div>
+            </div>
+
+            <!-- Card 18: まとめ -->
+            <div class="card fade-in-scale" style="animation-delay: 0.95s; border: 2px solid var(--color-primary);">
+                <div class="card-icon-wrapper" style="background: linear-gradient(135deg, var(--color-primary), var(--color-dark)); width: 80px; height: 80px; border-radius: 20px;">
+                    <i class="fas fa-flag-checkered" style="font-size: 36px;"></i>
+                </div>
+                <h2 class="text-xl font-bold mb-3" style="color: var(--color-primary);">⑱まとめ: Context Modeが変えるAI開発</h2>
+                <ul class="space-y-2 text-sm text-gray-700">
+                    <li><i class="fas fa-check-circle mr-2" style="color: var(--color-primary);"></i>トークンコストを<span class="highlight">最大98%削減</span> — 経済的負担を劇的に軽減</li>
+                    <li><i class="fas fa-check-circle mr-2" style="color: var(--color-primary);"></i>有効記憶を<span class="highlight">30分→3時間以上</span>に延長 — 長時間セッションが可能に</li>
+                    <li><i class="fas fa-check-circle mr-2" style="color: var(--color-primary);"></i>MCPプラグインで<span class="highlight">導入が超簡単</span> — 個人開発者は無料</li>
+                    <li><i class="fas fa-check-circle mr-2" style="color: var(--color-primary);"></i>大手企業も採用する<span class="highlight">実績あるオープンソース</span></li>
+                    <li><i class="fas fa-check-circle mr-2" style="color: var(--color-primary);"></i>Think-in-Codeという<span class="highlight">新しいパラダイム</span>を提示</li>
+                </ul>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fas fa-heart" style="color: var(--ui-color-5);"></i> トークン節約×記憶延長×簡単導入。AI開発者は必見です！</span>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <div class="mb-3">
+                <i class="fab fa-youtube text-2xl mr-2" style="color: #FF0000;"></i>
+                <span>🎬 動画: <a href="https://www.youtube.com/watch?v=5FqdthkzW-A" target="_blank" style="color: var(--color-primary);">Github★1.7万【ClaudeCode/Codex】のトークン節約とAIの記憶喪失問題を解決する【Context Mode】が凄い — Generative AI and InfoBusiness Institute</a></span>
+            </div>
+            <p>📅 2026年6月18日 | AI News Infographic</p>
+        </footer>
+
+    </div>
+
+    <script>
+        // Intersection Observer for fade-in animation
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.style.animationPlayState = 'running';
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.fade-in-scale').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

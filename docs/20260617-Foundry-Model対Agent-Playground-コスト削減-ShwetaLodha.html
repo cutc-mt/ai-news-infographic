@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Playground vs Agent Playground: Microsoft Foundryでコストを削減するコツ</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #005B96;
+            --ui-color-2: #6497B1;
+            --ui-color-3: #D6EAF8;
+            --ui-color-4: #03396C;
+            --ui-color-5: #B3D4FC;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background-color: #F0F6FB; font-family: 'Kaisei Decol', serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1), var(--ui-color-2)); border-radius: 30px; color: white; position: relative; overflow: hidden; }
+        .header::before { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%); animation: headerGlow 8s ease-in-out infinite; }
+        @keyframes headerGlow { 0%,100%{transform:translate(0,0)} 50%{transform:translate(20px,20px)} }
+        .header-icon { font-size:5em; margin-bottom:10px; animation:fa-bounce 2s infinite; }
+        .header h1 { font-size:2.2em; font-weight:900; margin-bottom:10px; text-shadow:2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size:1.3em; opacity:0.9; font-family:'Yomogi',cursive; }
+        .header .date { font-size:0.9em; opacity:0.7; margin-top:10px; }
+        .section-layout { display:flex; flex-wrap:wrap; gap:20px; justify-content:center; margin-bottom:20px; }
+        .section-card { flex:1; min-width:280px; max-width:450px; background-color:white; border-radius:20px; padding:20px; box-shadow:5px 5px 15px rgba(0,0,0,0.1); position:relative; overflow:hidden; transition:transform 0.3s ease, box-shadow 0.3s ease; }
+        .section-card:hover { transform:translateY(-5px); box-shadow:8px 8px 25px rgba(0,0,0,0.15); }
+        .section-card::before { content:''; position:absolute; top:0; left:0; width:100%; height:5px; background:linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2), var(--ui-color-5)); }
+        .mega-icon-container { text-align:center; margin:15px 0; }
+        .mega-icon-container h2 { font-size:1.15em; color:var(--ui-color-4); margin-top:10px; }
+        .card-content { padding:0 10px 15px; }
+        .keyword-list { margin:15px 0; padding:0; list-style-type:none; }
+        .keyword-list li { margin-bottom:10px; display:flex; align-items:flex-start; font-size:15px; line-height:1.6; }
+        .keyword-list li i { margin-right:8px; color:var(--ui-color-2); min-width:16px; margin-top:4px; }
+        .keyword-tag { background-color:var(--ui-color-3); color:var(--ui-color-4); padding:3px 8px; border-radius:5px; margin-right:5px; display:inline-block; font-weight:bold; font-size:14px; }
+        .speech-bubble { position:relative; background:#fff; border:3px solid var(--ui-color-1); border-radius:20px; padding:12px 15px; margin:15px 5px; font-family:'Yomogi',cursive; box-shadow:3px 3px 10px rgba(0,0,0,0.1); transform:rotate(-1deg); }
+        .speech-bubble::after { content:''; position:absolute; bottom:-13px; left:20px; border-width:12px 8px 0; border-style:solid; border-color:var(--ui-color-1) transparent; display:block; width:0; }
+        .speech-bubble.right::after { left:auto; right:20px; transform:rotate(15deg); }
+        .speech-bubble.top::after { bottom:auto; top:-13px; border-width:0 8px 12px; transform:rotate(-5deg); }
+        .speech-bubble.variant-1 { background:#FFF9E3; border-color:#B7A44C; transform:rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color:#B7A44C transparent; }
+        .speech-bubble.variant-2 { background:#FFE9E9; border-color:#BF5656; transform:rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color:#BF5656 transparent; }
+        .handwritten { font-family:'Yomogi',cursive; font-size:15px; line-height:1.5; color:#333; }
+        pre { background:#f5f5f5; padding:10px; border-radius:8px; font-size:13px; margin-top:10px; overflow-x:auto; border-left:4px solid var(--ui-color-1); }
+        .highlight { background:linear-gradient(transparent 60%, rgba(0,91,150,0.3) 60%); font-weight:bold; }
+        .fade-in-scale { opacity:0; transform:scale(0.95); animation:fadeInScale 0.6s ease forwards; }
+        @keyframes fadeInScale { to { opacity:1; transform:scale(1); } }
+        .section-card:nth-child(1) { animation-delay:0.1s; }
+        .section-card:nth-child(2) { animation-delay:0.2s; }
+        .section-card:nth-child(3) { animation-delay:0.3s; }
+        .section-card:nth-child(4) { animation-delay:0.4s; }
+        footer { text-align:center; padding:30px 20px; margin-top:30px; font-size:14px; color:#777; border-top:2px dashed #ddd; }
+        footer a { color:var(--ui-color-1); text-decoration:none; }
+        footer a:hover { text-decoration:underline; }
+        .comparison-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+        .comparison-table th { background:var(--ui-color-1); color:white; padding:8px 12px; text-align:left; }
+        .comparison-table td { padding:8px 12px; border-bottom:1px solid #eee; }
+        .comparison-table tr:nth-child(even) td { background:var(--ui-color-3); }
+        @media (max-width:1600px) { .section-card{min-width:280px} }
+        @media (max-width:1200px) { .section-card{min-width:320px} }
+        @media (max-width:900px) { .section-card{min-width:380px} }
+        @media (max-width:768px) { .section-layout{flex-direction:column} .section-card{width:100%;min-width:auto} }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<div class="header">
+    <div class="header-icon"><i class="fas fa-scale-balanced fa-7x" aria-hidden="true"></i></div>
+    <h1>Model Playground vs Agent Playground</h1>
+    <div class="subtitle">Microsoft Foundryでコストを節約する選び方のコツ</div>
+    <div class="date"><i class="fas fa-calendar"></i> 2026年6月17日</div>
+</div>
+
+<!-- Row 1 -->
+<div class="section-layout">
+
+<!-- Card 1 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-video fa-5x" style="color:var(--ui-color-1);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>① 動画の概要</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Microsoft Foundry</span>にある2つのプレイグラウンドの違いを解説</span></li>
+            <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>見た目は似ているが<span class="highlight">目的が全く異なる</span>2つのツール</span></li>
+            <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>間違った選び方をすると<span class="highlight">余計なコストと手間</span>がかかる</span></li>
+            <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span>正しい使い分けで開発の効率を最大化する方法を紹介</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color:var(--ui-color-2);"></i> 両方ともAIとチャットできるけど、役割がまるで違うんだ！</span>
+    </div>
+</div>
+
+<!-- Card 2 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-bullseye fa-5x" style="color:var(--ui-color-2);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>② 一言でまとめると</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-flask fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Model Playground</span> = 1つのモデルを実験する場所</span></li>
+            <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Agent Playground</span> = システム全体を構築する場所</span></li>
+            <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>Model: 「どの<span class="highlight">モデルとプロンプト</span>を使うべき？」</span></li>
+            <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>Agent: 「私の<span class="highlight">エージェント</span>は実際に動く？」</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color:#B7A44C;"></i> この2つの質問を分ければ、どちらを使うか迷わない！</span>
+    </div>
+</div>
+
+<!-- Card 3 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-user-tie fa-5x" style="color:var(--ui-color-1);animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>③ チャンネル紹介</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Shweta Lodha</span>が解説</span></li>
+            <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>Azure OpenAIやChatGPTなどのAI系コンテンツを中心に活動</span></li>
+            <li><i class="fa-solid fa-book fa-lg" aria-hidden="true"></i><span>MediumブログやGumroadで学習リソースも公開中</span></li>
+            <li><i class="fa-solid fa-share-nodes fa-lg" aria-hidden="true"></i><span>Instagram / X / Facebookで最新情報を発信</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color:#BF5656;"></i> 視聴者からのリクエストでこの比較動画を作ってくれた！</span>
+    </div>
+</div>
+
+<!-- Card 4 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>④ Microsoft Foundryとは</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i><span>旧称は<span class="keyword-tag">Azure AI Foundry</span></span></li>
+            <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span>MicrosoftのクラウドAIプラットフォームの一部</span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>モデルの選択から<span class="highlight">エージェントの構築・デプロイ</span>まで一貫した環境</span></li>
+            <li><i class="fa-solid fa-screwdriver-wrench fa-lg" aria-hidden="true"></i><span>Playgroundが2種類あり用途が明確に分かれている</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-info-circle fa-lg" style="color:var(--ui-color-2);"></i> Azure AI Foundryから名前が変わったんだね！</span>
+    </div>
+</div>
+
+</div>
+
+<!-- Row 2: Model Playground -->
+<div class="section-layout">
+
+<!-- Card 5 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-code-compare fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑤ サイドバイサイド比較</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>Model Playground最大の特徴: <span class="highlight">最大3つのモデルを同時に比較</span></span></li>
+            <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>同じプロンプトを複数モデルに一発で送信可能</span></li>
+            <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>プロジェクト初期で<span class="keyword-tag">モデル未定</span>の時に超便利</span></li>
+            <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>3つの別々の実験を1つの画面で完了できる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-trophy fa-lg" style="color:#B7A44C;"></i> これがModel Playgroundにしかない強力な機能！</span>
+    </div>
+</div>
+
+<!-- Card 6 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-sliders fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑥ パラメータの完全制御</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-temperature-half fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Temperature</span>: クリエイティブさの調整</span></li>
+            <li><i class="fa-solid fa-chart-pie fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Top P</span>: トークン選択の範囲</span></li>
+            <li><i class="fa-solid fa-repeat fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Frequency Penalty</span>: 繰り返しの抑制</span></li>
+            <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Presence Penalty</span>: 新しい話題の促進</span></li>
+            <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>すべて<span class="highlight">リアルタイムで調整</span>できる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right variant-2">
+        <span class="handwritten"><i class="fa-solid fa-magic fa-lg" style="color:#BF5656;"></i> エージェント内でいじるよりここでチューニングするのが正解！</span>
+    </div>
+</div>
+
+<!-- Card 7 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-toolbox fa-5x" style="color:var(--ui-color-1);animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>⑦ 組み込みツール群</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-globe fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Web Search</span>: ウェブ検索機能</span></li>
+            <li><i class="fa-solid fa-folder-open fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">File Search</span>: ファイル検索機能</span></li>
+            <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Code Interpreter</span>: コード実行機能</span></li>
+            <li><i class="fa-solid fa-check-circle fa-lg" aria-hidden="true"></i><span>3つとも<span class="highlight">追加設定なしですぐ使える</span></span></li>
+            <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>クイックな実験に最適な構成</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-zap fa-lg" style="color:var(--ui-color-2);"></i> セットアップ不要でサクサク使える！</span>
+    </div>
+</div>
+
+<!-- Card 8 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="color:var(--ui-color-2);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑧ SDKコードのエクスポート</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-download fa-lg" aria-hidden="true"></i><span>良い設定が見つかったら<span class="highlight">SDKコードを直接エクスポート</span></span></li>
+            <li><i class="fa-solid fa-flag-checkered fa-lg" aria-hidden="true"></i><span>クリーンなスタート地点が手に入る</span></li>
+            <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>Agent Playgroundへの<span class="highlight">移行の足がかり</span>として最適</span></li>
+        </ul>
+        <pre>// エクスポートしたSDKコードの例
+const response = await client.chat({
+  model: "gpt-4o",
+  messages: [...],
+  temperature: 0.7
+});</pre>
+    </div>
+    <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-code fa-lg" style="color:#B7A44C;"></i> 実験結果をそのままコードに！素晴らしいワークフロー</span>
+    </div>
+</div>
+
+</div>
+
+<!-- Row 3: Agent Playground -->
+<div class="section-layout">
+
+<!-- Card 9 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="color:var(--ui-color-1);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑨ カスタムツールの統合</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>Agent Playgroundの核心: <span class="highlight">カスタムツールの追加</span></span></li>
+            <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>外部APIの呼び出しが可能</span></li>
+            <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>独自の関数やサービスをエージェントに接続</span></li>
+            <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span>これが<span class="highlight">リアルなエージェントワークフロー</span>の基盤</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-link fa-lg" style="color:var(--ui-color-2);"></i> 組み込みツールじゃ足りない？ 自分専用ツールを繋げられる！</span>
+    </div>
+</div>
+
+<!-- Card 10 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x" style="color:var(--ui-color-2);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑩ ナレッジソースの接続</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-alt fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ファイル</span>、<span class="keyword-tag">URL</span>、<span class="keyword-tag">SharePoint</span>などに対応</span></li>
+            <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>実際のデータをエージェントに接続</span></li>
+            <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>エージェントがデータを検索して<span class="highlight">推論</span>できる</span></li>
+            <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>RAG（検索拡張生成）のセットアップを<span class="highlight">ここで確認</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color:#BF5656;"></i> データなしのエージェントじゃ意味ないもんね！</span>
+    </div>
+</div>
+
+<!-- Card 11 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-memory fa-5x" style="color:var(--ui-color-1);animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>⑪ メモリ（状態の保持）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>Model Playground: すべての会話が<span class="highlight">毎回リセット</span></span></li>
+            <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>Agent Playground: <span class="highlight">状態をターン間で維持</span>できる</span></li>
+            <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>5〜6ターンの<span class="highlight">マルチターン会話</span>をテスト可能</span></li>
+            <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i><span>エージェントの記憶設定を詳細に構成できる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right top">
+        <span class="handwritten"><i class="fa-solid fa-magic fa-lg" style="color:#B7A44C;"></i> 会話の文脈が途切れないのがポイント！</span>
+    </div>
+</div>
+
+<!-- Card 12 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-route fa-5x" style="color:var(--ui-color-2);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑫ トレーシング（実行追跡）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>Agent Playground<span class="highlight">専用</span>の強力機能</span></li>
+            <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>ツール呼び出し、検索結果、推論ステップをすべて記録</span></li>
+            <li><i class="fa-solid fa-bug fa-lg" aria-hidden="true"></i><span><span class="highlight">本番デプロイ前</span>に実行の全容を確認できる</span></li>
+            <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>これをやらないと<span class="highlight">何時間ものデバッグ</span>に…</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color:#BF5656;"></i> 本番に行く前に必ずトレースを確認！後悔しないために！</span>
+    </div>
+</div>
+
+</div>
+
+<!-- Row 4: 比較 -->
+<div class="section-layout">
+
+<!-- Card 13 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-table-columns fa-5x" style="color:var(--ui-color-1);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑬ 機能の比較一覧</h2>
+    </div>
+    <div class="card-content">
+        <table class="comparison-table">
+            <tr><th>機能</th><th>Model</th><th>Agent</th></tr>
+            <tr><td>モデル比較</td><td><i class="fa-solid fa-check" style="color:green;"></i></td><td><i class="fa-solid fa-xmark" style="color:red;"></i></td></tr>
+            <tr><td>パラメータ調整</td><td><i class="fa-solid fa-check" style="color:green;"></i></td><td><i class="fa-solid fa-check" style="color:green;"></i></td></tr>
+            <tr><td>組み込みツール</td><td><i class="fa-solid fa-check" style="color:green;"></i></td><td><i class="fa-solid fa-check" style="color:green;"></i></td></tr>
+            <tr><td>カスタムツール</td><td><i class="fa-solid fa-xmark" style="color:red;"></i></td><td><i class="fa-solid fa-check" style="color:green;"></i></td></tr>
+            <tr><td>ナレッジソース</td><td><i class="fa-solid fa-xmark" style="color:red;"></i></td><td><i class="fa-solid fa-check" style="color:green;"></i></td></tr>
+            <tr><td>メモリ</td><td><i class="fa-solid fa-xmark" style="color:red;"></i></td><td><i class="fa-solid fa-check" style="color:green;"></i></td></tr>
+            <tr><td>トレーシング</td><td><i class="fa-solid fa-xmark" style="color:red;"></i></td><td><i class="fa-solid fa-check" style="color:green;"></i></td></tr>
+        </table>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color:var(--ui-color-2);"></i> 赤い×がついてる機能はAgent専用だよ！</span>
+    </div>
+</div>
+
+<!-- Card 14 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-unlock fa-5x" style="color:var(--ui-color-2);animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>⑭ Modelだけにある機能</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span><span class="highlight">マルチモデル比較</span>はModel Playground専用</span></li>
+            <li><i class="fa-solid fa-not-equal fa-lg" aria-hidden="true"></i><span>Agent Playgroundでは2つのモデルを<span class="highlight">並べて比較できない</span></span></li>
+            <li><i class="fa-solid fa-arrows-left-right fa-lg" aria-hidden="true"></i><span>Agent Playgroundはデプロイ済みモデルの<span class="keyword-tag">バージョン比較</span>のみ</span></li>
+            <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>「どのモデルを使うか」という疑問があれば→Modelへ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color:#B7A44C;"></i> モデル選びの段階なら絶対Model Playground！</span>
+    </div>
+</div>
+
+<!-- Card 15 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-lock fa-5x" style="color:var(--ui-color-1);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑮ Agentだけにある機能</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span><span class="highlight">ナレッジソース</span>の接続機能</span></li>
+            <li><i class="fa-solid fa-memory fa-lg" aria-hidden="true"></i><span><span class="highlight">メモリ</span>（状態の保持）機能</span></li>
+            <li><i class="fa-solid fa-route fa-lg" aria-hidden="true"></i><span><span class="highlight">トレーシング</span>（実行の全追跡）機能</span></li>
+            <li><i class="fa-solid fa-stop fa-lg" aria-hidden="true"></i><span>これらのどれかが必要なら<span class="highlight">Agent一択</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color:#BF5656;"></i> ナレッジ・メモリ・トレースが必要ならAgent Playground一択！</span>
+    </div>
+</div>
+
+<!-- Card 16 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-dollar-sign fa-5x" style="color:var(--ui-color-2);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑯ コスト削減のコツ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span>初期段階では<span class="highlight">Model Playgroundを最大限に活用</span></span></li>
+            <li><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i><span>Agent Playgroundはより高コストな処理が走る</span></li>
+            <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span>モデルとプロンプトの決定が済むまでModelで済ませる</span></li>
+            <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>設定が固まってからAgent Playgroundに移行する</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-piggy-bank fa-lg" style="color:var(--ui-color-2);"></i> 無駄遣いしないための<span class="highlight">鉄則</span>だね！</span>
+    </div>
+</div>
+
+</div>
+
+<!-- Row 5: 実践ワークフロー -->
+<div class="section-layout">
+
+<!-- Card 17 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-list-ol fa-5x" style="color:var(--ui-color-1);animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>⑰ 推奨ワークフロー</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Step 1</span>: Model Playgroundでモデルを比較・選択</span></li>
+            <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Step 2</span>: 組み込みツールでプロンプトを調整</span></li>
+            <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Step 3</span>: SDKコードをエクスポート</span></li>
+            <li><i class="fa-solid fa-4 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Step 4</span>: Agent Playgroundでカスタムツール・ナレッジ・メモリを追加</span></li>
+            <li><i class="fa-solid fa-5 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Step 5</span>: トレースを確認して<span class="highlight">本番デプロイ</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-flag fa-lg" style="color:#B7A44C;"></i> 順番通りに進めれば確実！</span>
+    </div>
+</div>
+
+<!-- Card 18 -->
+<div class="section-card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color:var(--ui-color-2);animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>⑱ まとめ: プロンプトからプロダクトへ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-flask fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Model Playground</span>: モデル選択 → プロンプト調整 → コード出力。軽量・高速・比較に最適</span></li>
+            <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Agent Playground</span>: カスタムツール → ナレッジ → メモリ → トレース確認 → 本番へ</span></li>
+            <li><i class="fa-solid fa-heart fa-lg" aria-hidden="true"></i><span>2つのツールで<span class="highlight">1つのプロダクションAIエージェント</span>が完成する</span></li>
+            <li><i class="fa-solid fa-arrows-left-right-to-line fa-lg" aria-hidden="true"></i><span>順番を守れば<span class="highlight">コストも手間も最小限</span>に抑えられる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color:#BF5656;"></i> <span class="highlight">プロンプトがプロダクトになる</span>道のりを段階的に進めよう！</span>
+    </div>
+</div>
+
+</div>
+
+<footer>
+    🎬 動画: <a href="https://www.youtube.com/watch?v=NvoqyTpFE9M" target="_blank" style="color: inherit;">Shweta Lodha (AI with Shweta)</a> | 📅 2026年6月17日 | 🏷️ Microsoft Foundry, Model Playground, Agent Playground, Azure AI
+</footer>
+
+</div>
+</body>
+</html>

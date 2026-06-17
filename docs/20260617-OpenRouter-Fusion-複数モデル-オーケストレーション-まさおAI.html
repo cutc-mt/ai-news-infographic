@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenRouter Fusionを実際に使ってみた！複数モデルのオーケストレーション解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #C75B12;
+            --ui-color-2: #E8890C;
+            --ui-color-3: #FFF3E0;
+            --ui-color-4: #5D2E0A;
+            --ui-color-5: #FF6D00;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #FFFAF5;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1), var(--ui-color-5));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2), var(--ui-color-5));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.15em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: #B7A44C;
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: #B7A44C transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #BF5656;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #BF5656 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(199,91,18,0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* Fusion Badge */
+        .fusion-badge {
+            display: inline-block;
+            padding: 3px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 13px;
+            margin: 2px;
+        }
+        .badge-model { background: var(--ui-color-2); color: white; }
+        .badge-orch { background: var(--ui-color-4); color: white; }
+        .badge-score { background: var(--ui-color-5); color: white; }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Stagger animation delays */
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+
+        /* Full width card */
+        .full-width {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-atom fa-7x" aria-hidden="true"></i></div>
+            <h1>OpenRouter Fusion を実際に使ってみた！</h1>
+            <div class="subtitle">複数のLLMをオーケストレーションして最強の出力を得る新機能を徹底解説</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月16日</div>
+        </div>
+
+        <!-- Row 1: 概要 -->
+        <div class="section-layout">
+
+            <!-- Card 1: チャンネル紹介 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-tower-broadcast fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① まさおAIじっくり解説ch — 実務エンジニアが語るAI</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-gear"></i><span><span class="keyword-tag">まさお</span>は開発歴14年・自営業8年目の<span class="highlight">AIサービス開発エンジニア</span></span></li>
+                        <li><i class="fa-solid fa-trophy"></i><span>個人開発で<span class="keyword-tag">累計3,000万人以上</span>が利用したサービスと<span class="keyword-tag">400万DL超</span>のアプリを開発</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i><span>旧帝大出身で画素補完法の研究経験あり。得意分野は<span class="keyword-tag">フロントエンド</span>と<span class="keyword-tag">画像処理</span></span></li>
+                        <li><i class="fa-solid fa-upload"></i><span>ほぼ毎日AIに関する最新情報や本質を<span class="highlight">深く・早く</span>解説するチャンネル（2.49万人登録）</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-laugh-beam fa-lg" style="color: #B7A44C;"></i>
+                            「AIサービス開発に携わるエンジニア」が<br>
+                            実務のノウハウを交えて<br>
+                            <span class="keyword-tag">本当に役に立つAIの使い方</span>を語る！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: OpenRouter Fusionとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-atom fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② OpenRouter Fusion とは？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lightbulb"></i><span>OpenRouterから登場した<span class="highlight">新機能「Fusion」</span>が話題になっている</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span>1つの問いに対して<span class="keyword-tag">複数のLLMが回答を書き</span>、オーケストレーターが評価して最終出力をまとめる仕組み</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>例えばGemini、OpenAI、Claudeなど<span class="highlight">異なるモデルに同じ問題を解かせる</span></span></li>
+                        <li><i class="fa-solid fa-arrows-to-dot"></i><span>複数の視点を束ねることで<span class="keyword-tag">より強力な出力</span>を得る設計パターン</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            Claude CodeでもCodexやGeminiを<br>
+                            呼び出す手法はあったけど、<br>
+                            <span class="keyword-tag">OpenRouterがスキルとして公式提供</span>！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: 動画の概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-film fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ 今回の動画の内容</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i><span>8分程度の動画でFusionの仕組みから<span class="highlight">実検証結果</span>までを解説</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span>実際に<span class="keyword-tag">Opus 4.8</span>、<span class="keyword-tag">JM 3.1</span>、<span class="keyword-tag">GPT 5.5</span>を使ってフュージョンを試した結果を報告</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>単体モデル vs フュージョンの<span class="highlight">勝率比較</span>や、安いモデルのフュージョンはどうなるかを検証</span></li>
+                        <li><i class="fa-solid fa-screwdriver-wrench"></i><span>OpenRouterサイトでの使い方や<span class="keyword-tag">自作スキルfusion-fable</span>の紹介も含む</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bolt fa-lg" style="color: #BF5656;"></i>
+                            API課金なのでコストはかかる。<br>
+                            でも<span class="keyword-tag">使いどころ</span>次第では<br>
+                            大きな効果を発揮する！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: LM Debateとの関係 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>④ 設計パターンの系譜 — LM Debate から Fusion へ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-book-open"></i><span>複数モデルで議論・評価する手法は<span class="keyword-tag">LM Debate</span>などの研究で知られていた</span></li>
+                        <li><i class="fa-solid fa-building-columns"></i><span>Claude Codeなどの<span class="highlight">クローズドソース</span>でも同様の設計パターンが採用されていた</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span>Claude Codeでは<span class="keyword-tag">Codexを呼び出す</span>、<span class="keyword-tag">Geminiを呼び出す</span>など色々なやり方が存在</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>それが<span class="highlight">OpenRouter Fusionとしてスキルとして共有</span>され、誰でも手軽に利用できるようになった</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: #B7A44C;"></i>
+                            勇志（ゆうし）が<br>
+                            <span class="keyword-tag">fusion-fable</span>という<br>
+                            スキルとして共有してくれた！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Fusionの仕組み -->
+        <div class="section-layout">
+
+            <!-- Card 5: Fusionの内部構造 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ Fusion の中身 — 5つのAIに解かせて評価</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1"></i><span><span class="fusion-badge badge-model">Step 1</span> <span class="keyword-tag">1つの問い</span>に対して、複数のモデルに回答を書かせる（回答メモのような形式）</span></li>
+                        <li><i class="fa-solid fa-2"></i><span><span class="fusion-badge badge-orch">Step 2</span> <span class="keyword-tag">オーケストレーター</span>が各モデルの回答に対して評価を行う</span></li>
+                        <li><i class="fa-solid fa-3"></i><span><span class="fusion-badge badge-score">Step 3</span> 評価をもとに<span class="highlight">最終結果を出力</span>するシンプルな仕組み</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>これにより<span class="keyword-tag">抜け漏れが起こりにくく</span>なるというメリットがある</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            やっていることは<br>
+                            本当にシンプル！<br>
+                            <span class="keyword-tag">解かせて・評価して・まとめる</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: 実際の検証結果 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-column fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 実検証 — Opus 4.8 + JM 3.1 + GPT 5.5</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flask-vial"></i><span>まさおが実際に<span class="keyword-tag">Opus 4.8</span>、<span class="keyword-tag">JM 3.1</span>、<span class="keyword-tag">GPT 5.5</span>を組み合わせてフュージョンを試す</span></li>
+                        <li><i class="fa-solid fa-trophy"></i><span>結果は<span class="highlight">Opus単体よりも勝率が高い</span>というデータが得られた</span></li>
+                        <li><i class="fa-solid fa-coins"></i><span>ただしコストと<span class="keyword-tag">応答速度</span>はかかってしまうというトレードオフが存在する</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>他にも<span class="keyword-tag">MiniMax</span>、<span class="keyword-tag">Grok</span>、<span class="keyword-tag">Mamo</span>など低コスト系モデルを混ぜる組み合わせも可能</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: #BF5656;"></i>
+                            フロントア級モデル同士なら<br>
+                            <span class="keyword-tag">フュージョンが勝つ！</span><br>
+                            これは熱い結果だ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7: 安いモデルはどうか -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-money-bill-wave fa-5x" style="color: #BF5656; animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 安いモデルを束ねれば最強になるのか？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scale-unbalanced"></i><span>GrokやMiniMax、Mamoなどの<span class="keyword-tag">低コスト系モデル</span>がある</span></li>
+                        <li><i class="fa-solid fa-question"></i><span>じゃあ<span class="highlight">いっぱいガっちゃんこ</span>したらOpusより強くなるのか？</span></li>
+                        <li><i class="fa-solid fa-equals"></i><span>同じぐらいの質なら<span class="keyword-tag">複数混ぜた方が出力は良かった</span>という結果はある</span></li>
+                        <li><i class="fa-solid fa-arrow-down"></i><span>しかし<span class="highlight">モデルの質が根本的に重要</span>で、低コストだけではフロンティアには届かない</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-xmark fa-lg" style="color: var(--ui-color-1);"></i>
+                            「安いフュージョンは全然勝てない」<br>
+                            勝率は悪かった。<br>
+                            <span class="keyword-tag">中身のモデルの質</span>は大事！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: ブラインド検証 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shuffle fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ ブラインド検証 — Fusion は単体に勝つか？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-masks-theater"></i><span>どれのモデルが出した答えか分からないように<span class="keyword-tag">シャッフル</span>して評価させた</span></li>
+                        <li><i class="fa-solid fa-balance-scale"></i><span>結果は<span class="highlight">フュージョンした方が単体のものより良い結果</span>になった</span></li>
+                        <li><i class="fa-solid fa-ranking-star"></i><span>GPT 5.5とも比較し、<span class="keyword-tag">オレベルぐらいのモデル</span>を複数合わした方が良かった</span></li>
+                        <li><i class="fa-solid fa-hand-point-right"></i><span>「複数パターン・複数モデルを合わした方が良かった」という<span class="highlight">実験結果</span>が得られた</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-medal fa-lg" style="color: #B7A44C;"></i>
+                            複数の視点で<br>
+                            回答を評価するから<br>
+                            <span class="keyword-tag">抜け漏れが減る</span>のがポイント！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: 話題の背景とスコア -->
+        <div class="section-layout">
+
+            <!-- Card 9: 話題になった理由 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fire-flame-curved fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ なぜ話題に？ — Fable 引退とスコア検証</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-door-open"></i><span><span class="keyword-tag">Fableモデル</span>がなくなってしまったことが<span class="highlight">話題のきっかけ</span></span></li>
+                        <li><i class="fa-solid fa-search"></i><span>「Fableに近づけるにはどうすればいいか」という<span class="keyword-tag">代替手段の模索</span>が始まった</span></li>
+                        <li><i class="fa-solid fa-chart-simple"></i><span>OpenRouterの<span class="keyword-tag">スコア検証</span>でFableに近づくための組み合わせが共有されバズった</span></li>
+                        <li><i class="fa-solid fa-trophy"></i><span>例えば<span class="keyword-tag">Opus 4.8を2つ合わせたらFableより上</span>というスコア結果が話題に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-explosion fa-lg" style="color: #BF5656;"></i>
+                            Fableだけだったらこの性能だったけど<br>
+                            Opus 4.8×2ならFableより上！<br>
+                            <span class="keyword-tag">これがバズった</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: まさおの所見 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ まさおの所見 — Fable越えは必要か？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-exclamation"></i><span>個人としては<span class="highlight">Fable語とは全然思わない</span>とまさおは語る</span></li>
+                        <li><i class="fa-solid fa-layer-group"></i><span>課題ごとに<span class="keyword-tag">どれぐらい詳細である必要があるか</span>や<span class="keyword-tag">求められる知能のレベル</span>は違う</span></li>
+                        <li><i class="fa-solid fa-bookmark"></i><span>ただ、こういう<span class="keyword-tag">マルチモデルの設計パターン</span>が存在することは知っておくべき</span></li>
+                        <li><i class="fa-solid fa-lightbulb"></i><span>状況に応じて<span class="highlight">適切に使える選択肢</span>を持っておくことがエンジニアとして重要</span></li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            Fable語というよりは<br>
+                            <span class="keyword-tag">設計パターンとしての価値</span>を<br>
+                            覚えておくのが大事！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: コストと速度 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gauge-high fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ コストと速度のトレードオフ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-coins"></i><span>OpenRouterでAPI課金をするため<span class="highlight">コストは余計にかかる</span></span></li>
+                        <li><i class="fa-solid fa-stopwatch"></i><span>複数モデルを回すので<span class="keyword-tag">応答速度</span>もどうしてもかかってしまう</span></li>
+                        <li><i class="fa-solid fa-credit-card"></i><span>コストについては<span class="keyword-tag">サブスクの部分を使う</span>、<span class="keyword-tag">スキルを作って対応</span>すれば解消できる</span></li>
+                        <li><i class="fa-solid fa-hourglass-half"></i><span>しかし<span class="highlight">時間はどうしてもかかる</span>。これがFusionを使う上での最大の懸念点</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-clock fa-lg" style="color: #BF5656;"></i>
+                            お金はサブスクで節約できるけど<br>
+                            <span class="keyword-tag">時間はどうしてもかかる</span><br>
+                            ここが使いどころの鍵！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: 使いどころ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-crosshairs fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ Fusion のおすすめ使いどころ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i><span><span class="keyword-tag">急がないタスク</span>で使える場面があるかもしれない</span></li>
+                        <li><i class="fa-solid fa-lock-open"></i><span><span class="highlight">フロンティア級モデルが封じられた時</span>の代替手段として有力な選択肢になる</span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span>Grok、DeepSeek、GLMなどで<span class="keyword-tag">力を最大限発揮したい</span>時のパターン</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span><span class="highlight">把握すべき変数が多い</span>タスクほど、複数モデルの意見で<span class="keyword-tag">漏れを減らせる</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: #B7A44C;"></i>
+                            変数が多ければ多いほど<br>
+                            複数の視点が役立つ！<br>
+                            <span class="keyword-tag">レビューアーを複数にする</span>イメージ
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4: OpenRouterでの使い方とスキル -->
+        <div class="section-layout">
+
+            <!-- Card 13: OpenRouterサイトでの使い方 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ OpenRouterサイトでの使い方</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-link"></i><span>OpenRouterのサイトに<span class="keyword-tag">Model Fusion</span>という機能がある</span></li>
+                        <li><i class="fa-solid fa-hand-pointer"></i><span>そこから<span class="highlight">複数のモデルを選択</span>して進めていくことができる</span></li>
+                        <li><i class="fa-solid fa-sliders"></i><span><span class="keyword-tag">カスタム設定</span>も可能で、好きなモデルを自由にフュージョンできる</span></li>
+                        <li><i class="fa-solid fa-play"></i><span>簡単に試せるので、まずは<span class="highlight">OpenRouterのサイトから試す</span>のがおすすめ</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            openrouter.ai/fusion で<br>
+                            <span class="keyword-tag">ブラウザ上からすぐに試せる！</span><br>
+                            まずはここから始めよう。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: fusion-fableスキル -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ 自作スキル fusion-fable の紹介</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-pen"></i><span><span class="keyword-tag">勇志</span>が作成・共有した<span class="highlight">fusion-fable</span>というスキルがある</span></li>
+                        <li><i class="fa-solid fa-microchip"></i><span>Codexや<span class="keyword-tag">Gemini 3.1 Pro</span>などを呼び出してオーケストレーションする仕組み</span></li>
+                        <li><i class="fa-solid fa-gavel"></i><span>オーケストレーターは<span class="keyword-tag">Opus 4.8</span>、評価ジャッジも<span class="keyword-tag">4.8が担当</span>する構成</span></li>
+                        <li><i class="fa-solid fa-copy"></i><span>自作でもFusionと同じ仕組みを<span class="highlight">パクって実装可能</span>。シーケンスは直感的な作り</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: #B7A44C;"></i>
+                            僕も使ってます！<br>
+                            <span class="keyword-tag">ここぞという時</span>に<br>
+                            複数の視点を得るのに便利。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: 実際の使用シーン -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ まさおの実際の使用シーン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban"></i><span>まさおの環境では<span class="highlight">毎回使うような頻度の高い用途はない</span></span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>しかし<span class="keyword-tag">「ここぞ」という時</span>には活用していると明言</span></li>
+                        <li><i class="fa-solid fa-users-viewfinder"></i><span><span class="highlight">レビューアーを複数にしたい</span>と思った時がまさにFusionの出番</span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>頻度は低くても<span class="keyword-tag">持っておくと非常に心強い選択肢</span>として機能する</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-bullseye fa-lg" style="color: #BF5656;"></i>
+                            毎回じゃなくていい。<br>
+                            <span class="keyword-tag">重要な場面で1回使う</span>だけで<br>
+                            効果は十分にある！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16: フロンティア封じられた時 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ フロンティア級が封じられた時の代替戦略</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lock"></i><span><span class="keyword-tag">フロンティア級モデル</span>が制限・利用不可になった時の<span class="highlight">代替手段</span>として有効</span></li>
+                        <li><i class="fa-solid fa-users-gear"></i><span>Grok、DeepSeek、GLMなどの<span class="keyword-tag">強力なモデルを束ねる</span>ことでフロンティアに近い出力を狙う</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>組み合わせを変えることで<span class="highlight">状況に応じた最適構成</span>が作れる柔軟性が強み</span></li>
+                        <li><i class="fa-solid fa-network-wired"></i><span>特定のモデルに依存しない<span class="keyword-tag">リスク分散</span>としての役割も大きい</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            使いたいモデルの中で<br>
+                            <span class="keyword-tag">ベストを尽くす</span>という意味で<br>
+                            Fusionは1つの良い選択肢！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: 応用とまとめ -->
+        <div class="section-layout">
+
+            <!-- Card 17: Best-of-Nへの応用 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-ranking-star fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 応用編 — Best-of-N スキルへの展開</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-forward"></i><span>応用として<span class="keyword-tag">Best-of-N</span>のスキルを作ってみるのもおすすめとまさおは提案</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>OpenRouterのFusionは<span class="highlight">既に実装している人もいる</span>ほど直感的な作り</span></li>
+                        <li><i class="fa-solid fa-wrench"></i><span>スキルを色々と作って<span class="keyword-tag">ハーネスをより強力にしていく</span>ことができる</span></li>
+                        <li><i class="fa-solid fa-compass"></i><span>「<span class="highlight">どういう時にこのスキルを使ってほしいのか</span>」という研究も面白いテーマだ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: #B7A44C;"></i>
+                            Best-of-Nスキルで<br>
+                            <span class="keyword-tag">さらに精度の高い出力</span>を<br>
+                            目指せるかもしれない！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18: まとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ — Fusionは使う価値があるか？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check"></i><span><span class="highlight">オレベル以上のモデル</span>を組み合わせれば<span class="keyword-tag">単体を上回る性能</span>が確認された</span></li>
+                        <li><i class="fa-solid fa-xmark"></i><span><span class="highlight">安いモデルのフュージョン</span>ではフロンティア級には勝てない</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>コストと時間はかかるが、<span class="keyword-tag">急がない重要タスク</span>や<span class="keyword-tag">フロンティア封じ時</span>に有用</span></li>
+                        <li><i class="fa-solid fa-handshake"></i><span>複数の視点で漏れを減らす<span class="highlight">マルチモデル設計パターン</span>として覚えておく価値あり</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-heart fa-lg" style="color: #BF5656;"></i>
+                            毎回じゃなくていい。<br>
+                            <span class="keyword-tag">持っておくと心強い</span><br>
+                            選択肢として覚えておこう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://www.youtube.com/watch?v=nHchSttVuRM" target="_blank" style="color: inherit;">まさおAIじっくり解説ch</a> | 📅 2026年6月16日<br>
+            📌 <a href="https://openrouter.ai/fusion" target="_blank" style="color: inherit;">OpenRouter Fusion 公式ページ</a><br>
+            🤖 生成: AI News Infographic Generator
+        </footer>
+
+    </div>
+</body>
+</html>

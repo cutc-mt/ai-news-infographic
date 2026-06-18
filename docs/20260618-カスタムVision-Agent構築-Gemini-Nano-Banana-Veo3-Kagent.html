@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カスタムVision Agent構築ガイド - Google Gemini × Veo3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --ui-color-1: #A67C52;
+            --ui-color-2: #D4A574;
+            --ui-color-3: #FFF8F0;
+            --ui-color-4: #2C1810;
+            --ui-color-5: #C0713A;
+        }
+
+        body {
+            font-family: 'Kaisei Decol', serif;
+            background: #FFF8F0;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #A67C52 0%, #D4A574 50%, #C0713A 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header-icon {
+            color: var(--ui-color-1);
+        }
+
+        /* カードスタイル */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(166, 124, 82, 0.25);
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .mega-icon-container i {
+            color: var(--ui-color-1);
+        }
+
+        .mega-icon-container h2 {
+            font-size: 18px;
+            color: #555;
+            margin-top: 8px;
+            font-weight: 700;
+        }
+
+        .card-content {
+            padding: 0 5px 10px;
+        }
+
+        .keyword-list {
+            margin: 10px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 3px;
+        }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 2px 8px;
+            border-radius: 5px;
+            margin-right: 4px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 13px;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(192, 113, 58, 0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #FFF;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 12px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* レイアウト */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            max-width: 1800px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* アニメーション */
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+            opacity: 0;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 300px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 340px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; align-items: center; }
+            .section-card { min-width: auto; width: 100%; max-width: 100%; }
+        }
+
+        /* フローアロー */
+        .flow-arrow {
+            text-align: center;
+            color: var(--ui-color-2);
+            font-size: 24px;
+            margin: 10px 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            color: #888;
+            font-size: 14px;
+            border-top: 2px solid var(--ui-color-3);
+            margin-top: 40px;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- ヘッダー -->
+    <header style="text-align: center; padding: 40px 20px 20px;">
+        <div style="margin-bottom: 15px;">
+            <i class="fas fa-eye fa-7x header-icon" style="animation: fa-bounce 2s;"></i>
+        </div>
+        <h1 class="gradient-text" style="font-size: 42px; font-weight: 900; margin: 0;">カスタム Vision Agent 構築ガイド</h1>
+        <p style="font-size: 20px; color: #777; margin-top: 10px;">Google Gemini × Nano Banana × Veo 3 でWebカメラをアートに変える</p>
+        <div style="width: 120px; height: 4px; background: linear-gradient(to right, var(--ui-color-1), var(--ui-color-2)); margin: 20px auto; border-radius: 2px;"></div>
+        <p style="font-size: 14px; color: #999;">2026年6月18日</p>
+    </header>
+
+    <!-- ① Vision Agentとは -->
+    <div class="section-layout">
+
+    <div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-robot fa-5x" style="animation: fa-beat-fade 2s;"></i>
+            <h2>① Vision Agent とは？</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-camera"></i><span>Webカメラの映像フレームを<span class="highlight">リアルタイムでアートに変換</span>するAIエージェント</span></li>
+                <li><i class="fas fa-wand-magic-sparkles"></i><span>生成メディア、Google Geminiエコシステム、<span class="keyword-tag">ユーザーの芸術的ビジョン</span>を組み合わせた仕組み</span></li>
+                <li><i class="fas fa-layer-group"></i><span>単なるチャットボットを超えて、<span class="keyword-tag">カメラ → 変換 → アニメーション</span>のフルパイプラインを実現</span></li>
+                <li><i class="fas fa-comments"></i><span><span class="keyword-tag">米国手話（ASL）</span>の会話モードも搭載</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fas fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 基本的なチャットボットを超えて、カメラのフレームをアート作品に変える！</span>
+        </div>
+    </div>
+
+    <!-- ② できること -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-palette fa-5x" style="animation: fa-flip 3s;"></i>
+            <h2>② Vision Agent でできること</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-video"></i><span>カメラをセットアップして<span class="highlight">写真をキャプチャ＆変換</span></span></li>
+                <li><i class="fas fa-film"></i><span>写真をアニメーション化して<span class="keyword-tag">シネマティック動画</span>に</span></li>
+                <li><i class="fas fa-upload"></i><span>家族写真やお気に入りの画像を<span class="keyword-tag">アップロード可能</span></span></li>
+                <li><i class="fas fa-hand-sparkles"></i><span><span class="keyword-tag">手話会話モード</span>でカメラを使ってASLと対話</span></li>
+                <li><i class="fas fa-comment-dots"></i><span>フリーフォームのプロンプトで柔軟に操作</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten"><i class="fas fa-star fa-lg" style="color: var(--ui-color-5);"></i> 「ゴッホ風にして」や「シュルレアリスムで」といった自然言語で指示できる！</span>
+        </div>
+    </div>
+
+    <!-- ③ K Agentフレームワーク -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-cubes fa-5x" style="animation: fa-bounce 2s;"></i>
+            <h2>③ K Agent フレームワーク</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-server"></i><span><span class="keyword-tag">Kubernetes Agent</span> — Kubernetes上でAIを動かすオープンソースフレームワーク</span></li>
+                <li><i class="fas fa-cloud"></i><span>標準的なPythonアプリではなく<span class="highlight">クラウドネイティブ</span>なアーキテクチャを採用</span></li>
+                <li><i class="fas fa-arrows-spin"></i><span>より広範な<span class="keyword-tag">自動化ワークフロー</span>への直接統合が可能</span></li>
+                <li><i class="fas fa-code-branch"></i><span>カメラ、Nano Banana、Veo 3を<span class="keyword-tag">1つのスケーラブルマイクロサービス</span>として連携</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-2">
+            <span class="handwritten"><i class="fas fa-circle-question fa-lg" style="color: var(--ui-color-5);"></i> なぜPythonアプリじゃないの？ → クラウドネイティブでスケーラブルにするため！</span>
+        </div>
+    </div>
+
+    <!-- ④ なぜKubernetesか -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.4s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-dharmachakra fa-5x" style="animation: fa-spin 4s;"></i>
+            <h2>④ なぜ Kubernetes Agent なのか</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-check-circle"></i><span><span class="highlight">複雑なオーケストレーション</span>をエージェントアーキテクチャで実現</span></li>
+                <li><i class="fas fa-handshake"></i><span>カメラ ↔ Nano Banana ↔ Veo 3 の<span class="keyword-tag">シームレスな連携</span></span></li>
+                <li><i class="fas fa-expand-arrows-alt"></i><span>単一の<span class="keyword-tag">スケーラブルマイクロサービス</span>として展開可能</span></li>
+                <li><i class="fas fa-cloud-arrow-up"></i><span>クラウドネイティブ設計で<span class="highlight">本番環境へのデプロイ</span>が容易</span></li>
+                <li><i class="fas fa-gears"></i><span>Kubernetesの既存インフラとの統合もスムーズ</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ⑤ Gemini API -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.5s;">
+        <div class="mega-icon-container">
+            <i class="fab fa-google fa-5x" style="animation: fa-beat-fade 2s;"></i>
+            <h2>⑤ Gemini API が全体の基盤</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-key"></i><span>すべては<span class="keyword-tag">Gemini APIキー</span>を中心に構築</span></li>
+                <li><i class="fas fa-bolt"></i><span>静的アップロードではなく<span class="highlight">ライブフレームのキャプチャ</span>を即座に処理</span></li>
+                <li><i class="fas fa-comment"></i><span><span class="keyword-tag">フリーフォームプロンプト</span>に対応した設計</span></li>
+                <li><i class="fas fa-paintbrush"></i><span>「写真をゴッホの絵にする」や「<span class="keyword-tag">ASLをリアルタイム解釈</span>」など自由な指示が可能</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble top">
+            <span class="handwritten"><i class="fas fa-brain fa-lg" style="color: var(--ui-color-1);"></i> Google Geminiエコシステム全体がこのVision Agentの心臓部</span>
+        </div>
+    </div>
+
+    <!-- ⑥ カメラ統合 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.6s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-camera-retro fa-5x" style="animation: fa-shake 3s;"></i>
+            <h2>⑥ カメラ統合とハードウェア検出</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-laptop"></i><span>エージェントが<span class="highlight">カメラルーチンを検出</span>してローカルデバイスを取得</span></li>
+                <li><i class="fas fa-mobile-alt"></i><span>Mac内蔵カメラ、iPhone、接続済みの<span class="keyword-tag">外部カメラ</span>に対応</span></li>
+                <li><i class="fas fa-image"></i><span>個々のフレームを<span class="keyword-tag">マルチモーダルモデル</span>に直接渡す仕組み</span></li>
+                <li><i class="fas fa-usb"></i><span>サブプロセスまたはMCPツール経由で<span class="highlight">ハードウェアを自動検出</span></span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ⑦ MCP -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.7s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-plug fa-5x" style="animation: fa-beat 2s;"></i>
+            <h2>⑦ MCP：Model Context Protocol</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-link"></i><span><span class="keyword-tag">MCP</span>はモデルにコンテキストを送信するための標準プロトコル</span></li>
+                <li><i class="fas fa-server"></i><span><span class="keyword-tag">Fast MCP Server</span>でカメラコントロールやAIエンジンをツールとして登録</span></li>
+                <li><i class="fas fa-brain"></i><span>エージェントが<span class="highlight">推論・思考</span>しながらシーケンスを実行</span></li>
+                <li><i class="fas fa-arrow-right"></i><span>ハードウェア検出 → クラウドAPIのトリガーまでを<span class="keyword-tag">自動的に判断</span></span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-1 right">
+            <span class="handwritten"><i class="fas fa-cogs fa-lg" style="color: var(--ui-color-2);"></i> MCPがカメラとAIモデルをつなぐ「標準化された橋渡し」の役割！</span>
+        </div>
+    </div>
+
+    <!-- ⑧ Nano Banana -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.8s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-image fa-5x" style="animation: fa-bounce 2s;"></i>
+            <h2>⑧ Nano Banana：画像生成エンジン</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-fire"></i><span>Googleの<span class="highlight">画像生成・編集</span>の最前線ツール</span></li>
+                <li><i class="fas fa-magic"></i><span><span class="keyword-tag">ディープリーゾニング</span>と<span class="keyword-tag">スタイル転送</span>の能力を搭載</span></li>
+                <li><i class="fas fa-face-smile"></i><span>単なるフィルターではなく、<span class="highlight">顔・髪・背景を分析</span>してスタイルを適用</span></li>
+                <li><i class="fas fa-palette"></i><span>鮮やかな照明と豊かなテクスチャを<span class="keyword-tag">古典的スタイル</span>で再現</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-2">
+            <span class="handwritten"><i class="fas fa-star fa-lg" style="color: var(--ui-color-5);"></i> 自分の顔の特徴を保ったままシュルレアリスム風に変換できる！</span>
+        </div>
+    </div>
+
+    <!-- ⑨ スタイル転送 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.9s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-brush fa-5x" style="animation: fa-beat-fade 2s;"></i>
+            <h2>⑨ スタイル転送の仕組み</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-user"></i><span>元の写真を分析：<span class="keyword-tag">顔・髭・髪型・背景</span>を認識</span></li>
+                <li><i class="fas fa-masks-theater"></i><span>シュルレアリスムの美学を適用しつつ<span class="highlight">キャラクターの一貫性</span>を維持</span></li>
+                <li><i class="fas fa-lightbulb"></i><span>「Nano Bananaのシュルレアリスムで変換して」といった<span class="keyword-tag">自然言語の指示</span>が可能</span></li>
+                <li><i class="fas fa-check-double"></i><span>自撮り写真が<span class="keyword-tag">傑作</span>に変わる！</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ⑩ Gemini 3 Pro Image -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.0s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-fingerprint fa-5x" style="animation: fa-pulse 2s;"></i>
+            <h2>⑩ Gemini 3 Pro Image</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-microchip"></i><span>Nano Bananaは<span class="keyword-tag">Gemini 3 Pro Image</span>上で動作</span></li>
+                <li><i class="fas fa-lock"></i><span><span class="highlight">ワンショット・アイデンティティ・ロック</span>機能を搭載</span></li>
+                <li><i class="fas fa-face-grin-stars"></i><span><span class="keyword-tag">顔の特徴</span>を全フレームで一貫して維持</span></li>
+                <li><i class="fas fa-video"></i><span>Veo 3の動画に移行しても<span class="highlight">別人のように見えない</span></span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fas fa-lock fa-lg" style="color: var(--ui-color-1);"></i> アイデンティティロックが「顔が変わる問題」を解決！</span>
+        </div>
+    </div>
+
+    <!-- ⑪ Veo 3 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.1s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-film fa-5x" style="animation: fa-bounce 2s;"></i>
+            <h2>⑪ Veo 3：動画生成モデル</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-clapperboard"></i><span>Google最新の<span class="highlight">動画生成モデル</span></span></li>
+                <li><i class="fas fa-image"></i><span>変換済みの画像を<span class="keyword-tag">開始フレーム</span>として使用</span></li>
+                <li><i class="fas fa-clock"></i><span>約<span class="keyword-tag">2分</span>で思考・物理・モーション・音声を生成</span></li>
+                <li><i class="fas fa-tv"></i><span><span class="highlight">8秒間のHDシネマティック動画</span>を出力</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ⑫ 音声生成 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.2s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-volume-high fa-5x" style="animation: fa-beat 2s;"></i>
+            <h2>⑫ ナラティブ音声の自動生成</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-music"></i><span>Veo 3は<span class="highlight">ピクセルを動かすだけではない</span></span></li>
+                <li><i class="fas fa-audio-description"></i><span><span class="keyword-tag">ナラティブ音声を自動生成</span>する能力を持つ</span></li>
+                <li><i class="fas fa-photo-film"></i><span>写真から<span class="highlight">息を呑むシーン</span>へのシームレスな遷移を実現</span></li>
+                <li><i class="fas fa-masks-theater"></i><span>シュルレアリスムテーマなら<span class="keyword-tag">溶けるイメージ</span>のような映像に</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-1">
+            <span class="handwritten"><i class="fas fa-film fa-lg" style="color: var(--ui-color-2);"></i> 写真が生き生きと動き出す！まさに映画を作っているような体験</span>
+        </div>
+    </div>
+
+    <!-- ⑬ ナチュラル言語オーケストレーション -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.3s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-language fa-5x" style="animation: fa-flip 3s;"></i>
+            <h2>⑬ 自然言語によるオーケストレーション</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-comment-dots"></i><span><span class="highlight">事前設定のドロップダウン</span>に限定されない</span></li>
+                <li><i class="fas fa-keyboard"></i><span>「最新の画像からシネマティック動画を作って」と<span class="keyword-tag">自由に入力</span></span></li>
+                <li><i class="fas fa-arrows-rotate"></i><span>カメラ ↔ Nano Banana（スタイル）↔ Veo 3（モーション）の<span class="highlight">自動連携</span></span></li>
+                <li><i class="fas fa-rocket"></i><span>アイデアから<span class="keyword-tag">機能するワークフロー</span>へ素早く移行可能</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-2 right">
+            <span class="handwritten"><i class="fas fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i> ユーザーは自然言語で指示するだけ！あとはAgentが全部やってくれる</span>
+        </div>
+    </div>
+
+    <!-- ⑭ ワークフロー全体図 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.4s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-diagram-project fa-5x" style="animation: fa-beat-fade 2s;"></i>
+            <h2>⑭ ワークフロー全体図</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-1"></i><span><span class="keyword-tag">カメラ検出</span> — ハードウェアを自動認識</span></li>
+                <li><i class="fas fa-2"></i><span><span class="keyword-tag">フレーム取得</span> — ライブ映像からフレームを切り出し</span></li>
+                <li><i class="fas fa-3"></i><span><span class="keyword-tag">MCP経由で送信</span> — マルチモーダルモデルへ</span></li>
+                <li><i class="fas fa-4"></i><span><span class="keyword-tag">Nano Banana</span> — スタイル転送で画像変換</span></li>
+                <li><i class="fas fa-5"></i><span><span class="keyword-tag">Veo 3</span> — 動画＋音声の生成</span></li>
+                <li><i class="fas fa-6"></i><span><span class="highlight">シネマティック動画</span>を出力！</span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ⑮ ASLモード -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.5s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-hands-asl-interpreting fa-5x" style="animation: fa-bounce 2s;"></i>
+            <h2>⑮ ASL 手話会話モード</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-hand-sparkles"></i><span><span class="keyword-tag">アメリカ手話（ASL）</span>のリアルタイム会話モード</span></li>
+                <li><i class="fas fa-camera"></i><span>カメラで手話を撮影し、<span class="highlight">Geminiがリアルタイムで解釈</span></span></li>
+                <li><i class="fas fa-comments"></i><span>手話での対話が<span class="keyword-tag">自然なコミュニケーション</span>として機能</span></li>
+                <li><i class="fas fa-universal-access"></i><span><span class="highlight">アクセシビリティ</span>の観点からも意義のある機能</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble">
+            <span class="handwritten"><i class="fas fa-heart fa-lg" style="color: var(--ui-color-5);"></i> 聴覚障害者コミュニティにも役立つ、インクルーシブな技術！</span>
+        </div>
+    </div>
+
+    <!-- ⑯ 自分の画像 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.6s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-cloud-arrow-up fa-5x" style="animation: fa-beat 2s;"></i>
+            <h2>⑯ 自分の画像を活用する</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-family"></i><span><span class="keyword-tag">家族の写真</span>やお気に入りの画像をアップロード可能</span></li>
+                <li><i class="fas fa-face-smile-beam"></i><span>アップロード画像を<span class="highlight">アート作品に変換</span></span></li>
+                <li><i class="fas fa-film"></i><span>さらに<span class="keyword-tag">アニメーション動画</span>にまで拡張できる</span></li>
+                <li><i class="fas fa-share-nodes"></i><span>生成した画像や動画を<span class="keyword-tag">簡単に共有</span></span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ⑰ 使う技術スタック -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.7s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-layer-group fa-5x" style="animation: fa-flip 3s;"></i>
+            <h2>⑰ 技術スタックまとめ</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fab fa-google"></i><span><span class="keyword-tag">Gemini API</span> — 全体の基盤API</span></li>
+                <li><i class="fas fa-image"></i><span><span class="keyword-tag">Nano Banana</span> — 画像生成・スタイル転送</span></li>
+                <li><i class="fas fa-film"></i><span><span class="keyword-tag">Veo 3</span> — 動画＋音声生成</span></li>
+                <li><i class="fas fa-cubes"></i><span><span class="keyword-tag">K Agent</span> — Kubernetes AIフレームワーク</span></li>
+                <li><i class="fas fa-plug"></i><span><span class="keyword-tag">MCP</span> — Model Context Protocol</span></li>
+                <li><i class="fas fa-server"></i><span><span class="keyword-tag">Fast MCP Server</span> — ツール登録</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-1 top">
+            <span class="handwritten"><i class="fas fa-code fa-lg" style="color: var(--ui-color-2);"></i> オープンソースで全部揃っている！誰でも始められる</span>
+        </div>
+    </div>
+
+    <!-- ⑱ 始め方 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 1.8s;">
+        <div class="mega-icon-container">
+            <i class="fas fa-rocket fa-5x" style="animation: fa-beat-fade 2s;"></i>
+            <h2>⑱ 始め方と次のステップ</h2>
+        </div>
+        <div class="card-content">
+            <ul class="keyword-list">
+                <li><i class="fas fa-github"></i><span><span class="highlight">オープンソース</span>プロジェクトとして公開済み</span></li>
+                <li><i class="fas fa-user-plus"></i><span>Gemini APIキーを取得して<span class="keyword-tag">すぐに始められる</span></span></li>
+                <li><i class="fas fa-code"></i><span>自分だけの<span class="keyword-tag">ジェネレーティブメディアエージェント</span>を作ろう</span></li>
+                <li><i class="fas fa-share"></i><span>作成した画像や動画を<span class="highlight">コミュニティで共有</span>しよう！</span></li>
+                <li><i class="fas fa-lightbulb"></i><span>次は<span class="keyword-tag">あなたのアイデア</span>でAgentを拡張する番</span></li>
+            </ul>
+        </div>
+        <div class="speech-bubble variant-2 right">
+            <span class="handwritten"><i class="fas fa-rocket fa-lg" style="color: var(--ui-color-5);"></i> ゼロからでも簡単！オープンソースだからコードを読んで学べる</span>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- フッター -->
+    <footer>
+        <p>🎬 動画: <a href="https://www.youtube.com/watch?v=U1MQ9RZ0wC4" target="_blank">How to build a custom vision agent - Jon Capobianco</a></p>
+        <p>📅 2026年6月18日 | Generated by AI Infographic Agent</p>
+    </footer>
+
+</body>
+</html>

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Long Running Agents — 長期間稼働エージェントの設計原則を徹底解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #2C5F7C;
+            --ui-color-2: #3FA5A9;
+            --ui-color-3: #E8F1F2;
+            --ui-color-4: #1A2B3C;
+            --ui-color-5: #E8675A;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #F4F8FA; font-family: 'Kaisei Decol', serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2)); border-radius: 30px; color: white; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); animation: headerGlow 8s ease-in-out infinite; }
+        @keyframes headerGlow { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(20px, 20px); } }
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.4em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.3em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .section-card { flex: 1; min-width: 280px; max-width: 450px; background-color: white; border-radius: 20px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .section-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2)); }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.3em; color: var(--ui-color-4); margin-top: 10px; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 10px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 12px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #EFF8F8; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFF0EE; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 8px; font-size: 13px; margin-top: 10px; overflow-x: auto; border-left: 4px solid var(--ui-color-1); }
+        .highlight { background: linear-gradient(transparent 60%, rgba(63,165,169,0.35) 60%); font-weight: bold; }
+        .comparison-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #ddd; font-size: 15px; }
+        .comparison-row:last-child { border-bottom: none; }
+        .comp-left, .comp-right { flex: 1; text-align: center; font-weight: bold; }
+        .comp-center { flex: 0 0 40%; text-align: center; font-size: 13px; color: #666; }
+        .winner { color: var(--ui-color-1); font-weight: 900; }
+        .fade-in-scale { opacity: 0; transform: scale(0.95); animation: fadeInScale 0.6s ease forwards; }
+        @keyframes fadeInScale { to { opacity: 1; transform: scale(1); } }
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+        footer { text-align: center; padding: 30px 20px; margin-top: 30px; font-size: 14px; color: #777; border-top: 2px dashed #ddd; }
+        footer a { color: var(--ui-color-1); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-infinity fa-7x" aria-hidden="true"></i></div>
+            <h1>Long Running Agents</h1>
+            <div class="subtitle">長期間稼働エージェントの設計原則 — 数時間から数週間動き続けるAI</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月20日</div>
+        </div>
+        <!-- Row 1 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-infinity fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① Long Running Agentsとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info"></i><span>セッションをまたいで<span class="highlight">状態を維持し続ける</span>エージェントの設計パラダイム</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>稼働期間は<span class="keyword-tag">数時間</span>から<span class="keyword-tag">数日</span>、さらには<span class="keyword-tag">数週間</span>に及ぶ</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span>一度きりのデモではなく、実際の<span class="highlight">ビジネスプロセス全体</span>を自動化するのが目的</span></li>
+                        <li><i class="fa-solid fa-building"></i><span>Google Enterprise Agent Platformが提唱する次世代のアーキテクチャ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>「デモが動く」と「仕事が終わる」は<br>まるで別の問題なのです。</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-left-right fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>② 従来のエージェントとの決定的な違い</h2>
+                </div>
+                <div class="card-content">
+                    <div class="comparison-row">
+                        <div class="comp-left" style="color: var(--ui-color-5);">従来（ステートレス）</div>
+                        <div class="comp-center">VS</div>
+                        <div class="comp-right winner">Long Running</div>
+                    </div>
+                    <div class="comparison-row"><div class="comp-left">一度きりの実行</div><div class="comp-center">セッション</div><div class="comp-right winner">複数セッションで継続</div></div>
+                    <div class="comparison-row"><div class="comp-left">状態を保存しない</div><div class="comp-center">永続性</div><div class="comp-right winner">状態を永続化</div></div>
+                    <div class="comparison-row"><div class="comp-left">単一タスク</div><div class="comp-center">スコープ</div><div class="comp-right winner">ワークフロー単位</div></div>
+                    <div class="comparison-row"><div class="comp-left">クラッシュでリセット</div><div class="comp-center">耐障害性</div><div class="comp-right winner">チェックポイントで再開</div></div>
+                    <div class="speech-bubble top">
+                        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>デモが「動いた」だけで満足する時代は終わり。<br><span class="keyword-tag">現実の仕事</span>を最後までやり切る設計が必要です。</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-moon fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ 必須条件1: 真にスリープできること</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban"></i><span><span class="keyword-tag">アクティブポーリングは絶対NG</span>。CPUを食い続ける古い方式はスケールしない</span></li>
+                        <li><i class="fa-solid fa-bell"></i><span>正しい起動トリガーは<span class="highlight">イベント駆動</span>のみ。必要な時だけ目を覚ます</span></li>
+                        <li><i class="fa-solid fa-globe"></i><span><span class="keyword-tag">Webhook受信</span>で外部システムからの通知に反応</span></li>
+                        <li><i class="fa-solid fa-calendar-check"></i><span><span class="keyword-tag">スケジュール実行</span>で定期タスクを正確に実行</span></li>
+                        <li><i class="fa-solid fa-user-check"></i><span><span class="keyword-tag">人間の承認</span>を待機中は完全にスリープ状態へ</span></li>
+                        <li><i class="fa-solid fa-plug"></i><span><span class="keyword-tag">ツールコールバック</span>で非同期処理の完了を検知</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>ポーリング＝ずっと起きている。<br>スリープ＝必要な時だけ覚ます。<br><span class="keyword-tag">イベント駆動が唯一の正解</span>。</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 必須条件2: 全ステップにチェックポイント</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-server"></i><span>コンテナがクラッシュしても、<span class="highlight">再デプロイ後に正確に再開</span>できる仕組み</span></li>
+                        <li><i class="fa-solid fa-save"></i><span>各ステップの完了状態を<span class="keyword-tag">永続ストレージ</span>に保存</span></li>
+                        <li><i class="fa-solid fa-rotate-right"></i><span>復帰時に「どこまで終わったか」を正確に認識し、続きから再開</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span><span class="highlight">幻覚の記憶は一切なし</span>。状態は全て外部に保存し、LLMのコンテキストに依存しない</span></li>
+                        <li><i class="fa-solid fa-database"></i><span>メモリーバンク＋セッション管理で<span class="keyword-tag">長期記憶</span>を実現</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>人間が寝て起きても「昨日の続き」を<br>覚えているのと同じ仕組みを<br>エージェントにも必要なのです。</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Row 2 -->
+        <div class="section-layout">
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ 必須条件3: 3エージェント構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ban"></i><span><span class="keyword-tag">自己評価は絶対NG</span>。エージェントは自分の出力を常に過大評価する</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span>Anthropicの研究で、LLMは<span class="highlight">自分の仕事に点数をつけると常に甘くなる</span>ことが実証済み</span></li>
+                        <li><i class="fa-solid fa-sitemap"></i><span><span class="keyword-tag">Planner</span>が計画を立て、<span class="keyword-tag">Generator</span>が作業を実行、<span class="keyword-tag">Evaluator</span>が独立して評価</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>作業者と評価者を分離することで、<span class="highlight">品質の検証ループ</span>が初めて成立する</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 top">
+                        <span class="handwritten"><i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>自分で作って自分で採点＝<br><span class="keyword-tag">ズルの温床</span>。<br>第三者評価が必須です！</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ 3役割の詳細な分担</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-compass"></i><span><span class="keyword-tag">Planner</span>: タスク全体を分析し、段階的な実行計画を作成。何をいつやるかを設計</span></li>
+                        <li><i class="fa-solid fa-hammer"></i><span><span class="keyword-tag">Generator</span>: 計画に従って実際の作業を実行。コードを書いたり文章を作成</span></li>
+                        <li><i class="fa-solid fa-clipboard-check"></i><span><span class="keyword-tag">Evaluator</span>: 出力品質を客観的に評価。要件を満たしているかを独立して判断</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate"></i><span>評価が不合格なら<span class="highlight">Generatorにフィードバックを戻して修正ループ</span>を実行</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>この分離により<span class="keyword-tag">品質保証</span>が初めてエージェントで成立する</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>ソフトウェア開発の<br>PM＋エンジニア＋QAと同じ構造。<br><span class="keyword-tag">人間のチーム設計</span>をそのまま応用。</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ 壁1: コンテキスト劣化の問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-window-maximize"></i><span>LLMのコンテキストウィンドウには限界があり、<span class="highlight">いっぱいになると品質が急激に低下</span>する</span></li>
+                        <li><i class="fa-solid fa-chart-line-down"></i><span>長時間稼働するほど対話履歴が蓄積し、新しい情報の処理能力が圧迫されていく</span></li>
+                        <li><i class="fa-solid fa-rotate-left"></i><span>「毎回ゼロから始める」のは解決策にならない。<span class="highlight">過去の成果が全て失われる</span>から</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>必要なのは「文脈を圧縮して保持しつつ、新しい情報を取り込む」<span class="keyword-tag">インテリジェントな記憶管理</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten"><i class="fa-solid fa-exclamation fa-lg" style="color: var(--ui-color-5);"></i>人間も「寝る前に情報を整理」するように、<br>エージェントにも<br><span class="keyword-tag">記憶の整理</span>が必要です。</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-unlink fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ 壁2: 永続状態の欠如</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-cloud-arrow-down"></i><span>状態を保存する仕組みがないと、<span class="highlight">毎回「初対面」の状態に戻ってしまう</span></span></li>
+                        <li><i class="fa-solid fa-shuffle"></i><span>状態なしで長時間動かすと<span class="keyword-tag">ドリフト</span>が発生。本来の目的から徐々に逸脱</span></li>
+                        <li><i class="fa-solid fa-bomb"></i><span>重大な結果として<span class="keyword-tag">破壊的動作</span>を引き起こすリスク。作業成果を上書きしてしまう</span></li>
+                        <li><i class="fa-solid fa-face-sad-tear"></i><span>最悪のケースではエージェントが<span class="highlight">諦めてしまう</span>。「何をやっていたか」を忘れた状態に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>記憶がない人間は毎朝「自分は誰？」状態。<br>エージェントも同じ。<br><span class="keyword-tag">永続メモリが命綱</span>。</span>
+                    </div>
+                </div>
+            </div>
+        </div>

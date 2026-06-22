@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google I/O 2026 - 新AIエージェントスタック完全解説</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #4285F4;
+            --color-2: #1a56db;
+            --color-3: #EA4335;
+            --color-4: #0d3b8f;
+            --color-5: #FBBC05;
+            --color-6: #34A853;
+            --color-7: #f0f4ff;
+            --color-8: #fff8f5;
+            --color-9: #f5fff5;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #FAFBFE;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--color-1) 0%, var(--color-4) 50%, var(--color-3) 100%);
+            padding: 60px 20px 50px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: pulse-bg 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse-bg {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .header h1 {
+            font-size: 42px;
+            font-weight: 900;
+            color: #fff;
+            margin: 0 0 10px;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .subtitle {
+            font-size: 20px;
+            color: rgba(255,255,255,0.9);
+            margin: 0 0 15px;
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header .date-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 14px;
+            position: relative;
+            z-index: 1;
+            backdrop-filter: blur(10px);
+        }
+
+        .header-icon {
+            font-size: 64px;
+            color: var(--color-5);
+            margin-bottom: 15px;
+            animation: float 3s ease-in-out infinite;
+            filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.2));
+            position: relative;
+            z-index: 1;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            justify-content: center;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background: #fff;
+            border-radius: 20px;
+            padding: 25px 20px 20px;
+            box-shadow: 0 4px 20px rgba(66, 133, 244, 0.08);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(66, 133, 244, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            opacity: 0;
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            box-shadow: 0 12px 40px rgba(66, 133, 244, 0.18);
+            border-color: rgba(66, 133, 244, 0.3);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--color-1), var(--color-5), var(--color-3));
+            border-radius: 20px 20px 0 0;
+        }
+
+        .card-icon {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .card-icon i {
+            font-size: 3.2em;
+            color: var(--color-1);
+            filter: drop-shadow(2px 2px 4px rgba(66, 133, 244, 0.3));
+        }
+
+        .card-icon .icon-red { color: var(--color-3); filter: drop-shadow(2px 2px 4px rgba(234, 67, 53, 0.3)); }
+        .card-icon .icon-yellow { color: var(--color-5); filter: drop-shadow(2px 2px 4px rgba(251, 188, 5, 0.3)); }
+        .card-icon .icon-green { color: var(--color-6); filter: drop-shadow(2px 2px 4px rgba(52, 168, 83, 0.3)); }
+        .card-icon .icon-blue { color: var(--color-1); filter: drop-shadow(2px 2px 4px rgba(66, 133, 244, 0.3)); }
+
+        .card h2 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--color-4);
+            margin: 0 0 12px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        .card-content {
+            padding: 0 5px 10px;
+        }
+
+        .keyword-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #444;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            margin-top: 4px;
+            min-width: 16px;
+            color: var(--color-1);
+            font-size: 14px;
+        }
+
+        .keyword-list li .fa-circle-check { color: var(--color-6); }
+        .keyword-list li .fa-circle-exclamation { color: var(--color-3); }
+        .keyword-list li .fa-star { color: var(--color-5); }
+        .keyword-list li .fa-bolt { color: var(--color-3); }
+
+        .keyword-tag {
+            background: var(--color-7);
+            color: var(--color-4);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 3px;
+        }
+
+        .keyword-tag-red {
+            background: var(--color-8);
+            color: var(--color-3);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 3px;
+        }
+
+        .keyword-tag-yellow {
+            background: #FFF8E1;
+            color: #8B6914;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 3px;
+        }
+
+        .keyword-tag-green {
+            background: var(--color-9);
+            color: #1B5E20;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            display: inline-block;
+            margin-right: 3px;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(251, 188, 5, 0.35) 60%);
+            font-weight: 700;
+            padding: 0 2px;
+        }
+
+        .highlight-blue {
+            background: linear-gradient(transparent 60%, rgba(66, 133, 244, 0.25) 60%);
+            font-weight: 700;
+            padding: 0 2px;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 2.5px solid var(--color-1);
+            border-radius: 18px;
+            padding: 10px 14px;
+            margin: 12px 5px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 8px rgba(66, 133, 244, 0.12);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -11px;
+            left: 20px;
+            border-width: 10px 7px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(10deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -11px;
+            border-width: 0 7px 10px;
+            transform: rotate(-3deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF8E1;
+            border-color: var(--color-5);
+            transform: rotate(1.5deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-5) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--color-3);
+            transform: rotate(-1.5deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--color-3) transparent;
+        }
+
+        .speech-bubble.variant-3 {
+            background: #E8F5E9;
+            border-color: var(--color-6);
+            transform: rotate(0.5deg);
+        }
+
+        .speech-bubble.variant-3::after {
+            border-color: var(--color-6) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .stat-box {
+            background: var(--color-7);
+            border: 1px solid rgba(66, 133, 244, 0.15);
+            border-radius: 12px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .stat-box .stat-number {
+            font-size: 22px;
+            font-weight: 900;
+            color: var(--color-1);
+        }
+
+        .stat-box .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .section-divider {
+            text-align: center;
+            margin: 40px 0 30px;
+            position: relative;
+        }
+
+        .section-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--color-1), var(--color-5), var(--color-3), transparent);
+            opacity: 0.3;
+        }
+
+        .section-divider h2 {
+            display: inline-block;
+            background: #FAFBFE;
+            padding: 8px 30px;
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--color-4);
+            position: relative;
+            z-index: 1;
+        }
+
+        .footer {
+            background: linear-gradient(135deg, var(--color-4) 0%, #1a1a2e 100%);
+            padding: 40px 20px;
+            text-align: center;
+            margin-top: 60px;
+        }
+
+        .footer p, .footer a {
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            color: var(--color-5);
+            text-decoration: underline;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: translateY(20px) scale(0.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.1s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.2s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.3s; }
+        .card:nth-child(7) { animation-delay: 0.35s; }
+        .card:nth-child(8) { animation-delay: 0.4s; }
+        .card:nth-child(9) { animation-delay: 0.45s; }
+        .card:nth-child(10) { animation-delay: 0.5s; }
+        .card:nth-child(11) { animation-delay: 0.55s; }
+        .card:nth-child(12) { animation-delay: 0.6s; }
+        .card:nth-child(13) { animation-delay: 0.65s; }
+        .card:nth-child(14) { animation-delay: 0.7s; }
+        .card:nth-child(15) { animation-delay: 0.75s; }
+        .card:nth-child(16) { animation-delay: 0.8s; }
+        .card:nth-child(17) { animation-delay: 0.85s; }
+        .card:nth-child(18) { animation-delay: 0.9s; }
+
+        @media (max-width: 900px) {
+            .card { min-width: 100%; max-width: 100%; }
+            .header h1 { font-size: 28px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-icon"><i class="fa-solid fa-robot"></i></div>
+        <h1>Google I/O 2026 新AIエージェントスタック</h1>
+        <p class="subtitle">Gemini 3.5 Flash・Antigravity 2.0・Spark・Omni — エージェントの時代が本格到来</p>
+        <div class="date-badge"><i class="fa-regular fa-calendar"></i> 2026年6月23日</div>
+    </header>
+
+    <div class="container">
+
+        <!-- セクション1: 概要 -->
+        <div class="section-divider">
+            <h2><i class="fa-solid fa-microchip"></i> 「Agentic Gemini」時代の幕開け</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- カード① -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-layer-group fa-5x icon-blue" style="animation: fa-beat-fade 2s infinite;"></i>
+                </div>
+                <h2>①「Agentic Gemini時代」の全体像</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info"></i>GoogleはGeminiを「チャットボット」から<span class="highlight">分散型エージェントランタイム</span>へ転換</li>
+                        <li><i class="fa-solid fa-link"></i>ブラウザ・検索・IDE・スマホ・生産性スイートが<span class="highlight">共通のエージェント層</span>で繋がる</li>
+                        <li><i class="fa-solid fa-arrow-right"></i>製品の境界線は「アプリ」から<span class="highlight">「タスク」</span>へ移行した</li>
+                        <li><i class="fa-solid fa-gears"></i>モデル＋ツール＋サンドボックス＋ブラウザ＋検索＋クラウドを統合</li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg icon-yellow"></i> 個別の製品発表ではなく、<span class="keyword-tag">同じアーキテクチャ</span>の別々の表面（サーフェス）！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード② -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-diagram-project fa-5x icon-blue" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>②エージェントスタックの全体構成</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-brain"></i><span class="keyword-tag">Gemini 3.5 Flash</span> — 推論・行動モデル</li>
+                        <li><i class="fa-solid fa-network-wired"></i><span class="keyword-tag">Antigravity 2.0</span> — オーケストレーションハーネス</li>
+                        <li><i class="fa-solid fa-cloud"></i><span class="keyword-tag">Managed Agents</span> — クラウド上のエージェント実行環境</li>
+                        <li><i class="fa-solid fa-user-astronaut"></i><span class="keyword-tag">Gemini Spark</span> — 24時間動き続ける個人エージェント</li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span class="keyword-tag">AI Mode / Search</span> — カスタムUI・ダッシュボード生成</li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span class="keyword-tag">Gemini Omni</span> — ネイティブマルチモーダル生成</li>
+                        <li><i class="fa-brands fa-chrome"></i><span class="keyword-tag">Chrome / WebMCP</span> — Webをエージェントに読ませる</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- カード③ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-eye fa-5x icon-red" style="animation: fa-beat-fade 3s;"></i>
+                </div>
+                <h2>③「プロンプトからアクションへ」という転換</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-rotate"></i>ユーザーが結果を要求 → システムが<span class="highlight">ツールを選択</span></li>
+                        <li><i class="fa-solid fa-database"></i>コンテキストを取得 → コードを実行 → ブラウザ状態を使用</li>
+                        <li><i class="fa-solid fa-plug"></i>APIを呼び出し → ファイルを書き出し → 必要時に承認を求める</li>
+                        <li><i class="fa-solid fa-circle-check"></i>これは<span class="highlight">全製品に共通する</span>アーキテクチャパターン</li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-quote-left icon-yellow"></i> Sundar Pichai「Gemini製品、対話型AI、インフラ、モデル、エージェント」がキーワード</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- セクション2: モデル -->
+        <div class="section-divider">
+            <h2><i class="fa-solid fa-brain"></i> Gemini 3.5 Flash — エージェントの頭脳</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- カード④ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-bolt fa-5x icon-yellow" style="animation: fa-bounce 1.5s;"></i>
+                </div>
+                <h2>④Gemini 3.5 Flash: エージェントに最適化されたモデル</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-star"></i>Gemini 3 Flashをベースに<span class="highlight">思考レベル</span>を追加して品質・コスト・レイテンシを制御</li>
+                        <li><i class="fa-solid fa-file"></i>テキスト・画像・音声・動画ファイルに対応</li>
+                        <li><i class="fa-solid fa-expand"></i>最大<span class="keyword-tag">100万トークン</span>のコンテキストウィンドウ</li>
+                        <li><i class="fa-solid fa-pen"></i>出力上限は<span class="keyword-tag">6万4千トークン</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i>Gemini 3.1 Proを凌駕するコーディング・エージェント性能</li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten"><i class="fa-solid fa-bolt icon-yellow"></i> 「Flash」はもはや<span class="keyword-tag-green">低性能</span>の意味じゃない！デプロイ最適化されたフロンティアモデル</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑤ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-chart-line fa-5x icon-green" style="animation: fa-beat-fade 2.5s;"></i>
+                </div>
+                <h2>⑤Gemini 3.5 Flash ベンチマーク結果</h2>
+                <div class="card-content">
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;">
+                        <div class="stat-box">
+                            <div class="stat-number">76.2%</div>
+                            <div class="stat-label">Terminal-Bench 2.1</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number">1656</div>
+                            <div class="stat-label">GDPval-AA Elo</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number">83.6%</div>
+                            <div class="stat-label">MCP Atlas</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number">55.1%</div>
+                            <div class="stat-label">SWE-Bench Pro</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number">78.4%</div>
+                            <div class="stat-label">OSWorld-Verified</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-number">84.2%</div>
+                            <div class="stat-label">CharXiv Reasoning</div>
+                        </div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge-high"></i>出力速度は<span class="highlight">280トークン/秒</span>以上</li>
+                        <li><i class="fa-solid fa-brain"></i>Artificial Analysisの知能指数で<span class="keyword-tag">55</span>（前世代より9ポイント上昇）</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 카드⑥ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-dollar-sign fa-5x icon-green" style="animation: fa-bounce 2s;"></i>
+                </div>
+                <h2>⑥コスト・エコノミクスと戦略的意味</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-tag"></i>入力: <span class="highlight">$1.50 / 百万トークン</span>、出力: <span class="highlight">$9.00 / 百万トークン</span></li>
+                        <li><i class="fa-solid fa-percent"></i>キャッシュ入力で<span class="keyword-tag-green">90%割引</span>が適用される</li>
+                        <li><i class="fa-solid fa-circle-exclamation"></i>ただし高い思考レベルではGemini 3 Flashの<span class="keyword-tag-red">5.5倍</span>のコストに</li>
+                        <li><i class="fa-solid fa-check-circle"></i>正しい問い: <span class="highlight">「一番賢いか？」ではなく「エージェントワークフロー全体で速くて安いか？」</span></li>
+                        <li><i class="fa-solid fa-sync"></i>リトライ・ツール失敗・人間レビューを含めた<span class="keyword-tag">総合コスト</span>で評価すべき</li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg icon-yellow"></i> リトライが減れば、高価なモデルより<span class="keyword-tag-red">実質安く</span>済むパラドックス！</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- セクション3: Antigravity -->
+        <div class="section-divider">
+            <h2><i class="fa-solid fa-rocket"></i> Google Antigravity 2.0 — エージェントプラットフォーム</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- カード⑦ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-rocket fa-5x icon-blue" style="animation: fa-bounce 1.8s;"></i>
+                </div>
+                <h2>⑦Antigravity 2.0: エージェントファースト開発プラットフォーム</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-desktop"></i><span class="keyword-tag">スタンドアローンデスクトップアプリ</span>として大幅拡充</li>
+                        <li><i class="fa-solid fa-people-arrows"></i>複数エージェントを<span class="highlight">並列実行</span>してオーケストレーション</li>
+                        <li><i class="fa-solid fa-bolt"></i>例: 1つのエージェントがWebサイトを構築しながら、別がブランド資産を生成</li>
+                        <li><i class="fa-solid fa-terminal"></i>新しいコアプリミティブ: <span class="keyword-tag">サブエージェント</span>・<span class="keyword-tag">フック</span>・<span class="keyword-tag">非同期タスク管理</span></li>
+                        <li><i class="fa-solid fa-robot"></i>AntigravityエージェントハーネスがGemini 3.5 Flashと<span class="highlight">共同最適化</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 카드⑧ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-terminal fa-5x icon-green" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑧Antigravity CLI & SDK: 開発者のためのハーネス</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span class="keyword-tag">Antigravity CLI</span> — ターミナルファーストの軽量・高速な操作画面</li>
+                        <li><i class="fa-solid fa-code"></i><span class="keyword-tag">Antigravity SDK</span> — 自社インフラにカスタムエージェントをホスト可能</li>
+                        <li><i class="fa-solid fa-arrow-right"></i>Gemini CLIの学びを取り入れて統合 → <span class="highlight">単一のプラットフォーム</span>に移行推奨</li>
+                        <li><i class="fa-solid fa-microphone"></i>Gemini音声モデルの<span class="keyword-tag">ネイティブ音声サポート</span>も追加</li>
+                        <li><i class="fa-brands fa-android"></i>Android・Firebase・Google AI Studioとの統合も強化</li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten"><i class="fa-solid fa-code icon-green"></i> 開発者は<span class="keyword-tag-green">レビュアー・ディスパッチャー</span>に！AIが自律的に作業する新しい開発スタイル</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑨ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-sitemap fa-5x icon-red" style="animation: fa-bounce 2.5s;"></i>
+                </div>
+                <h2>⑨検証プロトコルとアーティファクト生成</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-list-check"></i>Antigravityエージェントが自動生成するアーティファクト:</li>
+                        <li><i class="fa-solid fa-check"></i>タスクリスト・実装計画・<span class="keyword-tag">スクリーンショット</span></li>
+                        <li><i class="fa-solid fa-check"></i><span class="keyword-tag">ブラウザ録画</span> — ユーザーが生ログを読まずに結果を検証可能</li>
+                        <li><i class="fa-solid fa-shield-halved"></i>検証なしの自律コーディングは「高速な推測」に過ぎない</li>
+                        <li><i class="fa-solid fa-circle-info"></i>エージェントが<span class="highlight">何を試し・何を変え・何が根拠か</span>を可視化する設計</li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-eye icon-blue"></i> ログは<span class="keyword-tag">デバッグ用</span>。人間の信頼インターフェースには<span class="keyword-tag">スクリーンショットと録画</span>！</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- セクション4: Omni & Spark -->
+        <div class="section-divider">
+            <h2><i class="fa-solid fa-wand-magic-sparkles"></i> Gemini Omni & Spark — 生成と常駐</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- カード⑩ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-video fa-5x icon-red" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑩Gemini Omni: ネイティブマルチモーダル生成</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-film"></i>テキスト・画像・動画・音声・コードを<span class="highlight">統一アーキテクチャ</span>で処理</li>
+                        <li><i class="fa-solid fa-circle-check"></i>モダリティ切り替えなし — <span class="keyword-tag">全モダリティがファーストクラス</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i>物理の理解（重力・運動エネルギー・流体力学）が<span class="highlight">向上</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i>生成動画には<span class="keyword-tag">SynthID透かし</span>を自動付与</li>
+                        <li><i class="fa-brands fa-youtube"></i>YouTube Shorts Remixで<span class="highlight">自分を映像に登場</span>可能に</li>
+                        <li><i class="fa-solid fa-user"></i><span class="keyword-tag">カスタムAIアバター</span>・<span class="keyword-tag-yellow">キャラクター一貫性</span>も向上</li>
+                        <li><i class="fa-solid fa-palette"></i>Google Flowで実世界と生成コンテンツを<span class="keyword-tag">対話的に融合</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-star icon-yellow"></i> APIは既存のまま。<span class="keyword-tag-yellow">移行不要</span>でOmniの機能を利用！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 카드⑫ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-user-astronaut fa-5x icon-blue" style="animation: fa-beat-fade 1.5s;"></i>
+                </div>
+                <h2>⑪Gemini Spark: 24時間動く個人エージェント</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i>クラウドベースで<span class="highlight">常時バックグラウンド実行</span></li>
+                        <li><i class="fa-solid fa-laptop"></i>PCを閉じても・スマホをロックしても<span class="keyword-tag">継続動作</span></li>
+                        <li><i class="fa-solid fa-envelope"></i>Gmail・Docs・Slidesなどの<span class="keyword-tag">Workspace</span>と統合</li>
+                        <li><i class="fa-solid fa-shield-halved"></i>大事なアクション（送金・メール送信）前に<span class="highlight">必ず確認</span></li>
+                        <li><i class="fa-solid fa-toggle-on"></i>ユーザーがオン/オフと接続アプリを<span class="keyword-tag">自由に選択</span></li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- セクション5: Search & Commerce -->
+        <div class="section-divider">
+            <h2><i class="fa-solid fa-magnifying-glass"></i> AI検索 & エージェントコマース</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- 카드⑬ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-magnifying-glass fa-5x icon-blue" style="animation: fa-bounce 1.5s;"></i>
+                </div>
+                <h2>⑫AI Mode検索: 10億人の壁を突破</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-users"></i>AI Mode月間ユーザーが<span class="highlight">10億人</span>を突破</li>
+                        <li><i class="fa-solid fa-arrow-trend-up"></i>クエリ数は四半期ごとに<span class="keyword-tag">2倍以上</span>に増加中</li>
+                        <li><i class="fa-solid fa-rotate"></i>デフォルトモデルを<span class="highlight">Gemini 3.5 Flash</span>にグローバルで切り替え</li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i>検索ボックスが<span class="keyword-tag">25年ぶりに大刷新</span> — テキスト・画像・動画・Chromeタブ対応</li>
+                        <li><i class="fa-solid fa-link"></i>AI Overview → AI Modeへの<span class="highlight">シームレスな遷移</span>が実現</li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-chart-line icon-green"></i> 「検索クエリが<span class="keyword-tag">過去最高</span>」→ AI検索が検索全体を牽引！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 카드⑭ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-satellite-dish fa-5x icon-red" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑬Search Agents: 24時間監視する情報エージェント</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i>検索内で<span class="highlight">カスタム情報エージェント</span>を作成・管理可能に</li>
+                        <li><i class="fa-solid fa-globe"></i>ブログ・ニュース・SNS + リアルタイムデータを<span class="keyword-tag">24/7で監視</span></li>
+                        <li><i class="fa-solid fa-bell"></i>変化を検知すると<span class="highlight">インテリジェントな要約</span>を通知</li>
+                        <li><i class="fa-solid fa-clone"></i><span class="keyword-tag">複数エージェント</span>を同時に稼働可能</li>
+                        <li><i class="fa-solid fa-crown"></i>まずGoogle AI Pro & Ultra加入者向けにリリース（今夏）</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 카드⑮ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-object-group fa-5x icon-yellow" style="animation: fa-bounce 2.5s;"></i>
+                </div>
+                <h2>⑭Generative UI & ミニアプリ: 検索がアプリを生成</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-table-cells"></i>検索が<span class="highlight">カスタムレイアウト</span>をリアルタイム生成</li>
+                        <li><i class="fa-solid fa-chart-bar"></i>インタラクティブなビジュアル・テーブル・グラフ・<span class="keyword-tag">シミュレーション</span>を組み立て</li>
+                        <li><i class="fa-solid fa-cubes"></i>継続的なタスク向けに<span class="highlight">ダッシュボード・トラッカー</span>を構築</li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i>まるで<span class="keyword-tag-yellow">個人のためのミニアプリ</span>を検索内で作成</li>
+                        <li><i class="fa-solid fa-gift"></i>Generative UIは<span class="keyword-tag-green">無料で全ユーザー</span>に（今夏）</li>
+                    </ul>
+                    <div class="speech-bubble variant-3">
+                        <span class="handwritten"><i class="fa-solid fa-lightbulb icon-yellow"></i> <span class="keyword-tag-green">ソフトウェア配信</span>のあり方を変える可能性！検索から「ミニアプリ」が直接生まれる</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑯ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-cart-shopping fa-5x icon-green" style="animation: fa-bounce 1.8s;"></i>
+                </div>
+                <h2>⑮Universal Cart: エージェントコマースの実現</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lock"></i>「買い物のための<span class="highlight">OAuth</span>」— 一度認可すればエージェントが購入完了</li>
+                        <li><i class="fa-solid fa-credit-card"></i>ユーザーが<span class="keyword-tag">支出上限</span>を設定 → 全取引がログに記録</li>
+                        <li><i class="fa-solid fa-rotate-left"></i><span class="keyword-tag-green">全額返金サポート</span>付きのセキュリティモデル</li>
+                        <li><i class="fa-solid fa-handshake"></i>加盟店はGoogle Merchant Center APIで<span class="highlight">一度統合</span>すれば完了</li>
+                        <li><i class="fa-solid fa-tags"></i>カートは価格推移・割引・再入荷を<span class="keyword-tag">自動追跡</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten"><i class="fa-solid fa-circle-exclamation icon-red"></i> 調達エージェントが注文・旅行エージェントが予約・<span class="keyword-tag-red">サプライチェーン</span>が在庫補充を自律的に実行！</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- セクション6: 開発者と未来 -->
+        <div class="section-divider">
+            <h2><i class="fa-solid fa-code"></i> 開発者体験 & 次世代エコシステム</h2>
+        </div>
+
+        <div class="section-layout">
+
+            <!-- 카드⑰ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-cloud-arrow-up fa-5x icon-blue" style="animation: fa-beat-fade 2s;"></i>
+                </div>
+                <h2>⑯Managed Agents & AI Studio: エージェント開発の民主化</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-server"></i><span class="keyword-tag">Managed Agents</span> — API 1回呼び出しでエージェント起動</li>
+                        <li><i class="fa-solid fa-linux"></i>分離された<span class="highlight">Linux環境</span>でコード実行・ツール使用・推論</li>
+                        <li><i class="fa-brands fa-android"></i>AI Studioで<span class="keyword-tag">Androidネイティブアプリ</span>を直接ビルド可能に</li>
+                        <li><i class="fa-brands fa-google-play"></i>Google Play Console連携で<span class="highlight">ワンクリック公開</span></li>
+                        <li><i class="fa-solid fa-gift"></i>初めての2つのアプリは<span class="keyword-tag-green">無料デプロイ</span>（クレジットカード不要）</li>
+                        <li><i class="fa-solid fa-arrow-right"></i>AI Studio → Antigravityへの<span class="keyword-tag">直接エクスポート</span>機能も追加</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- 카드⑱ -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-sun fa-5x icon-yellow" style="animation: fa-bounce 1.5s;"></i>
+                </div>
+                <h2>⑰Daily Brief & Neural Expressive: 次世代Gemini体験</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-mug-hot"></i><span class="keyword-tag">Daily Brief</span> — 翌朝のパーソナライズされたダイジェスト</li>
+                        <li><i class="fa-solid fa-brain"></i>メール・カレンダー・タスクを分析して<span class="highlight">重要事項を優先順位付け</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i>ユーザーの<span class="keyword-tag">好みや日時</span>を記憶して学習・改善</li>
+                        <li><i class="fa-solid fa-palette"></i><span class="keyword-tag">Neural Expressive</span> — GeminiのUI全体を再設計</li>
+                        <li><i class="fa-solid fa-hand-sparkles"></i>流れるようなアニメーション・バイブレーション・<span class="highlight">インタラクティブな応答</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles icon-yellow"></i> 「壁のテキスト」はもう終わり。<span class="keyword-tag-yellow">タイムライン・ズーム画像・埋め込みビジュアル</span>で応答！</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- カード⑲ (18枚目) -->
+            <div class="card">
+                <div class="card-icon">
+                    <i class="fa-solid fa-road fa-5x icon-red" style="animation: fa-beat-fade 2.5s;"></i>
+                </div>
+                <h2>⑱開発者プレイブック: 次に何をすべきか</h2>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-check"></i><span class="keyword-tag">専門化が安くなる</span> — 高頻度タスクはSpark、重い推論は3.5 Flash</li>
+                        <li><i class="fa-solid fa-circle-check"></i><span class="keyword-tag">記憶がファーストクラス</span> — ベクトルDB不要でエージェント記憶を維持</li>
+                        <li><i class="fa-solid fa-circle-check"></i><span class="keyword-tag">アクションエージェントが標準</span> — Universal Cartがその先駆け</li>
+                        <li><i class="fa-solid fa-circle-check"></i><span class="keyword-tag">オーケストレーションが最重要</span> — 単一モデルではなく層で勝負</li>
+                        <li><i class="fa-solid fa-rocket"></i>Chrome・検索・IDE・スマホを<span class="highlight">横断する共通エージェント層</span>の時代到来</li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten"><i class="fa-solid fa-flag-checkered icon-red"></i> Googleは「賢いモデル」ではなく<span class="highlight">「物事を成し遂げるインフラ」</span>を構築している</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p style="font-size:18px; margin-bottom:10px; color:var(--color-5);">
+            <i class="fa-brands fa-youtube"></i>
+            動画: <a href="https://www.youtube.com/watch?v=pg6TOXyiIuo" target="_blank" style="color:#FBBC05; font-weight:600;">Google's new AI agent stack from I/O 2026</a>
+        </p>
+        <p style="font-size:14px; margin-bottom:15px; color:rgba(255,255,255,0.6);">
+            参考文献: <a href="https://blog.google/innovation-and-ai/sundar-pichai-io-2026/" target="_blank">Sundar Pichai I/O 2026 Keynote</a> | 
+            <a href="https://kenhuangus.substack.com/p/google-io-2026-was-not-just-a-model" target="_blank">Ken Huang Substack</a> | 
+            <a href="https://blog.google/innovation-and-ai/technology/ai/google-io-2026-all-our-announcements/" target="_blank">Google I/O 2026 Announcements</a>
+        </p>
+        <p style="color:rgba(255,255,255,0.4);">Generated by AI Assistant • 2026年6月23日</p>
+    </footer>
+
+</body>
+</html>

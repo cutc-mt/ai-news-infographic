@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemma Coder (Fable Distilled): 12BモデルでFable級のコード生成</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #1E3A5F;
+            --ui-color-2: #4A90D9;
+            --ui-color-3: #E8F0FE;
+            --ui-color-4: #0D1B2A;
+            --ui-color-5: #2563EB;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F8FAFF;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-5));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(180deg, transparent 60%, rgba(74, 144, 217, 0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #E8F4FD;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f0f4f8;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-2);
+        }
+
+        /* Fade In Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .fade-in-scale.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card {
+                min-width: 280px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .section-card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 900px) {
+            .section-card {
+                min-width: 380px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+
+            .section-card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1));
+            border-radius: 20px;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: var(--ui-color-2);
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon">
+                <i class="fa-solid fa-microchip"></i>
+            </div>
+            <h1>Gemma Coder (Fable Distilled)</h1>
+            <div class="subtitle">12Bパラメータのローカルモデルが、Fableクラスのコード生成を目指す</div>
+            <div class="date">📅 2026年6月22日</div>
+        </div>
+
+        <!-- Cards Row 1 -->
+        <div class="section-layout">
+            <!-- Card 1 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fire fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>①トレンド事情: Hugging Faceで話題沸騰中</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-chart-line"></i><span>Hugging Faceのトレンドリストで<span class="highlight">上位にランクイン</span></span></li>
+                        <li><i class="fa-solid fa-download"></i><span>リリース数日で<span class="highlight">6,000回以上のダウンロード</span></span></li>
+                        <li><i class="fa-solid fa-heart"></i><span>約200件の「いいね」を獲得</span></li>
+                        <li><i class="fa-solid fa-circle-info"></i><span>正式名称は驚きの長さ：<span class="keyword-tag">Gemma 4 12B Agentic Fable 3.5x Compose</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-2);"></i>
+                        名前が長すぎるので、この動画では<br>
+                        シンプルに「Gemma」と呼んでいます！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microchip fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                    <h2>②モデルの正体: Gemma 4のファインチューン版</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-google"></i><span>ベースはGoogleの<span class="highlight">Gemma 4 12B Instruct</span></span></li>
+                        <li><i class="fa-solid fa-wrench"></i><span>コーディング専用にファインチューニング</span></li>
+                        <li><i class="fa-solid fa-terminal"></i><span>ターミナル作業とツール利用に最適化</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>推論とマルチステップのエージェントタスク向け</span></li>
+                        <li><i class="fa-solid fa-tag"></i><span>パラメータ数はわずか<span class="highlight">12B（120億）</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: #D4A017;"></i>
+                        12Bというサイズは、ローカルPCでも<br>
+                        比較的簡単に動かせる大きさです
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;"></i>
+                    <h2>③エージェント能力: コーディング＋自律動作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye"></i><span>利用可能な情報を<span class="highlight">自動的に読み取る</span></span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>情報を分析し、ツールを呼び出して変更を実行</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>作業結果を<span class="highlight">自分で検証</span>する能力</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>マルチステップのワークフローに対応</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>ファイルの読み取り・変更・ツール呼び出しを一連で実行</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--ui-color-5);"></i>
+                        作成者は「小さなローカルのコーディング＆<br>
+                        ツール利用エージェント」と表現しています
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 4 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shield-halved fa-5x" style="color: #2E7D32; animation: fa-beat 2s;"></i>
+                    <h2>④プライバシー重視: 完全ローカル動作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-house-laptop"></i><span><span class="highlight">すべてローカルで実行</span>、API費用ゼロ</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>データはマシン内に留まり、外部に送信されない</span></li>
+                        <li><i class="fa-solid fa-wifi-slash"></i><span>ダウンロード後は<span class="highlight">オフラインでも動作可能</span></span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>Apache 2.0ライセンスで<span class="keyword-tag">GGUF形式</span>で公開</span></li>
+                        <li><i class="fa-solid fa-plug"></i><span>llama.cpp、Ollama、LM Studioで簡単に利用可能</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 2 -->
+        <div class="section-layout">
+            <!-- Card 5 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="color: #D4A017; animation: fa-bounce 2s;"></i>
+                    <h2>⑤ベンチマーク: Tau 2 Bench Telecom で3.5倍</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flask"></i><span>テスト対象：<span class="keyword-tag">Tau 2 Bench Telecom</span>（マルチステップのツール利用）</span></li>
+                        <li><i class="fa-solid fa-circle-xmark"></i><span>ベースGemma 4 12Bのスコア：約<span class="highlight">15%</span></span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>ファインチューン版のスコア：約<span class="highlight">55%</span></span></li>
+                        <li><i class="fa-solid fa-arrow-up"></i><span>ベースモデル比で<span class="highlight">約3.5倍の性能向上</span></span></li>
+                        <li><i class="fa-solid fa-info-circle"></i><span>Q8量子化版での20タスクのローカルテスト</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                        ただし、これは小規模テストの結果。<br>
+                        公式リーダーボードとの直接比較はできません
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-unbalanced fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑥現実的な評価: フロンティアモデルには遠い</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ranking-star"></i><span>大型フロンティアモデルは<span class="highlight">同じ領域で90%以上</span>を記録</span></li>
+                        <li><i class="fa-solid fa-arrow-down"></i><span>MMLU Pro（一般知識）ではベースモデルより<span class="highlight">やや劣る</span></span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span>特定用途に特化したモデル＝一般的なチャットには不向き</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation"></i><span>作成者も「<span class="highlight">フロンティアモデルと競合するわけではない</span>」と明言</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-masks-theater fa-lg" style="color: var(--ui-color-2);"></i>
+                        一般知識を少し犠牲にして、<br>
+                        コーディングとエージェント動作を強化する<br>
+                        <span class="keyword-tag">トレードオフ設計</span>です
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 7 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hard-drive fa-5x" style="color: var(--ui-color-1); animation: fa-spin 3s;"></i>
+                    <h2>⑦量子化オプション: 4種類のサイズを選択</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-minimize"></i><span><span class="keyword-tag">Q3 KM</span>：約5.7 GB（最小・試用向け）</span></li>
+                        <li><i class="fa-solid fa-star"></i><span><span class="keyword-tag">Q4 KM</span>：約6.87 GB（<span class="highlight">推奨のスイートスポット</span>）</span></li>
+                        <li><i class="fa-solid fa-expand"></i><span><span class="keyword-tag">Q6 K</span>：約9.11 GB（品質重視）</span></li>
+                        <li><i class="fa-solid fa-maximize"></i><span><span class="keyword-tag">Q8</span>：約11.8 GB（最高品質）</span></li>
+                        <li><i class="fa-solid fa-circle-info"></i><span>多くの環境では<span class="highlight">Q4 KM</span>から始めるのがおすすめ</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gauge-high fa-lg" style="color: #D4A017;"></i>
+                        Q4 KMならメモリ使用量・速度・<br>
+                        品質のバランスが最適です！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sliders fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑧推奨サンプリング設定: 正しい設定が必須</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-temperature-high"></i><span>Temperature：<span class="keyword-tag">1.0</span></span></li>
+                        <li><i class="fa-solid fa-chart-pie"></i><span>Top P：<span class="keyword-tag">0.95</span></span></li>
+                        <li><i class="fa-solid fa-filter"></i><span>Top K：<span class="keyword-tag">64</span></span></li>
+                        <li><i class="fa-solid fa-rotate-left"></i><span>Repetition Penalty：<span class="highlight">1.1</span></span></li>
+                    </ul>
+                    <pre>temperature: 1.0
+top_p: 0.95
+top_k: 64
+repeat_penalty: 1.1</pre>
+                </div>
+                <div class="speech-bubble variant-2 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: #C62828;"></i>
+                        repetition penaltyを設定しないと、<br>
+                        「0000」のような<span class="keyword-tag">壊れた出力</span>が<br>
+                        続いてしまうことがあります
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 3 -->
+        <div class="section-layout">
+            <!-- Card 9 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-brands fa-ollama fa-5x" style="color: #F57C00; animation: fa-bounce 2s;"></i>
+                    <h2>⑨Ollamaで導入: ターミナルから素早くセットアップ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-download"></i><span>Hugging FaceからGGUFファイルをダウンロード</span></li>
+                        <li><i class="fa-solid fa-file-lines"></i><span>Modelfileを作成して推奨パラメータを記述</span></li>
+                        <li><i class="fa-solid fa-terminal"></i><span><code>ollama create gemma-for-agentic-f -f Modelfile</code></span></li>
+                        <li><i class="fa-solid fa-play"></i><span><code>ollama run gemma-for-agentic</code> で起動</span></li>
+                    </ul>
+                    <pre># 手順（3コマンド）
+wget &lt;gguf-url&gt;
+ollama create gemma-for-agentic-f -f Modelfile
+ollama run gemma-for-agentic</pre>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                        Gemma 4の新しいアーキテクチャを使っているので、<br>
+                        <span class="highlight">Ollamaを最新版にアップデート</span>してから<br>
+                        インポートしましょう
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 10 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-display fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑩LM Studioで導入: GUI派にやさしいルート</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-window-maximize"></i><span><span class="highlight">グラフィカルインターフェース</span>で簡単に操作</span></li>
+                        <li><i class="fa-solid fa-file-import"></i><span>アプリ内からGGUFをインポート、またはターミナルで<code>lms import</code></span></li>
+                        <li><i class="fa-solid fa-gear"></i><span>同じ推奨サンプリング設定を適用</span></li>
+                        <li><i class="fa-solid fa-server"></i><span>開発者セクションで<span class="highlight">ローカルAPIサーバー</span>を起動可能</span></li>
+                        <li><i class="fa-solid fa-key"></i><span>OpenAI互換APIで<span class="highlight">APIキーなし</span>で外部ツールに接続</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug-circle-check fa-5x" style="color: #2E7D32; animation: fa-bounce 2s;"></i>
+                    <h2>⑪外部ツール連携: Zedエディタでコーディング</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">Zed</span>エディタのエージェントパネルやインラインアシスタントで利用</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span>Ollama環境ならモデルを自動検出</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right"></i><span>LM Studioなら<span class="highlight">LM Studioプロバイダー</span>から選択</span></li>
+                        <li><i class="fa-solid fa-expand"></i><span>コンテキスト長はデフォルト4,096トークン（<span class="highlight">8,122推奨</span>）</span></li>
+                        <li><i class="fa-solid fa-circle-info"></i><span>ハードウェアのメモリ余裕があればさらに拡大可能</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: #D4A017;"></i>
+                        ZedはOllama接続時のコンテキストが<br>
+                        短めなので、設定画面から拡張推奨！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bug fa-5x" style="color: #C62828; animation: fa-beat 2s;"></i>
+                    <h2>⑫安定性の問題: 実用にはまだ早い</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bolt"></i><span>動くときは驚くほど良い結果を出すが、<span class="highlight">不安定さが目立つ</span></span></li>
+                        <li><i class="fa-solid fa-repeat"></i><span>同じ出力を繰り返したり、フリーズすることがある</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation"></i><span>ツール呼び出し用の<span class="keyword-tag">特殊トークンが漏出</span>する問題</span></li>
+                        <li><i class="fa-solid fa-xmark"></i><span>マルチステップのワークフローが正常に完了しないケース</span></li>
+                        <li><i class="fa-solid fa-user-slash"></i><span>レビュー結果：<span class="highlight">デイリー利用の信頼性に欠ける</span></span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 4 -->
+        <div class="section-layout">
+            <!-- Card 13 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;"></i>
+                    <h2>⑬バグの原因: モデル重みではなくクライアント側</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-laptop-code"></i><span>モデルカードによると、<span class="highlight">クライアントやサンプラーの設定</span>が原因</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>フロントエンドがGemma 4のネイティブツール形式を理解していない可能性</span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>正確なランタイム・チャットテンプレート・ツールパーサーが必要</span></li>
+                        <li><i class="fa-solid fa-face-meh"></i><span>ユーザーにとっては<span class="highlight">「動かない」なら原因はどうでも同じ</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-comment-dots fa-lg" style="color: var(--ui-color-5);"></i>
+                        理論的には修正可能ですが、<br>
+                        必要な環境が揃わないと<br>
+                        期待通りの動作になりません
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: #7B1FA2; animation: fa-beat-fade 2s;"></i>
+                    <h2>⑭良い面: ワンショットタスクで意外な実力</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code"></i><span>一発のコーディング質問は<span class="highlight">比較的高い精度</span></span></li>
+                        <li><i class="fa-solid fa-recycle"></i><span>関数のリファクタリングや自己完結型のソリューション生成に対応</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>12Bモデルとは思えない<span class="highlight">高い持続性</span>を発揮</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>技術的なプロンプトをベースモデルより<span class="highlight">有用に処理</span>する場面</span></li>
+                        <li><i class="fa-solid fa-lightbulb"></i><span>期待以上の結果が出るときは「Fable級」の感触あり</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-compare fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                    <h2>⑮使い分けガイド: どう活用すべきか</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-thumbs-up"></i><span><span class="highlight">実験・検証</span>：12Bの限界を試すのに最適</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span><span class="highlight">ワンショット</span>：小規模なコード生成や質問に有効</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span><span class="highlight">学習用</span>：ローカルエージェントの動作を理解する教材に</span></li>
+                        <li><i class="fa-solid fa-thumbs-down"></i><span><span class="keyword-tag">日常のエージェント開発</span>には信頼性不足</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>大規模リポジトリの変更は<span class="highlight">必ず監視が必要</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-hand-point-up fa-lg" style="color: #D4A017;"></i>
+                        「動くときは動く」がキーワード。<br>
+                        信頼性を求めるなら<br>
+                        より大型のモデルがまだ安心です
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 16 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-forward fa-5x" style="color: var(--ui-color-5); animation: fa-spin 2s;"></i>
+                    <h2>⑯今後の期待: V3リリースの噂</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ear-listen"></i><span>作成者がすでに<span class="highlight">V3の開発</span>に言及</span></li>
+                        <li><i class="fa-solid fa-bug-slash"></i><span>安定性の向上と<span class="highlight">壊れた動作の修正</span>が期待される</span></li>
+                        <li><i class="fa-solid fa-arrow-trend-up"></i><span>小型ローカルモデルのエージェント能力は急速に進化中</span></li>
+                        <li><i class="fa-solid fa-flag-checkered"></i><span>小型モデルがフロンティアに近づく流れは今後も続きそう</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 5 -->
+        <div class="section-layout">
+            <!-- Card 17 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s;"></i>
+                    <h2>⑰総合評価: 光と影が混在する新世代モデル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check"></i><span><span class="highlight">メリット</span>：無料・プライベート・小型・時折驚くほど優秀</span></li>
+                        <li><i class="fa-solid fa-xmark"></i><span><span class="highlight">デメリット</span>：バグが多い・エージェント利用には信頼性不足</span></li>
+                        <li><i class="fa-solid fa-dollar-sign"></i><span>API費用ゼロで試せるコーディングエージェントは魅力的</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>現段階では<span class="highlight">実験用途</span>として最も価値がある</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-5);"></i>
+                        試す価値は大あり！ただし期待値は<br>
+                        <span class="keyword-tag">リアルに設定</span>して、<br>
+                        出力は必ずダブルチェックしましょう
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                    <h2>⑱まとめ: 12Bの限界に挑む意欲作</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-microscope"></i><span>12Bモデルがマルチステップのエージェントタスクに挑戦</span></li>
+                        <li><i class="fa-solid fa-chart-line"></i><span>Tau 2ベンチマークでベース比<span class="highlight">3.5倍のスコア</span>を達成</span></li>
+                        <li><i class="fa-solid fa-gear"></i><span>OllamaやLM Studioで<span class="highlight">誰でも無料で試せる</span></span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span>Zedなどのエディタと組み合わせて実用的に利用</span></li>
+                        <li><i class="fa-solid fa-circle-info"></i><span>実用レベルの安定性には至っていないが、<span class="highlight">将来的に期待</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: #D4A017;"></i>
+                        <span class="keyword-tag">ローカルAI</span>の未来を示唆する<br>
+                        興味深いモデル。進化が楽しみ！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=1uw4UaZr3hA" target="_blank">Gemma Coder (Fable Distilled): WHAT.. FABLE LIKE OUTPUT from a 12B MODEL?</a></p>
+            <p>📅 2026年6月22日 | 🏷️ AIコーディング, ローカルLLM, Gemma, エージェント</p>
+        </div>
+    </div>
+
+    <!-- Fade In Animation Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.fade-in-scale');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible');
+                    }
+                });
+            }, {
+                threshold: 0.1,
+                rootMargin: '0px 0px -50px 0px'
+            });
+
+            cards.forEach(card => observer.observe(card));
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codexを長時間作業で使い倒す方法！持続スレッド・ループ・メモリを徹底解説</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #2D6A4F;
+            --ui-color-2: #D4A843;
+            --ui-color-3: #E8F0E3;
+            --ui-color-4: #1B2A1F;
+            --ui-color-5: #BC4749;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F8FAF5;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(212,168,67,0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Stagger animation delays */
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+
+        /* Full width card */
+        .full-width {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-microchip fa-7x" aria-hidden="true"></i></div>
+            <h1>Codexを長時間作業で使い倒す方法！</h1>
+            <div class="subtitle">持続スレッド・ループ自動化・メモリ・ステアリングを徹底解説</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月24日</div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1: 動画概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-play-circle fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① 動画概要: Codex公式ブログの解説</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-lines"></i><span>OpenAIの<span class="keyword-tag">Codex公式ブログ</span>が公開され、長時間作業でCodexを最大限に活用する方法を紹介</span></li>
+                        <li><i class="fa-solid fa-robot"></i><span>Codexは<span class="highlight">開発ツールだけでなく日常業務</span>にも使える強力なエージェント</span></li>
+                        <li><i class="fa-solid fa-shuffle"></i><span>Claude Codeを使っているユーザーでも<span class="highlight">サイドに置いておきたい</span>存在になっている</span></li>
+                        <li><i class="fa-solid fa-star"></i><span>デスクトップアプリが充実しており、コンピューターユースやイメージ機能など多彩な機能を搭載</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            Claude Code派でもCodexはチェック必須！<br>
+                            公式からの機能紹介は要注目です。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: 長時間作業の4つの柱 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② 長時間作業を支える4つの柱</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-link"></i><span><span class="keyword-tag">持続するスレッド</span> — コンテキストを維持したまま作業を継続</span></li>
+                        <li><i class="fa-solid fa-database"></i><span><span class="keyword-tag">共有メモリ</span> — プロジェクト横断で情報を保管・参照</span></li>
+                        <li><i class="fa-solid fa-wrench"></i><span><span class="keyword-tag">ツールへのアクセス</span> — ブラウザー、コンピューター、コネクターなど</span></li>
+                        <li><i class="fa-solid fa-rotate fa-lg"></i><span><span class="keyword-tag">繰り返し実行</span> — 1つのプロンプトを超えてループとして進み続ける</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span><span class="keyword-tag">レビュー</span> — 成果物を確認する場所も整っている</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            この4つが揃うことで<br>
+                            <span class="highlight">作業がループとして進み続ける</span>んです！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: 持続するスレッドとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-thumbtack fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>③ 持続するスレッド: ピン止めして使い続ける</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-desktop"></i><span>Codexデスクトップアプリの左側に<span class="keyword-tag">スレッドをピン止め</span>して配置できる</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate"></i><span>よく戻るプロジェクトや作業を<span class="highlight">スレッド単位でピン止め</span>して使い続けられる</span></li>
+                        <li><i class="fa-solid fa-comments"></i><span>繰り返し出る質問やフィードバック、世間の反応を見続けるためのスレッドを作成可能</span></li>
+                        <li><i class="fa-solid fa-heart-pulse"></i><span>後述の<span class="keyword-tag">ハートビート</span>機能と組み合わせて、スレッド単位でループを回し続けられる</span></li>
+                        <li><i class="fa-solid fa-circle-exclamation"></i><span>長く続けるとスピードが遅くなったり、コストが高くなることはある点に注意</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                            スピード低下はあるものの<br>
+                            <span class="highlight">過去のコンテキストを維持したまま</span><br>
+                            回答してくれるのが嬉しい！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: 音声入力機能 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microphone fa-5x" style="color: var(--ui-color-1); animation: fa-pulse 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ 音声入力: 話言葉でリクエストできる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-volume-high"></i><span>AquaVoiceやAmicaなど外部の音声入力サービスもあるが、<span class="highlight">Codex自体にも音声入力機能が内蔵</span>されている</span></li>
+                        <li><i class="fa-solid fa-desktop"></i><span>デスクトップアプリを通じて<span class="keyword-tag">音声で指示を出せる</span>環境が整っている</span></li>
+                        <li><i class="fa-solid fa-comment-dots"></i><span>話言葉でリクエストしても、コンテキストからCodexが<span class="highlight">いい感じに理解して指示を出してくれる</span></span></li>
+                        <li><i class="fa-solid fa-keyboard"></i><span>ショートカットにも音声入力を設定できる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i>
+                            外部の音声入力サービスを使ってない人は<br>
+                            ぜひCodexの標準機能を試してみて！<br>
+                            <span class="keyword-tag">便利さに驚くはず</span>
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5: ステアリング機能 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrows-up-down-left-right fa-5x" style="color: var(--ui-color-2); animation: fa-spin 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ ステアリング: 実行中に割り込み指示</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-forward"></i><span>Codexが<span class="highlight">動いている途中に次の指示を割り込ませる</span>ことができる</span></li>
+                        <li><i class="fa-solid fa-list-check"></i><span>指示をどんどん蓄積させ、次から次へと<span class="keyword-tag">連続で指示を送る</span>ことが可能</span></li>
+                        <li><i class="fa-solid fa-hand-pointer"></i><span>デスクトップアプリを使えば手を止めずに次のタスクを詰められるのが特徴</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>操作性が非常に高く、<span class="highlight">スムーズな作業フロー</span>を実現できる</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+                            動いてる最中に「あ、これもやって」<br>
+                            と追加できるのは<span class="highlight">めちゃくちゃ便利</span>！<br>
+                            手を止めずに詰めるのがCodex流。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: メモリ/保管庫の構造 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-box-archive fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ メモリ: 保管庫ディレクトリの構造</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-folder-tree"></i><span>公式で推奨する<span class="keyword-tag">保管庫ディレクトリ</span>の切り方を共有している</span></li>
+                        <li><i class="fa-solid fa-file-code"></i><span><span class="keyword-tag">agents.md</span> — エージェントの運用方法を定義するファイル</span></li>
+                        <li><i class="fa-solid fa-list-ol"></i><span><span class="keyword-tag">todo.md</span> — プロジェクト横断の優先度とフォローアップを管理</span></li>
+                        <li><i class="fa-solid fa-folder-open"></i><span>プロジェクトごとにディレクトリが存在し、<span class="keyword-tag">アクティブプロジェクトのインデックス</span>も貼れる</span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>エージェント自体の作業の好みなどを<span class="highlight">マークダウン形式</span>で保管できる</span></li>
+                    </ul>
+                    <pre>
+📁保管庫/
+├── agents.md（運用方法）
+├── todo.md（優先度管理）
+├── プロジェクトA/
+├── プロジェクトB/
+└── notes/（メモ・好み）</pre>
+                </div>
+            </div>
+
+            <!-- Card 7: メモリの活用例 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bookmark fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ メモリ活用: GitHub連携とレビュー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-github"></i><span>保管庫を<span class="keyword-tag">GitHubに置く</span>ことで、Codex自身がメモリのレビュー対象にできる</span></li>
+                        <li><i class="fa-solid fa-pen-to-square"></i><span>Codexが<span class="highlight">書き留めるに値する</span>と判断したものをレビューで確認できる仕組み</span></li>
+                        <li><i class="fa-solid fa-arrow-right"></i><span>話題が出たら関連するメモを更新</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>プロジェクトが前に進んだらプロジェクトページを更新</span></li>
+                        <li><i class="fa-solid fa-circle-check"></i><span>案件が閉じたら<span class="keyword-tag">「クローズ済み」</span>の印をつける</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>これらの運用ルールを<span class="highlight">agents.mdに定義</span>しておく形式</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-5);"></i>
+                            OpenAIの中の人もこういうの<br>
+                            使ってるのかな？<span class="keyword-tag">公式推奨</span>は面白い！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: Computer Use & Browser Use -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑧ Computer Use vs Browser Use vs コネクター</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-globe"></i><span><span class="keyword-tag">Browser Use</span> — ローカルアプリを作るだけならブラウザーユースで十分</span></li>
+                        <li><i class="fa-solid fa-key"></i><span>ログイン情報を使いたい場合は<span class="highlight">Chrome拡張</span>を使うのが推奨。ブラウザーユースでは権限が限定的</span></li>
+                        <li><i class="fa-solid fa-desktop"></i><span><span class="keyword-tag">Computer Use</span> — デスクトップアプリの操作など幅広いタスクに対応</span></li>
+                        <li><i class="fa-brands fa-slack"></i><span><span class="keyword-tag">コネクター</span> — Slackなどの外部サービスを連携可能</span></li>
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>複数のツールを組み合わせたタスクは<span class="highlight">スキルとして再利用</span>させるのがおすすめ</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            権限の使い分けが大事！<br>
+                            目的に応じて使い分けましょう。<br>
+                            <span class="keyword-tag">スキル化</span>で毎回の手間を省く。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+            <!-- Card 9: Codex Mobile連携 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-mobile-screen-button fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ Codex Mobile連携: 寝ながら仕事も可能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot"></i><span><span class="keyword-tag">リモート操作</span> — Codex Mobileを使えばスマホからCodexを操作できる</span></li>
+                        <li><i class="fa-solid fa-bed"></i><span>デスクトップアプリとスマホを<span class="highlight">連携させて寝ながら仕事</span>も可能（？）</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>ただしCodexに<span class="keyword-tag">ロックイン</span>されてしまう懸念点もある</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>使い勝手は非常に良く、リモート環境でもスムーズに操作ができる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-face-laugh fa-lg" style="color: var(--ui-color-5);"></i>
+                            「寝ながら仕事」はジョークっぽいけど<br>
+                            <span class="highlight">モバイル連携の使い勝手</span>は本物！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: スレッド自動化/ハートビート -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-heart-pulse fa-5x" style="color: var(--ui-color-5); animation: fa-pulse 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ スレッド自動化: ハートビートで定期監視</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clock"></i><span>スレッドに<span class="keyword-tag">「自動化追加」</span>でハートビートを設定できる</span></li>
+                        <li><i class="fa-solid fa-gear"></i><span>何分おきにチェックするかなど<span class="highlight">タイミング設定</span>が可能</span></li>
+                        <li><i class="fa-solid fa-bell"></i><span>監視し続けて問題があったら<span class="keyword-tag">Slackに転送</span>など条件付きアクションを実行</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span>これは<span class="highlight">外ループ的</span>な機能。Claude Codeの<span class="keyword-tag">/loop</span>に近いもの</span></li>
+                        <li><i class="fa-solid fa-mobile-screen"></i><span>デスクトップアプリ内で完結するため、<span class="highlight">難しい概念も直感的に使える</span></span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                            ハートビートはすごく便利！<br>
+                            これがCodexの<span class="keyword-tag">強みの一つ</span>。<br>
+                            外ループをアプリ内で完結させるのがポイント。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: ループの概念 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rotate fa-5x" style="color: var(--ui-color-2); animation: fa-spin 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ ループの概念: 内ループと外ループ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-nodes"></i><span>Codexのループ構造: <span class="keyword-tag">コンテキスト</span> → <span class="keyword-tag">ツールズ</span> → <span class="keyword-tag">メモリー</span> → <span class="keyword-tag">リファレンス</span> → <span class="keyword-tag">レビュー</span></span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span><span class="keyword-tag">内ループ</span> — ジェネレーターとエバリュエーターの分割などミクロなレベル</span></li>
+                        <li><i class="fa-solid fa-timeline"></i><span><span class="keyword-tag">外ループ</span> — タイマーやイベントトリガーをフックにしたエージェント的な判断</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>公式の説明は<span class="highlight">ちょっと分かりにくい</span>という印象もある</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>どっちかと言うと今回は<span class="highlight">外ループ的</span>な話が中心</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            内ループと外ループの話が混ざると<br>
+                            混乱しがち。<span class="highlight">マクロかミクロか</span>で<br>
+                            意識を分けると理解しやすいです。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: ループの定義例 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑫ ループの定義例: 3つのユースケース</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-tie"></i><span><span class="keyword-tag">アシスタント</span> — 30分ごとにSlackやGmailの未読をチェックし、優先付け・回答下書きまで自動化</span></li>
+                        <li><i class="fa-solid fa-chart-bar"></i><span><span class="keyword-tag">フィードバック監視</span> — 毎日特定のSlackチャンネルを確認し、上位フィードバックのテーマをまとめて下書きを作成</span></li>
+                        <li><i class="fa-solid fa-headset"></i><span><span class="keyword-tag">カスタマーサポート</span> — 5分単位で返金リクエストを処理。ユーザー反応に応じて<span class="highlight">柔軟にモードを変更</span></span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            返金処理のループが<span class="keyword-tag">1分ごと</span>の<br>
+                            チェックに切り替わるなど<br>
+                            <span class="highlight">リアルタイムで柔軟に対応</span>できるのが強み！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+            <!-- Card 13: レビューの役割 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ レビュー: 人間がやるべきこと</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-check"></i><span>Codexは<span class="highlight">未読メッセージや関連文脈</span>の確認、返信の下書きまでは準備する</span></li>
+                        <li><i class="fa-solid fa-hand"></i><span>しかし<span class="keyword-tag">承認は人間が行う</span>という明確な役割分担</span></li>
+                        <li><i class="fa-solid fa-compass"></i><span><span class="keyword-tag">トーンや方向付け</span>も人間の仕事。エージェントが勝手に送信しない仕組み</span></li>
+                        <li><i class="fa-solid fa-gavel"></i><span><span class="keyword-tag">最終判断</span>と<span class="keyword-tag">タイミング</span>の決定は人間がコントロール</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>人間が適切にレビューすることで<span class="highlight">安全性を担保</span>する設計</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+                            エージェントは下書きまで。<br>
+                            <span class="highlight">送信ボタンは人間が押す。</span><br>
+                            この役割分担は大事ですね。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: Goalコマンド -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ Goalコマンド: 目標設定の重要性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flag-checkered"></i><span><span class="keyword-tag">/goal</span>コマンドはClaude Codeにもあるが、Codexでも同様の概念が存在する</span></li>
+                        <li><i class="fa-solid fa-file-lines"></i><span>マークダウンのプランファイルをアバウトに渡すと、フェーズ別に実行してくれる</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>Opus 4.8やGPT-5.5環境では<span class="highlight">ドリフトを起こしやすい</span>ので注意が必要</span></li>
+                        <li><i class="fa-solid fa-sitemap"></i><span>ゴールを<span class="keyword-tag">フレームワーク</span>で綺麗に定義することが推奨される</span></li>
+                        <li><i class="fa-solid fa-clipboard-check"></i><span><span class="keyword-tag">制約</span>、<span class="keyword-tag">レビュー条件</span>、<span class="keyword-tag">受け入れ条件</span>を明記した上でゴールを定期するのが重要</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            /goalは本当にいっぱい使うべき！<br>
+                            <span class="highlight">条件を明記しないとドリフト</span>する。<br>
+                            フレームワーク使って定義しよう。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: サイドパネル -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-table-columns fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ サイドパネル: 作業の場が広がる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plus"></i><span>デスクトップアプリで<span class="keyword-tag">サイドパネル</span>を簡単に増やせる</span></li>
+                        <li><i class="fa-solid fa-comment"></i><span><span class="keyword-tag">サイドチャット</span>がタブで追加でき、複数の会話を並行管理可能</span></li>
+                        <li><i class="fa-solid fa-globe"></i><span>ブラウザータブも追加できて、Web操作やプレビューをサイドで確認できる</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>レビューでファイルも確認できる</span></li>
+                        <li><i class="fa-solid fa-hand-pointer"></i><span>サイドパネル上で<span class="highlight">プレビュー・インタラクション・コメント</span>など多彩な操作が可能</span></li>
+                        <li><i class="fa-solid fa-star"></i><span>公式は「<span class="highlight">サイドパネルがCodexの作業が起こる場所になり始めている</span>」と表現</span></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Card 16: スキルの作成 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ スキル化: 再利用性を高める</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plug"></i><span>コネクター（Slackなど）や<span class="keyword-tag">Computer Use</span>、<span class="keyword-tag">Browser Use</span>を複数組み合わせて1つのタスクを実行</span></li>
+                        <li><i class="fa-solid fa-recycle"></i><span>毎回Codexに教えるのではなく、<span class="highlight">スキルとして保存して再利用</span>させるのが推奨</span></li>
+                        <li><i class="fa-solid fa-gear"></i><span>Chrome拡張もComputer Useの一種として利用可能</span></li>
+                        <li><i class="fa-solid fa-users"></i><span>コーディングエージェントを日常的に使っている人にとっては<span class="keyword-tag">当たり前の話</span>かもしれない</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+                            スキル化は<span class="keyword-tag">時短の基本</span>！<br>
+                            一度作れば何度でも使える。<br>
+                            Codex使いなら必須の知識ですね。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Row 5 -->
+        <div class="section-layout">
+
+            <!-- Card 17: 所感とまとめ -->
+            <div class="section-card fade-in-scale full-width" style="max-width: 900px;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-list fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ 所感: Codexの強みと課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-thumbs-up"></i><span><span class="highlight">良いところ:</span> デスクトップアプリの統合感がすばらしい。ハートビート、ステアリング、サイドパネル、モバイル連携など<span class="keyword-tag">いいところが全部詰まっている</span></span></li>
+                        <li><i class="fa-solid fa-thumbs-down"></i><span><span class="highlight">気になるところ:</span> ループの<span class="keyword-tag">概念の切り方が分かりにくい</span>。内ループと外ループの話が混ざりがち</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span><span class="highlight">ロックイン懸念:</span> Codexエコシステムに縛られる可能性は感じる</span></li>
+                        <li><i class="fa-solid fa-ranking-star"></i><span>公式ブログは<span class="highlight">広く魅力を伝える</span>場所。開発者だけでなく一般ユーザーにも届く内容</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>内ループ（ミクロ）と外ループ（マクロ）の<span class="keyword-tag">意識の分け方</span>が理解の鍵</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            Claude Code派でもCodexは見ておいて損なし！<br>
+                            <span class="highlight">デスクトップアプリの完成度</span>には驚かされる。<br>
+                            ただしループの説明はもう少し分かりやすくしてほしい（笑）
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Row 5-2 -->
+        <div class="section-layout">
+
+            <!-- Card 18: ループエンジニアリングの本質 -->
+            <div class="section-card fade-in-scale full-width" style="max-width: 900px;">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ さらに学ぶ: ループエンジニアリングの本質</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-book"></i><span>配信者の<span class="keyword-tag">Clozeメンバーシップ</span>で「ループエンジニアリングの本質」というノートを公開中</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass"></i><span>そこで<span class="highlight">徹底的にループの解説</span>を行っている。ループの解像度や概念の整理が書かれている</span></li>
+                        <li><i class="fa-solid fa-video"></i><span>メンバーシップに参加すると<span class="keyword-tag">過去の動画アーカイブ</span>も見放題になる</span></li>
+                        <li><i class="fa-solid fa-circle-info"></i><span>内ループと外ループのどちらの話をしているのかを<span class="highlight">意識して聞く</span>と理解しやすい</span></li>
+                        <li><i class="fa-solid fa-link"></i><span>一方では内ループの話、もう一方では外ループの話をしていることがある点に注意</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-forward fa-lg" style="color: var(--ui-color-5);"></i>
+                            ループエンジニアリングは<span class="keyword-tag">これからのAI開発</span>の<br>
+                            重要な概念。<br>
+                            内ループと外ループの<span class="highlight">違いを意識</span>しよう！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=EJ-NSOLKUkw" target="_blank">オスマ（おすま）チャンネル</a> | 📅 2026年6月24日公開</p>
+            <p style="margin-top: 5px; font-size: 12px; color: #999;">Codex長時間作業使い倒し方インフォグラフィック | 2026年6月24日作成</p>
+        </footer>
+
+    </div>
+</body>
+</html>

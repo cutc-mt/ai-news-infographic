@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sakana AI「Fugu」の仕組みがヤバかった件｜国産LLMがMythos級に挑戦</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #0D6E6E;
+            --ui-color-2: #E8913A;
+            --ui-color-3: #E8F4F0;
+            --ui-color-4: #1A1A2E;
+            --ui-color-5: #D94F4F;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #F5FAF8;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), #0A4F4F, var(--ui-color-2));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(135deg, #FFF3CD, #FFE0B2);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            color: var(--ui-color-4);
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        /* Handwritten */
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        /* Animations */
+        @keyframes fa-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        @keyframes fa-beat-fade {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.15s; }
+        .section-card:nth-child(3) { animation-delay: 0.2s; }
+        .section-card:nth-child(4) { animation-delay: 0.25s; }
+        .section-card:nth-child(5) { animation-delay: 0.3s; }
+        .section-card:nth-child(6) { animation-delay: 0.35s; }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), #0A4F4F);
+            border-radius: 20px;
+            color: white;
+            font-family: 'Yomogi', cursive;
+            font-size: 0.95em;
+        }
+
+        .footer a {
+            color: #FFD700;
+            text-decoration: none;
+            border-bottom: 1px dashed rgba(255,215,0,0.5);
+        }
+
+        .footer a:hover {
+            color: #FFF;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ヘッダー -->
+        <div class="header">
+            <div class="header-icon">🐡</div>
+            <h1><i class="fa-solid fa-fish" style="margin-right: 10px;"></i>Sakana AI「Fugu」の仕組みがヤバかった件</h1>
+            <div class="subtitle">国産LLMがMythos級の性能を実現！マルチエージェント基盤モデルの全貌</div>
+            <div class="date"><i class="fa-regular fa-calendar"></i> 2026年6月22日 一般提供開始 | チャンネル: AI総合研究所</div>
+        </div>
+
+        <!-- カード1-4 -->
+        <div class="section-layout">
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>①Sakana AIとは: 日本発のフロンティアAI企業</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-location-dot"></i><span>東京拠点のAI企業。「Building Frontier AI in Japan」を掲げる</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span><span class="keyword-tag">集合知</span>研究を中核に、複数LLMを編成するアプローチを追求</span></li>
+                        <li><i class="fa-solid fa-globe"></i><span>日本発の<span class="highlight">国際商用AIプロダクト</span>として注目を集める</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>米国一極集中の輸出規制リスクに対する独自の立ち位置</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> データ主権やコンプライアンスの観点でも日本発のAIには意味があるね！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fish fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                    <h2>②Sakana Fuguとは: マルチエージェント基盤モデル</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info"></i><span>2026年4月24日に<span class="keyword-tag">ベータ公開</span>、6月22日に一般提供開始</span></li>
+                        <li><i class="fa-solid fa-users-gear"></i><span>複数のフロンティアモデルを動的に編成して動かす設計</span></li>
+                        <li><i class="fa-solid fa-plug"></i><span>ユーザーからは<span class="highlight">1つのモデルAPI</span>に見えるが、内部では複数LLMを「エージェント」として呼び分け</span></li>
+                        <li><i class="fa-solid fa-layer-group"></i><span>Claude系・GPT系・Gemini系を含む多様なモデル群を活用</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i> "One Model to Command Them All" がキャッチコピー！<br>一つのAPIで全部まとめるのがウリ</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-sliders fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                    <h2>③2つのモデル: FuguとFugu Ultra</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bolt"></i><span><span class="keyword-tag">Fugu（標準版）</span>: 日常業務向け。低レイテンシでコーディングやチャットに適応</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span><span class="keyword-tag">Fugu Ultra</span>: フラッグシップモデル。複雑な多段階タスクに対応</span></li>
+                        <li><i class="fa-solid fa-ban"></i><span>標準版は<span class="highlight">プロバイダーの除外設定</span>が可能（例: OpenAIモデルを使わない）</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>Ultra版は品質維持のためエージェントプールが固定</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-5);"></i> Ultraはプール固定だけど、標準版はプライバシー要件に合わせてカスタマイズ可能！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-music fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>④Conductor: 指揮者モデルが全体を統括</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-wand-magic-sparkles"></i><span><span class="keyword-tag">Conductor（指揮者）</span>が「誰に・どのタスクを・どう投げるか」を判断</span></li>
+                        <li><i class="fa-solid fa-microchip"></i><span><span class="highlight">7Bパラメータの小型モデル</span>で強化学習（RL）による訓練</span></li>
+                        <li><i class="fa-solid fa-arrows-turn-right"></i><span>中間結果を見ながら<span class="keyword-tag">戦略を動的に変更</span>する判断力を獲得</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span>ICLR 2026の論文「Conductor」が技術的ベース</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-book-open fa-lg" style="color: var(--ui-color-5);"></i> 小さいけど賢い指揮者が、GPT-5やClaude Opusを束ねて動かすイメージ！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5-8 -->
+        <div class="section-layout">
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑤TRINITY: Thinker・Worker・Verifierの3役割</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lightbulb"></i><span><span class="keyword-tag">Thinker（思考担当）</span>: タスク全体の方針を立て、問題を構造化する</span></li>
+                        <li><i class="fa-solid fa-wrench"></i><span><span class="keyword-tag">Worker（実行担当）</span>: サブタスクを実際に解く。コード生成や計算をこなす</span></li>
+                        <li><i class="fa-solid fa-clipboard-check"></i><span><span class="keyword-tag">Verifier（検証担当）</span>: 出力を確認し、誤りや欠落を指摘する</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i><span>人が設計したワークフローではなく、<span class="highlight">学習したコーディネーター</span>が動的に決定</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-rotate fa-lg" style="color: var(--ui-color-1);"></i> Thinker→Worker→Verifierの役割割り当てをAI自身が学習で決めるのがTRINITYの肝！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-infinity fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑥再帰的呼び出し: Fuguが自分自身も使う</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>Fugu自身が<span class="highlight">エージェントプールの中に再帰的に含まれる</span></span></li>
+                        <li><i class="fa-solid fa-rotate-left"></i><span>失敗したら別の戦略で<span class="keyword-tag">自動で再実行</span></span></li>
+                        <li><i class="fa-solid fa-sitemap"></i><span>大きなタスクを段階的に分解し、各段階でサブチームを動的編成</span></li>
+                        <li><i class="fa-solid fa-arrow-trend-up"></i><span><span class="keyword-tag">recursive test-time scaling</span>: 推論時の計算量を増やして品質を上げる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i> 人間が「次は何をするか」を指示しなくても、Conductor自身がループを回すのがポイント！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑦ベンチマーク結果: Mythos級の性能を達成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">Terminal-Bench 2.1</span>: <span class="highlight">Ultra 82.1</span> vs Fable 5 80.4 vs GPT 5.5 78.2</span></li>
+                        <li><i class="fa-solid fa-book"></i><span><span class="keyword-tag">CharXiv Reasoning</span>: <span class="highlight">Ultra 86.6</span> vs Mythos Preview 86.1</span></li>
+                        <li><i class="fa-solid fa-flask"></i><span><span class="keyword-tag">GPQA-D</span>: <span class="highlight">Ultra 95.5</span> vs Mythos 94.6 vs Gemini 93.4</span></li>
+                        <li><i class="fa-solid fa-code"></i><span><span class="keyword-tag">LiveCodeBench</span>: <span class="highlight">Ultra 93.2</span> vs Fable 5 89.8</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-chart-line fa-lg" style="color: var(--ui-color-5);"></i> エージェントプール内にFable 5やMythosを持たないのにこの成績！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑧課題も: Fable 5に届かない領域</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-skull-crossbones"></i><span><span class="keyword-tag">HLE</span>: Fable 5 53.3 vs Fugu Ultra 50.0 — 最難関でFable 5に及ばず</span></li>
+                        <li><i class="fa-solid fa-bug"></i><span><span class="keyword-tag">SWEBench Pro</span>: Fable 5 80.0 vs Fugu Ultra 73.7</span></li>
+                        <li><i class="fa-solid fa-atom"></i><span><span class="keyword-tag">SciCode</span>: Fable 5 60.2 vs Fugu Ultra 58.7</span></li>
+                        <li><i class="fa-solid fa-circle-info"></i><span><span class="highlight">「全領域最強」ではなく</span>、フロンティア帯と渡り合える領域が広がったのが正しい解釈</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-1);"></i> 「束ねて近づける」アプローチだから、特定の専門領域ではFable 5に届かないことも</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9-12 -->
+        <div class="section-layout">
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑨実務パフォーマンス: 50週取引で+19.43%</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-coins"></i><span>50週分の株式取引パイプライン評価で<span class="highlight">+$11,943.22</span>の平均リターン</span></li>
+                        <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>他のフロンティアモデル単体は<span class="keyword-tag">+15%未満</span>にとどまる結果</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>「複数日の連続タスクで<span class="highlight">方針を維持する力</span>」に明確な差が出た</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass-plus"></i><span>コードレビューでUltraが20件以上の問題を指摘 vs 他モデルは3件のみ</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-meteor fa-lg" style="color: var(--ui-color-2);"></i> ベンチマーク数値では現れにくい「多段ワークフロー上の差」がここで明確に！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-money-bill-wave fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑩料金体系: サブスク3プラン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user"></i><span><span class="keyword-tag">Standard $20/月</span>: 軽量な日常使用、個人ワークフロー向け</span></li>
+                        <li><i class="fa-solid fa-user-tie"></i><span><span class="keyword-tag">Pro $100/月</span>: Standardの10倍枠。集中作業セッション向け</span></li>
+                        <li><i class="fa-solid fa-building"></i><span><span class="keyword-tag">Max $200/月</span>: Standardの20倍枠。長尺・連続ワークロード向け</span></li>
+                        <li><i class="fa-solid fa-gift"></i><span><span class="highlight">7月末まで登録で2ヶ月目無料</span>のローンチキャンペーン実施中</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-1);"></i> ChatGPT PlusやClaude Proと正面から競合する価格設定！複数モデル契約を1つに統合できる</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-receipt fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑪API従量課金: 単価比較</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-dollar-sign"></i><span>Ultra API: 入力<span class="highlight">$5</span> / 出力<span class="highlight">$30</span>（100万トークンあたり）</span></li>
+                        <li><i class="fa-solid fa-arrows-up-to-line"></i><span>272Kトークン超過時: 入力$10 / 出力$45に切り替わる<span class="keyword-tag">段階制</span></span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>GPT-5.5とほぼ同水準。Mythos Preview（入$25/出$125）の<span class="highlight">約1/4の単価</span></span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation"></i><span>マルチエージェント構造のため<span class="keyword-tag">消費トークン数は単体より多くなる</span>傾向</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-calculator fa-lg" style="color: var(--ui-color-5);"></i> 単価の安さだけで判断せず、ワークロード単位の実コストで評価して！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug-circle-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑫OpenAI互換API: 既存コードがそのまま動く</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code"></i><span>エンドポイントURLとAPIキーを差し替えるだけで<span class="highlight">切り替え可能</span></span></li>
+                        <li><i class="fa-solid fa-link"></i><span><span class="keyword-tag">LangChain</span>・<span class="keyword-tag">LlamaIndex</span>等フレームワークで「openai」クライアントがそのまま使える</span></li>
+                        <li><i class="fa-solid fa-laptop-code"></i><span>GitHub CopilotやOpenAI Codex CLIにも設定可能</span></li>
+                        <li><i class="fa-solid fa-circle-xmark"></i><span>Claude CodeはLLM gateway（プロキシ）でリクエスト変換が必要</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i> 既存システムへの組み込み変更が最小限！これが最大の導入メリット</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13-16 -->
+        <div class="section-layout">
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑬適しているユースケース: 多段タスクに強い</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">大規模コードレビュー</span>: 複数モデルの観点で問題点を抽出</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span><span class="keyword-tag">サイバーセキュリティ分析</span>: 脆弱性検出で多角的な分析が可能</span></li>
+                        <li><i class="fa-solid fa-book-open-reader"></i><span><span class="keyword-tag">論文・特許リサーチ</span>: 数十本の文献を横断して比較・要約</span></li>
+                        <li><i class="fa-solid fa-flask-vial"></i><span><span class="keyword-tag">実験自動化</span>: 論文の再実装と再現実験を自律で完遂</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-clock fa-lg" style="color: var(--ui-color-1);"></i> 通常3〜4日かかるリサーチ作業が<span class="highlight">数時間で完了</span>する事例も！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-ban fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑭向いていないユースケース</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-gauge-high"></i><span><span class="keyword-tag">低レイテンシ重視</span>: 短い対話ではConductorのオーバーヘッドが生じる</span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span><span class="keyword-tag">再現性重視</span>: 規制対応では単一モデルAPIの方が監査がシンプル</span></li>
+                        <li><i class="fa-solid fa-earth-europe"></i><span><span class="keyword-tag">EU/EEA管轄</span>: <span class="highlight">GDPR対応未完了で現時点では利用不可</span></span></li>
+                        <li><i class="fa-solid fa-comment"></i><span><span class="keyword-tag">小規模単発タスク</span>: マルチエージェントの恩恵が薄くコスト効率が悪化</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-5);"></i> 無理にFuguを使わず、目的に合った単一モデルAPIを選ぶのが正解の場合も</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shuffle fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑮OpenRouter Fusion APIとの比較</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-diagram-project"></i><span><span class="keyword-tag">Sakana Fugu</span>: オーケストレーション（Conductorが役割分担と委譲を学習）</span></li>
+                        <li><i class="fa-solid fa-comments"></i><span><span class="keyword-tag">OpenRouter Fusion</span>: 合議（複数モデルの並列回答を統合）</span></li>
+                        <li><i class="fa-solid fa-arrow-right"></i><span>長い自律タスクや<span class="highlight">多段リサーチ</span>では<span class="keyword-tag">Fugu</span>が有利</span></li>
+                        <li><i class="fa-solid fa-check-double"></i><span>単発の重要回答の品質担保では<span class="keyword-tag">Fusion API</span>が向く構図</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-2);"></i> 「タスクを分解して割り振る」vs「同じ質問を投げて合議する」— 設計思想が根本的に違う！</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bolt-lightning fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑯Fable 5停止の空白を埋める存在</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-xmark"></i><span>Anthropicが<span class="highlight">2026年6月13日にFable 5・Mythos 5を利用停止</span></span></li>
+                        <li><i class="fa-solid fa-circle-question"></i><span>次世代モデルでMythos級能力を一般公開する時期は<span class="keyword-tag">未確定</span></span></li>
+                        <li><i class="fa-solid fa-hand-holding-heart"></i><span>Fugu Ultraは<span class="highlight">Mythos Previewの約1/4の単価</span>でフロンティア帯にアクセス可能</span></li>
+                        <li><i class="fa-solid fa-user-check"></i><span>特殊な認定や審査なしで<span class="keyword-tag">API契約だけで一般企業が使える</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> フロンティア帯の選択肢が薄くなった今、Fugu Ultraは現実的な代替候補！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17-18 -->
+        <div class="section-layout">
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-building-shield fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;"></i>
+                    <h2>⑰企業 導入時の注意点とガバナンス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye"></i><span>各リクエストで<span class="highlight">どのモデルが選ばれたかの可観測性</span>が運用の鍵</span></li>
+                        <li><i class="fa-solid fa-filter"></i><span>データ送信先プロバイダー単位での<span class="keyword-tag">除外設定</span>がコンプライアンスに必須</span></li>
+                        <li><i class="fa-solid fa-file-shield"></i><span>厳密なモデル別監査が必要な業務は<span class="highlight">単一モデル直接契約</span>を維持</span></li>
+                        <li><i class="fa-solid fa-rotate-left"></i><span>突発的なFugu側障害に備えて<span class="keyword-tag">Opus 4.8等へのフォールバック経路</span>を用意</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-5);"></i> 「Fuguに一本化」ではなく、主用途と緊急時のフォールバックを別系統で用意する設計が現実的</span>
+                </div>
+            </div>
+
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-compass fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;"></i>
+                    <h2>⑱まとめ: マルチエージェント時代の幕開け</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-flag-checkered"></i><span>Sakana Fuguは<span class="highlight">「マルチエージェント基盤モデル」という新しいパラダイム</span>を体現</span></li>
+                        <li><i class="fa-solid fa-map-pin"></i><span>まずは<span class="keyword-tag">コードレビュー</span>・<span class="keyword-tag">リサーチ</span>・<span class="keyword-tag">多段ワークフロー</span>の3領域で試すのが第一歩</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>運用ルールとガバナンスを並行で整備していくことが重要</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span><span class="highlight">「待つ」のではなく「いま試す」</span>姿勢がこれからのAI活用の競争力を左右する</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-fish-fins fa-lg" style="color: var(--ui-color-1);"></i> 🐡 フグは毒も持つ強い魚。<br>Sakana AIのFuguも、AI業界に強烈な一撃を見舞いました！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="footer">
+            <p>🎬 動画: <a href="https://youtu.be/cK5sxqvn9ZY" target="_blank">【Mythos級？】最強！国産LLM Sakana AI「Fugu」の仕組みがヤバかった件</a></p>
+            <p style="margin-top: 8px;">📺 チャンネル: <a href="https://www.youtube.com/@AI総合研究所" target="_blank">AI総合研究所</a> | 📅 2026年6月26日作成</p>
+            <p style="margin-top: 8px; opacity: 0.7;">📚 参考: <a href="https://www.ai-souken.com/article/what-is-sakana-fugu" target="_blank">AI総合研究所 - Sakana Fugu解説</a> | <a href="https://sakana.ai/fugu/" target="_blank">Sakana AI公式</a></p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AIオブザーバビリティ スペシャル#1 〜トークン消費を可視化して効率化する〜</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #2D6A4F;
+            --ui-color-2: #D4A03C;
+            --ui-color-3: #E8F5E9;
+            --ui-color-4: #1B4332;
+            --ui-color-5: #E07A5F;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #FFF8F5;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-4));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        /* Section Layout */
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        /* Card Styles */
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.3em;
+            color: var(--ui-color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        /* Keyword List */
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--ui-color-2);
+            min-width: 16px;
+            margin-top: 4px;
+        }
+
+        /* Keyword Tag */
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        /* Speech Bubble */
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--ui-color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--ui-color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: var(--ui-color-5);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--ui-color-5) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        /* Code Preview */
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-top: 10px;
+            overflow-x: auto;
+            border-left: 4px solid var(--ui-color-1);
+        }
+
+        /* Highlight */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(212,160,60,0.3) 60%);
+            font-weight: bold;
+        }
+
+        /* Fade-in Animation */
+        .fade-in-scale {
+            opacity: 0;
+            transform: scale(0.95);
+            animation: fadeInScale 0.6s ease forwards;
+        }
+
+        @keyframes fadeInScale {
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Stagger animation delays */
+        .section-card:nth-child(1) { animation-delay: 0.1s; }
+        .section-card:nth-child(2) { animation-delay: 0.2s; }
+        .section-card:nth-child(3) { animation-delay: 0.3s; }
+        .section-card:nth-child(4) { animation-delay: 0.4s; }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            font-size: 14px;
+            color: #777;
+            border-top: 2px dashed #ddd;
+        }
+
+        footer a {
+            color: var(--ui-color-1);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive */
+        @media (max-width: 1600px) {
+            .section-card { min-width: 280px; }
+        }
+        @media (max-width: 1200px) {
+            .section-card { min-width: 320px; }
+        }
+        @media (max-width: 900px) {
+            .section-card { min-width: 380px; }
+        }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+
+        /* Full width card */
+        .full-width {
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon"><i class="fas fa-eye fa-7x" aria-hidden="true"></i></div>
+            <h1>AIオブザーバビリティ スペシャル#1</h1>
+            <div class="subtitle">トークン消費を可視化して効率化する — AI駆動開発の次の一手</div>
+            <div class="date"><i class="fas fa-calendar"></i> 2026年6月25日（木）19:00〜 @ タイミー東京本社</div>
+        </div>
+
+        <!-- Row 1 -->
+        <div class="section-layout">
+
+            <!-- Card 1: イベント概要 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-calendar-days fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>① イベント概要: AI駆動開発勉強会の特別編</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building"></i><span><span class="keyword-tag">会場</span> 株式会社タイミー東京本社（汐留シティセンター35階）で開催</span></li>
+                        <li><i class="fa-solid fa-users"></i><span>現地参加最大100名＋オンライン配信の<span class="highlight">ハイブリッド形式</span>。計430名以上が参加</span></li>
+                        <li><i class="fa-solid fa-bullhorn"></i><span>主催は「AI駆動開発(AI-Driven Development)勉強会」。GitHub CopilotやCursor、Claude Codeなどの活用を共有するコミュニティ</span></li>
+                        <li><i class="fa-solid fa-handshake"></i><span>株式会社タイミーが会場を提供。スポットバイトサービス「タイミー」を運営</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            AI駆動開発コミュニティは<br>
+                            定期的に勉強会を開催していて、<br>
+                            今回は<span class="keyword-tag">オブザーバビリティ</span>に特化した<br>
+                            スペシャル版でした。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 2: テーマの背景 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-coins fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>② テーマの背景: トークンコストが見えない課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-trend-up"></i><span>GitHub Copilotが<span class="keyword-tag">トークンベース従量課金</span>に移行。Claude CodeやCodexの本格利用も広がり中</span></li>
+                        <li><i class="fa-solid fa-robot"></i><span>CIやエージェントの自動実行が日常になるなかで、<span class="highlight">トークン消費は今後さらに膨らむ</span>見込み</span></li>
+                        <li><i class="fa-solid fa-eye-slash"></i><span>個人サブスクの利用分は見えていても、その使われ方が妥当かどうかは把握できていない</span></li>
+                        <li><i class="fa-solid fa-server"></i><span>CIやエージェントの自動実行から走っているAPI利用分が、何にどの程度使われ無駄になっていないかまで把握しきれていない</span></li>
+                    </ul>
+                    <div class="speech-bubble right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-2);"></i>
+                            「使っている感」はあるけど、<br>
+                            <span class="keyword-tag">何にいくら使っているか</span>は<br>
+                            実はほとんど見えていない —<br>
+                            それが企業・個人共通の課題。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 3: 発表者紹介 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microphone-lines fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>③ 発表者ラインナップ: 4人の専門家</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-tie"></i><span><span class="keyword-tag">菅本さん（ファインディ株式会社）</span> アウトプット増からトークン消費効率改善までを可視化する基盤整備の実践</span></li>
+                        <li><i class="fa-solid fa-user"></i><span><span class="keyword-tag">takafumi_-_suzukiさん</span> GitHub Copilot運用のリアル：AI Credit時代にどう向き合うか</span></li>
+                        <li><i class="fa-solid fa-user"></i><span><span class="keyword-tag">shihochanさん</span> （セッション内容は調整中と記載）</span></li>
+                        <li><i class="fa-solid fa-user"></i><span><span class="keyword-tag">dak2さん（株式会社タイミー）</span> 現場のトークンマネジメント〜 Tokenmaxxing is over 〜</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-comments fa-lg" style="color: var(--ui-color-1);"></i>
+                            全員<span class="keyword-tag">10分LT</span>形式。<br>
+                            現場のリアルな知見を<br>
+                            密に詰め込んだ構成。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 4: ファインディ基盤整備 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-chart-column fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>④ ファインディの実践: 可視化基盤の整備</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database"></i><span>ファインディ株式会社の菅本さんが<span class="keyword-tag">トークン消費を可視化する基盤</span>を構築した実践を共有</span></li>
+                        <li><i class="fa-solid fa-arrows-up-down"></i><span>アウトプット（生産量）の増加だけでなく、消費効率の改善まで一気通貫で追える仕組みを導入</span></li>
+                        <li><i class="fa-solid fa-gauge"></i><span>単なる「いくら使ったか」ではなく、<span class="highlight">どのタスクでどれくらい消費し、成果に繋がったか</span>まで分析可能に</span></li>
+                        <li><i class="fa-solid fa-sitemap"></i><span>組織全体でAIコストを把握し、無駄な消費を特定して効率化する取り組み</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                            コストの<span class="keyword-tag">可視化</span>が全ての第一歩。<br>
+                            見えないものは改善できない —<br>
+                            この原則をAIコストにも適用。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2 -->
+        <div class="section-layout">
+
+            <!-- Card 5: Copilot運用のリアル -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-brands fa-github fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 1.5s infinite;" aria-hidden="true"></i>
+                    <h2>⑤ Copilot運用のリアル: AI Credit時代への対応</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-credit-card"></i><span>takafumi_-_suzukiさんが<span class="keyword-tag">AI Credit</span>の概念に基づくGitHub Copilotの運用実態を赤裸々に語る</span></li>
+                        <li><i class="fa-solid fa-wallet"></i><span>Creditとは事前チャージ型の<span class="highlight">従量課金モデル</span>。使った分だけ差し引かれる仕組みでコスト管理が求められる</span></li>
+                        <li><i class="fa-solid fa-chart-pie"></i><span>チームメンバーごとのトークン消費傾向を分析し、効率的な使い方を啓発する試み</span></li>
+                        <li><i class="fa-solid fa-sliders"></i><span>開発フローにAIを組み込む際のベストプラクティスと、コストを抑えつつ品質を維持する方法</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+                            「固定月額」から<span class="keyword-tag">使った分だけ</span>へ。<br>
+                            パラダイムシフトに<br>
+                            現場はどう適応しているのか？
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 6: Tokenmaxxingの終わり -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑥ Tokenmaxxing is over: 量から質への転換</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-fire"></i><span>dak2さん（タイミー）が<span class="highlight">Tokenmaxxingは終わった</span>と断言。トークンを大量消費することが目的化していたトレンドの終焉</span></li>
+                        <li><i class="fa-brands fa-amazon"></i><span><span class="keyword-tag">Amazon</span>は開発者のトークン消費量を競うランキングボードを廃止。「AIを使うこと自体を目的とした利用を促進するものではない」と表明</span></li>
+                        <li><i class="fa-solid fa-building"></i><span><span class="keyword-tag">Uber</span>は2026年のAI予算をわずか4ヶ月で使い切ってしまった事例も報告</span></li>
+                        <li><i class="fa-solid fa-circle-arrow-right"></i><span>活動量が必ずしも成果を意味しないという認識が広がり、<span class="highlight">実質的な価値に焦点を当てる動き</span>が加速中</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-1);"></i>
+                            トークン消費量＝優秀さ<br>
+                            という神話が崩れた。<br>
+                            <span class="keyword-tag">質が勝負</span>の時代へ。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 7: オブザーバビリティとは -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-radar fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑦ AIオブザーバビリティとは: 確率的システムの監視</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-eye"></i><span>AIシステムがどのように入力を処理し出力を生成しているかを<span class="highlight">リアルタイムで可視化</span>するアプローチ</span></li>
+                        <li><i class="fa-solid fa-not-equal"></i><span>従来のIT監視はシステムが<span class="keyword-tag">決定論的</span>に動く前提。LLMは同じ入力でも異なる応答を返す確率的な性質</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>モデルのドリフト、トークン使用量、AIによる混乱などを制御。セキュリティとコンプライアンスの観点でも重要</span></li>
+                        <li><i class="fa-solid fa-toolbox"></i><span>主要ツール：<span class="keyword-tag">LangSmith</span>、<span class="keyword-tag">Langfuse</span>、Phoenix (Arize) など</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-2);"></i>
+                            従来の監視ツールでは<br>
+                            AIの<span class="keyword-tag">確率的な挙動</span>を追えない。<br>
+                            専用の仕組みが不可欠に。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 8: Copilot従量課金 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-invoice-dollar fa-5x" style="color: var(--ui-color-2); animation: fa-spin 4s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑧ Copilotの従量課金移行: 使う分だけ払う時代</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-right-arrow-left"></i><span>GitHub Copilotが固定月額から<span class="keyword-tag">トークンベースの従量課金</span>へ移行。AIコーディングツール全体のトレンド</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>Claude CodeやCodexの本格利用が広がり、開発現場でのAI利用は日常化</span></li>
+                        <li><i class="fa-solid fa-arrow-trend-up"></i><span>CIやエージェントの自動実行が増えるほど、<span class="highlight">気づけば請求が膨れ上がる</span>リスク</span></li>
+                        <li><i class="fa-solid fa-scale-balanced"></i><span>これまでの「サブスクで使い放題」から<span class="keyword-tag">「使った分だけ」</span>へ。コスト意識を持つ組織づくりが必須に</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-coins fa-lg" style="color: var(--ui-color-2);"></i>
+                            エージェントが自律的に動くと<br>
+                            <span class="keyword-tag">人間の目を離れた間</span>にも<br>
+                            トークンが消費され続ける。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3 -->
+        <div class="section-layout">
+
+            <!-- Card 9: コスト管理の課題 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑨ 企業が直面するコスト管理の課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-user-gear"></i><span>個人サブスクの利用分は概ね把握できているが、<span class="highlight">使われ方が妥当かどうかまでは不明</span></span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>CIやエージェントの自動実行経由のAPI利用は、何にどの程度使われ<span class="keyword-tag">無駄になっていないか</span>まで把握できない</span></li>
+                        <li><i class="fa-solid fa-chart-line"></i><span>組織規模が大きくなるほど、部門間で重複したAI利用が発生しやすくなる</span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span>各企業が<span class="highlight">「次の一手」</span>として、コスト可視化と効率化の取り組みを始める段階に</span></li>
+                    </ul>
+                    <div class="speech-bubble top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                            見えているのは<span class="keyword-tag">請求額だけ</span>。<br>
+                            何が効いていて何が無駄か —<br>
+                            その分析がこれからの鍵。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 10: 可視化のベストプラクティス -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑩ 可視化のベストプラクティス: 効率改善のステップ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">Step 1: 現状把握</span> — トークン消費量をサービス・チーム・個人ごとに可視化する</span></li>
+                        <li><i class="fa-solid fa-2"></i><span><span class="keyword-tag">Step 2: 分析</span> — どのタスクで多く消費し、成果に繋がっているかを分析</span></li>
+                        <li><i class="fa-solid fa-3"></i><span><span class="keyword-tag">Step 3: 改善</span> — プロンプトの最適化、モデルの使い分け、無駄な呼び出しの削減</span></li>
+                        <li><i class="fa-solid fa-4"></i><span><span class="keyword-tag">Step 4: 継続</span> — ダッシュボードで定期的にモニタリングし、改善サイクルを回す</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-arrows-spin fa-lg" style="color: var(--ui-color-5);"></i>
+                            PDCAをAIコストにも適用。<br>
+                            <span class="keyword-tag">見える化→分析→改善→継続</span><br>
+                            のサイクルが重要。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 11: プロンプト最適化 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑪ プロンプト最適化: トークンを無駄にしない書き方</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-scissors"></i><span>冗長なプロンプトは<span class="highlight">余分なトークンを消費</span>するだけ。簡潔で明確な指示がコスト削減の第一歩</span></li>
+                        <li><i class="fa-solid fa-arrows-split-up-and-left"></i><span>タスクを細かく分割し、それぞれに最適なモデルを使い分けることで効率化</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>キャッシュを活用して同じコンテキストの再計算を避ける。システムプロンプトやドキュメントのキャッシュが有効</span></li>
+                        <li><i class="fa-solid fa-temperature-low"></i><span>temperatureを下げて出力の無駄を減らす。推論タスクでは低めに設定するのが基本</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-pen-fancy fa-lg" style="color: var(--ui-color-2);"></i>
+                            「丁寧すぎるプロンプト」は<br>
+                            <span class="keyword-tag">お金の無駄遣い</span>。<br>
+                            シンプル・明確・具体的が正解。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 12: モデル選び -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+                    <h2>⑫ モデルの適材適所: 高級品と日用品を使い分ける</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-crown"></i><span><span class="keyword-tag">複雑な推論・設計</span>はGPT-4oやClaude Opusなど上位モデル。品質が重要な場面に限定</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span><span class="keyword-tag">定型処理・単純タスク</span>は小型モデルやDeepSeekなど低コストモデルに振る</span></li>
+                        <li><i class="fa-solid fa-code-branch"></i><span>コーディングの補完はCopilot、自立型エージェントはClaude CodeやCodexと使い分け</span></li>
+                        <li><i class="fa-solid fa-money-bill-wave"></i><span>全タスクで<span class="highlight">コスト9分の1</span>のモデルで済むなら、そちらを選ぶ。成果が変わらない限り安い方が正解</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                            どんな料理にも<span class="keyword-tag">三つ星レストラン</span>は<br>
+                            使わないように。<br>
+                            用途に合わせてモデルを選ぼう。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 4 -->
+        <div class="section-layout">
+
+            <!-- Card 13: チーム啓発 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-group fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑬ チームの啓発: コスト意識の浸透</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-chart-bar"></i><span>チームメンバーごとのトークン消費を<span class="keyword-tag">ダッシュボードで共有</span>。誰がどこで使っているかが透明に</span></li>
+                        <li><i class="fa-solid fa-trophy"></i><span>Amazonは消費量ランキングを廃止したが、<span class="highlight">効率の良い使い方</span>を称える文化づくりが重要</span></li>
+                        <li><i class="fa-solid fa-graduation-cap"></i><span>「無駄遣い」ではなく「賢い使い方」をチームで学び合う場を定期的に設ける</span></li>
+                        <li><i class="fa-solid fa-comments"></i><span>コスト情報をオープンにすることで、メンバー自身が自律的に改善する文化を育む</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-users fa-lg" style="color: var(--ui-color-5);"></i>
+                            消費量ランキングは<span class="keyword-tag">逆効果</span>。<br>
+                            重要なのは「使った量」じゃなくて<br>
+                            「どう賢く使ったか」。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 14: エージェント自動実行のリスク -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑭ エージェント自動実行の隠れたコスト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-infinity"></i><span>エージェントが自律的に動くと<span class="highlight">人間の目を離れた間にもトークンが消費され続ける</span></span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>ループに陥って無限にトークンを消費するケースも。ガードレールの設置が必須</span></li>
+                        <li><i class="fa-solid fa-clock"></i><span>CI/CDパイプラインに組み込むと、コミットのたびにAIが動いてコストが積み上がる</span></li>
+                        <li><i class="fa-solid fa-shield-halved"></i><span>上限設定（rate limit）とアラート通知の仕組みを<span class="keyword-tag">必ず</span>導入すべき</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1 top">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-2);"></i>
+                            エージェントに<span class="keyword-tag">予算上限</span>を<br>
+                            設けていない状態で<br>
+                            自律実行させるのは危険！
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 15: ツール紹介 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-toolbox fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑮ 活用できるツール群: 監視・分析の武器</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-link"></i><span><span class="keyword-tag">LangSmith</span> — LangChain系のアプリケーションのトレーシングとデバッグに特化</span></li>
+                        <li><i class="fa-solid fa-fire"></i><span><span class="keyword-tag">Langfuse</span> — オープンソースのLLMオブザーバビリティプラットフォーム。コスト追跡も可能</span></li>
+                        <li><i class="fa-solid fa-feather-pointed"></i><span><span class="keyword-tag">Phoenix (Arize)</span> — LLMアプリケーションの評価と監視。トークン使用量の可視化も</span></li>
+                        <li><i class="fa-solid fa-chart-simple"></i><span>各ツール共通：<span class="highlight">リクエストごとのトークン消費量・レイテンシ・エラー率</span>をダッシュボードで確認可能</span></li>
+                    </ul>
+                    <div class="speech-bubble">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i>
+                            まずは<span class="keyword-tag">Langfuse</span>あたりから<br>
+                            始めるのがハードル低め。<br>
+                            OSSで自社環境に構築可能。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 16: 企業事例 -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-building-columns fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑯ 企業事例: 大手のAIコスト管理</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-brands fa-amazon"></i><span><span class="keyword-tag">Amazon</span> — トークン消費ランキングを廃止。量よりも質を重視する方針に転換</span></li>
+                        <li><i class="fa-solid fa-car"></i><span><span class="keyword-tag">Uber</span> — 2026年のAI予算を4ヶ月で使い切り。コスト管理の重要性を痛感</span></li>
+                        <li><i class="fa-solid fa-chart-line"></i><span>Big Tech各社が<span class="highlight">「AIを安く提供しないと売れない」</span>と静かに認識し始めている</span></li>
+                        <li><i class="fa-solid fa-lightbulb"></i><span>日本企業でもAIコストの可視化に乗り出す動きが活発化。この勉強会自体がその証拠</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2 right">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-globe fa-lg" style="color: var(--ui-color-5);"></i>
+                            世界中の企業が<br>
+                            <span class="keyword-tag">AIコストの爆発</span>に直面。<br>
+                            先行者の知見が貴重に。
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5 -->
+        <div class="section-layout">
+
+            <!-- Card 17: これから -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-road fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                    <h2>⑰ これからどうなるか: AIコスト管理の未来</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-arrow-right"></i><span>「使えば使うほど良い」から<span class="highlight">「賢く使うほど良い」</span>へのパラダイムシフトが加速</span></li>
+                        <li><i class="fa-solid fa-gauge-high"></i><span>トークン単価の低下とモデル性能の向上で、コスト効率は改善していく見込み</span></li>
+                        <li><i class="fa-solid fa-network-wired"></i><span>エージェント間の通信コストも新たな課題に。マルチエージェントシステムではさらに複雑化</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>AI自体が<span class="keyword-tag">自分のコストを最適化</span>する時代が来るかも。自己効率化エージェントの可能性</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-1">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-forward fa-lg" style="color: var(--ui-color-1);"></i>
+                            AIがAIのコストを<br>
+                            管理する未来も<br>
+                            <span class="keyword-tag">そう遠くない</span>かもしれません。
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card 18: まとめ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                    <h2>⑱ まとめ: 知見を持ち寄る場の重要性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check"></i><span>AIオブザーバビリティは<span class="highlight">まだ知見が少ないテーマ</span>だからこそ、情報共有が極めて重要</span></li>
+                        <li><i class="fa-solid fa-handshake"></i><span>ファインディとタイミーなど異業種の実践が交わることで、<span class="keyword-tag">自社の次の一手</span>を考えるヒントになる</span></li>
+                        <li><i class="fa-solid fa-circle-nodes"></i><span>「可視化→分析→改善→継続」のサイクルを組織に組み込むことが、AI駆動開発の成熟度を高める鍵</span></li>
+                        <li><i class="fa-solid fa-flag"></i><span>Tokenmaxxingは終わった。<span class="highlight">Token efficiency</span>（トークン効率）の時代がここから始まる</span></li>
+                    </ul>
+                    <div class="speech-bubble variant-2">
+                        <span class="handwritten">
+                            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i>
+                            <span class="keyword-tag">量から質へ</span>。<br>
+                            AIコストの最適化は<br>
+                            2026年の最重要課題の一つ。<br>
+                            あなたはどう取り組みますか？
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            <p>🎬 動画: <a href="https://www.youtube.com/live/mXcnJPbUVG0" target="_blank">AI駆動開発(AI-Driven Development)勉強会 — AIオブザーバビリティ スペシャル#1</a></p>
+            <p style="margin-top: 5px;">📅 2026年6月25日（木）19:00〜20:30 | 📍 タイミー東京本社（汐留）</p>
+            <p style="margin-top: 10px; font-size: 12px; color: #999;">AIオブザーバビリティ インフォグラフィック | 2026年6月26日作成</p>
+        </footer>
+
+    </div>
+</body>
+</html>

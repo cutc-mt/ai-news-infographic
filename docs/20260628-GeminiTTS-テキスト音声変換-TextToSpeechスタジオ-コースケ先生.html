@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini TTSでテキストを音声に！Text to Speechスタジオ開発｜コースケ先生</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+        :root {
+            --ui-color-1: #8B5CF6;
+            --ui-color-2: #F59E0B;
+            --ui-color-3: #F3E8FF;
+            --ui-color-4: #6D28D9;
+            --ui-color-5: #EF4444;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #FDF8FF; font-family: 'Kaisei Decol', serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+        .header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-1), #A78BFA, var(--ui-color-2)); border-radius: 30px; color: white; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); animation: headerGlow 8s ease-in-out infinite; }
+        @keyframes headerGlow { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(20px,20px); } }
+        .header-icon { font-size: 5em; margin-bottom: 10px; }
+        .header h1 { font-size: 2.2em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.2em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .card { flex: 1; min-width: 220px; max-width: 450px; background-color: white; border-radius: 20px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2)); }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.1em; color: var(--ui-color-4); margin-top: 8px; }
+        .card-content { padding: 0 10px 15px; }
+        .card-content p { font-size: 15px; color: #333; line-height: 1.7; margin-bottom: 8px; }
+        .keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 14px; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-1); min-width: 16px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; }
+        .highlight { background: linear-gradient(transparent 60%, #FDE68A 60%); font-weight: bold; padding: 0 2px; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        pre { background: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; overflow-x: auto; }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out forwards; }
+        .footer { text-align: center; padding: 30px 20px; margin-top: 20px; background: linear-gradient(135deg, #2D3748, #4A5568); border-radius: 20px; color: #CBD5E0; font-size: 14px; }
+        .footer a { color: #90CDF4; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        @media (max-width: 1600px) { .card { min-width: 280px; } }
+        @media (max-width: 1200px) { .card { min-width: 320px; } }
+        @media (max-width: 900px) { .card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="header-icon"><i class="fas fa-volume-high" style="animation: fa-beat 2s infinite;"></i></div>
+        <h1><i class="fas fa-microphone"></i> Gemini TTS テキスト読み上げを気軽に使おう</h1>
+        <p class="subtitle">テキストを超リアルな音声に変換！Text to Speechスタジオを自作して使いこなす</p>
+        <p class="date">📅 2026年6月28日 | チャンネル: コースケ先生</p>
+    </div>
+
+    <div class="section-layout">
+
+        <!-- ① -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-circle-info fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>①Gemini TTSとは: テキストを読み上げるAI技術</h2>
+            </div>
+            <div class="card-content">
+                <p>Googleの高性能な<span class="highlight">Geminiモデルの能力を活用した最新のテキスト読み上げ技術</span>。単に文字を音声に変換するだけではなく、表現力豊かな音声を生成できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-globe"></i> 基盤モデル: Gemini 2.5 / 3.1</li>
+                    <li><i class="fas fa-building"></i> 提供元: Google</li>
+                    <li><i class="fas fa-tag"></i> <span class="keyword-tag">Text to Speech</span> の略称としてTTSと呼ぶ</li>
+                    <li><i class="fas fa-star"></i> 最高級モデルはGemini 3.5だがTTSは3.1が最新</li>
+                </ul>
+            </div>
+            <div class="speech-bubble"><span class="handwritten"><i class="fas fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> TTS＝テキストトゥスピーチ＝文字を音声にする技術のことだよ🎤</span></div>
+        </div>
+
+        <!-- ② -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s;"></i>
+                <h2>②息継ぎ・感情・抑揚: 人間らしい表現力</h2>
+            </div>
+            <div class="card-content">
+                <p>従来の読み上げソフトとは違って、<span class="highlight">呼吸や感情、抑揚など人間らしい表現</span>を再現できるのが最大の特徴。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-wind"></i> 言葉と言葉の間に自然な息継ぎが入る</li>
+                    <li><i class="fas fa-face-smile"></i> 感情を込めた読み上げが可能</li>
+                    <li><i class="fas fa-chart-line"></i> 抑揚（声の上がり下がり）が自然</li>
+                    <li><i class="fas fa-gauge-high"></i> ペースも自由に調整できる</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1"><span class="handwritten"><i class="fas fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i> これ聞いたらビックリ！AIがここまで喋れるようになったんだね😮</span></div>
+        </div>
+
+        <!-- ③ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-desktop fa-5x" style="color: var(--ui-color-4); animation: fa-bounce 2s;"></i>
+                <h2>③利用方法1: Google AI Studioから使う</h2>
+            </div>
+            <div class="card-content">
+                <p>1つ目の方法は<span class="highlight">Google AI Studio</span>でテキストトゥスピーチのモデルを直接選択して利用する方法。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-arrow-right"></i> モデル選択 → オーディオ を選択</li>
+                    <li><i class="fas fa-list"></i> Gemini 3.1 Flash TTS Preview</li>
+                    <li><i class="fas fa-list"></i> Gemini 2.5 Pro / 2.5 Flash</li>
+                    <li><i class="fas fa-music"></i> クイックスタートテンプレートから始められる</li>
+                </ul>
+            </div>
+            <div class="speech-bubble"><span class="handwritten"><i class="fas fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i> ただし日本語化されていないので英語UIでの操作が必要⚠️</span></div>
+        </div>
+
+        <!-- ④ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-users fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s;"></i>
+                <h2>④テキストモードとコンポーザーモード</h2>
+            </div>
+            <div class="card-content">
+                <p>Google AI Studioには<span class="highlight">2つのモード</span>がある。テキストモードは1人のスピーカー、コンポーザーモードは複数スピーカーの会話を作れる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-user"></i> テキストモード: スピーカー1人の読み上げ</li>
+                    <li><i class="fas fa-user-group"></i> コンポーザーモード: スピーカー1＋スピーカー2の会話</li>
+                    <li><i class="fas fa-puzzle-piece"></i> スピーチブロックを追加して話者を切り替え</li>
+                    <li><i class="fas fa-sliders"></i> シーンやコンテキストも設定可能</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ⑤ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-palette fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2s;"></i>
+                <h2>⑤スピーカー設定とスタイル選択</h2>
+            </div>
+            <div class="card-content">
+                <p>AI Studioでは<span class="highlight">スピーカーの種類や読み方のスタイル</span>を細かく調整できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-newspaper"></i> スタイル例: ニュースキャスター</li>
+                    <li><i class="fas fa-comment-dots"></i> スタイル例: ウィスパー（囁き）</li>
+                    <li><i class="fas fa-forward-fast"></i> ペース: ラピッドファイヤー（早口）</li>
+                    <li><i class="fas fa-gauge-simple-low"></i> ペース: ザ・ドリフト（ゆっくり）</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2"><span class="handwritten"><i class="fas fa-face-sad-tear fa-lg" style="color: var(--ui-color-5);"></i> 英語表記が多くて日本語ユーザーにはちょっと分かりづらい部分も😢</span></div>
+        </div>
+
+        <!-- ⑥ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-slideshow fa-5x" style="color: var(--ui-color-4); animation: fa-beat 2s;"></i>
+                <h2>⑥利用方法2: Google Vidsのナレーター機能</h2>
+            </div>
+            <div class="card-content">
+                <p>2つ目は<span class="highlight">Google Vids（Google ビッツ）</span>のナレーター機能を使う方法。事前にGeminiに台本を作らせてから音声化させる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-file-lines"></i> 事前にGeminiで台本を作成</li>
+                    <li><i class="fas fa-microphone-lines"></i> ナレーション機能から声を選択</li>
+                    <li><i class="fas fa-wand-magic-sparkles"></i> 「〇〇の声を使ってナレーション生成」と指示</li>
+                    <li><i class="fas fa-check"></i> 音声がスライドに自動で差し込まれる</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1"><span class="handwritten"><i class="fas fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i> Google ビッツなら日本語で操作できて気軽！👍</span></div>
+        </div>
+
+        <!-- ⑦ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-spin 4s;"></i>
+                <h2>⑦AI Studio vs Vids: 気軽さと機能の比較</h2>
+            </div>
+            <div class="card-content">
+                <p>AI Studioは<span class="highlight">機能が豊富だが英語UIで使いづらく</span>、Vidsは気軽だが細かな調整ができない。両者の<span class="highlight">いいとこ取り</span>が求められていた。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-check-circle"></i> AI Studio: 高機能、スピーカー設定、コンテキスト設定</li>
+                    <li><i class="fas fa-times-circle"></i> AI Studio: 英語UIで分かりづらい</li>
+                    <li><i class="fas fa-check-circle"></i> Vids: 日本語対応、気軽に使える</li>
+                    <li><i class="fas fa-times-circle"></i> Vids: 抑揚などの細かな設定が不可能</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ⑧ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-lightbulb fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s;"></i>
+                <h2>⑧解決策: Gemini CanvasアプリでAPI利用</h2>
+            </div>
+            <div class="card-content">
+                <p><span class="highlight">GeminiのAPIをAPIキー発行せずに使える方法</span>がある。それはGeminiの<span class="highlight">Canvasアプリ</span>を使うこと。Canvasアプリ経由でAPIからテキストトゥスピーチモデルを呼び出せる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-key"></i> APIキーの発行が不要</li>
+                    <li><i class="fas fa-mobile-screen"></i> Gemini Canvasアプリを利用</li>
+                    <li><i class="fas fa-code"></i> API経由でTTSモデルにアクセス可能</li>
+                    <li><i class="fas fa-rocket"></i> この仕組みを活用してアプリを開発！</li>
+                </ul>
+            </div>
+            <div class="speech-bubble"><span class="handwritten"><i class="fas fa-brain fa-lg" style="color: var(--ui-color-1);"></i> CanvasアプリからAPIが使えるって知ってた？ここがポイント！💡</span></div>
+        </div>
+
+        <!-- ⑨ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-laptop-code fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s;"></i>
+                <h2>⑨自作アプリ: テキストトゥスピーチスタジオ</h2>
+            </div>
+            <div class="card-content">
+                <p>コースケ先生が開発した<span class="highlight">「テキストトゥスピーチスタジオ」</span>というアプリ。Gemini Canvasアプリ経由でTTSモデルを利用し、日本語で気軽に操作できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-link"></i> 概要欄にアプリURLあり</li>
+                    <li><i class="fas fa-language"></i> <span class="keyword-tag">完全日本語対応</span></li>
+                    <li><i class="fas fa-cogs"></i> 裏側でGemini 2.5 Flash TTSを使用</li>
+                    <li><i class="fas fa-download"></i> 生成した音声をMP3でダウンロード可能</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1"><span class="handwritten"><i class="fas fa-fire fa-lg" style="color: var(--ui-color-5);"></i> 自作だからこそ欲しい機能を全部詰め込めた！🔥</span></div>
+        </div>
+
+        <!-- ⑩ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-user fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s;"></i>
+                <h2>⑩シングルスピーカーモード: 30種類の声</h2>
+            </div>
+            <div class="card-content">
+                <p>シングルスピーカーモードでは<span class="highlight">全30種類のボイスモデル</span>からお好みの声を選べる。スタイル設定も全て日本語化されている。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-voice-off"></i> 声の種類: 全30種類</li>
+                    <li><i class="fas fa-face-laugh-beam"></i> スタイル: 高エネルギーで興奮気味</li>
+                    <li><i class="fas fa-face-meh"></i> スタイル: 平坦で無感情</li>
+                    <li><i class="fas fa-forward"></i> ペース: ラピッドファイヤー / ドリフト など</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ⑪ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-headphones fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s;"></i>
+                <h2>⑪プレビュー機能で冒頭5秒を確認</h2>
+            </div>
+            <div class="card-content">
+                <p>音声生成の前に<span class="highlight">「プレビュー冒頭5秒」</span>という機能で声の確認ができる。気に入らなければ別の声に変更してから本番生成できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-play"></i> プレビューで冒頭5秒を試聴</li>
+                    <li><i class="fas fa-repeat"></i> 好きな声が見つかるまで何度でも変更OK</li>
+                    <li><i class="fas fa-check-double"></i> 納得してから「音声生成」を押す</li>
+                    <li><i class="fas fa-download"></i> 生成後にMP3形式でダウンロード</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2"><span class="handwritten"><i class="fas fa-music fa-lg" style="color: var(--ui-color-1);"></i> 「お、この声いいかも！」→生成！の流れがスムーズ🎵</span></div>
+        </div>
+
+        <!-- ⑫ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-sliders fa-5x" style="color: var(--ui-color-4); animation: fa-spin 3s;"></i>
+                <h2>⑫スタイルチューニングの威力: 同じ台本で大変化</h2>
+            </div>
+            <div class="card-content">
+                <p>同じ台本でも<span class="highlight">スタイルとペースを変えるだけで全く違う印象</span>の音声になる。これがGemini TTSの真の実力。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-bolt"></i> 高エネルギー×ラピッドファイヤー = 興奮した早口</li>
+                    <li><i class="fas fa-moon"></i> 平坦で無感情×ドリフト = 機械的なゆっくり読み</li>
+                    <li><i class="fas fa-arrows-rotate"></i> 同じテキストでも印象が180度変わる</li>
+                    <li><i class="fas fa-palette"></i> 用途に合わせたチューニングが可能</li>
+                </ul>
+            </div>
+            <div class="speech-bubble"><span class="handwritten"><i class="fas fa-face-surprise fa-lg" style="color: var(--ui-color-2);"></i> 同じ台本なのに全然違って聞こえる！これすごい！😲</span></div>
+        </div>
+
+        <!-- ⑬ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-people-arrows fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                <h2>⑬マルチスピーカーモード: 2人の会話を作る</h2>
+            </div>
+            <div class="card-content">
+                <p>マルチスピーカーモードでは<span class="highlight">スピーカー1とスピーカー2に別々の声とスタイル</span>を設定して、2人の会話形式の音声を作れる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-user"></i> スピーカー1: 声とスタイルを個別設定</li>
+                    <li><i class="fas fa-user"></i> スピーカー2: 全く違う声とスタイルを設定</li>
+                    <li><i class="fas fa-comments"></i> 2人の台本をそれぞれ入力</li>
+                    <li><i class="fas fa-masks-theater"></i> 例: ナレーター＋プレゼンターの組み合わせ</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ⑭ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-file-audio fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s;"></i>
+                <h2>⑭マルチスピーカーの実際の使い方</h2>
+            </div>
+            <div class="card-content">
+                <p>スピーカー1を「平坦で無感情のドリフト」に、スピーカー2を「高エネルギーのラピッドファイヤー」に設定するなど、<span class="highlight">対照的なペルソナを割り当てて</span>使い分ける。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-file-lines"></i> スライド1の台本をスピーカー1に</li>
+                    <li><i class="fas fa-file-lines"></i> スライド2の台本をスピーカー2に</li>
+                    <li><i class="fas fa-code-branch"></i> セリフを追加して会話を展開</li>
+                    <li><i class="fas fa-shuffle"></i> 声とスタイルを自由に組み合わせ可能</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1"><span class="handwritten"><i class="fas fa-masks-theater fa-lg" style="color: var(--ui-color-4);"></i> まるでラジオ番組みたいな2人のトークが作れる🎭</span></div>
+        </div>
+
+        <!-- ⑮ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2s;"></i>
+                <h2>⑮Vidsとの連携: スライド台本から音声生成</h2>
+            </div>
+            <div class="card-content">
+                <p>Google Vidsで作成したスライドの台本を<span class="highlight">テキストトゥスピーチスタジオにコピペ</span>して、より高品質な音声を生成できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-copy"></i> Vidsの台本をスタジオに貼り付け</li>
+                    <li><i class="fas fa-sliders"></i> スタイルとペースを細かく調整</li>
+                    <li><i class="fas fa-wand-magic-sparkles"></i> Vidsではできないチューニングが可能</li>
+                    <li><i class="fas fa-download"></i> MP3でダウンロードしてVidsに戻して利用</li>
+                </ul>
+            </div>
+            <div class="speech-bubble"><span class="handwritten"><i class="fas fa-handshake fa-lg" style="color: var(--ui-color-2);"></i> Vidsの気軽さ＋スタジオの高機能＝最強のコンボ🤝</span></div>
+        </div>
+
+        <!-- ⑯ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-microphone-lines fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s;"></i>
+                <h2>⑯漫才やPodcastへの応用例</h2>
+            </div>
+            <div class="card-content">
+                <p>このチャンネルでは以前<span class="highlight">ミルクボーイのネタを作って漫才の音声に仕上げる</span>ことにもTTSを使った。ポッドキャストや教育動画のナレーションにも活用できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-masks-theater"></i> 漫才のネタをAIで作成して音声化</li>
+                    <li><i class="fas fa-podcast"></i> ポッドキャストのナレーション生成</li>
+                    <li><i class="fas fa-graduation-cap"></i> 教育動画やプレゼンの音声</li>
+                    <li><i class="fas fa-book-open"></i> オーディオブックの作成にも応用可能</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- ⑰ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-microchip fa-5x" style="color: var(--ui-color-4); animation: fa-beat-fade 2s;"></i>
+                <h2>⑰技術背景: Gemini 2.5 Flashを裏側で使用</h2>
+            </div>
+            <div class="card-content">
+                <p>テキストトゥスピーチスタジオでは<span class="highlight">Gemini 2.5 Flashテキストトゥスピーチモデル</span>を裏側で使用している。最新の3.1モデルにはCanvas領域からアクセスできなかったため。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-microchip"></i> 使用モデル: Gemini 2.5 Flash TTS</li>
+                    <li><i class="fas fa-lock"></i> 3.1モデルはCanvasからアクセス不可</li>
+                    <li><i class="fas fa-gear"></i> API経由でモデルを指定して呼び出し</li>
+                    <li><i class="fas fa-circle-info"></i> 今後3.1対応次第でさらに高品質に</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2"><span class="handwritten"><i class="fas fa-arrow-up fa-lg" style="color: var(--ui-color-1);"></i> 3.1対応したらさらに进化しそう！楽しみ🚀</span></div>
+        </div>
+
+        <!-- ⑱ -->
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fas fa-rocket fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s;"></i>
+                <h2>⑱まとめ: 誰でも気軽に高品質な音声生成が可能に</h2>
+            </div>
+            <div class="card-content">
+                <p>Gemini TTSは<span class="highlight">息遣いや感情を再現する圧倒的な表現力</span>を持つ。テキストトゥスピーチスタジオを使えば、APIキー不要で<span class="highlight">日本語から簡単に操作</span>できる。</p>
+                <ul class="keyword-list">
+                    <li><i class="fas fa-check"></i> 30種類の声から選択可能</li>
+                    <li><i class="fas fa-check"></i> スタイル・ペースの細かいチューニング</li>
+                    <li><i class="fas fa-check"></i> シングル・マルチスピーカー対応</li>
+                    <li><i class="fas fa-check"></i> MP3ダウンロードでどこでも使える</li>
+                </ul>
+            </div>
+            <div class="speech-bubble"><span class="handwritten"><i class="fas fa-heart fa-lg" style="color: var(--ui-color-5);"></i> ぜひテキストトゥスピーチスタジオを試してみてね！💜</span></div>
+        </div>
+
+    </div>
+
+    <footer class="footer">
+        <p>🎬 動画: <a href="https://www.youtube.com/watch?v=guNTxkXFEfg" target="_blank">コースケ先生 - Gemini TTS テキスト読み上げを気軽に使え</a></p>
+        <p>📅 2026年6月28日 | 📺 チャンネル: <a href="https://www.youtube.com/@kosukesensei" target="_blank">コースケ先生</a></p>
+    </footer>
+
+</div>
+</body>
+</html>

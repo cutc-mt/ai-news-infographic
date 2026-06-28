@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチエージェント合体：Fugu, Fusion, LobeHub CAO テクニカルレポート解説</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+        :root {
+            --color-1: #0A7E8C;
+            --color-2: #064E63;
+            --color-3: #14B8A6;
+            --color-4: #042F2E;
+            --color-5: #5EEAD4;
+            --bg-canvas: #F0FDFA;
+            --card-bg: #FFFFFF;
+            --text-primary: #1a1a2e;
+            --text-secondary: #555555;
+            --accent-warm: #F59E0B;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: var(--bg-canvas);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* ヘッダー */
+        header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-4) 0%, var(--color-2) 60%, var(--color-1) 100%);
+            border-radius: 24px;
+            color: white;
+        }
+
+        header h1 {
+            font-family: 'Zen Kurenaido', sans-serif;
+            font-size: 36px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header h1 i {
+            margin: 0 10px;
+            color: var(--color-5);
+        }
+
+        header .subtitle {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        header .date {
+            font-size: 14px;
+            opacity: 0.7;
+        }
+
+        .header-icons {
+            font-size: 60px;
+            margin: 15px 0;
+        }
+
+        .header-icons i {
+            margin: 0 15px;
+            color: var(--color-5);
+        }
+
+        /* セクションタイトル */
+        .section-title {
+            display: flex;
+            align-items: center;
+            margin: 30px 0 15px;
+            padding: 10px 20px;
+            background: linear-gradient(90deg, var(--color-1), var(--color-2));
+            border-radius: 12px;
+            color: white;
+        }
+
+        .section-title i {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+
+        .section-title h2 {
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        /* カードレイアウト */
+        .card-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        /* カード */
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 420px;
+            background: var(--card-bg);
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+            position: relative;
+            overflow: hidden;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+            opacity: 0;
+            animation: fadeInScale 0.6s ease-out forwards;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(10,126,140,0.2);
+            border-color: var(--color-1);
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: translateY(20px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        /* カードのストライプ装飾 */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--color-1), var(--color-3), var(--accent-warm));
+        }
+
+        /* 大型アイコン */
+        .card-icon {
+            text-align: center;
+            margin: 10px 0 15px;
+        }
+
+        .card-icon i {
+            font-size: 3.5em;
+            color: var(--color-1);
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.15));
+        }
+
+        /* カードタイトル */
+        .card h2 {
+            font-size: 20px;
+            color: var(--color-2);
+            margin-bottom: 10px;
+            text-align: center;
+            line-height: 1.4;
+        }
+
+        /* カード本文 */
+        .card p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+            margin-bottom: 8px;
+        }
+
+        /* キーワードリスト */
+        .keyword-list {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+
+        .keyword-list li {
+            margin-bottom: 6px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .keyword-list li i {
+            color: var(--color-1);
+            min-width: 20px;
+            margin-right: 8px;
+            margin-top: 3px;
+        }
+
+        /* highlightクラス */
+        .highlight {
+            background: linear-gradient(transparent 60%, rgba(20,184,166,0.25) 60%);
+            font-weight: 700;
+            color: var(--color-2);
+        }
+
+        /* タグ */
+        .tag {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(10,126,140,0.1), rgba(20,184,166,0.15));
+            border: 1px solid rgba(10,126,140,0.3);
+            color: var(--color-2);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            margin: 2px 3px;
+        }
+
+        /* 手書き風吹き出し */
+        .speech-bubble {
+            position: relative;
+            background: #FFF9E3;
+            border: 2.5px solid var(--accent-warm);
+            border-radius: 18px;
+            padding: 10px 14px;
+            margin: 12px 0 5px;
+            font-family: 'Yomogi', cursive;
+            font-size: 14px;
+            color: var(--text-primary);
+            box-shadow: 3px 3px 8px rgba(0,0,0,0.08);
+            transform: rotate(-0.5deg);
+            line-height: 1.6;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 25px;
+            border-width: 10px 7px 0;
+            border-style: solid;
+            border-color: var(--accent-warm) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 25px;
+        }
+
+        .speech-bubble.variant-1 {
+            background: #E0F2FE;
+            border-color: var(--color-1);
+            transform: rotate(0.8deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-1) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE4E6;
+            border-color: #E11D48;
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #E11D48 transparent;
+        }
+
+        .speech-bubble i {
+            margin-right: 5px;
+        }
+
+        /* コードブロック */
+        .code-block {
+            background: #1E293B;
+            color: #E2E8F0;
+            padding: 10px 14px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+
+        /* 統計ボックス */
+        .stat-row {
+            display: flex;
+            gap: 8px;
+            margin: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .stat-box {
+            flex: 1;
+            min-width: 80px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-2));
+            color: white;
+            padding: 8px 10px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-box .stat-num {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--color-5);
+        }
+
+        .stat-box .stat-label {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        /* フッター */
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 40px;
+            background: var(--color-4);
+            border-radius: 16px;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+        }
+
+        footer a {
+            color: var(--color-5);
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        /* レスポンシブ */
+        @media (max-width: 900px) {
+            .card { min-width: 100%; }
+        }
+
+        /* アニメーションディレイ */
+        .card:nth-child(1) { animation-delay: 0.05s; }
+        .card:nth-child(2) { animation-delay: 0.10s; }
+        .card:nth-child(3) { animation-delay: 0.15s; }
+        .card:nth-child(4) { animation-delay: 0.20s; }
+        .card:nth-child(5) { animation-delay: 0.25s; }
+        .card:nth-child(6) { animation-delay: 0.30s; }
+        .card:nth-child(7) { animation-delay: 0.35s; }
+        .card:nth-child(8) { animation-delay: 0.40s; }
+        .card:nth-child(9) { animation-delay: 0.45s; }
+        .card:nth-child(10) { animation-delay: 0.50s; }
+        .card:nth-child(11) { animation-delay: 0.55s; }
+        .card:nth-child(12) { animation-delay: 0.60s; }
+        .card:nth-child(13) { animation-delay: 0.65s; }
+        .card:nth-child(14) { animation-delay: 0.70s; }
+        .card:nth-child(15) { animation-delay: 0.75s; }
+        .card:nth-child(16) { animation-delay: 0.80s; }
+        .card:nth-child(17) { animation-delay: 0.85s; }
+        .card:nth-child(18) { animation-delay: 0.90s; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <header>
+        <div class="header-icons">
+            <i class="fas fa-fish" style="animation: fa-bounce 2s;"></i>
+            <i class="fas fa-robot"></i>
+            <i class="fas fa-users-cog" style="animation: fa-spin 3s;"></i>
+            <i class="fas fa-code-branch"></i>
+        </div>
+        <h1><i class="fas fa-diagram-project"></i> 複数のモデルを合体させると本当に強くなるのか？</h1>
+        <p class="subtitle">Multi-Agent Orchestration: Fugu, Fusion, and LobeHub CAO テクニカルレポート解説</p>
+        <p class="date">📅 2026年6月28日 | 🎬 Jun Suzuki（@AI-INFO-BIZ）</p>
+    </header>
+
+    <!-- ===== セクション1: Sakana Fuguの概要 ===== -->
+    <div class="section-title">
+        <i class="fas fa-fish"></i>
+        <h2>Sakana Fugu の概要：マルチエージェントを1つのモデルとして</h2>
+    </div>
+    <div class="card-layout">
+
+        <!-- カード1 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-fish fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+            </div>
+            <h2>①Fugu（河豚）とは何か</h2>
+            <p>Sakana AIが開発した<span class="highlight">マルチエージェント・オーケストレーションシステム</span>。単一のAPIエンドポイントから複数の最先端モデルを動的に組み合わせて協調させる仕組みです。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-check-circle"></i> ユーザーは1つのモデルとして扱える</li>
+                <li><i class="fas fa-check-circle"></i> 内部では複数モデルがルーティングされる</li>
+                <li><i class="fas fa-check-circle"></i> GPT-5.5、Opus 4.8、Gemini 3.1 Pro等を統合</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-lightbulb"></i>
+                「河豚」のように小さいが、中身は複数の強力なモデルを統率するオーケストレーターです！
+            </div>
+        </div>
+
+        <!-- カード2 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-network-wired fa-5x" style="color: var(--color-3);"></i>
+            </div>
+            <h2>②新しいスケーリングの軸</h2>
+            <p>Fuguは<span class="highlight">ゼロから学習した独自の重みを持たない</span>。あくまで「指揮者」として機能し、既存の強力なモデル群を組み合わせて Collective Intelligence（集合知能）を実現します。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-arrow-right"></i> 従来：巨大な単一モデルに投資</li>
+                <li><i class="fas fa-arrow-right"></i> Fugu：複数モデルの協調で性能を追求</li>
+                <li><i class="fas fa-arrow-right"></i> サードパーティ製モデルも利用可能</li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <i class="fas fa-brain"></i>
+                「もっと大きく」ではなく「もっと賢く組み合わせる」という新しいアプローチ！
+            </div>
+        </div>
+
+        <!-- カード3 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-plug fa-5x" style="color: var(--accent-warm);"></i>
+            </div>
+            <h2>③OpenAI互換APIで利用可能</h2>
+            <p>Fuguは<span class="highlight">OpenAI互換のAPI</span>を提供。既存のツールやフレームワークにそのまま組み込めます。OpenRouter、Vercel AI Gateway、Merge API等でも利用可能です。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-code"></i> <span class="tag">OpenRouter</span> <span class="tag">Vercel</span> <span class="tag">Merge API</span></li>
+                <li><i class="fas fa-server"></i> ローカル実行は不可（ホスト型サービス）</li>
+                <li><i class="fas fa-shield-alt"></i> どの基盤モデルが応答したかは非公開</li>
+            </ul>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション2: TRINITY 進化型コーディネーター ===== -->
+    <div class="section-title">
+        <i class="fas fa-dna"></i>
+        <h2>TRINITY：進化型LLMコーディネーター</h2>
+    </div>
+    <div class="card-layout">
+
+        <!-- カード4 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-dna fa-5x" style="color: var(--color-1); animation: fa-flip 3s;"></i>
+            </div>
+            <h2>④TRINITYの基本構造</h2>
+            <p>TRINITYは<span class="highlight">約0.6Bの小型言語モデル（バックボーン）</span>に、約1万パラメータのヘッドを組み合わせた軽量コーディネーターです。バックボーンはクエリを読み取り、ヘッドが各ワーカーのスコアを出力します。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-microchip"></i> バックボーン：~0.6Bパラメータ</li>
+                <li><i class="fas fa-cog"></i> ヘッド：約10Kパラメータ（学習対象）</li>
+                <li><i class="fas fa-bolt"></i> テキストを生成せず「選択」だけを出力</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-comment-dots"></i>
+                通常のLLMはトークンを一つずつ生成するが、TRINITYは「誰に任せるか」だけを瞬時に決める設計！
+            </div>
+        </div>
+
+        <!-- カード5 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-user-tag fa-5x" style="color: var(--color-3);"></i>
+            </div>
+            <h2>⑤Thinker・Worker・Verifierの3役割</h2>
+            <p>TRINITYの研究では、モデルに<span class="highlight">3つの役割</span>を割り当てて複数ターンにわたって統括します。コーディング・数学・推論・知識タスクに応じて適応的に振り分けます。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-brain"></i> <span class="tag">Thinker</span>：問題を分析・計画する</li>
+                <li><i class="fas fa-hammer"></i> <span class="tag">Worker</span>：実際のタスクを実行する</li>
+                <li><i class="fas fa-clipboard-check"></i> <span class="tag">Verifier</span>：結果を検証する</li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <i class="fas fa-users"></i>
+                チーム開発と同じ：思考役・実行役・検証役で品質を担保する仕組み！
+            </div>
+        </div>
+
+        <!-- カード6 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-graduation-cap fa-5x" style="color: var(--accent-warm);"></i>
+            </div>
+            <h2>⑥2段階の学習プロセス</h2>
+            <p>TRINITYの学習は<span class="highlight">監督付き微調整（SFT）</span>と<span class="highlight">進化戦略（sep-CMA-ES）</span>の2段階で行われます。勾配を使わず、ブラックボックス最適化でパラメータを改善します。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-book"></i> <span class="tag">Stage 1: SFT</span> — 各タスクで誰が得意かを学習</li>
+                <li><i class="fas fa-dna"></i> <span class="tag">Stage 2: 進化戦略</span> — セッション全体の成功を最大化</li>
+                <li><i class="fas fa-chart-line"></i> 報酬は単純な0/1（成功/失敗）</li>
+            </ul>
+            <div class="speech-bubble variant-2">
+                <i class="fas fa-exclamation-triangle"></i>
+                勾配ベースのREINFORCEではノイズに埋もれて失敗。進化戦略ならパラメータ全体を一括で最適化できる！
+            </div>
+        </div>
+
+        <!-- カード7 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-shuffle fa-5x" style="color: var(--color-1);"></i>
+            </div>
+            <h2>⑦ドメインごとのルーティング</h2>
+            <p>TRINITYの優秀な点は<span class="highlight">ドメインに応じてルーティング分布が変化する</span>ことです。数学ならGPT、コーディングならOpusなど、各分野の最強モデルに自動で振り分けます。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-calculator"></i> 数学的推論 → GPT-5.5（60%）</li>
+                <li><i class="fas fa-terminal"></i> ターミナルコーディング → GPT-5.5</li>
+                <li><i class="fas fa-code"></i> 競技プログラミング → Gemini 3.1 Pro</li>
+                <li><i class="fas fa-shield-alt"></i> セキュリティ → Claude Opus 4.8</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-chart-pie"></i>
+                「誰が得意か」をデータから学習。手作りのif-elseルールではなく、賢い自動振り分け！
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション3: Conductor & Fugu Ultra ===== -->
+    <div class="section-title">
+        <i class="fas fa-music"></i>
+        <h2>Conductor：オーケストラの指揮者 & Fugu Ultra</h2>
+    </div>
+    <div class="card-layout">
+
+        <!-- カード8 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-music fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;"></i>
+            </div>
+            <h2>⑧Conductorの仕組み</h2>
+            <p>Fugu Ultraの心臓部は<span class="highlight">約7BパラメータのConductor</span>。TRINITYと異なり、フルの言語モデルとしてテキストでワークフロー全体を記述し、各エージェントへの割り当てと通信トポロジーを決定します。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-list-ol"></i> サブタスクのリストを出力</li>
+                <li><i class="fas fa-user-check"></i> 各タスクにワーカーを割り当て</li>
+                <li><i class="fas fa-sitemap"></i> アクセスリストで通信経路を定義</li>
+                <li><i class="fas fa-sync-alt"></i> 再帰的に自分を呼び出し可能</li>
+            </ul>
+        </div>
+
+        <!-- カード9 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-project-diagram fa-5x" style="color: var(--color-3);"></i>
+            </div>
+            <h2>⑨通信トポロジーの柔軟性</h2>
+            <p>Conductorが生成するアクセスリストによって、<span class="highlight">チェーン、多数決、ディベートツリー、再帰呼び出し</span>など多様な協調パターンを実現します。これらは手書きではなく学習から自然に現れます。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-link"></i> チェーン：順次処理</li>
+                <li><i class="fas fa-poll"></i> 多数決（Best-of-N）：独立に実行して投票</li>
+                <li><i class="fas fa-comments"></i> ディベート：意見をぶつけ合う</li>
+                <li><i class="fas fa-recycle"></i> 再帰：自分自身を再度呼び出し</li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <i class="fas fa-magic"></i>
+                「triviaにはディベートツリーを使え」なんて手作業で書いていない。報酬最大化から自然に浮かび上がる戦略！
+            </div>
+        </div>
+
+        <!-- カード10 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-hand-sparkles fa-5x" style="color: var(--accent-warm);"></i>
+            </div>
+            <h2>⑩オープンソース限定でも強い</h2>
+            <p>驚くべきことに、Conductorは<span class="highlight">オープンソースモデルのみで構成した場合でも</span>、Claude Sonnet 4を約10%上回る性能を発揮しました。これは協調の力が、単に強いモデルに乗るだけではない証拠です。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-unlock"></i> オープンソース限定のConductor構成</li>
+                <li><i class="fas fa-chart-bar"></i> Claude Sonnet 4を約10%上回る</li>
+                <li><i class="fas fa-users-cog"></i> 「協調」そのものが価値を生む</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-trophy"></i>
+                コストやコンプライアンスで制約があっても、賢い組み合わせでフロンティアモデルを超えられる！
+            </div>
+        </div>
+
+        <!-- カード11 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-coins fa-5x" style="color: var(--color-1);"></i>
+            </div>
+            <h2>⑪FuguとFugu Ultraの違い</h2>
+            <p><span class="tag">Fugu</span>は1つのワーカーを選ぶだけ（高速）、<span class="tag">Fugu Ultra</span>はチーム全体を構成する（高品質）。どちらも同じAPIで利用でき、ワークロードに応じて切り替え可能です。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-bolt"></i> <span class="tag">Fugu</span>：1ワーカー選択、レイテンシ重視</li>
+                <li><i class="fas fa-crown"></i> <span class="tag">Fugu Ultra</span>：多エージェント編成、品質重視</li>
+                <li><i class="fas fa-sliders-h"></i> 特定プロバイダーの除外も可能</li>
+            </ul>
+            <div class="stat-row">
+                <div class="stat-box">
+                    <div class="stat-num">$5</div>
+                    <div class="stat-label">Ultra入力/Mトークン</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-num">$30</div>
+                    <div class="stat-label">Ultra出力/Mトークン</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション4: ベンチマーク結果 ===== -->
+    <div class="section-title">
+        <i class="fas fa-chart-line"></i>
+        <h2>ベンチマーク性能：本当に強いのか？</h2>
+    </div>
+    <div class="card-layout">
+
+        <!-- カード12 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-trophy fa-5x" style="color: var(--accent-warm); animation: fa-beat-fade 2s;"></i>
+            </div>
+            <h2>⑫SWE Bench Pro: 73.7%</h2>
+            <p>ソフトウェアエンジニアリングのベンチマーク<span class="highlight">SWE Bench Pro</span>で、Fugu Ultraが73.7%を記録。Opus 4.8（69.2%）、GPT 5.5（58.6%）を上回り、最高スコアをマークしました。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-medal"></i> Fugu Ultra: <span class="highlight">73.7%</span>（1位）</li>
+                <li><i class="fas fa-star"></i> Opus 4.8: 69.2%</li>
+                <li><i class="fas fa-circle"></i> Gemini 3.1 Pro: 54.2%</li>
+                <li><i class="fas fa-circle"></i> GPT 5.5: 58.6%</li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <i class="fas fa-fire"></i>
+                複数モデルの協調で単体最强を一貫して上回る結果！
+            </div>
+        </div>
+
+        <!-- カード13 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-flask fa-5x" style="color: var(--color-3);"></i>
+            </div>
+            <h2>⑬科学・推論系ベンチマーク</h2>
+            <p>科学系ではGPQA-Dで<span class="highlight">95.5%</span>、Humanity's Last Examで50.0%を記録。長文脈推論やコーディング（LiveCodeBench 93.2%）でも最先端をリードしています。</p>
+            <div class="stat-row">
+                <div class="stat-box">
+                    <div class="stat-num">95.5%</div>
+                    <div class="stat-label">GPQA-D</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-num">93.2%</div>
+                    <div class="stat-label">LiveCodeBench</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-num">86.6%</div>
+                    <div class="stat-label">CharXiv</div>
+                </div>
+            </div>
+            <ul class="keyword-list">
+                <li><i class="fas fa-check"></i> Human's Last Exam: 50.0%（最高）</li>
+                <li><i class="fas fa-check"></i> Long Context Reasoning: 74.7%</li>
+                <li><i class="fas fa-check"></i> SciCode: 60.1%</li>
+            </ul>
+        </div>
+
+        <!-- カード14 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-chess-board fa-5x" style="color: var(--color-2);"></i>
+            </div>
+            <h2>⑭実デモ：目隠しチェスで4連勝</h2>
+            <p>Fuguは<span class="highlight">目隠しチェスを4局連続で制覇</span>。3つのフロンティアモデルと2100 ELOのStockfishを相手に、盤面を見ずにゲーム全体を記憶し、全対局をチェックメイトで終えました。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-chess-knight"></i> 盤面非表示の条件で対局</li>
+                <li><i class="fas fa-chess-king"></i> 4つの強力な相手に全勝</li>
+                <li><i class="fas fa-brain"></i> 長期的記憶と推論力が鍵</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-chess"></i>
+                相手が手を乱す場面でも正確さを保ち続ける。まさに「集合知能」の力！
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション5: Model Fusion & LobeHub CAO ===== -->
+    <div class="section-title">
+        <i class="fas fa-object-group"></i>
+        <h2>Model Fusion & LobeHub CAO：合体の別のアプローチ</h2>
+    </div>
+    <div class="card-layout">
+
+        <!-- カード15 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-object-group fa-5x" style="color: var(--color-1); animation: fa-spin 4s;"></i>
+            </div>
+            <h2>⑮Model Fusion（モデル融合）の世界</h2>
+            <p>Model Merging / Fusionは、<span class="highlight">別々に学習された複数モデルの重みを数学的に統合</span>する技術。Fuguの「APIレベルの協調」と異なり、重みレベルで1つのモデルに合体させます。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-layer-group"></i> TIES、DARE、SLERP等の手法</li>
+                <li><i class="fas fa-database"></i> 学習不要で統合が可能</li>
+                <li><i class="fas fa-file-alt"></i> 2026年ACM Computing Surveysに包括的サーベイ論文</li>
+            </ul>
+            <div class="speech-bubble variant-1">
+                <i class="fas fa-puzzle-piece"></i>
+                Fuguは「APIでつなぐ」アプローチ。Fusionは「重みを混ぜる」アプローチ。両者が並行して進化中！
+            </div>
+        </div>
+
+        <!-- カード16 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-th-large fa-5x" style="color: var(--color-3);"></i>
+            </div>
+            <h2>⑯LobeHub CAO：チーフ・エージェント・オペレーター</h2>
+            <p><span class="highlight">LobeHub CAO</span>はオープンソースのマルチエージェントプラットフォーム。20万以上のスキルのマーケットプレイスからエージェントを組み合わせ、チームとしてタスクを遂行させます。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-store"></i> <span class="tag">20万+スキル</span> のマーケットプレイス</li>
+                <li><i class="fas fa-users"></i> Agent Groupsでチーム編成</li>
+                <li><i class="fas fa-code"></i> Claude Code、Codex、OpenClaw等を統合</li>
+                <li><i class="fas fa-user-friends"></i> 逐次・並列・反復・ディベートの協調モード</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-handshake"></i>
+                Fuguが「プロプライエタリな指揮者」なら、LobeHub CAOは「オープンでユーザー主導のチーム管理」！
+            </div>
+        </div>
+
+        <!-- カード17 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-cogs fa-5x" style="color: var(--accent-warm);"></i>
+            </div>
+            <h2>⑰LobeHubのアーキテクチャ</h2>
+            <p>LobeHubは<span class="highlight">Agent Runtime</span>と<span class="highlight">Model Runtime</span>の2つのエンジンを搭載。Plan-Execute LoopでマルチステップAI動作を管理し、30以上のAIプロバイダーのAPI差異を吸収します。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-sync"></i> Plan-Execute Loop：計画→実行→結果処理のループ</li>
+                <li><i class="fas fa-wrench"></i> コンテキスト圧縮で長文脈に対応</li>
+                <li><i class="fas fa-mask"></i> Human-in-the-Loopのセキュリティチェック</li>
+                <li><i class="fas fa-desktop"></i> macOSアプリ＆Web UIを提供</li>
+            </ul>
+            <div class="speech-bubble variant-2">
+                <i class="fas fa-lock"></i>
+                Fuguは非公開のルーティングだが、LobeHubはユーザーがモデル・プロバイダーを自由に選べる！
+            </div>
+        </div>
+
+        <!-- カード18 -->
+        <div class="card">
+            <div class="card-icon">
+                <i class="fas fa-balance-scale fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+            </div>
+            <h2>⑱3つのアプローチを比較</h2>
+            <p>今回紹介した3つの手法は<span class="highlight">それぞれ異なる戦略</span>でマルチモデル合体を実現しています。用途と制約に応じて最適な選択が変わります。</p>
+            <ul class="keyword-list">
+                <li><i class="fas fa-fish"></i> <span class="tag">Sakana Fugu</span>：学習済みオーケストレーター、API完結</li>
+                <li><i class="fas fa-object-group"></i> <span class="tag">Model Fusion</span>：重みを統合、1モデルに合体</li>
+                <li><i class="fas fa-th-large"></i> <span class="tag">LobeHub CAO</span>：オープンソース、ユーザー主導のチーム編成</li>
+            </ul>
+            <div class="speech-bubble">
+                <i class="fas fa-lightbulb"></i>
+                結論：複数モデルを合体させると本当に強くなる！ただし「どう合体させるか」が鍵！
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <footer>
+        <p>🎬 動画: <a href="https://www.youtube.com/watch?v=vQ1EtHQkSWY" target="_blank">Jun Suzuki（@AI-INFO-BIZ）</a></p>
+        <p style="margin-top: 8px;">
+            📄 参考文献:
+            <a href="https://sakana.ai/fugu/" target="_blank">Sakana Fugu 公式</a> |
+            <a href="https://arxiv.org/abs/2512.04695" target="_blank">TRINITY論文</a> |
+            <a href="https://arxiv.org/abs/2512.04388" target="_blank">Conductor論文</a> |
+            <a href="https://lobehub.com/" target="_blank">LobeHub</a>
+        </p>
+        <p style="margin-top: 8px;">📅 2026年6月28日 作成 | 🤖 Generated with AI Assistance</p>
+    </footer>
+
+</div>
+</body>
+</html>

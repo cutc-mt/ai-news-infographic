@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチエージェントの継続的評価パイプライン - Google Cloud Tech</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --color-1: #1A237E;
+            --color-2: #3F51B5;
+            --color-3: #C5CAE9;
+            --color-4: #0D1137;
+            --color-5: #7986CB;
+            --accent: #FF6F00;
+            --accent-light: #FFE0B2;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #E8EAF6;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-1), var(--color-2), var(--color-5));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--color-1), var(--color-5), var(--accent));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.2em;
+            color: var(--color-1);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-2);
+            min-width: 16px;
+            margin-top: 3px;
+        }
+
+        .keyword-tag {
+            background-color: var(--color-3);
+            color: var(--color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, var(--accent-light) 60%);
+            font-weight: bold;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #E8F5E9;
+            border-color: var(--color-5);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-5) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFF3E0;
+            border-color: var(--accent);
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: var(--accent) transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-1));
+            border-radius: 20px;
+            color: white;
+            font-family: 'Yomogi', cursive;
+            font-size: 1.1em;
+        }
+
+        footer a {
+            color: var(--color-5);
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1200px) {
+            .card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon">🤖</div>
+            <h1><i class="fas fa-robot" aria-hidden="true"></i> マルチエージェントの継続的評価パイプラインを構築する</h1>
+            <div class="subtitle">Gemini Enterprise Agent Platform × Cloud Run で自動テストを実現！</div>
+            <div class="date">📅 2026年7月1日 | 発表者: Vlad Kolesnikov, Leonid Yankulin</div>
+        </div>
+
+        <!-- Cards Row 1 -->
+        <div class="section-layout">
+            <!-- Card 1 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-microscope fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>①この配信のテーマ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>「AIエージェントが<span class="highlight">本当に動いているか</span>」を客観的に検証する</span></li>
+                        <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>手動の<span class="keyword-tag">バイブチェック</span>からデータ駆動の評価へ移行</span></li>
+                        <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span><span class="highlight">Gemini Enterprise Agent Platform</span>を活用</span></li>
+                        <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>プロダクション環境での<span class="highlight">品質保証</span>がテーマ</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-2);"></i>
+                        「なんとなく動いてる」じゃなくて<br>数字で証明しよう！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-exclamation-triangle fa-5x" style="color: var(--accent); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>②「見えない回帰」の問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bug" aria-hidden="true"></i><span>コード変更で<span class="highlight">エージェントの品質が</span>こっそり低下する</span></li>
+                        <li><i class="fa-solid fa-eye-slash" aria-hidden="true"></i><span>回帰は<span class="keyword-tag">目に見えにくい</span>から危険</span></li>
+                        <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>プロトタイプでは手動確認で済むが…</span></li>
+                        <li><i class="fa-solid fa-industry" aria-hidden="true"></i><span>プロダクションでは<span class="highlight">自動化された評価</span>が必須</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-ghost fa-lg" style="color: var(--accent);"></i>
+                        見えないバグが<br>プロダクションで発覚するの恐い！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-users-robot fa-5x" style="color: var(--color-5); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>③マルチエージェントシステムとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>複数のAIエージェントが<span class="highlight">協調して動く</span>仕組み</span></li>
+                        <li><i class="fa-solid fa-arrows-split-up-and-left" aria-hidden="true"></i><span>タスクが<span class="keyword-tag">分散</span>され、それぞれが専門的な役割を担う</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i><span>オーケストレーターが全体を束ねる</span></li>
+                        <li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>構成が複雑なほど<span class="highlight">テストが困難</span>になる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-people-group fa-lg" style="color: var(--color-2);"></i>
+                        1人のAIよりチームの方が<br>強いけど、管理が大変！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 2 -->
+        <div class="section-layout">
+            <!-- Card 4 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-gauge-high fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>④データ駆動の評価とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-database" aria-hidden="true"></i><span><span class="highlight">定量的なメトリクス</span>でエージェントを評価する</span></li>
+                        <li><i class="fa-solid fa-ruler-combined" aria-hidden="true"></i><span><span class="keyword-tag">ルーブリック</span>（評価基準）を明確に定義</span></li>
+                        <li><i class="fa-solid fa-wrench" aria-hidden="true"></i><span>ツール使用の品質も測定対象</span></li>
+                        <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>コード変更のたびに<span class="highlight">自動で再評価</span>が走る</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-chart-bar fa-lg" style="color: var(--color-2);"></i>
+                        「前より悪くなってない？」を<br>毎回自動で確認できる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-file-lines fa-5x" style="color: var(--accent); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑤適応型ルーブリック</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>評価基準を<span class="highlight">動的に調整</span>できる仕組み</span></li>
+                        <li><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Geminiが<span class="keyword-tag">出力の品質スコア</span>を自動採点</span></li>
+                        <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>複数の次元で<span class="highlight">多角的に評価</span></span></li>
+                        <li><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span>基準の<span class="keyword-tag">カスタマイズ</span>も柔軟に対応</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--color-2);"></i>
+                        評価基準もAIが<br>賢く調整してくれる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-wrench fa-5x" style="color: var(--color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑥ツール使用品質メトリクス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>エージェントが<span class="highlight">正しくツールを呼び出せたか</span>を測る</span></li>
+                        <li><i class="fa-solid fa-bullseye" aria-hidden="true"></i><span>引数の<span class="keyword-tag">妥当性</span>・結果の<span class="keyword-tag">正確性</span>をチェック</span></li>
+                        <li><i class="fa-solid fa-timeline" aria-hidden="true"></i><span>不要なツール呼び出しを<span class="highlight">検出</span>する</span></li>
+                        <li><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i><span>ツールの<span class="keyword-tag">使用頻度</span>や<span class="keyword-tag">順序</span>も分析</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--accent);"></i>
+                        「正しいツールを<br>正しく使ってる？」を数値化！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 3 -->
+        <div class="section-layout">
+            <!-- Card 7 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-cloud fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑦Gemini Enterprise Agent Platform</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>Google Cloudの<span class="highlight">エージェント開発プラットフォーム</span></span></li>
+                        <li><i class="fa-solid fa-pipeline" aria-hidden="true"></i><span><span class="keyword-tag">Pipelines</span>機能で評価ワークフローを構築</span></li>
+                        <li><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span>複数のエージェントを<span class="highlight">オーケストレーション</span></span></li>
+                        <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>エンタープライズグレードの<span class="keyword-tag">セキュリティ</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gem fa-lg" style="color: var(--color-2);"></i>
+                        Geminiの力で<br>エージェント管理が超便利に！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-server fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑧Cloud Run Functions</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bolt-lightning" aria-hidden="true"></i><span>評価ロジックを<span class="highlight">サーバーレス関数</span>として実装</span></li>
+                        <li><i class="fa-solid fa-scale-unbalanced" aria-hidden="true"></i><span>負荷に応じて<span class="keyword-tag">自動スケーリング</span></span></li>
+                        <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>Pipeline とシームレスに連携</span></li>
+                        <li><i class="fa-solid fa-coins" aria-hidden="true"></i><span>使った分だけ<span class="highlight">コスト最適化</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-cloud-arrow-up fa-lg" style="color: var(--color-2);"></i>
+                        サーバー管理なしで<br>評価処理をサクサク動かせる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-code-branch fa-5x" style="color: var(--accent); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑨シャドウデプロイメント</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-ghost" aria-hidden="true"></i><span>本番環境に<span class="highlight">影響なし</span>で新しい版をテスト</span></li>
+                        <li><i class="fa-solid fa-tags" aria-hidden="true"></i><span>Cloud Runの<span class="keyword-tag">tagged revision</span>機能を活用</span></li>
+                        <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>プライベートなリビジョンに<span class="highlight">安全にデプロイ</span></span></li>
+                        <li><i class="fa-solid fa-shuffle" aria-hidden="true"></i><span>トラフィックを分割して<span class="keyword-tag">段階的に移行</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-user-secret fa-lg" style="color: var(--accent);"></i>
+                        ユーザーに気づかれずに<br>こっそりテストできる！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 4 -->
+        <div class="section-layout">
+            <!-- Card 10 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-gears fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑩CI/CD自動化との統合</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>コード変更のたびに<span class="highlight">自動で評価パイプラインが実行</span></span></li>
+                        <li><i class="fa-solid fa-code-commit" aria-hidden="true"></i><span>PRごとに<span class="keyword-tag">回帰テスト</span>が走る仕組み</span></li>
+                        <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>品質が基準を下回れば<span class="highlight">デプロイを自動阻止</span></span></li>
+                        <li><i class="fa-solid fa-bell" aria-hidden="true"></i><span>品質低下の<span class="keyword-tag">通知</span>も自動で届く</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-robot fa-lg" style="color: var(--color-2);"></i>
+                        コード変えるたびに<br>AIが品質チェックしてくれる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-diagram-successor fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑪評価パイプラインの全体像</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-play" aria-hidden="true"></i><span>テストスイートを<span class="highlight">トリガー</span>として起動</span></li>
+                        <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>エージェントに<span class="keyword-tag">入力データ</span>を送信</span></li>
+                        <li><i class="fa-solid fa-check-double" aria-hidden="true"></i><span>ルーブリックで<span class="highlight">出力を採点</span></span></li>
+                        <li><i class="fa-solid fa-file-circle-check" aria-hidden="true"></i><span>結果を<span class="keyword-tag">レポート</span>として出力</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-arrows-spin fa-lg" style="color: var(--color-2);"></i>
+                        入力→実行→採点→レポート<br>のサイクルを自動化！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-flask fa-5x" style="color: var(--accent); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑫Codelabでハンズオン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i><span>公式の<span class="highlight">Codelab</span>が用意されている</span></li>
+                        <li><i class="fa-solid fa-link" aria-hidden="true"></i><span> goo.gle/prai-rs-2 でアクセス可能</span></li>
+                        <li><i class="fa-solid fa-laptop-code" aria-hidden="true"></i><span>実際に<span class="keyword-tag">手を動かして</span>パイプラインを体験</span></li>
+                        <li><i class="fa-solid fa-road" aria-hidden="true"></i><span>ステップバイステップの<span class="highlight">ガイド付き</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-hand-pointer fa-lg" style="color: var(--accent);"></i>
+                        Codelabをやれば<br>すぐに試せるよ！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 5 -->
+        <div class="section-layout">
+            <!-- Card 13 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-ranking-star fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑬評価の3つの柱</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1" aria-hidden="true"></i><span><span class="highlight">適応型ルーブリック</span>で出力品質を評価</span></li>
+                        <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="highlight">ツール使用メトリクス</span>で操作の正確性を検証</span></li>
+                        <li><i class="fa-solid fa-3" aria-hidden="true"></i><span><span class="highlight">回帰テスト</span>で品質低下を防止</span></li>
+                        <li><i class="fa-solid fa-circle-nodes" aria-hidden="true"></i><span>3つを組み合わせて<span class="keyword-tag">網羅的に</span>評価</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-layer-group fa-lg" style="color: var(--color-2);"></i>
+                        品質・正確性・安定性<br>3方向からガード！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-vial fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑭テストスイートの設計</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span>多様な<span class="highlight">入力パターン</span>を網羅的に用意</span></li>
+                        <li><i class="fa-solid fa-dice" aria-hidden="true"></i><span>エッジケースや<span class="keyword-tag">異常系</span>も含める</span></li>
+                        <li><i class="fa-solid fa-arrows-turn-to-dots" aria-hidden="true"></i><span>正常系・異常系・<span class="keyword-tag">境界値</span>をカバー</span></li>
+                        <li><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span>テストケースは<span class="highlight">バージョン管理</span>する</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-list-ol fa-lg" style="color: var(--color-2);"></i>
+                        良いテストは<br>良いエージェントの基盤！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-chart-column fa-5x" style="color: var(--accent); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑮スコアリングとレポート</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-star-half-stroke" aria-hidden="true"></i><span>各テストの<span class="highlight">スコアを集計</span>して可視化</span></li>
+                        <li><i class="fa-solid fa-arrow-trend-down" aria-hidden="true"></i><span>前回実行との<span class="keyword-tag">差分比較</span>が可能</span></li>
+                        <li><i class="fa-solid fa-file-export" aria-hidden="true"></i><span>結果を<span class="highlight">自動レポート</span>として出力</span></li>
+                        <li><i class="fa-solid fa-bell" aria-hidden="true"></i><span>しきい値を下回ると<span class="keyword-tag">アラート通知</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-square-poll-vertical fa-lg" style="color: var(--accent);"></i>
+                        数字で見えるから<br>改善の方向性が明確！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 6 -->
+        <div class="section-layout">
+            <!-- Card 16 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-network-wired fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑯分散エージェントの課題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shuffle" aria-hidden="true"></i><span>複数エージェント間の<span class="highlight">相互作用</span>が予測困難</span></li>
+                        <li><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>実行時間や<span class="keyword-tag">コスト</span>の管理が必要</span></li>
+                        <li><i class="fa-solid fa-link-slash" aria-hidden="true"></i><span>通信の<span class="highlight">遅延やエラー</span>への対応</span></li>
+                        <li><i class="fa-solid fa-masks-theater" aria-hidden="true"></i><span>各エージェントの<span class="keyword-tag">役割の明確化</span>が重要</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-tornado fa-lg" style="color: var(--color-2);"></i>
+                        エージェントが増えるほど<br>複雑さが爆発する！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-triangle-exclamation fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑰回帰防止のベストプラクティス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span><span class="highlight">品質のベースライン</span>を定義して守る</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i><span>A/Bテストで<span class="keyword-tag">新旧比較</span>を徹底</span></li>
+                        <li><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>変更前に<span class="highlight">スナップショット</span>を取得</span></li>
+                        <li><i class="fa-solid fa-door-closed" aria-hidden="true"></i><span>品質が下回ったら<span class="keyword-tag">自動でデプロイ阻止</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-shield fa-lg" style="color: var(--color-2);"></i>
+                        「前より悪くならない」<br>これが一番大事！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-flag-checkered fa-5x" style="color: var(--accent); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑱まとめ：評価の自動化で<br>信頼性を確保する</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check-double" aria-hidden="true"></i><span><span class="highlight">データ駆動の評価</span>がエージェント信頼性の鍵</span></li>
+                        <li><i class="fa-solid fa-gears" aria-hidden="true"></i><span>Gemini + Cloud Run で<span class="keyword-tag">パイプライン構築</span></span></li>
+                        <li><i class="fa-solid fa-ghost" aria-hidden="true"></i><span>シャドウデプロイで<span class="highlight">安全な移行</span>を実現</span></li>
+                        <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>CI/CDに組み込んで<span class="highlight">継続的に品質を守る</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-hands-clapping fa-lg" style="color: var(--accent);"></i>
+                        AIエージェントの品質を<br>自動で守る時代が来た！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://www.youtube.com/live/WRU7-4bpZkg" target="_blank">Google Cloud Tech「How to build a continuous evaluation pipeline for multi-agent systems with Gemini」</a><br>
+            📺 チャンネル: Google Cloud Tech | 📅 2026年7月1日 | 🤖 AIニュースインフォグラフィック
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>エージェントのための検索ハーネス構築 - LlamaIndex</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --color-1: #4A1942;
+            --color-2: #6B2D5B;
+            --color-3: #F3E5F5;
+            --color-4: #2E0854;
+            --color-5: #9C27B0;
+            --accent: #E040FB;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #FBE9FF;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 2000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-1), var(--accent));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon {
+            font-size: 5em;
+            margin-bottom: 10px;
+            animation: fa-bounce 2s infinite;
+        }
+
+        .header h1 {
+            font-size: 2.4em;
+            font-weight: 900;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header .subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            font-family: 'Yomogi', cursive;
+        }
+
+        .header .date {
+            font-size: 0.9em;
+            opacity: 0.7;
+            margin-top: 10px;
+        }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, var(--color-1), var(--accent));
+        }
+
+        .mega-icon-container {
+            text-align: center;
+            margin: 15px 0;
+        }
+
+        .mega-icon-container h2 {
+            font-size: 1.2em;
+            color: var(--color-4);
+            margin-top: 10px;
+        }
+
+        .card-content {
+            padding: 0 10px 15px;
+        }
+
+        .keyword-list {
+            margin: 15px 0;
+            padding: 0;
+            list-style-type: none;
+        }
+
+        .keyword-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .keyword-list li i {
+            margin-right: 8px;
+            color: var(--color-5);
+            min-width: 16px;
+            margin-top: 3px;
+        }
+
+        .keyword-tag {
+            background-color: var(--color-3);
+            color: var(--color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+        }
+
+        .highlight {
+            background: linear-gradient(transparent 60%, var(--color-3) 60%);
+            font-weight: bold;
+        }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--color-1);
+            border-radius: 20px;
+            padding: 10px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px;
+            left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--color-1) transparent;
+            display: block;
+            width: 0;
+        }
+
+        .speech-bubble.right::after {
+            left: auto;
+            right: 20px;
+            transform: rotate(15deg);
+        }
+
+        .speech-bubble.top::after {
+            bottom: auto;
+            top: -13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+
+        .speech-bubble.variant-1 {
+            background: #FFF9E3;
+            border-color: var(--color-2);
+            transform: rotate(1deg);
+        }
+
+        .speech-bubble.variant-1::after {
+            border-color: var(--color-2) transparent;
+        }
+
+        .speech-bubble.variant-2 {
+            background: #FFE9E9;
+            border-color: #BF5656;
+            transform: rotate(-2deg);
+        }
+
+        .speech-bubble.variant-2::after {
+            border-color: #BF5656 transparent;
+        }
+
+        .handwritten {
+            font-family: 'Yomogi', cursive;
+            font-size: 15px;
+            line-height: 1.5;
+            color: #333;
+        }
+
+        @keyframes fadeInScale {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .fade-in-scale {
+            animation: fadeInScale 0.6s ease-out forwards;
+        }
+
+        footer {
+            text-align: center;
+            padding: 30px 20px;
+            margin-top: 30px;
+            background: linear-gradient(135deg, var(--color-4), var(--color-1));
+            border-radius: 20px;
+            color: white;
+            font-family: 'Yomogi', cursive;
+            font-size: 1.1em;
+        }
+
+        footer a {
+            color: #CE93D8;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 1200px) {
+            .card {
+                min-width: 320px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .section-layout {
+                flex-direction: column;
+            }
+            .card {
+                width: 100%;
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-icon">🔍</div>
+            <h1><i class="fas fa-magnifying-glass-chart" aria-hidden="true"></i> エージェントのための検索ハーネス構築</h1>
+            <div class="subtitle">grepだけ？意味検索だけ？それとも両方？ LlamaIndexが語る企業向け最適解</div>
+            <div class="date">📅 2026年7月1日</div>
+        </div>
+
+        <!-- Cards Row 1 -->
+        <div class="section-layout">
+            <!-- Card 1 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-sitemap fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>①Retrieval Harnessとは？</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>AIエージェントが<span class="highlight">文書から情報を取り出す枠組み</span>のこと</span></li>
+                        <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span><span class="keyword-tag">意味検索</span>・<span class="keyword-tag">grep</span>・<span class="keyword-tag">ファイル探索</span>を一つに統合</span></li>
+                        <li><i class="fa-solid fa-gears" aria-hidden="true"></i><span>エージェントの<span class="highlight">推論ループの中で</span>動的に使い分ける設計</span></li>
+                        <li><i class="fa-solid fa-building" aria-hidden="true"></i><span>LlamaIndexが<span class="keyword-tag">LlamaParse Index</span>に組み込み</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-5);"></i>
+                        一つの検索方法じゃなくて<br>全部まとめて使うのが正解！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 2 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-terminal fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>②grep検索の強み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span><span class="highlight">正確な文字列一致</span>ができる</span></li>
+                        <li><i class="fa-solid fa-hashtag" aria-hidden="true"></i><span>関数名・エラー文字列など<span class="keyword-tag">既知のトークン</span>に最適</span></li>
+                        <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>50年以上の歴史で<span class="highlight">LLMの学習データも豊富</span></span></li>
+                        <li><i class="fa-solid fa-expand" aria-hidden="true"></i><span>周辺ファイルを読んで<span class="keyword-tag">文脈を広げる</span>使い方が自然</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bullseye fa-lg" style="color: var(--color-5);"></i>
+                        「このエラーメッセージはどこ？」<br>みたいな時に超便利！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 3 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-triangle-exclamation fa-5x" style="color: #E76F51; animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>③grepの限界</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-pdf" aria-hidden="true"></i><span><span class="highlight">PDFや画像にはgrepできない</span></span></li>
+                        <li><i class="fa-solid fa-table" aria-hidden="true"></i><span>Office文書も<span class="keyword-tag">プレーンテキスト化</span>が必要</span></li>
+                        <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>100万ファイル超えると<span class="highlight">検索が遅くなる</span></span></li>
+                        <li><i class="fa-solid fa-volume-high" aria-hidden="true"></i><span>ノイズが多くて<span class="keyword-tag">文脈ウインドウが埋まる</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-face-sad-tear fa-lg" style="color: #BF5656;"></i>
+                        企業のデータって<br>大半が非構造化なんだよね…
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 2 -->
+        <div class="section-layout">
+            <!-- Card 4 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-file-lines fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>④非構造化文書の壁</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building-columns" aria-hidden="true"></i><span>企業の知識は<span class="highlight">PDF・Office・画像</span>に偏在</span></li>
+                        <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>レイアウト無視の抽出だと<span class="keyword-tag">表が壊れる</span></span></li>
+                        <li><i class="fa-solid fa-image" aria-hidden="true"></i><span>視覚モデルは<span class="highlight">遅くてハルシネーションも多い</span></span></li>
+                        <li><i class="fa-solid fa-key" aria-hidden="true"></i><span>精度と速度の<span class="keyword-tag">バランスが重要</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lock fa-lg" style="color: var(--color-5);"></i>
+                        表や図が入ったPDFは<br>本当に読み取るのが大変！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 5 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-wand-magic-sparkles fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑤LlamaParseで文書を解放</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i><span><span class="highlight">130以上の形式</span>に対応する解析ツール</span></li>
+                        <li><i class="fa-solid fa-table-cells" aria-hidden="true"></i><span>表・グラフ・画像・手書き文字も<span class="keyword-tag">高精度で処理</span></span></li>
+                        <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>エージェント型の<span class="highlight">OCR技術</span>を活用</span></li>
+                        <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span><span class="keyword-tag">MCPサーバー</span>としても利用可能</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-unlock fa-lg" style="color: var(--color-5);"></i>
+                        PDFの中身がきれいに<br>テキストとして取り出せる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 6 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-bolt fa-5x" style="color: var(--color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑥LiteParse：軽量ローカル解析</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-hard-drive" aria-hidden="true"></i><span><span class="highlight">完全ローカルで動く</span>高速解析ツール</span></li>
+                        <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>レイアウトを保持したまま<span class="keyword-tag">空間的にテキスト抽出</span></span></li>
+                        <li><i class="fa-solid fa-gauge-simple-high" aria-hidden="true"></i><span>応答は通常<span class="highlight">数秒</span>で完了</span></li>
+                        <li><i class="fa-solid fa-handshake" aria-hidden="true"></i><span>grepの<span class="keyword-tag">最高の相棒</span>になる設計</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gauge-high fa-lg" style="color: #BF5656;"></i>
+                        速さ重視ならLiteParse<br>きれいさ重視ならLlamaParse！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 3 -->
+        <div class="section-layout">
+            <!-- Card 7 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-brain fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑦意味検索（セマンティック）とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-language" aria-hidden="true"></i><span>言葉の<span class="highlight">意味を理解して</span>関連情報を見つける</span></li>
+                        <li><i class="fa-solid fa-cube" aria-hidden="true"></i><span>文書をベクトル空間に<span class="keyword-tag">埋め込み</span>して索引化</span></li>
+                        <li><i class="fa-solid fa-magnifying-glass-location" aria-hidden="true"></i><span>類似ベクトルを<span class="highlight">数ミリ秒</span>で検索</span></li>
+                        <li><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i><span>「売上認識」が<span class="keyword-tag">「ASC 606」</span>にヒットする</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-spell-check fa-lg" style="color: var(--color-5);"></i>
+                        言葉が違っても<br>意味が同じなら見つけてくれる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 8 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-database fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑧意味検索のスケーラビリティ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span><span class="highlight">100万件でも10万件と同じ速度</span></span></li>
+                        <li><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span><span class="keyword-tag">ANNインデックス</span>がおさめる近似検索</span></li>
+                        <li><i class="fa-solid fa-spell-check" aria-hidden="true"></i><span>同義語を<span class="highlight">自動的に理解</span>する</span></li>
+                        <li><i class="fa-solid fa-minimize" aria-hidden="true"></i><span>Top-Kで<span class="keyword-tag">文脈ウインドウを清潔に保つ</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-rocket fa-lg" style="color: var(--color-5);"></i>
+                        文書が増えても<br>検索速度は落ちない！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 9 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-scale-balanced fa-5x" style="color: var(--color-5); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑨ハイブリッド検索が最強</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-code-merge" aria-hidden="true"></i><span><span class="highlight">意味検索＋BM25＋メタデータ</span>の組み合わせ</span></li>
+                        <li><i class="fa-solid fa-compass" aria-hidden="true"></i><span>grepの<span class="keyword-tag">正確さ</span>と埋め込みの<span class="keyword-tag">再現率</span>を両立</span></li>
+                        <li><i class="fa-solid fa-filter" aria-hidden="true"></i><span>メタデータフィルターで<span class="highlight">ノイズを削減</span></span></li>
+                        <li><i class="fa-solid fa-trophy" aria-hidden="true"></i><span>本番環境の<span class="keyword-tag">RAGシステム</span>で標準的に採用</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-medal fa-lg" style="color: #BF5656;"></i>
+                        片方だけじゃなくて<br>組み合わせるのが一番いい！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 4 -->
+        <div class="section-layout">
+            <!-- Card 10 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-diagram-project fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑩LlamaParse Indexの構成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span><span class="highlight">意味検索</span>：ベクトル埋め込みベース</span></li>
+                        <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span><span class="keyword-tag">サーバーサイドgrep</span>：正確な文字列検索</span></li>
+                        <li><i class="fa-solid fa-folder-tree" aria-hidden="true"></i><span><span class="keyword-tag">ファイルレベル探索</span>：文書全体をナビゲーション</span></li>
+                        <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>三つを<span class="highlight">一つの推論ループ</span>で連携</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gears fa-lg" style="color: var(--color-5);"></i>
+                        三つの検索方法を<br>エージェントが賢く使い分ける！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 11 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-gears fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑪エージェントの推論ループ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-circle-question" aria-hidden="true"></i><span>質問を受け取って<span class="highlight">検索戦略を決定</span></span></li>
+                        <li><i class="fa-solid fa-shuffle" aria-hidden="true"></i><span>意味検索→grep→ファイル探索を<span class="keyword-tag">動的に切り替え</span></span></li>
+                        <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>結果を評価して<span class="highlight">追加検索を判断</span></span></li>
+                        <li><i class="fa-solid fa-flag-checkered" aria-hidden="true"></i><span>十分な情報が集まるまで<span class="keyword-tag">繰り返す</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-user-gear fa-lg" style="color: var(--color-5);"></i>
+                        エージェント自身が<br>どの検索を使うか考える！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 12 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-server fa-5x" style="color: var(--color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑫サーバーサイドgrepの利点</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span><span class="highlight">セキュリティ</span>：ファイルをクライアントに送らない</span></li>
+                        <li><i class="fa-solid fa-tachometer-alt" aria-hidden="true"></i><span>サーバー側で<span class="keyword-tag">高速に検索</span>して結果だけ返す</span></li>
+                        <li><i class="fa-solid fa-cloud" aria-hidden="true"></i><span>大規模な<span class="highlight">コーパス</span>でも安定したパフォーマンス</span></li>
+                        <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span>機密文書の<span class="keyword-tag">取り扱いが安全</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-shield fa-lg" style="color: #BF5656;"></i>
+                        ファイルの中身そのものは<br>サーバー内に留まる！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 5 -->
+        <div class="section-layout">
+            <!-- Card 13 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-file-export fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑬MCP統合でエージェント拡張</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i><span><span class="highlight">LlamaParse MCP</span>でプラグアンドプレイ</span></li>
+                        <li><i class="fa-solid fa-wrench" aria-hidden="true"></i><span>解析・分割・分類を<span class="keyword-tag">API一つ</span>で実行</span></li>
+                        <li><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i><span><span class="keyword-tag">Vercel Skills</span>や<span class="keyword-tag">GitHub</span>から導入可能</span></li>
+                        <li><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i><span>エージェントに<span class="highlight">最初から使える</span>コンテキスト付き</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--color-5);"></i>
+                        MCPにつなぐだけで<br>エージェントが賢くなる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 14 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-sitemap fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑭grep論争の背景</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-newspaper" aria-hidden="true"></i><span>論文で<span class="highlight">「grepが最強」</span>と主張する声が話題に</span></li>
+                        <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>ソースコードなら<span class="keyword-tag">確かにgrepが強い</span></span></li>
+                        <li><i class="fa-solid fa-file-pdf" aria-hidden="true"></i><span>でも企業では<span class="highlight">非構造化文書が大多数</span></span></li>
+                        <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>結論：<span class="keyword-tag">用途に応じて使い分ける</span>のが正解</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-comments fa-lg" style="color: var(--color-5);"></i>
+                        「grep vs RAG」じゃなくて<br>「grep and RAG」だね！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 15 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-chart-bar fa-5x" style="color: var(--color-5); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑮スケール別の最適戦略</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-seedling" aria-hidden="true"></i><span>小規模（数百〜数千）：<span class="highlight">grep中心</span>で十分</span></li>
+                        <li><i class="fa-solid fa-tree" aria-hidden="true"></i><span>中規模（数万）：<span class="keyword-tag">ハイブリッド</span>が効果的</span></li>
+                        <li><i class="fa-solid fa-mountain" aria-hidden="true"></i><span>大規模（100万超）：<span class="highlight">意味検索が必須</span></span></li>
+                        <li><i class="fa-solid fa-arrows-spin" aria-hidden="true"></i><span>企業は<span class="keyword-tag">段階的に移行</span>するのが現実的</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 top">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-stairs fa-lg" style="color: #BF5656;"></i>
+                        データ量に合わせて<br>段階的に検索を強化しよう！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cards Row 6 -->
+        <div class="section-layout">
+            <!-- Card 16 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-robot fa-5x" style="color: var(--color-1); animation: fa-bounce 2s;" aria-hidden="true"></i>
+                    <h2>⑯エージェントの検索パターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i><span>まず<span class="highlight">広く意味検索</span>で候補を絞る</span></li>
+                        <li><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>特定文字列が分かったら<span class="keyword-tag">grepで精密検索</span></span></li>
+                        <li><i class="fa-solid fa-folder-open" aria-hidden="true"></i><span>関連文書全体を読むなら<span class="keyword-tag">ファイル探索</span></span></li>
+                        <li><i class="fa-solid fa-repeat" aria-hidden="true"></i><span>結果を見て<span class="highlight">戦略を動的に変更</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-route fa-lg" style="color: var(--color-5);"></i>
+                        人間と同じように<br>検索のやり方を変えられる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 17 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-building fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+                    <h2>⑰企業利用のユースケース</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-contract" aria-hidden="true"></i><span><span class="highlight">契約書・規程</span>からの特定条項検索</span></li>
+                        <li><i class="fa-solid fa-headset" aria-hidden="true"></i><span><span class="keyword-tag">サポートチケット</span>の類似事例探索</span></li>
+                        <li><i class="fa-solid fa-flask" aria-hidden="true"></i><span><span class="keyword-tag">研究レポート</span>からの知識抽出</span></li>
+                        <li><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i><span><span class="keyword-tag">設計仕様書</span>の横断的参照</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-briefcase fa-lg" style="color: var(--color-5);"></i>
+                        社内文書の山から<br>一瞬で答えを見つけ出す！
+                    </span>
+                </div>
+            </div>
+
+            <!-- Card 18 -->
+            <div class="card">
+                <div class="mega-icon-container">
+                    <i class="fas fa-flag-checkered fa-5x" style="color: var(--color-1); animation: fa-flip 2s;" aria-hidden="true"></i>
+                    <h2>⑱まとめ：三つの検索を統合せよ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-check-double" aria-hidden="true"></i><span><span class="highlight">grepは行かない</span>が、意味検索も必須</span></li>
+                        <li><i class="fa-solid fa-cubes" aria-hidden="true"></i><span>LlamaParse Indexが<span class="keyword-tag">三つの検索を一つに統合</span></span></li>
+                        <li><i class="fa-solid fa-circle-nodes" aria-hidden="true"></i><span>エージェントが<span class="highlight">自律的に使い分ける</span>設計</span></li>
+                        <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>企業の<span class="highlight">非構造化データ</span>を最大限に活用する鍵</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2 right">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-hands-clapping fa-lg" style="color: #BF5656;"></i>
+                        検索の未来は<br>一つじゃなくて全部！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer>
+            🎬 動画: <a href="https://youtu.be/bXDsohiwdYQ" target="_blank">LlamaIndex「Building retrieval harness for enterprise agents」</a><br>
+            📅 2026年7月1日 | 🤖 AIニュースインフォグラフィック
+        </footer>
+    </div>
+</body>
+</html>

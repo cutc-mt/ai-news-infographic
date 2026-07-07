@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Qwen 3.6 + Pi Agent: 自分だけのAIアシスタント構築 | AI開発チュートリアル</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #1B6C8C;
+            --ui-color-2: #BF8136;
+            --ui-color-3: #F2E8E4;
+            --ui-color-4: #260101;
+            --ui-color-5: #BF5656;
+            --bg: #FFF8F5;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif; color: #333; line-height: 1.6; }
+        .canvas { max-width: 2000px; margin: 0 auto; padding: 30px 20px; }
+        .header {
+            text-align: center; padding: 40px 20px; margin-bottom: 30px;
+            background: linear-gradient(135deg, #1B6C8C 0%, #2E86AB 50%, #BF8136 100%);
+            border-radius: 24px; color: #fff; position: relative; overflow: hidden;
+        }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); }
+        .header .date { font-size: 14px; opacity: 0.9; margin-bottom: 8px; }
+        .header h1 { font-size: 36px; font-weight: bold; margin: 10px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+        .header .channel { font-size: 16px; opacity: 0.9; }
+        .header i { font-size: 48px; margin-bottom: 10px; animation: fa-beat-fade 2s infinite; }
+
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; padding: 10px 0; }
+        .section-card {
+            flex: 1; min-width: 220px; max-width: 450px;
+            background-color: white; border-radius: 20px; padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+            border-top: 4px solid var(--ui-color-1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(27,108,140,0.2); }
+        .card-number { position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; color: var(--ui-color-1); opacity: 0.3; }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container i { color: var(--ui-color-1); }
+        .mega-icon-container h2 { font-size: 20px; color: #333; margin-top: 8px; font-family: 'Kaisei Decol', serif; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 14px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 3px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 2px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 13px; }
+        .highlight { background: linear-gradient(transparent 60%, #FFE066 60%); padding: 0 2px; font-weight: bold; }
+
+        .speech-bubble {
+            position: relative; background: #fff; border: 3px solid var(--ui-color-1);
+            border-radius: 20px; padding: 10px 15px; margin: 15px 5px;
+            font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg);
+        }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+
+        .footer { text-align: center; padding: 30px; margin-top: 40px; background: linear-gradient(135deg, #1B6C8C, #BF8136); border-radius: 20px; color: #fff; }
+        .footer a { color: #FFE066; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+
+        @keyframes fa-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes fa-beat-fade { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.1)} }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out; }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="canvas">
+    <div class="header">
+        <i class="fa-solid fa-robot fa-3x"></i>
+        <div class="date">2026年7月7日</div>
+        <h1>🤖 Qwen 3.6 + Pi Agent: 自分だけのAIアシスタントを構築</h1>
+        <div class="channel"><i class="fa-solid fa-user"></i> Bitforge</div>
+    </div>
+
+    <div class="section-layout">
+        <!-- ① -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">①</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-puzzle-piece fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>Pi Agentとは</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-info"></i><span><span class="keyword-tag">pie.dev</span> は<span class="highlight">オープンソースのエージェントハーネス</span></span></li>
+                    <li><i class="fa-solid fa-star"></i><span>OpenClawエージェントや<span class="highlight">Hermes Agent</span>を動かす基盤技術</span></li>
+                    <li><i class="fa-solid fa-code"></i><span>LLMを中心にツール・スキル・コネクタを<span class="highlight">ラップする仕組み</span></span></li>
+                    <li><i class="fa-solid fa-gear"></i><span>軽量で必要な機能だけを追加できる<span class="highlight">モジュラー設計</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-2);"></i> Piはオールインワンじゃなくて、自分で組み立てるのが魅力！🧩</span>
+            </div>
+        </div>
+
+        <!-- ② -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">②</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-desktop fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>Pi Agentの基本機能</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-code"></i><span><span class="highlight">ファイルの読み書き</span>とコマンド実行が可能</span></li>
+                    <li><i class="fa-solid fa-globe"></i><span><span class="highlight">ブラウザ制御</span>でWeb操作を自動化</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i><span><span class="keyword-tag">カスタムスキル</span>をアップロードして定型作業を登録</span></li>
+                    <li><i class="fa-solid fa-plug"></i><span><span class="highlight">プラグイン・コネクタ</span>で外部システムと連携</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-desktop fa-lg" style="color: var(--ui-color-2);"></i> コンピュータの操作を全部AIに任せられる！🖥️</span>
+            </div>
+        </div>
+
+        <!-- ③ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">③</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-brain fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>持続的メモリ機能</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-database"></i><span><span class="highlight">永続的な記憶</span>を作成してコンテキストを保持</span></li>
+                    <li><i class="fa-solid fa-arrows-rotate"></i><span>セッションをまたいで<span class="highlight">過去の情報を記憶</span></span></li>
+                    <li><i class="fa-solid fa-lightbulb"></i><span>長期的なタスクでも<span class="highlight">一貫性のある対応</span>が可能</span></li>
+                    <li><i class="fa-solid fa-book-open"></i><span>企業の知識ベースとしての<span class="highlight">活用も想定</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-1);"></i> AIに記憶ができるって画期的！🧠</span>
+            </div>
+        </div>
+
+        <!-- ④ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">④</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bullseye fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>今回のゴール設定</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-envelope"></i><span><span class="highlight">AI従業員</span>を構築して受信箱を管理</span></li>
+                    <li><i class="fa-solid fa-inbox"></i><span>Gmail・Outlook・<span class="keyword-tag">Zendesk</span> に対応</span></li>
+                    <li><i class="fa-solid fa-server"></i><span><span class="highlight">ローカルAIモデル</span>で完全自前運用</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>24時間365日<span class="highlight">自動応答</span>を目標に</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-bullseye fa-lg" style="color: var(--ui-color-5);"></i> 自分だけのAI従業員を作るぞ！🎯</span>
+            </div>
+        </div>
+
+        <!-- ⑤ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑤</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-microchip fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>LM StudioでローカルLLM</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-laptop-code"></i><span><span class="keyword-tag">LM Studio</span> はローカルモデル実行の定番ツール</span></li>
+                    <li><i class="fa-solid fa-link"></i><span><span class="highlight">API URL</span>を提供して外部ツールからアクセス可能</span></li>
+                    <li><i class="fa-solid fa-network-wired"></i><span><span class="keyword-tag">LM Link</span> で複数マシンのモデルにも接続</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span><span class="highlight">データは全てローカル</span>でプライバシー安全</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top variant-1">
+                <span class="handwritten"><i class="fa-solid fa-microchip fa-lg" style="color: var(--ui-color-2);"></i> ローカルならAPIキー不要で安全！🔒</span>
+            </div>
+        </div>
+
+        <!-- ⑥ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑥</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bolt fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>Qwen 3.6 35Bモデル</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-star"></i><span>今回は<span class="highlight">Qwen 3.6 35B</span>をMac Studioで実行</span></li>
+                    <li><i class="fa-solid fa-gauge-high"></i><span>ローカルでも<span class="highlight">高速で快適な応答</span>を実現</span></li>
+                    <li><i class="fa-solid fa-code"></i><span>エージェント構築・コード生成にも<span class="highlight">十分な性能</span></span></li>
+                    <li><i class="fa-solid fa-layer-group"></i><span>40以上のモデルを<span class="keyword-tag">LM Studio</span> で管理可能</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-1);"></i> Qwen 3.6はローカルAIの最適解の一つ！⚡</span>
+            </div>
+        </div>
+
+        <!-- ⑦ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑦</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-download fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>Step1: Piのインストール</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-terminal"></i><span>インストールコマンドを<span class="highlight">ターミナルに貼り付け</span>て実行</span></li>
+                    <li><i class="fa-solid fa-folder-open"></i><span>空のプロジェクトフォルダに<span class="highlight">Piを導入</span></span></li>
+                    <li><i class="fa-solid fa-play"></i><span><span class="keyword-tag">pi</span> と入力するだけで起動可能</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i><span>初期状態では<span class="highlight">モデル未接続</span>なのでパッケージが必要</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten"><i class="fa-solid fa-download fa-lg" style="color: var(--ui-color-2);"></i> 数分でセットアップ完了！簡単！📥</span>
+            </div>
+        </div>
+
+        <!-- ⑧ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑧</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-plug-circle-check fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>LM Studio拡張の追加</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cubes"></i><span><span class="keyword-tag">pi-lm-studio</span> パッケージをインストール</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>デバイス上の<span class="highlight">全モデルに自動アクセス</span></span></li>
+                    <li><i class="fa-solid fa-check-circle"></i><span>エラーが消えて<span class="highlight">すぐに会話可能</span>に</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span>複数マシン間の<span class="highlight">LM Link接続</span>にも対応</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-plug-circle-check fa-lg" style="color: var(--ui-color-1);"></i> 一発でローカルモデルと接続完了！✅</span>
+            </div>
+        </div>
+
+        <!-- ⑨ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑨</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-feather fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>Piの軽量設計思想</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-minimize"></i><span>インストール直後は<span class="highlight">最小限のハーネスのみ</span></span></li>
+                    <li><i class="fa-solid fa-ban"></i><span>巨大なシステムプロンプトや<span class="highlight">事前スキルなし</span></span></li>
+                    <li><i class="fa-solid fa-puzzle-piece"></i><span>不要な機能を含まず<span class="highlight">用途に合わせて拡張</span></span></li>
+                    <li><i class="fa-solid fa-sliders"></i><span>OpenClawのような<span class="highlight">多機能ツールとの対比</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-feather fa-lg" style="color: var(--ui-color-5);"></i> 余計なものが一切ないのが最高！🪶</span>
+            </div>
+        </div>
+
+        <!-- ⑩ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑩</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-hammer fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>自己構築能力</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-book"></i><span>Piは<span class="highlight">自身の内部ドキュメントを読んで</span>理解</span></li>
+                    <li><i class="fa-solid fa-code-branch"></i><span>フォルダ構造・スキル・拡張機能を<span class="highlight">自動生成</span></span></li>
+                    <li><i class="fa-solid fa-comments"></i><span>会話ベースで<span class="highlight">エージェントを構築</span>できる</span></li>
+                    <li><i class="fa-solid fa-robot"></i><span>Qwen 3.6が<span class="highlight">すべてのコードを書いた</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-hammer fa-lg" style="color: var(--ui-color-2);"></i> AIが自分で自分を作る！メタです！🔨</span>
+            </div>
+        </div>
+
+        <!-- ⑪ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑪</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-headset fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>カスタマーサポートエージェント</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-ticket"></i><span><span class="keyword-tag">Zendesk</span> のチケットを<span class="highlight">自動で読み取り</span></span></li>
+                    <li><i class="fa-solid fa-pen-to-square"></i><span>チケットの文脈を理解して<span class="highlight">適切な応答を生成</span></span></li>
+                    <li><i class="fa-solid fa-paper-plane"></i><span>生成した応答を<span class="highlight">Zendeskに自動送信</span></span></li>
+                    <li><i class="fa-solid fa-users-gear"></i><span><span class="highlight">Bitforge</span>社のサポートチームとして機能</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-headset fa-lg" style="color: var(--ui-color-1);"></i> サポートの自動化はビジネスの即効性がある！🎧</span>
+            </div>
+        </div>
+
+        <!-- ⑫ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑫</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-folder-tree fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>自動生成されたフォルダ構造</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-code"></i><span><span class="keyword-tag">extensions/zendesk.ts</span> — API連携の拡張機能</span></li>
+                    <li><i class="fa-solid fa-file-lines"></i><span><span class="keyword-tag">prompts/</span> — 応答のトーン・品質・構造を定義</span></li>
+                    <li><i class="fa-solid fa-file-shield"></i><span><span class="keyword-tag">skills/</span> — 応答品質と構造のスキル</span></li>
+                    <li><i class="fa-solid fa-tags"></i><span>チケットの<span class="highlight">タグ分類</span>と対応ツールも自動設定</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top variant-1">
+                <span class="handwritten"><i class="fa-solid fa-folder-tree fa-lg" style="color: var(--ui-color-2);"></i> ローカルLLMが全部自動生成！すごすぎ！📂</span>
+            </div>
+        </div>
+
+        <!-- ⑬ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑬</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-key fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>環境変数とAPI認証</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-signature"></i><span><span class="keyword-tag">.env</span> ファイルで<span class="highlight">APIキーと認証情報</span>を管理</span></li>
+                    <li><i class="fa-solid fa-lock"></i><span>Zendesk管理画面で<span class="highlight">APIトークン</span>を発行</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span>認証情報を<span class="highlight">コードに直接書かない</span>のが鉄則</span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench"></i><span>Piが<span class="highlight">拡張機能の修正</span>も自動で行った</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color: var(--ui-color-5);"></i> .envファイルで安全に認証管理！🔑</span>
+            </div>
+        </div>
+
+        <!-- ⑭ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑭</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-flask fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>テストと動作確認</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-list-check"></i><span>Zendeskの<span class="highlight">33件のチケット</span>を正常に取得</span></li>
+                    <li><i class="fa-solid fa-reply"></i><span>チケット<span class="keyword-tag">#115</span> に<span class="highlight">応答メッセージを送信</span>して確認</span></li>
+                    <li><i class="fa-solid fa-comments"></i><span>過去のメッセージを<span class="highlight">読み取って文脈を理解</span></span></li>
+                    <li><i class="fa-solid fa-check-double"></i><span>読み取り・生成・送信の<span class="highlight">全工程が正常動作</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-flask fa-lg" style="color: var(--ui-color-1);"></i> 実際に動いた瞬間が最高のシーン！🧪</span>
+            </div>
+        </div>
+
+        <!-- ⑮ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑮</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-clock-rotate-left fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>cron jobで24/7自動化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-repeat"></i><span><span class="highlight">5秒ごと</span>にZendesk受信箱を<span class="keyword-tag">ポーリング</span></span></li>
+                    <li><i class="fa-solid fa-circle-plus"></i><span>ステータスが<span class="highlight">「新規」</span>のチケットを自動検出</span></li>
+                    <li><i class="fa-solid fa-arrow-right"></i><span>検出したチケットをPiの<span class="highlight">Print Modeに送信</span></span></li>
+                    <li><i class="fa-solid fa-paper-plane"></i><span>生成した応答を<span class="highlight">自動で顧客に送信</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten"><i class="fa-solid fa-clock-rotate-left fa-lg" style="color: var(--ui-color-2);"></i> 寝ている間もAIが働いてくれる！💤→👷</span>
+            </div>
+        </div>
+
+        <!-- ⑯ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑯</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-print fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>Print Mode（非対話モード）</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">pi -p</span> で<span class="highlight">非対話的にクエリを実行</span></span></li>
+                    <li><i class="fa-solid fa-folder-open"></i><span>エージェントフォルダ内の<span class="highlight">全リソースにアクセス</span></span></li>
+                    <li><i class="fa-solid fa-lightbulb"></i><span>FAQ・スキル・プロセスを<span class="highlight">踏まえて応答生成</span></span></li>
+                    <li><i class="fa-solid fa-code"></i><span>出力結果を<span class="highlight">チケットに貼り付け可能</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble top">
+                <span class="handwritten"><i class="fa-solid fa-print fa-lg" style="color: var(--ui-color-1);"></i> 対話なしで応答を生成できるのが鍵！🖨️</span>
+            </div>
+        </div>
+
+        <!-- ⑰ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑰</div>
+            <div class="mega-icon-container">
+                <i class="fa-brands fa-telegram fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+                <h2>Telegramパッケージ連携</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-brands fa-telegram"></i><span><span class="keyword-tag">Telegramパッケージ</span>をPiに追加</span></li>
+                    <li><i class="fa-solid fa-mobile-screen"></i><span>外出先から<span class="highlight">スマホでPiと会話</span>可能に</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span><span class="highlight">ターミナル不要</span>でどこからでも操作</span></li>
+                    <li><i class="fa-solid fa-share-nodes"></i><span><span class="highlight">Piパッケージ</span>は<span class="highlight">共有可能</span>でクラウドにも移行</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-brands fa-telegram fa-lg" style="color: var(--ui-color-5);"></i> 外出先でもスマホからAIに指示出せる！📱</span>
+            </div>
+        </div>
+
+        <!-- ⑱ -->
+        <div class="section-card fade-in-scale">
+            <div class="card-number">⑱</div>
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-graduation-cap fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+                <h2>本番化に向けた次のステップ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-chart-bar"></i><span><span class="keyword-tag">評価</span>を実行してエージェントを<span class="highlight">賢く改善</span></span></li>
+                    <li><i class="fa-solid fa-user-shield"></i><span><span class="highlight">個人情報（PII）</span>の<span class="highlight">自動マスキング</span></span></li>
+                    <li><i class="fa-solid fa-shield-virus"></i><span><span class="highlight">プロンプトインジェクション対策</span>で安全性を確保</span></li>
+                    <li><i class="fa-solid fa-cloud"></i><span><span class="highlight">クラウドデプロイ</span>で本番環境に移行</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--ui-color-2);"></i> 本番化はまだ課題が多いけど今後が楽しみ！🎓</span>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        🎬 動画: <a href="https://www.youtube.com/watch?v=7KwoyDzxEuk" target="_blank">Qwen 3.6 + Pi Agent: Build Your Own AI Assistant (Full Setup)</a> | チャンネル: <a href="https://www.youtube.com/@Bitforge" target="_blank">Bitforge</a> | 📅 2026年7月7日
+    </footer>
+</div>
+</body>
+</html>

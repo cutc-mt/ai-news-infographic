@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Karpathy LLM Wikiはスケールしない｜Cole Medin | AIインフォグラフィック</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --ui-color-1: #3B6B5E;
+            --ui-color-2: #5E9B8A;
+            --ui-color-3: #E0F0EC;
+            --ui-color-4: #1A3D33;
+            --ui-color-5: #C44D4D;
+            --bg: #F5FAF8;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif; color: #333; line-height: 1.6; }
+        .canvas { max-width: 2000px; margin: 0 auto; padding: 30px 20px; }
+        .header {
+            text-align: center; padding: 40px 20px; margin-bottom: 30px;
+            background: linear-gradient(135deg, #3B6B5E 0%, #5E9B8A 50%, #8FC4B5 100%);
+            border-radius: 24px; color: #fff; position: relative; overflow: hidden;
+        }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); }
+        .header .date { font-size: 14px; opacity: 0.9; margin-bottom: 8px; }
+        .header h1 { font-size: 32px; font-weight: bold; margin: 10px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+        .header .channel { font-size: 16px; opacity: 0.9; }
+        .header i { font-size: 48px; margin-bottom: 10px; animation: fa-beat-fade 2s infinite; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; padding: 10px 0; }
+        .section-card {
+            flex: 1; min-width: 220px; max-width: 450px;
+            background-color: white; border-radius: 20px; padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+            border-top: 4px solid var(--ui-color-2);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(59,107,94,0.2); }
+        .card-number { position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; color: var(--ui-color-1); opacity: 0.3; }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container i { color: var(--ui-color-1); }
+        .mega-icon-container h2 { font-size: 20px; color: #333; margin-top: 8px; font-family: 'Kaisei Decol', serif; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 14px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 3px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 2px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 13px; }
+        .highlight { background: linear-gradient(transparent 60%, #FFE066 60%); padding: 0 2px; font-weight: bold; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .footer { text-align: center; padding: 30px; margin-top: 40px; background: linear-gradient(135deg, #3B6B5E, #5E9B8A); border-radius: 20px; color: #fff; }
+        .footer a { color: #FFE066; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        @keyframes fa-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes fa-beat-fade { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.1)} }
+        @keyframes fa-flip { 0%{transform:rotateY(0)} 100%{transform:rotateY(360deg)} }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out; }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="canvas">
+
+<div class="header">
+    <div class="date">📅 2026年7月9日（木）</div>
+    <i class="fa-solid fa-scale-balanced fa-7x" aria-hidden="true"></i>
+    <h1>⚖️ KarpathyのLLM Wikiは愛されているが<br>スケールしない。では何がスケールするのか</h1>
+    <div class="channel">📝 チャンネル: Cole Medin</div>
+</div>
+
+<div class="section-layout">
+
+<!-- ① -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">①</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>AIエージェントの2つの種類: 個人型と本番環境型</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user" aria-hidden="true"></i><span><span class="keyword-tag">パーソナルエージェント</span> — Claude CodeやHermesなど、個人のローカルで動くもの</span></li>
+            <li><i class="fa-solid fa-building" aria-hidden="true"></i><span><span class="keyword-tag">本番環境エージェント</span> — プラットフォームの一部として複数ユーザーに提供されるもの</span></li>
+            <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>現在人人は個人型に<span class="highlight">過度に注目</span>していると指摘</span></li>
+            <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>真のビジネス価値の大半は<span class="highlight">本番環境に出荷される側</span>にある</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 誰もがパーソナルAIに夢中だけど、企業価値は本番環境の方にあるんだね</span>
+    </div>
+</div>
+
+<!-- ② -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">②</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>パーソナルエージェントの仕組み: マークダウンWiki方式</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span><span class="keyword-tag">Karpathy LLM Wiki</span>的なナレッジベースを構築するのが主流</span></li>
+            <li><i class="fa-solid fa-tags" aria-hidden="true"></i><span>タグ付け・分類されたインデックス文書とエンティティで構成</span></li>
+            <li><i class="fa-solid fa-hand-pointer" aria-hidden="true"></i><span>エージェントと対話しながら<span class="highlight">時間をかけて知識を蓄積</span>していく</span></li>
+            <li><i class="fa-solid fa-laptop-code" aria-hidden="true"></i><span>Claude Codeや<span class="keyword-tag">Hermes</span>などの既製品もよく使われる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-2);"></i> 自分専用のセカンドブレインは最高に便利！でも…</span>
+    </div>
+</div>
+
+<!-- ③ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">③</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-heart fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>パーソナル方式の強み: シンプルさと柔軟性</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>すべてを自社システム上に保持し、<span class="highlight">高速なアクセス</span>を実現</span></li>
+            <li><i class="fa-solid fa-wrench" aria-hidden="true"></i><span>自作でも既製品でも、<span class="highlight">最もシンプルで柔軟</span>な方法</span></li>
+            <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>第二の脳と対話して<span class="keyword-tag">自然に知識ベースを構築</span>できる</span></li>
+            <li><i class="fa-solid fa-lock-open" aria-hidden="true"></i><span>ガバナンスやアクセス制御は<span class="keyword-tag">気にしなくてよい</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i> 個人用途ならこれで十分！でも他の人が使うと話が変わる…</span>
+    </div>
+</div>
+
+<!-- ④ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">④</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-explosion fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>スケールの壁: マークダウン方式は限界にぶつかる</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-users" aria-hidden="true"></i><span>他のユーザーが同時にエージェントを使い始めると<span class="highlight">破綻する</span></span></li>
+            <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>アクセス制御や<span class="keyword-tag">大規模データ取得</span>の問題が発生</span></li>
+            <li><i class="fa-solid fa-search" aria-hidden="true"></i><span>すべてをマークダウンで管理すると<span class="highlight">検索や整理が不可能</span>に</span></li>
+            <li><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>結論：<span class="highlight">データベースが存在する理由</span>はここにある</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-5);"></i> 「そもそもデータベースがあるのには理由があるんです」 — Cole</span>
+    </div>
+</div>
+
+<!-- ⑤ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑤</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-coins fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>コスト問題: セカンドブレインは意外と高い</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i><span>ClaudeやCodexのような<span class="keyword-tag">コーディングエージェントSDK</span>はサブスクリプション連携</span></li>
+            <li><i class="fa-solid fa-user-lock" aria-hidden="true"></i><span>そのサブスクは<span class="highlight">個人利用専用</span>なので本番環境では使えない</span></li>
+            <li><i class="fa-solid fa-file-alt" aria-hidden="true"></i><span>システムプロンプトやマークダウン文書を<span class="keyword-tag">丸ごと読み込ませる方法</span>は非効率</span></li>
+            <li><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>データ取得規模が増えると<span class="highlight">コスト最適化が必須</span>になる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-wallet fa-lg" style="color: var(--ui-color-2);"></i> 個人サブスクを本番で使えないのが最大の壁！</span>
+    </div>
+</div>
+
+<!-- ⑥ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑥</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-cubes fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>本番環境エージェントのアーキテクチャ: データベース方式</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>マークダウンではなく<span class="highlight">データベースを使ってスケーリング</span></span></li>
+            <li><i class="fa-solid fa-server" aria-hidden="true"></i><span>HermesやClaude CodeのWikiを用意するだけでは<span class="keyword-tag">不十分</span></span></li>
+            <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>データベースが保存・処理すべきものが<span class="highlight">2つ</span>ある</span></li>
+            <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>この仕組みは個人エージェントよりも<span class="keyword-tag">はるかに一般的</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-architecture fa-lg" style="color: var(--ui-color-2);"></i> 本番環境では根本的にアプローチを変える必要がある！</span>
+    </div>
+</div>
+
+<!-- ⑦ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑦</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-puzzle-piece fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>2つの核となる要素: コンテキスト取得器とエージェントメモリ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i><span><span class="keyword-tag">コンテキスト取得器</span> — エージェントにビジネスデータへのアクセス権を付与</span></li>
+            <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span><span class="keyword-tag">エージェントメモリ</span> — ユーザーの短期記憶と長期記憶に相当</span></li>
+            <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>データ形式を伝え、エージェントが<span class="highlight">何を照会できるか</span>を理解可能にする</span></li>
+            <li><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><span>時間をかけて<span class="keyword-tag">ユーザーに関する知識</span>を蓄積していく仕組み</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i> この2つが本番環境エージェントの肝！後半で詳しく解説します</span>
+    </div>
+</div>
+
+<!-- ⑧ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑧</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-diamond fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>Redis Irisの紹介: エージェント向けデータベース</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span><span class="highlight">Redis Iris</span>は現在プレビュー版の強力な新機能</span></li>
+            <li><i class="fa-solid fa-globe" aria-hidden="true"></i><span>ビジネスコンテキストと<span class="keyword-tag">ユーザーメモリ</span>を1箇所で実現可能</span></li>
+            <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>データベースとしてRedisをラップし、<span class="highlight">エージェントのアクセス権限を向上</span></span></li>
+            <li><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span>アイデアは<span class="keyword-tag">任意の本番システム</span>に適用可能（DBラッパー）</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-info-circle fa-lg" style="color: var(--ui-color-5);"></i> Redisを使わなくても概念はすべてのDBプラットフォームに通用するよ</span>
+    </div>
+</div>
+
+<!-- ⑨ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑨</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-gears fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>デモ環境の構成: eコマースストアの模擬データ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-store" aria-hidden="true"></i><span>ECサイト向けの<span class="keyword-tag">模擬データ</span>をRedisのキーバリューストアに格納</span></li>
+            <li><i class="fa-solid fa-box" aria-hidden="true"></i><span>顧客情報・注文・製品・出荷など<span class="highlight">非構造化データ</span>として保存</span></li>
+            <li><i class="fa-solid fa-chart-pie" aria-hidden="true"></i><span>分析担当者と<span class="keyword-tag">顧客対応担当者</span>の2つのユースケース</span></li>
+            <li><i class="fa-solid fa-code" aria-hidden="true"></i><span><span class="highlight">Pydantic AI</span>でエージェントを構築</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-cart-shopping fa-lg" style="color: var(--ui-color-2);"></i> ECサイトなら分析エージェントとサポートエージェントが使える！</span>
+    </div>
+</div>
+
+<!-- ⑩ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑩</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>Pydantic AIの推し: コーディングSDKとの違い</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-trophy" aria-hidden="true"></i><span>Coleは<span class="highlight">すべての本番環境エージェント</span>にPydantic AIを推奨</span></li>
+            <li><i class="fa-solid fa-turtle" aria-hidden="true"></i><span>Claude Agent SDKやCodex SDKは<span class="keyword-tag">長いコーディングタスク向け</span></span></li>
+            <li><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>処理速度が遅く、<span class="highlight">トークン消費も多い</span></span></li>
+            <li><i class="fa-solid fa-rocket" aria-hidden="true"></i><span>本番環境にデプロイするものには<span class="keyword-tag">Pydantic AIの方が適している</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-code fa-lg" style="color: var(--ui-color-2);"></i> コーディング補助と本番エージェントは別物という主張！</span>
+    </div>
+</div>
+
+<!-- ⑪ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑪</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-route fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>デモの結果: 多段階のデータ検索が1リクエストで完結</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user-tag" aria-hidden="true"></i><span>「ジョーダン・リベラ、注文が遅れているのはなぜ？」と尋ねる</span></li>
+            <li><i class="fa-solid fa-chain" aria-hidden="true"></i><span>エージェントが<span class="highlight">記憶→顧客情報→注文→出荷</span>と自動で追跡</span></li>
+            <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span><span class="keyword-tag">1000トークン未満</span>で全情報を収集して回答を生成</span></li>
+            <li><i class="fa-solid fa-face-smile" aria-hidden="true"></i><span>「返金より再発送を希望」という<span class="highlight">過去の記憶</span>も自動参照</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i> 何万ものトークンを使わずに完璧な回答！すごい…</span>
+    </div>
+</div>
+
+<!-- ⑫ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑫</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-sitemap fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>コンテキスト取得器の仕組み: 構造の提供</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-table-cells" aria-hidden="true"></i><span>Redisデータは<span class="highlight">すべてキーと値のペア</span>（非構造化）</span></li>
+            <li><i class="fa-solid fa-compass" aria-hidden="true"></i><span>エージェントは<span class="keyword-tag">何を検索できるか</span>も把握していない状態</span></li>
+            <li><i class="fa-solid fa-map" aria-hidden="true"></i><span>コンテキスト取得器が<span class="highlight">構造とデータインテリジェンス</span>を提供</span></li>
+            <li><i class="fa-solid fa-book-open" aria-hidden="true"></i><span>KarpathyのWikiの<span class="keyword-tag">メタデータ</span>のような役割を果たす</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-compass fa-lg" style="color: var(--ui-color-2);"></i> WikiのメタデータをDBレイヤーで自動実現するイメージ</span>
+    </div>
+</div>
+
+<!-- ⑬ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑬</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>MCPツールの自動生成: エンティティからツールが生まれる</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-cubes-stacked" aria-hidden="true"></i><span><span class="keyword-tag">エンティティ</span>を定義すると、自動的にMCPツールが生成される</span></li>
+            <li><i class="fa-solid fa-city" aria-hidden="true"></i><span>都市で顧客フィルタリング、メールで検索など<span class="highlight">属性ごとにツール</span></span></li>
+            <li><i class="fa-solid fa-text-width" aria-hidden="true"></i><span>テキスト型には<span class="keyword-tag">全文検索機能</span>も自動付与</span></li>
+            <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>必要なツールがなければ<span class="highlight">エンティティを調整</span>して即追加可能</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-magic fa-lg" style="color: var(--ui-color-2);"></i> これがこの動画で一番気に入ってる機能！自動生成最高</span>
+    </div>
+</div>
+
+<!-- ⑭ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑭</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt-lightning fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>実践例: 1回のMCP呼び出しで全データ取得</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-filter" aria-hidden="true"></i><span>「遅延している注文を表示」→ <span class="highlight">1つのMCP呼び出しでステータスフィルタ</span></span></li>
+            <li><i class="fa-solid fa-search" aria-hidden="true"></i><span>「返金についてのチケット」→ <span class="keyword-tag">テキスト検索で即座に該当件を表示</span></span></li>
+            <li><i class="fa-solid fa-file-invoice" aria-hidden="true"></i><span>インデックスドキュメントの読み込みや<span class="keyword-tag">巨大な全文検索は不要</span></span></li>
+            <li><i class="fa-solid fa-gauge-simple-high" aria-hidden="true"></i><span><span class="highlight">超高速・超効率</span>なデータアクセスを実現</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i> マークダウンWikiでやっていたことがDBなら1発で終わる！</span>
+    </div>
+</div>
+
+<!-- ⑮ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑮</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-memory fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>エージェントメモリ: 短期記憶と長期記憶の管理</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span><span class="keyword-tag">短期記憶</span> — すべての会話セッションを保存</span></li>
+            <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span><span class="keyword-tag">長期記憶</span> — 重要な情報を抽出して永続的に保持</span></li>
+            <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>短期から長期への<span class="highlight">自動的な記憶の昇格</span>プロセスを実行</span></li>
+            <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>ベクトルを使った<span class="keyword-tag">セマンティック検索</span>で記憶を検索</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i> セカンドブレインと同じ手法をDBでスケールさせる！</span>
+    </div>
+</div>
+
+<!-- ⑯ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑯</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>記憶の昇格: 会話から長期記憶への自動抽出</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-gear" aria-hidden="true"></i><span>Redis Irisが<span class="highlight">バックグラウンドプロセス</span>で自動的に実行</span></li>
+            <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span>個人のセカンドブレインでは<span class="keyword-tag">memory.md</span>に手動抽出する手法が一般的</span></li>
+            <li><i class="fa-solid fa-arrow-up" aria-hidden="true"></i><span>ここでは<span class="highlight">自動で重要な会話内容をRedisに保存</span></span></li>
+            <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>各ユーザーが<span class="keyword-tag">数百万件のメモリ</span>を持っても対応可能</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-sparkles fa-lg" style="color: var(--ui-color-2);"></i> memory.mdの手作業が不要になるのが革命的！</span>
+    </div>
+</div>
+
+<!-- ⑰ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑰</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-vial fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>メモリの実証: 新しいセッションでも記憶が継続</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i><span>完全に新しいセッションを開始して好みを尋ねる</span></li>
+            <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>エージェントが<span class="highlight">即座に長期記憶を引き出して</span>回答</span></li>
+            <li><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span>過去の注文・サポートチケット・<span class="keyword-tag">ユーザーの好み</span>を要約して提示</span></li>
+            <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>「返金より再発送を希望」が<span class="highlight">別セッションでも正確に反映</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-mind-blowing fa-lg" style="color: var(--ui-color-5);"></i> 明示的に記憶を指示しなくても自動抽出される！すごすぎ…</span>
+    </div>
+</div>
+
+<!-- ⑱ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑱</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>まとめ: 個人と本番でアプローチを分けよ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user" aria-hidden="true"></i><span><span class="keyword-tag">個人エージェント</span> → LLM Wiki・Hermes・Claude Codeで十分</span></li>
+            <li><i class="fa-solid fa-building" aria-hidden="true"></i><span><span class="keyword-tag">本番環境エージェント</span> → DB＋コンテキスト取得器＋メモリが必須</span></li>
+            <li><i class="fa-solid fa-recycle" aria-hidden="true"></i><span>記憶抽出・検索ツール構築のプロセスを<span class="highlight">維持する必要がある</span></span></li>
+            <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>すべてがDBで管理されることで<span class="keyword-tag">完全な制御と可視性</span>を確保</span></li>
+            <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>どちらの分野も<span class="highlight">今後コンテンツを継続</span>していくと宣言</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--ui-color-2);"></i> 正しいツールを正しい場所で使うことが、スケールの鍵だ！</span>
+    </div>
+</div>
+
+</div>
+
+<div class="footer">
+    <p>🎬 動画: <a href="https://youtu.be/R-5_2nsF_ZM" target="_blank" style="color: #FFE066;">Cole Medin - I Love the Karpathy LLM Wiki but it Doesn't Scale. Here's What Does.</a></p>
+    <p style="margin-top: 8px;">📅 2026年7月9日（木）｜👥 Cole Medin</p>
+</div>
+
+</div>
+</body>
+</html>

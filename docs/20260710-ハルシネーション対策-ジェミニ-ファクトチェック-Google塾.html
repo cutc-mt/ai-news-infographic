@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生成AIのハルシネーション対策｜Geminiでファクトチェック | AIインフォグラフィック</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root { --ui-color-1: #0D9488; --ui-color-2: #115E59; --ui-color-3: #CCFBF1; --ui-color-4: #042F2E; --ui-color-5: #F97316; --bg: #F0FDFA; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); font-family: 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif; color: #333; line-height: 1.6; }
+        .canvas { max-width: 2000px; margin: 0 auto; padding: 30px 20px; }
+        .header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, #0D9488 0%, #115E59 50%, #042F2E 100%); border-radius: 24px; color: #fff; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); }
+        .header .date { font-size: 14px; opacity: 0.9; margin-bottom: 8px; }
+        .header h1 { font-size: 28px; font-weight: bold; margin: 10px 0; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+        .header .channel { font-size: 16px; opacity: 0.9; }
+        .header i { font-size: 48px; margin-bottom: 10px; animation: fa-beat-fade 2s infinite; }
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; padding: 10px 0; }
+        .section-card { flex: 1; min-width: 220px; max-width: 450px; background-color: white; border-radius: 20px; padding: 15px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; border-top: 4px solid var(--ui-color-2); transition: transform 0.3s, box-shadow 0.3s; }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(13,148,136,0.2); }
+        .card-number { position: absolute; top: 10px; right: 15px; font-size: 24px; font-weight: bold; color: var(--ui-color-1); opacity: 0.3; }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container i { color: var(--ui-color-1); }
+        .mega-icon-container h2 { font-size: 20px; color: #333; margin-top: 8px; font-family: 'Kaisei Decol', serif; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 14px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 3px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 2px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 13px; }
+        .highlight { background: linear-gradient(transparent 60%, #FFE066 60%); padding: 0 2px; font-weight: bold; }
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 10px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-5); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-5) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-2); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-2) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        .footer { text-align: center; padding: 30px; margin-top: 40px; background: linear-gradient(135deg, #0D9488, #115E59); border-radius: 20px; color: #fff; }
+        .footer a { color: #FFE066; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+        @keyframes fa-bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes fa-beat-fade { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.1)} }
+        @keyframes fa-flip { 0%{transform:rotateY(0)} 100%{transform:rotateY(360deg)} }
+        @keyframes fa-pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out; }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="canvas">
+<div class="header">
+    <div class="date">📅 2026年7月10日（金）</div>
+    <i class="fa-solid fa-eye fa-7x" aria-hidden="true"></i>
+    <h1>👁️ 生成AIの「ハルシネーション」を圧倒的に抑え込む方法<br>Geminiを使った実践的なファクトチェック術</h1>
+    <div class="channel">📝 チャンネル: こーすけ先生のGoogle塾</div>
+</div>
+<div class="section-layout">
+
+<!-- ① -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">①</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>生成AIの3大リスク</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-ghost" aria-hidden="true"></i><span><span class="keyword-tag">ハルシネーション</span> — 事実とは違う情報を自信満々に出力する</span></li>
+            <li><i class="fa-solid fa-lock-open" aria-hidden="true"></i><span><span class="keyword-tag">情報漏洩</span> — 入力したデータが意図せず外部に流出する</span></li>
+            <li><i class="fa-solid fa-gavel" aria-hidden="true"></i><span><span class="keyword-tag">権利侵害</span> — 著作物などの知的財産権を侵害する出力</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+            中でもハルシネーションはAI特有の現象として特に注目されている！
+        </span>
+    </div>
+</div>
+
+<!-- ② -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">②</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-eye-low-vision fa-5x" style="animation: fa-pulse 2s;" aria-hidden="true"></i>
+        <h2>ハルシネーションとは何か</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-language" aria-hidden="true"></i><span>英語の「幻覚（Hallucination）」が語源のAI用語</span></li>
+            <li><i class="fa-solid fa-comment-slash" aria-hidden="true"></i><span>答えは<span class="highlight">間違っているのに</span>、自信満々に回答してくる現象</span></li>
+            <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span>文章としては<span class="highlight">真実っぽく見える</span>のが一番危険</span></li>
+            <li><i class="fa-solid fa-user-secret" aria-hidden="true"></i><span>擬人化すると「幻覚を見ているように事実と違うことを語る」状態</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-5);"></i>
+            これって人間の「嘘をつく」とは違うんだよね。AIは悪気がないのが厄介！
+        </span>
+    </div>
+</div>
+
+<!-- ③ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">③</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-infinity fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>ハルシネーションはゼロにならない</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-microchip" aria-hidden="true"></i><span>ChatGPT、Claude、Gemini、Grok — どのモデルでも<span class="highlight">リスク0は存在しない</span></span></li>
+            <li><i class="fa-solid fa-fire" aria-hidden="true"></i><span>ClaudeのFableなど最新モデルでもハルシネーションは報告されている</span></li>
+            <li><i class="fa-solid fa-gears" aria-hidden="true"></i><span>AIの仕組み上、推論の過程で<span class="highlight">誤情報が混ざる可能性</span>が原理的に排除できない</span></li>
+            <li><i class="fa-solid fa-arrow-down" aria-hidden="true"></i><span>出づらさは上がっても、絶対ゼロというのは難しい</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-xmark fa-lg" style="color: var(--ui-color-2);"></i>
+            「出づらいモデル」はあるけど「出ないモデル」はまだない。だからこそ対策が重要！
+        </span>
+    </div>
+</div>
+
+<!-- ④ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">④</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-people-arrows fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>Human in the Loop から脱却へ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user-check" aria-hidden="true"></i><span>現在の主流：<span class="keyword-tag">Human in the Loop</span> — 人間がAIの出力を検証する手法</span></li>
+            <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>未来の方向：<span class="keyword-tag">Human out of the Loop</span> — AIエージェント同士が相互レビュー</span></li>
+            <li><i class="fa-solid fa-building" aria-hidden="true"></i><span>Gemini Enterpriseではエージェント同士のレビュー機能が実装されている</span></li>
+            <li><i class="fa-solid fa-flask" aria-hidden="true"></i><span>研究開発は急速に進んでいるが、<span class="highlight">現段階では人間の検証が不可欠</span></span></li>
+        </ul>
+    </div>
+</div>
+
+<!-- ⑤ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑤</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-notebook-medical fa-5x" style="animation: fa-flip 3s;" aria-hidden="true"></i>
+        <h2>ノートブックLMの活用</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-upload" aria-hidden="true"></i><span><span class="keyword-tag">ノートブックLM</span>はアップロードした資料のみを元に回答する</span></li>
+            <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>外部知識が混ざらないため<span class="highlight">ハルシネーションリスクが大幅に軽減</span></span></li>
+            <li><i class="fa-solid fa-copyright" aria-hidden="true"></i><span>各文末に<span class="keyword-tag">丸付き数字</span>で出典元が表示される仕組み</span></li>
+            <li><i class="fa-solid fa-list-ol" aria-hidden="true"></i><span>社内マニュアルや規則集のチャットボットに<span class="highlight">最適</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i>
+            ただし壁打ちや広範な知識の探索には向かないのが弱点！
+        </span>
+    </div>
+</div>
+
+<!-- ⑥ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑥</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>Geminiの想像的・主観的な性質</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>Geminiは<span class="keyword-tag">想像的で主観的</span>な情報生成に特化している</span></li>
+            <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>学習データ全体から情報をひっくり返して回答を作る仕組み</span></li>
+            <li><i class="fa-solid fa-bug" aria-hidden="true"></i><span>その性質上、<span class="highlight">ミスやハルシネーションが生まれやすい</span></span></li>
+            <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>広範な知識探索には<span class="keyword-tag">Geminiが必須</span>だがリスクとセット</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-5);"></i>
+            ノートブックLM（狭く正確）とGemini（広く想像的）を使い分けるのが基本！
+        </span>
+    </div>
+</div>
+
+<!-- ⑦ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑦</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-1 fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>対策その1：ファクトチェッカーGem</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file-export" aria-hidden="true"></i><span>AIに文章を生成させた後、その文章を<span class="keyword-tag">ファクトチェッカー</span>に貼り付ける</span></li>
+            <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>チェッカーがWeb検索で<span class="highlight">事実確認と引用元を提示</span></span></li>
+            <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>正確性・確かさの評価に加え、<span class="keyword-tag">ハルシネーションの可能性箇所</span>も指摘</span></li>
+            <li><i class="fa-solid fa-book-open" aria-hidden="true"></i><span>参考文献リストも自動で出力される</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-check-double fa-lg" style="color: var(--ui-color-1);"></i>
+            2段構え：生成→ファクトチェック。シンプルで効果的！
+        </span>
+    </div>
+</div>
+
+<!-- ⑧ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑧</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="animation: fa-pulse 2s;" aria-hidden="true"></i>
+        <h2>ファクトチェッカーの出力例</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>結論：<span class="highlight">全体的に非常に的確</span>と評価されたケースも</span></li>
+            <li><i class="fa-solid fa-warning" aria-hidden="true"></i><span>注意点もちゃんと出る：「概要としては間違いはないが<span class="keyword-tag">制限がある</span>」等</span></li>
+            <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>Google Meetの文字起こし機能について<span class="highlight">利用言語や契約プランによる制限</span>を補足</span></li>
+            <li><i class="fa-solid fa-shield" aria-hidden="true"></i><span>単に正誤だけでなく、<span class="keyword-tag">文脈的な注意事項</span>まで教えてくれるのが強み</span></li>
+        </ul>
+    </div>
+</div>
+
+<!-- ⑨ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑨</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-2 fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>対策その2：回答の再確認機能</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-ellipsis" aria-hidden="true"></i><span>Geminiの回答にある<span class="keyword-tag">3点リーダー（…）</span>をクリックするとメニューが開く</span></li>
+            <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>「<span class="highlight">回答確認</span>」を選ぶとGoogle検索が裏で実行される</span></li>
+            <li><i class="fa-solid fa-highlighter" aria-hidden="true"></i><span>回答文が<span class="keyword-tag">緑色にハイライト</span>され、類似コンテンツの有無が表示</span></li>
+            <li><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i><span>緑色部分をクリックすれば、<span class="highlight">該当Webページへ直接ジャンプ</span>可能</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+            Google検索の強みをGeminiに直接組み込んだ機能！
+        </span>
+    </div>
+</div>
+
+<!-- ⑩ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑩</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-half-stroke fa-5x" style="animation: fa-flip 3s;" aria-hidden="true"></i>
+        <h2>再確認機能の注意点</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-scale-unbalanced" aria-hidden="true"></i><span>緑色になっても<span class="highlight">「確からしい」だけであって「正しい」とは限らない</span></span></li>
+            <li><i class="fa-solid fa-spider" aria-hidden="true"></i><span>評価に使われたWebページ自体が<span class="keyword-tag">間違っている可能性</span>もある</span></li>
+            <li><i class="fa-solid fa-hand" aria-hidden="true"></i><span>鵜呑みにせず、<span class="highlight">あくまで指針の一つ</span>として活用するのが正しい姿勢</span></li>
+            <li><i class="fa-solid fa-route" aria-hidden="true"></i><span>ファクトチェッカーと組み合わせれば<span class="keyword-tag">より精度の高い検証</span>が可能</span></li>
+        </ul>
+    </div>
+</div>
+
+<!-- ⑪ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑪</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-3 fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>対策その3：裏付けGem（独自開発）</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>こーすけ先生が独自に開発した<span class="keyword-tag">「裏付け」</span>というカスタムGem</span></li>
+            <li><i class="fa-solid fa-cogs" aria-hidden="true"></i><span>ファクトチェッカーとノートブックLMの<span class="highlight">両方のいいとこ取り</span>をした仕組み</span></li>
+            <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>生成された文章の各文に<span class="keyword-tag">引用番号</span>を自動付与</span></li>
+            <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span>文末に<span class="highlight">引用一覧</span>をまとめて表示し、クリックで元ページへ飛べる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i>
+            動画の概要欄からこのGemをコピーして使える！
+        </span>
+    </div>
+</div>
+
+<!-- ⑫ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑫</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-building-columns fa-5x" style="animation: fa-pulse 2s;" aria-hidden="true"></i>
+        <h2>裏付けGemの情報源ルール</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>✅ <span class="keyword-tag">政府・公的機関</span>の情報</span></li>
+            <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>✅ <span class="keyword-tag">教育・研究機関</span>の情報</span></li>
+            <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>✅ <span class="keyword-tag">大手報道機関・新聞社</span>の情報</span></li>
+            <li><i class="fa-solid fa-check-circle" aria-hidden="true"></i><span>✅ <span class="keyword-tag">一次情報の公式サイト</span>の情報</span></li>
+            <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>❌ <span class="highlight">個人ブログ</span>や<span class="highlight">出展不明なサイト</span>は除外</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-filter fa-lg" style="color: var(--ui-color-1);"></i>
+            信頼性の高い情報源に限定するのが品質のカギ！
+        </span>
+    </div>
+</div>
+
+<!-- ⑬ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑬</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-code fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>裏付けGemのコード生成でも活躍</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-envelope" aria-hidden="true"></i><span>例：「Gmailを受信したらスプレッドシートに書き込むGASを作成して」</span></li>
+            <li><i class="fa-solid fa-file-code" aria-hidden="true"></i><span>GASのコードが出来上がると同時に<span class="keyword-tag">各ステップに引用番号</span>が付く</span></li>
+            <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>「トリガーの自動化設定はどうやる？」→ <span class="highlight">6番の引用を見れば手順が分かる</span></span></li>
+            <li><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i><span>コードの書き方だけでなく、<span class="keyword-tag">設定手順の裏付け</span>も確認できる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-2);"></i>
+            プログラミングにも向いているとのこと。実務で大活躍！
+        </span>
+    </div>
+</div>
+
+<!-- ⑭ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑭</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-comments fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>さらに深掘り：相談機能との連携</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-copy" aria-hidden="true"></i><span>引用元URLをコピーして<span class="keyword-tag">Geminiの相談機能</span>に貼り付ける</span></li>
+            <li><i class="fa-solid fa-globe" aria-hidden="true"></i><span>「このサイトにおけるこの記述って<span class="highlight">どういう意味？</span>」とさらに質問できる</span></li>
+            <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>引用→確認→深掘りという<span class="keyword-tag">3段階の検証フロー</span>が完成</span></li>
+            <li><i class="fa-solid fa-magnifying-glass-plus" aria-hidden="true"></i><span>サイト内の文脈をGeminiが認識して解説してくれる</span></li>
+        </ul>
+    </div>
+</div>
+
+<!-- ⑮ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑮</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-hand fa-5x" style="animation: fa-flip 3s;" aria-hidden="true"></i>
+        <h2>フェイルセーフの思想</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-circle-xmark" aria-hidden="true"></i><span>裏付けGemには<span class="keyword-tag">フェイルセーフ</span>の指示も組み込まれている</span></li>
+            <li><i class="fa-solid fa-face-meh" aria-hidden="true"></i><span>信頼できる情報源から見つからなかったら<span class="highlight">「無理でした」と正直に答える</span></span></li>
+            <li><i class="fa-solid fa-explosion" aria-hidden="true"></i><span>無理に答えようとしてハルシネーションをひねり出すより、<span class="keyword-tag">「分からない」と言う方が安全</span></span></li>
+            <li><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i><span>嘘をつくリスクを減らす設計思想が<span class="highlight">最重要ポイント</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-laugh-beam fa-lg" style="color: var(--ui-color-5);"></i>
+            「無理して答えるより正直に降参する」がAIの正しい使い方！
+        </span>
+    </div>
+</div>
+
+<!-- ⑯ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑯</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-pulse 2s;" aria-hidden="true"></i>
+        <h2>3つの対策の比較まとめ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-1" aria-hidden="true"></i><span><span class="keyword-tag">ファクトチェッカー</span> — 生成後に文章を貼って検証。手動で2回操作</span></li>
+            <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="keyword-tag">回答再確認</span> — Gemini標準機能。緑のハイライトで即座に確認</span></li>
+            <li><i class="fa-solid fa-3" aria-hidden="true"></i><span><span class="keyword-tag">裏付けGem</span> — 生成と同時に引用を付与。最も自動化されて効率的</span></li>
+            <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>用途に応じて<span class="highlight">組み合わせて使う</span>のがベストプラクティス</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-1);"></i>
+            一番おすすめは「裏付けGem」！生成しながら引用がつくから一番楽！
+        </span>
+    </div>
+</div>
+
+<!-- ⑰ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑰</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-gem fa-5x" style="animation: fa-bounce 2s;" aria-hidden="true"></i>
+        <h2>Gemini Enterpriseのエージェント連携</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-users-gear" aria-hidden="true"></i><span><span class="keyword-tag">Gemini Enterprise</span>ではエージェント同士が相互フォローする仕組みがある</span></li>
+            <li><i class="fa-solid fa-user-pen" aria-hidden="true"></i><span>誰かが成果物を作成すると、<span class="highlight">第三者的にレビューするエージェント</span>が確認</span></li>
+            <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>Human in the Loopから<span class="keyword-tag">Human out of the Loop</span>への移行が加速中</span></li>
+            <li><i class="fa-solid fa-forward" aria-hidden="true"></i><span>将来的にはAI同士でハルシネーションを検知する世界が来るかも</span></li>
+        </ul>
+    </div>
+</div>
+
+<!-- ⑱ -->
+<div class="section-card fade-in-scale">
+    <div class="card-number">⑱</div>
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-graduation-cap fa-5x" style="animation: fa-beat-fade 2s;" aria-hidden="true"></i>
+        <h2>まとめ：ハルシネーションとの向き合い方</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-bullseye" aria-hidden="true"></i><span>ハルシネーションを<span class="highlight">ゼロにすることは難しい</span>が、リスクを抑え込むことは可能</span></li>
+            <li><i class="fa-solid fa-hammer" aria-hidden="true"></i><span>ノートブックLMで<span class="keyword-tag">情報源を限定</span>するのが第一歩</span></li>
+            <li><i class="fa-solid fa-shield-heart" aria-hidden="true"></i><span>ファクトチェッカー・回答再確認・裏付けGemの<span class="keyword-tag">3本柱</span>で防御を厚くする</span></li>
+            <li><i class="fa-solid fa-handshake" aria-hidden="true"></i><span>AIを信頼しつつも<span class="highlight">人間の目で確認する</span>姿勢が今の最適解</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-hand-peace fa-lg" style="color: var(--ui-color-5);"></i>
+            AIと仲良く付き合うには、程よく疑うことも大事！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<footer class="footer">
+    <p>🎬 動画: <a href="https://youtu.be/kZylmh-TgdY" target="_blank" style="color: inherit;">こーすけ先生のGoogle塾</a></p>
+    <p>📅 2026年7月10日（金）</p>
+</footer>
+
+</div>
+</body>
+</html>

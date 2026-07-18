@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Codeエージェント: シンプルなエージェント作成【第4回】</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #D84315;
+            --ui-color-2: #FF7043;
+            --ui-color-3: #FBE9E7;
+            --ui-color-4: #BF360C;
+            --ui-color-5: #E64A19;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body { background-color: #FFFAF7; font-family: 'Kaisei Decol', serif; color: #333; line-height: 1.6; }
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+
+        .header { text-align: center; padding: 40px 20px; margin-bottom: 30px; background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-2)); border-radius: 30px; color: white; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%); animation: headerGlow 8s ease-in-out infinite; }
+        @keyframes headerGlow { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(20px,20px); } }
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.2em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.2em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+        .section-card { flex: 1; min-width: 280px; max-width: 450px; background-color: white; border-radius: 20px; padding: 20px; box-shadow: 5px 5px 15px rgba(0,0,0,0.1); position: relative; overflow: hidden; transition: transform 0.3s ease, box-shadow 0.3s ease; }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .section-card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2)); }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.3em; color: var(--ui-color-4); margin-top: 10px; }
+        .card-content { padding: 0 10px 15px; }
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 10px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+        .keyword-tag { background-color: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+        .highlight { background: linear-gradient(120deg, rgba(255,112,67,0.3) 0%, rgba(216,67,21,0.3) 100%); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+
+        .speech-bubble { position: relative; background: #fff; border: 3px solid var(--ui-color-1); border-radius: 20px; padding: 12px 15px; margin: 15px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--ui-color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #E8F5E9; border-color: #2E7D32; transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: #2E7D32 transparent; }
+        .speech-bubble.variant-2 { background: #E3F2FD; border-color: #1565C0; transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: #1565C0 transparent; }
+
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+        pre { background: #f5f5f5; padding: 8px; border-radius: 5px; font-size: 12px; margin-top: 10px; overflow-x: auto; }
+
+        footer { text-align: center; padding: 30px 20px; margin-top: 30px; background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1)); border-radius: 20px; color: white; font-size: 1em; }
+        footer a { color: #FFAB91; text-decoration: underline; }
+        .fade-in-scale { animation: fadeInScale 0.5s ease-out forwards; }
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-icon"><i class="fa-solid fa-robot fa-beat-fade"></i></div>
+            <h1>Claude Codeエージェント: シンプルなエージェント作成【第4回】</h1>
+            <p class="subtitle">AnthropicのAIエージェントを自作して動かす実践ガイド</p>
+            <p class="date">📅 2026年7月18日 | 解説: 森本洋平のAI大学〜ヨッピーCH</p>
+        </div>
+
+        <div class="section-layout">
+            <!-- ① -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                    <h2>①シリーズの全貌</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-book-open"></i><span>全<span class="highlight">4回構成</span>のClaude Code入門シリーズ</span></li>
+                        <li><i class="fa-solid fa-list-ol"></i><span>第1回: Claude Codeの概要と準備</span></li>
+                        <li><i class="fa-solid fa-download"></i><span>第2回: PCへのインストールとアカウント連携</span></li>
+                        <li><i class="fa-solid fa-laptop-code"></i><span>第3回: VS Codeでの起動と最初の指示出し</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>第4回: <span class="highlight">シンプルなエージェントの構築と実行</span></span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" style="color: var(--ui-color-2);"></i> この第4回がシリーズの集大成だ！</span>
+                </div>
+            </div>
+
+            <!-- ② -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;"></i>
+                    <h2>②Claude Codeとは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-building"></i><span><span class="keyword-tag">Anthropic</span>が提供するAIエージェントツール</span></li>
+                        <li><i class="fa-solid fa-terminal"></i><span>CLIベースで<span class="highlight">ターミナルから直接</span>操作可能</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>プログラミングや開発支援に特化した設計</span></li>
+                        <li><i class="fa-solid fa-brain"></i><span>自然言語での指示に基づいてコードを生成・編集</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-robot fa-lg" style="color: var(--ui-color-1);"></i> CLIで動くから開発者のワークフローに馴染む！</span>
+                </div>
+            </div>
+
+            <!-- ③ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s;"></i>
+                    <h2>③エージェントの基本概念</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-bullseye"></i><span>AIに<span class="highlight">特定のタスク</span>を自律的に実行させる仕組み</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>指示 → 実行 → 結果確認 → 次のアクションの<span class="highlight">ループ</span></span></li>
+                        <li><i class="fa-solid fa-gears"></i><span>ツール（ファイル操作・シェル実行）を組み合わせて活用</span></li>
+                        <li><i class="fa-solid fa-map"></i><span>エージェントが自ら<span class="highlight">計画を立てて実行</span>する流れ</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: #2E7D32;"></i> AIが「自分で考えて動く」のがエージェントの醍醐味！</span>
+                </div>
+            </div>
+
+            <!-- ④ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-screwdriver-wrench fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s;"></i>
+                    <h2>④エージェントの準備</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span>Claude Code CLIが<span class="highlight">インストール済み</span>であることが前提</span></li>
+                        <li><i class="fa-solid fa-key"></i><span>Claudeアカウントとの連携が完了している</span></li>
+                        <li><i class="fa-solid fa-folder"></i><span>作業ディレクトリをプロジェクトに設定</span></li>
+                        <li><i class="fa-solid fa-laptop-code"></i><span>VS Code内でClaude Codeを起動済み</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten"><i class="fa-solid fa-screwdriver-wrench fa-lg" style="color: var(--ui-color-2);"></i> 第1〜3回で環境構築が済んでいる状態からスタート</span>
+                </div>
+            </div>
+
+            <!-- ⑤ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-file-lines fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s;"></i>
+                    <h2>⑤CLAUDE.mdの設定</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-code"></i><span>プロジェクトの<span class="highlight">CLAUDE.md</span>にエージェントの指示を記述</span></li>
+                        <li><i class="fa-solid fa-book"></i><span>プロジェクトの構造やルールをAIに教えるファイル</span></li>
+                        <li><i class="fa-solid fa-pen"></i><span>エージェントに<span class="highlight">何をしてほしいか</span>を明確に定義</span></li>
+                        <li><i class="fa-solid fa-check-circle"></i><span>具体的な指示を書くほど精度の高い出力が得られる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-file-lines fa-lg" style="color: var(--ui-color-1);"></i> CLAUDE.mdがエージェントの「設計書」になる！</span>
+                </div>
+            </div>
+
+            <!-- ⑥ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑥シンプルなエージェントの作成</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-pencil"></i><span>まずは<span class="highlight">最小限の構成</span>でエージェントを作成</span></li>
+                        <li><i class="fa-solid fa-bullseye"></i><span>一つの明確なタスクに集中させる</span></li>
+                        <li><i class="fa-solid fa-route"></i><span>実行手順をステップバイステップで定義</span></li>
+                        <li><i class="fa-solid fa-play"></i><span>小さな成功体験を積んでから拡張していく</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i> 小さく始めるのがエージェント作成のコツ！</span>
+                </div>
+            </div>
+
+            <!-- ⑦ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s;"></i>
+                    <h2>⑦エージェントワークフロー</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-1"></i><span><span class="highlight">入力</span>: ユーザーがタスクを指示</span></li>
+                        <li><i class="fa-solid fa-2"></i><span><span class="highlight">計画</span>: AIが実行計画を策定</span></li>
+                        <li><i class="fa-solid fa-3"></i><span><span class="highlight">実行</span>: ツールを使ってタスクを実行</span></li>
+                        <li><i class="fa-solid fa-4"></i><span><span class="highlight">検証</span>: 結果を確認して必要なら修正</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-5);"></i> 計画→実行→検証のサイクルで自律的に動く！</span>
+                </div>
+            </div>
+
+            <!-- ⑧ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s;"></i>
+                    <h2>⑧CLIでの実行方法</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-terminal"></i><span>ターミナルで<span class="highlight">claude</span>コマンドを実行</span></li>
+                        <li><i class="fa-solid fa-message"></i><span>自然言語でエージェントにタスクを指示</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>実行ログをリアルタイムで確認できる</span></li>
+                        <li><i class="fa-solid fa-hand"></i><span>途中で介入したり修正を指示することも可能</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten"><i class="fa-solid fa-terminal fa-lg" style="color: var(--ui-color-2);"></i> ターミナルで会話するようにエージェントを操作！</span>
+                </div>
+            </div>
+
+            <!-- ⑨ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-tools fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                    <h2>⑨使用可能なツール</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-file-edit"></i><span><span class="keyword-tag">ファイル操作</span>: 読み書き・作成・編集</span></li>
+                        <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">シェル実行</span>: コマンドの実行と結果取得</span></li>
+                        <li><i class="fa-solid fa-code-search"></i><span><span class="keyword-tag">コード検索</span>: プロジェクト内の検索・解析</span></li>
+                        <li><i class="fa-solid fa-window-maximize"></i><span><span class="keyword-tag">ブラウザ操作</span>: Web画面の表示と操作</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-tools fa-lg" style="color: var(--ui-color-1);"></i> これらのツールを組み合わせて自律的に作業する！</span>
+                </div>
+            </div>
+
+            <!-- ⑩ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑩MCPとの連携</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-cable-car"></i><span><span class="highlight">MCP (Model Context Protocol)</span>で外部ツールと接続</span></li>
+                        <li><i class="fa-solid fa-database"></i><span>データベースやAPIへのアクセスを拡張</span></li>
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span>外部サービスとの統合をシームレスに実現</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>エージェントの能力を<span class="highlight">大幅に拡張</span>できる仕組み</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-plug fa-lg" style="color: var(--ui-color-2);"></i> MCPでエージェントの可能性が無限に広がる！</span>
+                </div>
+            </div>
+
+            <!-- ⑪ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-wrench fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s;"></i>
+                    <h2>⑪Skillsの活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-graduation-cap"></i><span><span class="keyword-tag">Skills</span>でエージェントに専門的な能力を追加</span></li>
+                        <li><i class="fa-solid fa-book"></i><span>特定のタスク向けの手順書を読み込ませる</span></li>
+                        <li><i class="fa-solid fa-recycle"></i><span>再利用可能な<span class="highlight">スキルパッケージ</span>として管理</span></li>
+                        <li><i class="fa-solid fa-share"></i><span>コミュニティでスキルを共有できるエコシステム</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-5);"></i> スキルを追加すればどんどん賢くなる！</span>
+                </div>
+            </div>
+
+            <!-- ⑫ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-anchor fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s;"></i>
+                    <h2>⑫Hooksの仕組み</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-link"></i><span><span class="keyword-tag">Hooks</span>で<span class="highlight">特定のアクション</span>の前後に処理を差し込む</span></li>
+                        <li><i class="fa-solid fa-shield-check"></i><span>安全チェックやバリデーションを自動化</span></li>
+                        <li><i class="fa-solid fa-rotate"></i><span>定型処理をフックとして登録しておく</span></li>
+                        <li><i class="fa-solid fa-lock"></i><span>エージェントの動作に<span class="highlight">ガードレール</span>を設定</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten"><i class="fa-solid fa-anchor fa-lg" style="color: var(--ui-color-1);"></i> 自動で安全チェックを挟めるから安心！</span>
+                </div>
+            </div>
+
+            <!-- ⑬ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users-rectangle fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s;"></i>
+                    <h2>⑬Subagentsの活用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-people-arrows"></i><span><span class="keyword-tag">Subagents</span>で<span class="highlight">複数のエージェント</span>を協調動作</span></li>
+                        <li><i class="fa-solid fa-diagram-project"></i><span>タスクを分割してそれぞれのエージェントに割り当て</span></li>
+                        <li><i class="fa-solid fa-arrows-spin"></i><span>エージェント同士が情報をやり取りしながら進行</span></li>
+                        <li><i class="fa-solid fa-gauge-high"></i><span>並行処理で<span class="highlight">効率的なタスク実行</span>を実現</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-users-rectangle fa-lg" style="color: var(--ui-color-1);"></i> チームで作業するようにエージェントを協調させる！</span>
+                </div>
+            </div>
+
+            <!-- ⑭ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑭Pluginsの拡張</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-puzzle-piece"></i><span><span class="keyword-tag">Plugins</span>で外部機能をシームレスに追加</span></li>
+                        <li><i class="fa-solid fa-box-open"></i><span>プラグイン市場から必要な機能を導入</span></li>
+                        <li><i class="fa-solid fa-code"></i><span>独自のプラグインを開発して公開も可能</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>エージェントの<span class="highlight">能力の境界</span>を大きく広げる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-2);"></i> プラグインで機能をどんどん拡張できる！</span>
+                </div>
+            </div>
+
+            <!-- ⑮ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-group fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s;"></i>
+                    <h2>⑮エージェントチーム機能</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-people-group"></i><span>複数のClaude Codeエージェントが<span class="highlight">連携</span>して作業</span></li>
+                        <li><i class="fa-solid fa-diagram-successor"></i><span>タスクごとに専門のエージェントを割り当て</span></li>
+                        <li><i class="fa-solid fa-arrows-turn-to-dots"></i><span>エージェント間の通信と調整が自動化される</span></li>
+                        <li><i class="fa-solid fa-bolt"></i><span>大規模プロジェクトの<span class="highlight">完全自律型AI</span>の実現</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble right">
+                    <span class="handwritten"><i class="fa-solid fa-user-group fa-lg" style="color: var(--ui-color-1);"></i> AIチームでプロジェクトを自律的に進める未来！</span>
+                </div>
+            </div>
+
+            <!-- ⑯ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s;"></i>
+                    <h2>⑯注意点とベストプラクティス</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-shield"></i><span>エージェントに<span class="highlight">過度な権限</span>を与えない</span></li>
+                        <li><i class="fa-solid fa-eye"></i><span>実行結果を必ず確認・レビューする</span></li>
+                        <li><i class="fa-solid fa-circle-xmark"></i><span>破壊的な操作には確認フックを設定</span></li>
+                        <li><i class="fa-solid fa-gauge"></i><span>APIコストに注意してタスクの規模を調整</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble top">
+                    <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-2);"></i> 自律性とセキュリティのバランスが大事！</span>
+                </div>
+            </div>
+
+            <!-- ⑰ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-road fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s;"></i>
+                    <h2>⑰学習のステップアップ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-stairs"></i><span>第1回→第4回で<span class="highlight">基礎から実践</span>まで段階的に学習</span></li>
+                        <li><i class="fa-solid fa-seedling"></i><span>まずはシンプルなエージェントで成功体験を</span></li>
+                        <li><i class="fa-solid fa-layer-group"></i><span>MCP・Skills・Hooksを段階的に組み込む</span></li>
+                        <li><i class="fa-solid fa-forward"></i><span>最終的に<span class="highlight">エージェントチーム</span>の構築へ</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten"><i class="fa-solid fa-road fa-lg" style="color: var(--ui-color-1);"></i> 4回のシリーズで着実にステップアップ！</span>
+                </div>
+            </div>
+
+            <!-- ⑱ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2s;"></i>
+                    <h2>⑱まとめ: Claude Codeの可能性</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li><i class="fa-solid fa-star"></i><span>シンプルなエージェント作成で<span class="highlight">AI開発の第一歩</span>を踏み出す</span></li>
+                        <li><i class="fa-solid fa-rocket"></i><span>エージェントワークフローで業務の自動化が進む</span></li>
+                        <li><i class="fa-solid fa-unlock"></i><span>MCPやプラグインで無限の拡張性</span></li>
+                        <li><i class="fa-solid fa-forward"></i><span>プログラミング経験がなくても<span class="highlight">誰でも</span>始められる</span></li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten"><i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-1);"></i> AIエージェントの時代が到来！今が始めどき！</span>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            🎬 動画: <a href="https://youtu.be/AyNBVkAe7jw" target="_blank">森本洋平のAI大学〜ヨッピーCH</a> | 📅 2026年7月18日<br>
+            📖 参考: <a href="https://claude.ai/" target="_blank">Claude</a> | <a href="https://docs.anthropic.com/" target="_blank">Anthropicドキュメント</a>
+        </footer>
+    </div>
+</body>
+</html>

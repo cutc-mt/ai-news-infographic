@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loop Engineering Explained: AIエージェントが「考える」ループを設計する</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --ui-color-1: #2D6A4F;
+            --ui-color-2: #D4A373;
+            --ui-color-3: #FEFAE0;
+            --ui-color-4: #1B3A2D;
+            --ui-color-5: #E76F51;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: #FFF8F0;
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.4em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.3em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+
+        .section-layout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .section-card {
+            flex: 1;
+            min-width: 280px;
+            max-width: 450px;
+            background-color: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .section-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 8px 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .section-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.3em; color: var(--ui-color-4); margin-top: 10px; }
+
+        .card-content { padding: 0 10px 15px; }
+
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+
+        .keyword-list li {
+            margin-bottom: 10px;
+            display: flex;
+            align-items: flex-start;
+            font-size: 15px;
+            line-height: 1.6;
+        }
+
+        .keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 4px; }
+
+        .keyword-tag {
+            background-color: var(--ui-color-3);
+            color: var(--ui-color-4);
+            padding: 3px 8px;
+            border-radius: 5px;
+            margin-right: 5px;
+            display: inline-block;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .highlight { background: linear-gradient(transparent 60%, rgba(231,111,81,0.3) 60%); font-weight: bold; }
+
+        .speech-bubble {
+            position: relative;
+            background: #fff;
+            border: 3px solid var(--ui-color-1);
+            border-radius: 20px;
+            padding: 12px 15px;
+            margin: 15px 5px;
+            font-family: 'Yomogi', cursive;
+            box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -13px; left: 20px;
+            border-width: 12px 8px 0;
+            border-style: solid;
+            border-color: var(--ui-color-1) transparent;
+            display: block; width: 0;
+        }
+
+        .speech-bubble.right::after { left: auto; right: 20px; }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+
+        pre {
+            background: #f5f5f5;
+            padding: 8px;
+            border-radius: 5px;
+            font-size: 12px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1));
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+        }
+
+        .footer a { color: #FEFAE0; text-decoration: underline; }
+
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <div class="header-icon"><i class="fa-solid fa-rotate fa-5x" aria-hidden="true"></i></div>
+        <h1>Loop Engineering: AIエージェントが「考える」ループを設計する</h1>
+        <div class="subtitle">プロンプトエンジニアリングは終わった。次は「ループ」を設計しよう。</div>
+        <div class="date">📅 2026年7月18日 | AI Anytime</div>
+    </div>
+
+    <div class="section-layout">
+        <!-- ① -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>①Loop Engineeringとは何か</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span><span class="keyword-tag">Loop Engineering</span>とは、AIエージェントが実行する<span class="highlight">ループそのものを設計</span>する新しいパラダイム</span></li>
+                    <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>プロンプトを頑張るのではなく、<span class="highlight">エージェントが自律的に動く仕組み</span>を構築する</span></li>
+                    <li><i class="fa-solid fa-arrows-spin" aria-hidden="true"></i><span>エージェントは「LLM + ツール + whileループ」の構造で動く</span></li>
+                    <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>Peter Steinberger（OpenClaw開発者）とBoris Cherny（Claude Code責任者）がほぼ同時に提唱</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-quote-left fa-lg" style="color: var(--ui-color-2);"></i>
+                    「もうプロンプトを書かない。<br>僕の仕事はループを書くことだ」<br>
+                    <small>— Boris Cherny, Anthropic</small>
+                </span>
+            </div>
+        </div>
+
+        <!-- ② -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-timeline fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>②進化の歴史: プロンプト→ループ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Prompt Engineering</span>：1回の指示を最適化する（2023年頃）</span></li>
+                    <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Context Engineering</span>：モデルが見る全情報をカリキュレーション（2024年）</span></li>
+                    <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Harness</span>：モデルを「作業エンジン」にする枠組み（LangChain）</span></li>
+                    <li><i class="fa-solid fa-4 fa-lg" aria-hidden="true"></i><span><span class="highlight">Loop Engineering</span>：エージェントの実行ループ全体を設計（2026年）</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                    進化の軸は「1回の対話」→「状態管理」→「自律実行ループ」<br>
+                    すべて<span class="keyword-tag">モデルを操縦する</span>という同じ目的！
+                </span>
+            </div>
+        </div>
+
+        <!-- ③ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-play fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                <h2>③現在のエージェント開発の問題</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-pen" aria-hidden="true"></i><span>プロンプトを書く→権限を許可→テスト実行→エラー発生→修正依頼...</span></li>
+                    <li><i class="fa-solid fa-repeat" aria-hidden="true"></i><span>同じサイクルを<span class="highlight">何度も繰り返してベビーシッター状態</span>に</span></li>
+                    <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>20分経つと、自分がOffloadしたかった作業を自分でやっていることに気づく</span></li>
+                    <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>本来なら<span class="highlight">「考える作業」</span>に集中すべきなのに、単純作業をしている</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                    自分でOffloadしたはずの作業を、<br>結局自分が監視していて本末転倒...<br>
+                    <span class="keyword-tag">ベビーシッター問題</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- ④ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>④ループの2つの必須条件</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span><span class="highlight">トリガー（起動条件）</span>：PRが開いた、CIが失敗した、スケジュール、Slackメッセージなど</span></li>
+                    <li><i class="fa-solid fa-flag-checkered" aria-hidden="true"></i><span><span class="highlight">検証可能なゴール（停止条件）</span>：全テスト通過、レビューOK、CIグリーンなど</span></li>
+                    <li><i class="fa-solid fa-fire" aria-hidden="true"></i><span>停止条件がないと、<span class="keyword-tag">自信過剰なトークン炉</span>になるだけ</span></li>
+                    <li><i class="fa-solid fa-circle-exclamation" aria-hidden="true"></i><span>cron（固定スクリプト）とは違う：<span class="highlight">エージェントが状態を見て判断する</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-2);"></i>
+                    cron = 「毎時このスクリプトを実行」<br>
+                    ループ = 「状態を見て次の行動を自分で決める」<br>
+                    この違いが<span class="keyword-tag">超重要</span>！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑤ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-wrench fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                <h2>⑤5つのレバー: ツール設計</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span><span class="keyword-tag">ACI</span>（Agent-Computer Interface）：エージェント版のUI</span></li>
+                    <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>AnthropicのSWE-benchでは<span class="highlight">ツール設計にプロンプト以上の時間</span>を費やした</span></li>
+                    <li><i class="fa-solid fa-sh" aria-hidden="true"></i><span>Simon Willisonは<span class="highlight">シェルコマンド</span>を推奨：コーディングエージェントはシェルが得意</span></li>
+                    <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>エージェントが「語れる」だけでなく<span class="highlight">「行動できる」</span>ようにする設計</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                    UIは人間向けインターフェース。<br>
+                    ACIはエージェント向けインターフェース。<br>
+                    同じくらい<span class="keyword-tag">慎重に設計</span>すべき！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑥ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-hand fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                <h2>⑥5つのレバー: 停止条件</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-stop" aria-hidden="true"></i><span>成功時・<span class="keyword-tag">最大イテレーション</span>・予算上限・<span class="highlight">進捗なし検出</span></span></li>
+                    <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>停止条件がないループは<span class="highlight">早期に勝利宣言するか永遠に止まらない</span></span></li>
+                    <li><i class="fa-solid fa-chart-simple" aria-hidden="true"></i><span>Softなゴール：レビューモデルがUIと仕様を照合する</span></li>
+                    <li><i class="fa-solid fa-hard-drive" aria-hidden="true"></i><span>Deterministicなゴール：全テスト通過 + CIグリーン</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+                    止まらないエージェント =<br>
+                    費用無限大の<span class="keyword-tag">トークン炉</span>💥<br>
+                    硬いブレーキが必須！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑦ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑦5つのレバー: コンテキスト管理</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-compress" aria-hidden="true"></i><span><span class="keyword-tag">Compaction</span>：ウィンドウ限界で要約して再スタート</span></li>
+                    <li><i class="fa-solid fa-sticky-note" aria-hidden="true"></i><span><span class="keyword-tag">NOTES.md</span>：エージェントがコンテキスト外にメモを残す</span></li>
+                    <li><i class="fa-solid fa-users" aria-hidden="true"></i><span><span class="keyword-tag">サブエージェント</span>：数万トークン消費後、1,000〜2,000トークンの要約を返す</span></li>
+                    <li><i class="fa-solid fa-arrow-down" aria-hidden="true"></i><span>トークン数が増えると<span class="highlight">リコール（思い出し）性能が劣化</span>する問題</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                    モデルは忘れるけど、リポジトリは忘れない。<br>
+                    <span class="keyword-tag">外部アーティファクト</span>に<br>
+                    判断と証拠を残すのが正解！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑧ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                <h2>⑧5つのレバー: 検証（Verification）</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-vial" aria-hidden="true"></i><span>ループが<span class="highlight">「本当にやった」ことを証明する仕組み</span></span></li>
+                    <li><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>Anthropic：200以上の<span class="keyword-tag">機能リスト</span>を全て passes: false で開始</span></li>
+                    <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>テストスイートが<span class="highlight">エージェントの価値を劇的に amplify</span>する</span></li>
+                    <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>レビューエージェント + diffと仕様の照合も有効</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-check-double fa-lg" style="color: var(--ui-color-1);"></i>
+                    エージェントの「終わったよ！」<br>
+                    を<span class="keyword-tag">鵜呑みにしない</span>。<br>
+                    テストが通るまで終わらない！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑨ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                <h2>⑨5つのレバー: ガードレール</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-box" aria-hidden="true"></i><span><span class="keyword-tag">サンドボックス</span>：危険な操作を隔離する環境</span></li>
+                    <li><i class="fa-solid fa-key" aria-hidden="true"></i><span><span class="highlight">スコープ限定の認証情報</span>：テスト/ステージング環境限定</span></li>
+                    <li><i class="fa-solid fa-dollar-sign" aria-hidden="true"></i><span>Simon WillisonはClaude Codeに<span class="highlight">Fly.ioの$5予算</span>を設定</span></li>
+                    <li><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>暴走ループが<span class="keyword-tag">本番の課金</span>に触れないようにする設計</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-5);"></i>
+                    Solomon Hykes（Docker創業者）:<br>
+                    「AIエージェントとは、<br>
+                    ループの中で環境を<span class="keyword-tag">破壊するLLM</span>」
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑩ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                <h2>⑩実践: Addy Osmaniの6要素</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Automations</span>：ループが自動で起動する仕組み</span></li>
+                    <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Worktrees</span>：並列エージェントの衝突を防ぐ</span></li>
+                    <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Skills</span>：プロジェクトルールを再利用可能に</span></li>
+                    <li><i class="fa-solid fa-4 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Plugins</span>：GitHub・Linear・Slack等と接続</span></li>
+                    <li><i class="fa-solid fa-5 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Sub-agents</span>：コードを書くのとレビューするのを分離</span></li>
+                    <li><i class="fa-solid fa-6 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Memory</span>：モデルは忘れるがリポジトリは忘れない</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                    Skillsがないループは毎回ゼロから<br>
+                    プロジェクトを<span class="keyword-tag">再発見</span>する。<br>
+                    トークンを無駄に燃やすだけ！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑪ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-file-lines fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑪スキル（Skills）の重要性</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-bookmark" aria-hidden="true"></i><span>マークダウンのファイル群：<span class="highlight">規約・例・テストコマンド・禁忌事項</span></span></li>
+                    <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>1スキル = 1タスク。できるだけ<span class="keyword-tag">密度高く</span>書く</span></li>
+                    <li><i class="fa-solid fa-arrow-up" aria-hidden="true"></i><span>良いスキルは<span class="highlight">複利効果</span>を生む：毎回の実行が改善を蓄積</span></li>
+                    <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>エージェントに<span class="keyword-tag">インデックス</span>を作らせる：どのスキルを開くべきか自動判断</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                    スキルは「プロジェクトの記憶」。<br>
+                    コンテキストに毎回手動で入れるのではなく、<br>
+                    <span class="keyword-tag">自動で参照</span>されるように！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑫ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                <h2>⑫具体的なループの例</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-sun" aria-hidden="true"></i><span><span class="keyword-tag">毎朝自動起動</span>：昨日のCI失敗・オープンISSUE・最新コミットを読む</span></li>
+                    <li><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>状態ファイルに<span class="highlight">優先順位付き</span>で取り組むべき事項を書く</span></li>
+                    <li><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span>ISSUEごとに<span class="keyword-tag">別ワークツリー</span>を開き、エージェント1体を派遣</span></li>
+                    <li><i class="fa-solid fa-vial" aria-hidden="true"></i><span>もう1体が<span class="highlight">レビュー＆テスト</span>。テスト通過ならPR作成</span></li>
+                    <li><i class="fa-solid fa-inbox" aria-hidden="true"></i><span>失敗時：エラーをフィードバック。行き詰まり：<span class="keyword-tag">人間の受信箱へ</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-arrows-spin fa-lg" style="color: var(--ui-color-1);"></i>
+                    あなたは7回も指示を出さない。<br>
+                    7ステップの<span class="keyword-tag">システム</span>を<br>
+                    一度設計するだけ！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑬ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                <h2>⑬自動化 vs ループの違い</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-list-ol" aria-hidden="true"></i><span><span class="keyword-tag">自動化</span>：「ステップ1→2→3」と固定シナリオ</span></li>
+                    <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span><span class="highlight">ループ</span>：「状態を見る→判断→実行→確認→次の判断」</span></li>
+                    <li><i class="fa-solid fa-gears" aria-hidden="true"></i><span>ループは<span class="highlight">小さなエンジニアリングプロセス</span>に近い</span></li>
+                    <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>ループは<span class="keyword-tag">作業の単位（Unit of Work）</span>になる：スケジュール実行・サブエージェント・永続化</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-arrows-rotate fa-lg" style="color: var(--ui-color-5);"></i>
+                    古いシステム：LLMをもう一度実行<br>
+                    新しいループ：<span class="keyword-tag">作業の単位</span>として<br>
+                    スケジュール・ワークツリー対応
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑭ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>⑭2つの危険な落とし穴</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span><span class="highlight">問題1：ゴールの定義が難しい</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>ソフトウェア開発は<span class="keyword-tag">探求的</span>なことが多い：最終形が最初は分からない</span></li>
+                    <li><i class="fa-solid fa-infinity fa-lg" aria-hidden="true"></i><span><span class="highlight">問題2：コスト爆発</span></span></li>
+                    <li><i class="fa-solid fa-fire" aria-hidden="true"></i><span>自己レビュー→サブエージェント→リトライで<span class="keyword-tag">数百万トークンを瞬時に消費</span></span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                    ループ設計は大企業のラボなら<br>
+                    推奨されやすい。個人開発者は<br>
+                    <span class="keyword-tag">手動起動＋監視</span>が安全！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑮ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-user-gear fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+                <h2>⑮カスタマーサポートでの応用</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-headset" aria-hidden="true"></i><span>サポートチケットは<span class="highlight">ループ設計の最適なユースケース</span></span></li>
+                    <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>着信→意図推定→情報検索→アクション→確認→解決 or 担当者へ</span></li>
+                    <li><i class="fa-solid fa-percent" aria-hidden="true"></i><span>従来チャットボット：<span class="keyword-tag">10〜25%</span>解決率</span></li>
+                    <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>エージェント型プラットフォーム：<span class="highlight">70〜85%</span>のエンドツーエンド解決率</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-headset fa-lg" style="color: var(--ui-color-2);"></i>
+                    CXリードの言葉:<br>
+                    「AIには<span class="keyword-tag">自信があるものだけ</span><br>
+                    処理させ、それ以外は手を出すな」
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑯ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-stethoscope fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+                <h2>⑯診断ガイド: 症状からレバーを特定</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-face-smile-beam" aria-hidden="true"></i><span>自信満々に間違える → <span class="keyword-tag">検証＋ガードレール</span>不足</span></li>
+                    <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>永遠にループ → <span class="keyword-tag">停止条件</span>がない</span></li>
+                    <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>長いタスクで忘れる → <span class="keyword-tag">コンテキスト管理</span>不足</span></li>
+                    <li><i class="fa-solid fa-comment-slash" aria-hidden="true"></i><span>語れるが動けない → <span class="keyword-tag">ツール</span>不足</span></li>
+                    <li><i class="fa-solid fa-explosion" aria-hidden="true"></i><span>破壊的なことをした → <span class="keyword-tag">ガードレール</span>不足</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten">
+                    <i class="fa-solid fa-stethoscope fa-lg" style="color: var(--ui-color-5);"></i>
+                    修正は<span class="keyword-tag">プロンプトの書き換え</span>ではなく<br>
+                    <span class="highlight">レバーの調整</span>で！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑰ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>⑰どのタスクにループを適用すべきか</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-check" aria-hidden="true"></i><span><span class="keyword-tag">✅ ループが適している</span>：繰り返し作業・明確な成功/失敗信号</span></li>
+                    <li><i class="fa-solid fa-xmark" aria-hidden="true"></i><span><span class="highlight">❌ ループが不適切</span>：曖昧なタスク・創造的作業・「良いもの」が定義できない</span></li>
+                    <li><i class="fa-solid fa-play" aria-hidden="true"></i><span>一度きりの作業 → そのまま<span class="keyword-tag">プロンプトで</span></span></li>
+                    <li><i class="fa-solid fa-arrow-up" aria-hidden="true"></i><span>反復＋明確な信号 → <span class="highlight">ループを構築</span></span></li>
+                    <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>「自分がやっているのは<span class="keyword-tag">単純作業</span>か？」→ YESならループ化を検討</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten">
+                    <i class="fa-solid fa-quote-left fa-lg" style="color: var(--ui-color-2);"></i>
+                    「より速く進む」ために使うか、<br>
+                    「<span class="keyword-tag">理解を回避</span>する」ために使うか。<br>
+                    正しい選択をしよう！
+                </span>
+            </div>
+        </div>
+
+        <!-- ⑱ -->
+        <div class="section-card">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+                <h2>⑱まとめ: エンジニアであり続けよう</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>5年前：自分でコードを書く</span></li>
+                    <li><i class="fa-solid fa-message" aria-hidden="true"></i><span>2年前：モデルにプロンプトでコードを書かせる</span></li>
+                    <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>昨年：Claudeがコードを書くのを監視する</span></li>
+                    <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>今：<span class="highlight">適切なタスクにはループを設計</span>する</span></li>
+                    <li><i class="fa-solid fa-heart" aria-hidden="true"></i><span>出荷したものを<span class="keyword-tag">読む</span>、品質を<span class="keyword-tag">所有</span>する、停止条件を<span class="keyword-tag">定義</span>する</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten">
+                    <i class="fa-solid fa-hand-peace fa-lg" style="color: var(--ui-color-1);"></i>
+                    プロンプトエンジニアリングは死んだわけじゃない。<br>
+                    <span class="highlight">レバレッジポイント</span>が移動しただけ。<br>
+                    <span class="keyword-tag">エンジニアであり続けよう</span>！
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        🎬 動画: <a href="https://youtu.be/-gPiI4iku_Q" target="_blank">Loop Engineering Explained: Start Building AI Agents That Think | AI Anytime</a> | 📅 2026年7月18日<br>
+        📝 参考記事: <a href="https://www.louisbouchard.ai/loop-engineering/" target="_blank">Louis Bouchard</a> | <a href="https://www.eesel.ai/blog/loop-engineering" target="_blank">eesel AI</a>
+    </div>
+</div>
+</body>
+</html>

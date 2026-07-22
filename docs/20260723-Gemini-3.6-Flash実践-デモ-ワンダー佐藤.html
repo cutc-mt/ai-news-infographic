@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini 3.6 Flash 実践デモ解説 - ワンダー佐藤</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+        :root {
+            --color-1: #0D9488;
+            --color-2: #115E59;
+            --color-3: #CCFBF1;
+            --color-4: #134E4A;
+            --color-5: #14B8A6;
+            --color-bg: #F0FDFA;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--color-bg);
+            font-family: 'Kaisei Decol', serif;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+
+        .header {
+            text-align: center;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, var(--color-1), var(--color-2));
+            border-radius: 30px;
+            color: white;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+            animation: headerGlow 8s ease-in-out infinite;
+        }
+
+        @keyframes headerGlow {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(20px, 20px); }
+        }
+
+        .header-icon { font-size: 5em; margin-bottom: 10px; animation: fa-bounce 2s infinite; }
+        .header h1 { font-size: 2.4em; font-weight: 900; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.3em; opacity: 0.9; font-family: 'Yomogi', cursive; }
+        .header .date { font-size: 0.9em; opacity: 0.7; margin-top: 10px; }
+
+        .section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 20px; }
+
+        .card {
+            flex: 1; min-width: 280px; max-width: 450px;
+            background-color: white; border-radius: 20px; padding: 20px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px; background: linear-gradient(90deg, var(--color-1), var(--color-5)); }
+
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container h2 { font-size: 1.2em; color: var(--color-4); margin-top: 10px; }
+
+        .card-content { padding: 0 10px 15px; }
+
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 10px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+        .keyword-list li i { margin-right: 8px; color: var(--color-1); min-width: 16px; margin-top: 4px; }
+
+        .keyword-tag { background-color: var(--color-3); color: var(--color-4); padding: 3px 8px; border-radius: 5px; margin-right: 5px; display: inline-block; font-weight: bold; font-size: 14px; }
+
+        .speech-bubble {
+            position: relative; background: #fff; border: 3px solid var(--color-1);
+            border-radius: 20px; padding: 12px 15px; margin: 15px 5px;
+            font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1); transform: rotate(-1deg);
+        }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -13px; left: 20px; border-width: 12px 8px 0; border-style: solid; border-color: var(--color-1) transparent; display: block; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--color-5); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--color-5) transparent; }
+        .speech-bubble.variant-2 { background: #E0F7F5; border-color: var(--color-2); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--color-2) transparent; }
+
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+
+        .highlight { background: linear-gradient(transparent 60%, rgba(13,148,136,0.3) 60%); font-weight: bold; }
+
+        .comparison-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #ddd; font-size: 15px; }
+        .comparison-row:last-child { border-bottom: none; }
+        .comp-left, .comp-right { flex: 1; text-align: center; font-weight: bold; }
+        .comp-center { flex: 0 0 40%; text-align: center; font-size: 13px; color: #666; }
+        .winner { color: var(--color-1); }
+
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out forwards; opacity: 0; }
+
+        .footer {
+            text-align: center; padding: 30px 20px; margin-top: 30px;
+            background: linear-gradient(135deg, var(--color-2), var(--color-4));
+            border-radius: 30px; color: white; font-family: 'Yomogi', cursive;
+        }
+        .footer a { color: #5EEAD4; text-decoration: none; }
+        .footer a:hover { text-decoration: underline; }
+
+        @media (max-width: 1600px) { .card { min-width: 280px; } }
+        @media (max-width: 1200px) { .card { min-width: 320px; } }
+        @media (max-width: 900px) { .card { min-width: 380px; } }
+        @media (max-width: 768px) { .section-layout { flex-direction: column; } .card { width: 100%; min-width: auto; } }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <div class="header-icon"><i class="fa-solid fa-bolt"></i></div>
+        <h1>Gemini 3.6 Flash 実践デモ解説</h1>
+        <div class="subtitle"><i class="fa-solid fa-flask"></i> マルチモーダル最強モデルの使いどころを徹底検証</div>
+        <div class="date"><i class="fa-regular fa-calendar"></i> 2026年7月23日 | ワンダー佐藤</div>
+    </div>
+
+    <div class="section-layout">
+
+        <div class="card fade-in-scale">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-rocket fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>①Gemini 3.6 Flash の位置づけ</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-info"></i>ベンチマークでは<span class="highlight">3.1 Proを上回る</span>結果が出ている</li>
+                    <li><i class="fa-solid fa-circle-info"></i>ただし、その差は「そこまで上ではない」という印象</li>
+                    <li><i class="fa-solid fa-circle-info"></i>論理的・ロジック系のタスクは<span class="keyword-tag">3.1 Proの方が優秀</span></li>
+                    <li><i class="fa-solid fa-circle-info"></i>柔らかく・分かりやすく出力したい場合に3.6 Flashが光る</li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-5);"></i> 競合相手ではなく<span class="highlight">使い分けるパートナー</span>として使うのが正解！</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.1s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-wrench fa-5x" style="color: var(--color-2); animation: fa-bounce 2s;"></i>
+                <h2>②ワンダー佐藤流の使い方: ツールとして活用</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-screwdriver-wrench"></i>AIエージェントではなく<span class="highlight">ワンポイントのAIツール</span>として活用</li>
+                    <li><i class="fa-solid fa-music"></i><span class="keyword-tag">音楽の分析</span>をさせて楽曲の構成を把握</li>
+                    <li><i class="fa-solid fa-video"></i>動画の文字起こし → 内容の深掘り・要約</li>
+                    <li><i class="fa-solid fa-clock"></i>動画から<span class="keyword-tag">タイムライン作成</span></li>
+                    <li><i class="fa-solid fa-pen-to-square"></i>動画の<span class="highlight">概要欄作成</span>（YouTuber必見！）</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--color-2);"></i> 「目が良くて変換する力がめちゃくちゃある」共感感覚を持つようなモデルだとの評判</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.2s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-chart-bar fa-5x" style="color: var(--color-5); animation: fa-flip 3s;"></i>
+                <h2>③AI競争の全体像: Fableが圧倒的</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-trophy"></i><span class="highlight">Claude Fable</span>が全レベルでトップクラスの性能</li>
+                    <li><i class="fa-solid fa-shield-halved"></i>GPT-5.5 Cipherはサイバーセキュリティ分野で異常に強い</li>
+                    <li><i class="fa-solid fa-circle-info"></i>Fableは意図的に高めているわけではなく、<span class="keyword-tag">結果的に</span>強くなった</li>
+                    <li><i class="fa-solid fa-eye"></i>政府に目を付けられないよう、意図的に力を抑えている可能性</li>
+                    <li><i class="fa-solid fa-code-branch"></i>Gemini K3はAIエージェントとしては強いが、<span class="highlight">Fableには遠く及ばない</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-2">
+                <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--color-1);"></i> Geminiの使命はバランスの良さ。Fableほど尖らせない戦略</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.3s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-draw-polygon fa-5x" style="color: var(--color-1); animation: fa-spin 4s;"></i>
+                <h2>④テキスト→SVG: 鍵盤解剖図が爆誕</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-keyboard"></i>鍵盤の解剖図テキストを<span class="highlight">SVGで正確に描画</span></li>
+                    <li><i class="fa-solid fa-arrows-rotate"></i>背面・後面の構造まで<span class="keyword-tag">立体的に表現</span></li>
+                    <li><i class="fa-solid fa-toggle-on"></i>ラベル非表示などの表示切り替え機能を実装</li>
+                    <li><i class="fa-solid fa-hand-pointer"></i>クリックで部品名が表示されるインタラクティブな図面</li>
+                </ul>
+                <div class="comparison-row">
+                    <div class="comp-left winner"><i class="fa-solid fa-check-circle"></i> Gemini 3.6</div>
+                    <div class="comp-center">解剖図SVG生成</div>
+                    <div class="comp-right"><i class="fa-solid fa-times-circle" style="color:#BF5656;"></i> GPT-5.5 Sol</div>
+                </div>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--color-5);"></i> GPT-5.5 Solでも全然追いつかない！この抽象的思考力は<span class="highlight">Gemini独自の強み</span></span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.4s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-file-powerpoint fa-5x" style="color: var(--color-2); animation: fa-beat-fade 2s;"></i>
+                <h2>⑤Googleスライド自動生成の改善</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-search"></i>コンテンツ検索 → Googleスライド自動作成をテスト</li>
+                    <li><i class="fa-solid fa-image"></i>以前は<span class="highlight">外部画像を拾ってくる癖</span>があった</li>
+                    <li><i class="fa-solid fa-arrow-up"></i>「画像は外部から持ってこない」指示に<span class="keyword-tag">追従性が向上</span></li>
+                    <li><i class="fa-solid fa-shapes"></i>画像を使わず<span class="highlight">SVGインフォグラフィック</span>で視覚化してくれる</li>
+                    <li><i class="fa-solid fa-check"></i>図表・チャート形式の工夫が凝らされる</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--color-2);"></i> 急いで資料を作りたい時にサクッと使える！指示追従性の向上が大きな改善点</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.5s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-brain fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;"></i>
+                <h2>⑥強化思考モードが全編の鍵</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-toggle-on"></i>今回は<span class="highlight">すべて強化思考モード（Extended Thinking）</span>で検証</li>
+                    <li><i class="fa-solid fa-ban"></i>フラッシュライト・思考なしバージョンは一切使用せず</li>
+                    <li><i class="fa-solid fa-link"></i>システムプロンプトが<span class="keyword-tag">以前から変更された可能性</span>が高い</li>
+                    <li><i class="fa-solid fa-circle-info"></i>プロンプトなしでも、自動的に<span class="highlight">適切なフォーマット</span>で出力するように</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--color-2);"></i> 「3.6 Flash」と言ったらこの<span class="highlight">強化思考モード</span>を指すと理解しておいて！</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="section-layout">
+
+        <div class="card fade-in-scale" style="animation-delay: 0.6s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-blog fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑦ブログ自動生成: 長文を一気にブログ化</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-magnifying-glass"></i><span class="keyword-tag">ディープリサーチ</span>で得た長文を元にブログ記事を生成</li>
+                    <li><i class="fa-solid fa-heading"></i>タイトル → セクション → サブセクション → H3タグまで<span class="highlight">自動構造化</span></li>
+                    <li><i class="fa-solid fa-list-ol"></i>ナンバリング・箇条書き・表形式など<span class="keyword-tag">見やすいレイアウト</span>で出力</li>
+                    <li><i class="fa-solid fa-feather"></i>マークダウン形式で柔らかい文章スタイル</li>
+                    <li><i class="fa-solid fa-scale-balanced"></i>セクション構成のバランスが非常に良い</li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-pen-nib fa-lg" style="color: var(--color-1);"></i> ぶち込むだけで<span class="highlight">かなりいい感じ</span>の記事が完成！ソルは長すぎ、GPTは硬すぎ…ここがいい塩梅</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.7s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-user-tie fa-5x" style="color: var(--color-2); animation: fa-flip 3s;"></i>
+                <h2>⑧Proモード: プロフェッショナルな文体</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-graduation-cap"></i>プロモードは<span class="highlight">絵文字を使わない</span>フォーマルな出力</li>
+                    <li><i class="fa-solid fa-microscope"></i>専門用語もしっかり扱い、<span class="keyword-tag">認知的負荷</span>を抑えつつ論理的に記述</li>
+                    <li><i class="fa-solid fa-arrow-down"></i>柔らかさ・共感性はフラッシュより落ちる</li>
+                    <li><i class="fa-solid fa-circle-check"></i>「論理的にしっかり書きたい」時に<span class="highlight">Proが最適</span></li>
+                </ul>
+                <div class="comparison-row">
+                    <div class="comp-left"><i class="fa-solid fa-heart" style="color:#e91e63;"></i> Flash</div>
+                    <div class="comp-center">文体のトーン</div>
+                    <div class="comp-right winner"><i class="fa-solid fa-graduation-cap"></i> Pro</div>
+                </div>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-5);"></i> 硬く作ってから柔らかくするか、柔らかく作ってから引き締めるか…その<span class="highlight">バランス感覚</span>が大事！</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.8s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-share-nodes fa-5x" style="color: var(--color-5); animation: fa-bounce 2s;"></i>
+                <h2>⑨SNSまとめ: Flash vs Proの差</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-compact-disc"></i><span class="keyword-tag">Flash</span>: SNS用にエッセンシャルにまとめるが、少し情報不足</li>
+                    <li><i class="fa-solid fa-compact-disc"></i><span class="keyword-tag">Pro</span>: より本質的で要約力が高い</li>
+                    <li><i class="fa-solid fa-circle-info"></i>どちらも<span class="highlight">アイコンは不要</span>、文章だけで十分まとまる</li>
+                    <li><i class="fa-solid fa-arrows-up-down"></i>長すぎるより、削って調整する方が良い分量感</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-comment-dots fa-lg" style="color: var(--color-1);"></i> ProのSNSまとめの方が情報密度が高くて<span class="highlight">使いやすい</span>印象</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 0.9s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑩ライティング対決: 各モデルの立ち位置</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-crown"></i><span class="highlight">Claude Sonnet 5</span>が現在のAIライティング最適解</li>
+                    <li><i class="fa-solid fa-coins"></i>クレジットを節約したいなら<span class="keyword-tag">3.6 Flash強化思考モード</span></li>
+                    <li><i class="fa-solid fa-comment-slash"></i>Sol: 長すぎて使いにくい</li>
+                    <li><i class="fa-solid fa-snowflake"></i>GPT-5.5: 文体が硬すぎる</li>
+                    <li><i class="fa-solid fa-star"></i>Claude Opus: もちろん最高だがクレジット消費が多い</li>
+                </ul>
+                <div class="comparison-row">
+                    <div class="comp-left"><i class="fa-solid fa-coins"></i> 無料/低コスト</div>
+                    <div class="comp-center">AIライティング</div>
+                    <div class="comp-right winner"><i class="fa-solid fa-crown"></i> Sonnet 5</div>
+                </div>
+            </div>
+            <div class="speech-bubble right">
+                <span class="handwritten"><i class="fa-solid fa-handshake fa-lg" style="color: var(--color-5);"></i> 「ソネット5か3.6 Flashか」まずここで試して判断するのが<span class="highlight">現実的な選択肢</span></span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.0s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--color-2); animation: fa-bounce 2s;"></i>
+                <h2>⑪学習パートナーとしての強み</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-book-open"></i><span class="highlight">NotebookLM</span>が学習用途で非常に強力</li>
+                    <li><i class="fa-solid fa-hand-holding-heart"></i>難しい内容でも<span class="keyword-tag">噛み砕いて</span>分かりやすく教えてくれる</li>
+                    <li><i class="fa-solid fa-volume-high"></i>音声・動画形式での解説も可能</li>
+                    <li><i class="fa-solid fa-circle-info"></i>ChatGPT SolやClaudeよりも<span class="highlight">分かりやすさで優れている</span></li>
+                    <li><i class="fa-solid fa-bullseye"></i>Geminiの役割・使命は「<span class="highlight">学習に使うAI</span>」にある</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--color-1);"></i> Solは分かりやすく教えてもまだ難しい。<span class="highlight">Geminiのレベルがちょうどいい！</span></span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.1s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-atom fa-5x" style="color: var(--color-5); animation: fa-spin 4s;"></i>
+                <h2>⑫超難解テキスト解説: 量子場理論</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-scroll"></i>独自の<span class="keyword-tag">量子場理論の論文</span>（ロータムフィールドセオリー）を読み込ませた</li>
+                    <li><i class="fa-solid fa-face-smile"></i>3.6 Flash: <span class="highlight">柔らかく読みやすい</span>解説をしてくれる</li>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i>ただし重要な要点が<span class="keyword-tag">抜け落ちる</span>傾向（λ=πなど）</li>
+                    <li><i class="fa-solid fa-graduation-cap"></i>Pro: 条件付き同変など<span class="highlight">核心をしっかり</span>押さえる</li>
+                    <li><i class="fa-solid fa-circle-info"></i>Flashは突っ込めば出てくるが、<span class="keyword-tag">分からない人が突っ込めるか</span>が課題</li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-2">
+                <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--color-2);"></i> 読みやすさ → Flash / 正確さ → Pro<span class="highlight">用途で使い分けよう！</span></span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="section-layout">
+
+        <div class="card fade-in-scale" style="animation-delay: 1.2s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-comments fa-5x" style="color: var(--color-1); animation: fa-beat-fade 2s;"></i>
+                <h2>⑬Solとの違い: 批判的フィードバック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-magnifying-glass-chart"></i><span class="highlight">GPT-5.5 Sol</span>は<span class="keyword-tag">AIの迎合（sycophancy）</span>を排除</li>
+                    <li><i class="fa-solid fa-flag"></i>「この大きな問題点があります」と<span class="highlight">批判的に指摘</span>してくれる</li>
+                    <li><i class="fa-solid fa-arrow-right"></i>次の研究の指標が見つかる = 研究の質が向上</li>
+                    <li><i class="fa-solid fa-circle-exclamation"></i>ただし<span class="keyword-tag">建設的な提案</span>はまだ不足気味</li>
+                    <li><i class="fa-solid fa-ban"></i>Gemini 3.6 Flash / 3.1 Proは、まだ<span class="highlight">問題点指摘</span>はできないレベル</li>
+                </ul>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-thought-bubble fa-lg" style="color: var(--color-5);"></i> 「悪いのは分かった。じゃあどうすれば？」その<span class="highlight">建設性</span>が次の課題ですね</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.3s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-seedling fa-5x" style="color: var(--color-2); animation: fa-bounce 2s;"></i>
+                <h2>⑭3.6 Flashの進化: 評価フィードバック</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-arrow-up"></i>「読む際の評価・評価の要点」といった<span class="keyword-tag">フィードバック的生成</span>が可能に</li>
+                    <li><i class="fa-solid fa-circle-info"></i>前のバージョンにはなかった<span class="highlight">進化ポイント</span></li>
+                    <li><i class="fa-solid fa-eye"></i>内容を客観的に見る力が向上している</li>
+                    <li><i class="fa-solid fa-circle-check"></i>Solレベルではないが、<span class="highlight">確実に改善傾向</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1">
+                <span class="handwritten"><i class="fa-solid fa-seedling fa-lg" style="color: var(--color-1);"></i> 批判的フィードバックの芽が見える！今後のバージョンアップに期待大</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.4s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-palette fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s;"></i>
+                <h2>⑮マルチモーダル可視化: 最強のイメージ力</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i>難解テキストを<span class="highlight">図解・イラストに変換</span>する能力は最強</li>
+                    <li><i class="fa-solid fa-circle-info"></i>ダークマターとダークエネルギーの変換位相を<span class="keyword-tag">視覚的に表現</span></li>
+                    <li><i class="fa-solid fa-check"></i>λ=πの概念もイメージとして正確に描き出す</li>
+                    <li><i class="fa-solid fa-robot"></i>ProはCoT（思考連鎖）が強すぎて<span class="highlight">イメージ力が弱い</span></li>
+                    <li><i class="fa-solid fa-scale-balanced"></i>Solは中間。Flashが<span class="highlight">柔らかくイメージで出してくれる</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble right variant-2">
+                <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--color-2);"></i> テキストだけでは理解できない内容も<span class="highlight">視覚化すれば一発で分かる！</span>これがGeminiの真骨頂</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.5s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-layer-group fa-5x" style="color: var(--color-1); animation: fa-flip 3s;"></i>
+                <h2>⑯可視化力の3モデル比較</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-star" style="color:#FBBF24;"></i><span class="highlight">3.6 Flash</span>: 柔らかいイメージ、<span class="keyword-tag">最も分かりやすい</span></li>
+                    <li><i class="fa-solid fa-star-half-stroke" style="color:#9CA3AF;"></i><span class="highlight">3.1 Pro</span>: CoTが働きすぎてイメージが不十分</li>
+                    <li><i class="fa-solid fa-star-half-stroke" style="color:#9CA3AF;"></i><span class="highlight">GPT-5.5 Sol</span>: 中間。λ=πは出すが変換が不明瞭</li>
+                </ul>
+                <div class="comparison-row">
+                    <div class="comp-left"><i class="fa-solid fa-brain"></i> 入門学習</div>
+                    <div class="comp-center">目的別使い分け</div>
+                    <div class="comp-right winner"><i class="fa-solid fa-microscope"></i> 専門理解</div>
+                </div>
+                <div class="comparison-row">
+                    <div class="comp-left winner">→ Flash 3.6</div>
+                    <div class="comp-center"></div>
+                    <div class="comp-right">→ Pro / Sol</div>
+                </div>
+            </div>
+            <div class="speech-bubble">
+                <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--color-5);"></i> 分野の<span class="highlight">入り口で学ぶ</span>ならFlash！<span class="highlight">プロ的に深く</span>理解するならPro/Sol！</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.6s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-closed-captioning fa-5x" style="color: var(--color-2); animation: fa-bounce 2s;"></i>
+                <h2>⑰動画文字起こし & 概要欄生成</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-video"></i>24分の動画を<span class="highlight">忠実に文字起こし</span></li>
+                    <li><i class="fa-solid fa-clock"></i>3.6では<span class="keyword-tag">タイムスタンプが自動付与</span>される</li>
+                    <li><i class="fa-solid fa-circle-info"></i>システムプロンプトが変更され、<span class="highlight">プロンプトなしでも整形</span>される</li>
+                    <li><i class="fa-solid fa-file-lines"></i>概要欄は<span class="keyword-tag">セクション形式</span>で充実した内容</li>
+                    <li><i class="fa-solid fa-timeline"></i>タイムラインも<span class="highlight">自動生成</span> → コピペでそのまま使える</li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-1 right">
+                <span class="handwritten"><i class="fa-solid fa-youtube fa-lg" style="color: #FF0000;"></i> YouTuberなら<span class="highlight">必須ツール</span>！もうコピペだけで概要欄完成</span>
+            </div>
+        </div>
+
+        <div class="card fade-in-scale" style="animation-delay: 1.7s;">
+            <div class="mega-icon-container">
+                <i class="fa-solid fa-music fa-5x" style="color: var(--color-5); animation: fa-beat-fade 2s;"></i>
+                <h2>⑱音楽分析: Geminiオンリーの領域</h2>
+            </div>
+            <div class="card-content">
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-lock"></i><span class="highlight">Claude・ChatGPTにはできない</span>音楽分析機能</li>
+                    <li><i class="fa-solid fa-guitar"></i>コード・ピッチ・キー・<span class="keyword-tag">テンポ（BPM）</span>・楽器構成を分析</li>
+                    <li><i class="fa-solid fa-face-smile-beam"></i>Flash: 「切なくも暖かいクラシカルポップス」と正確に表現</li>
+                    <li><i class="fa-solid fa-bullseye"></i>ノスタルジー感・カタルシスなどの<span class="highlight">心理的効果</span>も言及</li>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i>FlashはBPM推定に誤りあり、<span class="keyword-tag">Proの方が精度高い</span></li>
+                    <li><i class="fa-solid fa-circle-check"></i>Proは約7割の精度。知識があれば<span class="highlight">十分実用レベル</span></li>
+                </ul>
+            </div>
+            <div class="speech-bubble variant-2">
+                <span class="handwritten"><i class="fa-solid fa-gem fa-lg" style="color: var(--color-1);"></i> 音楽分析は<span class="highlight">Geminiオンリーの領域</span>！どちらも部分的に間違いはあるが、音楽の知識がある人であれば補うには十分使える！
+                </span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+        <p>🎬 動画: <a href="https://youtu.be/hKBuz66bjL8" target="_blank">ワンダー佐藤「Gemini 3.6 Flash 実践デモ解説」</a></p>
+        <p style="margin-top: 10px; opacity: 0.8;">📅 2026年7月23日 | 🎨 AI News Infographic by OpenClaw</p>
+    </div>
+
+</div>
+</body>
+</html>

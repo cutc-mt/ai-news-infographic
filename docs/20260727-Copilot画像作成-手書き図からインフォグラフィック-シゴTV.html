@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Copilot画像作成 - 手書き図からインフォグラフィックを自動生成</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+    --ui-color-1: #1565C0;
+    --ui-color-2: #42A5F5;
+    --ui-color-3: #E3F2FD;
+    --ui-color-4: #0D47A1;
+    --ui-color-5: #64B5F6;
+    --color-1: #1976D2;
+    --color-2: #0D47A1;
+    --color-3: #64B5F6;
+    --color-4: #0A1929;
+    --color-5: #2196F3;
+    --bg-canvas: #F0F7FF;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background-color: var(--bg-canvas);
+    font-family: 'Zen Kurenaido', sans-serif;
+    color: #333333;
+    line-height: 1.6;
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* ヘッダー */
+.header {
+    text-align: center;
+    padding: 40px 20px 30px;
+    background: linear-gradient(135deg, var(--color-1), var(--color-2), var(--color-4));
+    border-radius: 24px;
+    margin-bottom: 30px;
+    color: white;
+    box-shadow: 8px 8px 25px rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.header::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(100,181,246,0.15) 0%, transparent 70%);
+    animation: headerGlow 6s ease-in-out infinite;
+}
+
+@keyframes headerGlow {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(5%, 5%); }
+}
+
+.header-icon {
+    font-size: 80px;
+    margin-bottom: 15px;
+    animation: fa-bounce 2s infinite;
+    position: relative;
+    z-index: 1;
+}
+
+.header h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 42px;
+    margin-bottom: 10px;
+    position: relative;
+    z-index: 1;
+}
+
+.header .subtitle {
+    font-size: 20px;
+    opacity: 0.9;
+    font-family: 'Yomogi', cursive;
+    position: relative;
+    z-index: 1;
+}
+
+.header .date {
+    margin-top: 12px;
+    font-size: 16px;
+    opacity: 0.8;
+    position: relative;
+    z-index: 1;
+}
+
+/* カードレイアウト */
+.section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 30px;
+}
+
+/* カード */
+.section-card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 4px solid var(--ui-color-1);
+}
+
+.section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 8px 25px rgba(21,101,192,0.2);
+}
+
+.section-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, transparent 50%, rgba(33,150,243,0.08) 50%);
+    border-radius: 0 20px 0 0;
+}
+
+/* フェードインアニメーション */
+.fade-in-scale {
+    animation: fadeInScale 0.6s ease-out both;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* 大型アイコン */
+.mega-icon-container {
+    text-align: center;
+    margin: 10px 0 15px;
+}
+
+.mega-icon-container i {
+    color: var(--ui-color-1);
+}
+
+.mega-icon-container h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 22px;
+    color: #555555;
+    margin-top: 10px;
+    font-weight: bold;
+}
+
+/* カードコンテンツ */
+.card-content {
+    padding: 0 5px 10px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+    margin: 10px 0;
+    padding: 0;
+    list-style-type: none;
+}
+
+.keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 18px;
+    margin-top: 3px;
+}
+
+.keyword-list li span {
+    flex: 1;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 2px 8px;
+    border-radius: 5px;
+    margin-right: 4px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.keyword-tag.danger {
+    background-color: #FFEBEE;
+    color: #B71C1C;
+}
+
+.keyword-tag.success {
+    background-color: #E8F5E9;
+    color: #1B5E20;
+}
+
+/* highlight */
+.highlight {
+    background: linear-gradient(120deg, rgba(33,150,243,0.3) 0%, rgba(33,150,243,0.15) 100%);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: bold;
+    color: var(--ui-color-4);
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+    position: relative;
+    background: #FFF;
+    border: 2.5px solid var(--ui-color-1);
+    border-radius: 18px;
+    padding: 10px 14px;
+    margin: 12px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+    transform: rotate(-0.8deg);
+}
+
+.speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -12px;
+    left: 20px;
+    border-width: 11px 7px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+}
+
+.speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+    bottom: auto;
+    top: -12px;
+    border-width: 0 7px 11px;
+    transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--ui-color-2);
+    transform: rotate(0.8deg);
+}
+
+.speech-bubble.variant-1::after {
+    border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+    background: #FFE9E9;
+    border-color: var(--ui-color-5);
+    transform: rotate(-1.5deg);
+}
+
+.speech-bubble.variant-2::after {
+    border-color: var(--ui-color-5) transparent;
+}
+
+.handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+}
+
+/* コードプレビュー */
+pre {
+    background: #2D2D2D;
+    color: #F8F8F2;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    border-left: 4px solid var(--ui-color-2);
+}
+
+pre .comment { color: #6A9955; }
+pre .command { color: #569CD6; }
+pre .danger-cmd { color: #F44747; font-weight: bold; }
+
+/* フッター */
+footer {
+    text-align: center;
+    padding: 25px 20px;
+    background: linear-gradient(135deg, var(--color-4), var(--color-2));
+    border-radius: 16px;
+    color: white;
+    margin-top: 20px;
+    font-family: 'Yomogi', cursive;
+    font-size: 16px;
+}
+
+footer a {
+    color: #64B5F6;
+    text-decoration: none;
+    font-weight: bold;
+    transition: color 0.3s;
+}
+
+footer a:hover {
+    color: white;
+}
+
+/* セクションタイトル */
+.section-divider {
+    text-align: center;
+    padding: 15px 20px;
+    margin: 10px 0 20px;
+    position: relative;
+}
+
+.section-divider h3 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 28px;
+    color: var(--ui-color-4);
+    position: relative;
+    display: inline-block;
+    padding: 0 30px;
+}
+
+.section-divider h3::before,
+.section-divider h3::after {
+    content: '✨';
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 24px;
+}
+
+.section-divider h3::before {
+    left: -5px;
+}
+
+.section-divider h3::after {
+    right: -5px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+    .section-card {
+        min-width: 320px;
+    }
+}
+
+@media (max-width: 1200px) {
+    .section-card {
+        min-width: 350px;
+    }
+}
+
+@media (max-width: 900px) {
+    .section-card {
+        min-width: 400px;
+    }
+}
+
+@media (max-width: 768px) {
+    .section-layout {
+        flex-direction: column;
+    }
+    
+    .section-card {
+        width: 100%;
+        min-width: auto;
+    }
+    
+    .header h1 {
+        font-size: 28px;
+    }
+}
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<header class="header">
+    <div class="header-icon">
+        <i class="fa-solid fa-wand-magic-sparkles" style="color: #64B5F6;"></i>
+    </div>
+    <h1><i class="fa-solid fa-pen-ruler" style="font-size: 36px;"></i> Copilotで画像作成</h1>
+    <p class="subtitle">手書きのラフ図からインフォグラフィックを自動生成する<br>Microsoft Copilotの画像作成機能の進化と実践テクニック</p>
+    <p class="date">📅 2026年7月27日</p>
+</header>
+
+<!-- ===== セクション1: AI時代の資料作成 ===== -->
+<div class="section-divider">
+    <h3>AI時代の資料作成</h3>
+</div>
+
+<div class="section-layout">
+
+<!-- カード① -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>① AI時代の資料作成: コンテクスト蓄積から実行まで</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>まず<span class="highlight">自組織ならではの情報とコンテクスト</span>をちゃんと蓄積することが出発点</span></li>
+            <li><i class="fa-solid fa-people-arrows fa-lg" aria-hidden="true"></i><span>蓄積した情報を参照しながら<span class="keyword-tag">人間が方向付け</span>を行う</span></li>
+            <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>AIと対話しながら<span class="keyword-tag">肉付け</span>をしていく</span></li>
+            <li><i class="fa-solid fa-check-double fa-lg" aria-hidden="true"></i><span>最後に人間が<span class="highlight">スタンスを取って決定</span>し、人に話して実行する</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-arrows-rotate fa-lg" style="color: var(--ui-color-1);"></i>
+            実行した結果をまた蓄積してループを回す — これがAI時代の資料作成！
+        </span>
+    </div>
+</div>
+
+<!-- カード② -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-pen-fancy fa-5x" style="animation: fa-bounce 3s infinite;"></i>
+        <h2>② 手書きラフをベースに: A4の紙から始める</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-file fa-lg" aria-hidden="true"></i><span>A4のコピー用紙に<span class="highlight">手書きで図を書く</span> — AI時代の資料作成の考え方をまとめた図を用意</span></li>
+            <li><i class="fa-solid fa-camera fa-lg" aria-hidden="true"></i><span>書いた図を<span class="keyword-tag">写真に撮って</span>そのままコピペでCopilotに投入</span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>プロンプトは<span class="highlight">「添付の写真を分かりやすいインフォグラフィックにしてください」</span>というシンプルな指示だけ</span></li>
+            <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i><span>モデルや設定は<span class="keyword-tag">デフォルトのまま</span>で実行 — 特別な調整は不要</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-smile fa-lg" style="color: #4CAF50;"></i>
+            手書きの図をパッと渡すだけでOK — これが一番簡単！
+        </span>
+    </div>
+</div>
+
+<!-- カード③ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-image fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>③ 生成結果: 構造は伝わる、でも文字は...</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span><span class="highlight">構造としては伝わっている</span> — 上から四角い流れがあって、ベースラインがある意図は把握できている</span></li>
+            <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>ただし<span class="keyword-tag danger">文字の読み取りミス</span>が発生 — 「肉付け」が「内付け」に、「ならでは」が「名古」になってしまう</span></li>
+            <li><i class="fa-solid fa-spell-check fa-lg" aria-hidden="true"></i><span>手書きの文字は<span class="keyword-tag">AIにとって読みづらい</span>という課題がある</span></li>
+            <li><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i><span>それでも<span class="highlight">図になっているとイメージが涌きやすい</span>というメリットは大きい</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-5);"></i>
+            「肉付け」が「内付け」になるのはよくある笑
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション2: 修正と精度向上 ===== -->
+<div class="section-divider">
+    <h3>修正と精度向上</h3>
+</div>
+
+<div class="section-layout">
+
+<!-- カード④ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.4s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x" style="animation: fa-spin 6s linear infinite;"></i>
+        <h2>④ 修正の工夫: 日本語がおかしい部分は直せる</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-pen-to-square fa-lg" aria-hidden="true"></i><span>日本語がおかしい部分を<span class="highlight">「直して」と指示</span>すれば修正が可能</span></li>
+            <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>ただし<span class="keyword-tag">「推測して直せ」という指示</span>ではうまくいかない場合がある</span></li>
+            <li><i class="fa-solid fa-clipboard-list fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">具体的にどこを直すか</span>を指定する方が成功率が高い</span></li>
+            <li><i class="fa-solid fa-shapes fa-lg" aria-hidden="true"></i><span>「肉付け」の修正リクエストで<span class="highlight">正しく反映される</span>ことを確認</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+            だめだと思っても、やり直せばできる時がある！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑤ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.5s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-sparkles fa-5x" style="animation: fa-beat-fade 2.5s infinite;"></i>
+        <h2>⑤ リトライで成功: 文脈を理解して自動修正</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-magic-wand-sparkles fa-lg" aria-hidden="true"></i><span>修正リクエストを送ると、<span class="highlight">文脈を理解して正しい日本語に修正</span>してくれる</span></li>
+            <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>「肉付け」「スタンスを取り」「実行」という<span class="keyword-tag success">キーワードが正しく反映</span>される</span></li>
+            <li><i class="fa-solid fa-plus fa-lg" aria-hidden="true"></i><span>プラスアルファの情報も<span class="highlight">全く正しい内容</span>で追加される</span></li>
+            <li><i class="fa-solid fa-trophy fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">「天才！」</span> — リトライで精度が大幅に向上することを実証</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-thumbs-up fa-lg" style="color: #4CAF50;"></i>
+            やればできる！Copilotの底力を感じる瞬間
+        </span>
+    </div>
+</div>
+
+<!-- カード⑥ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.6s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑥ Copilotの進化: 以前よりレベルが大幅アップ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span>以前は<span class="keyword-tag">「負けているんじゃないか」</span>と言われていたが、現在は<span class="highlight">レベルが大幅に向上</span></span></li>
+            <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>チャットGPTでもClaudeでも<span class="keyword-tag">お好みのモデル</span>で実行可能</span></li>
+            <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i><span>右上のモデル選択で<span class="highlight">自動以外のモデル</span>にも変更できる</span></li>
+            <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>今回はあえて<span class="keyword-tag">デフォルト設定のまま</span>で精度を検証</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-1);"></i>
+            進化がすごい — 以前とは別物レベル！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション3: 画像編集機能 ===== -->
+<div class="section-divider">
+    <h3>画像編集機能のすごさ</h3>
+</div>
+
+<div class="section-layout">
+
+<!-- カード⑦ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.7s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-object-group fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑦ オブジェクトとして認識: 図を分解して編集</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i><span>生成された図は<span class="highlight">平面ではなくオブジェクトとして認識</span>される</span></li>
+            <li><i class="fa-solid fa-eraser fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">「消去」ボタン</span>を押すと、各要素が個別に選択できるようになる</span></li>
+            <li><i class="fa-solid fa-trash fa-lg" aria-hidden="true"></i><span>不要なオブジェクトを<span class="keyword-tag danger">個別に削除</span>可能 — 「消去しますか？」の確認付き</span></li>
+            <li><i class="fa-solid fa-image fa-lg" aria-hidden="true"></i><span>企業のロゴなどを<span class="highlight">アップロードして追加</span>することもできる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-5);"></i>
+            図がバラバラに選べる — これめちゃくちゃ便利！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑧ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.8s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-pen-nib fa-5x" style="animation: fa-bounce 2.5s infinite;"></i>
+        <h2>⑧ テキスト編集: 日本語は今後に期待</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-keyboard fa-lg" aria-hidden="true"></i><span>テキストの編集は<span class="highlight">一応可能</span>だが、日本語はまだ<span class="keyword-tag">精度に課題</span>がある</span></li>
+            <li><i class="fa-solid fa-text-height fa-lg" aria-hidden="true"></i><span>文字をテキストとして判断する際、<span class="keyword-tag danger">若干のずれ</span>が生じることがある</span></li>
+            <li><i class="fa-solid fa-text-width fa-lg" aria-hidden="true"></i><span><span class="keyword-tag danger">文字の大きさが変わってしまう</span>こともあり、修正が必要になる</span></li>
+            <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>この機能は<span class="highlight">今後のアップデートに期待</span>という位置づけ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-hourglass-half fa-lg" style="color: var(--ui-color-1);"></i>
+            日本語テキスト編集はまだ発展途上 — でも画面内で完結できる設計！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑨ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.9s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-file-export fa-5x" style="animation: fa-flip 3s infinite;"></i>
+        <h2>⑨ 出力形式: 画像として保存、パワポは別ルート</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-image fa-lg" aria-hidden="true"></i><span>保存形式は<span class="highlight">画像ファイル</span>として出力される</span></li>
+            <li><i class="fa-solid fa-panorama fa-lg" aria-hidden="true"></i><span>思想的には<span class="keyword-tag">画面内で全て編集を完結</span>させて、パワポに貼り付けられる状態にする</span></li>
+            <li><i class="fa-solid fa-file-powerpoint fa-lg" aria-hidden="true"></i><span>パワポファイルが必要な場合は<span class="keyword-tag success">PowerPointのCopilot</span>を使うのが正解</span></li>
+            <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>「テキストで欲しい」「パワポにしたい」という要望は<span class="highlight">今後のアップデートに期待</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            図として欲しい時はCopilot、パワポとして欲しい時はパワポのCopilot！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション4: Copilot画像作成モード ===== -->
+<div class="section-divider">
+    <h3>Copilot画像作成モード</h3>
+</div>
+
+<div class="section-layout">
+
+<!-- カード⑩ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.0s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-palette fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑩ 画像作成に特化: 専用モードでスタイル選択</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-images fa-lg" aria-hidden="true"></i><span>Copilotには<span class="highlight">画像作成に特化した専用モード</span>が用意されている</span></li>
+            <li><i class="fa-solid fa-brush fa-lg" aria-hidden="true"></i><span>スタイルを選べる：<span class="keyword-tag">リアリスティック</span>、<span class="keyword-tag">イラスト</span>、<span class="keyword-tag">フラットデザイン</span>など</span></li>
+            <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">フラットデザイン</span>は資料として使いやすいデザインが出てくる</span></li>
+            <li><i class="fa-solid fa-droplet fa-lg" aria-hidden="true"></i><span><span class="highlight">ブランドカラー</span>を指定することも可能 — 自社カラーを入れておくと統一感が出る</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-palette fa-lg" style="color: var(--ui-color-1);"></i>
+            スタイルも色も選べる — 資料用からポスターまで！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑪ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-pen-clip fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑪ 同じ図を別モードで: チャット vs 画像作成</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-right-left fa-lg" aria-hidden="true"></i><span><span class="highlight">同じ手書き図</span>をチャットモードと画像作成モードの両方で作成可能</span></li>
+            <li><i class="fa-solid fa-chart-column fa-lg" aria-hidden="true"></i><span>以前はチャットの精度がイマイチで<span class="keyword-tag">画像作成モードを使っていた</span></span></li>
+            <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>最近はチャットも<span class="keyword-tag success">精度が大幅に向上</span> — どちらでも良いレベルに</span></li>
+            <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>用途に応じて<span class="highlight">使い分ける</span>のがベストプラクティス</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-check fa-lg" style="color: #4CAF50;"></i>
+            どっちも使える — 好みで選んでOK！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑫ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-doodle fa-5x" style="animation: fa-beat-fade 1.5s infinite;"></i>
+        <h2>⑫ Doodleスタイル: ワクワク感のある図を生成</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-paintbrush fa-lg" aria-hidden="true"></i><span>Doodleスタイルを選ぶと<span class="highlight">可愛らしい手描き風の図</span>が生成される</span></li>
+            <li><i class="fa-solid fa-bullhorn fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">イベントの一枚発表紙</span>などの用途に最適</span></li>
+            <li><i class="fa-solid fa-face-smile-beam fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">ワクワク感を作る</span>時に有効に働く</span></li>
+            <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>ただし<span class="keyword-tag danger">文字の読み込み精度</span>は少し落ちるので、文字は一緒に添えるのがコツ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+            一発でいい感じに仕上げたい時はDoodle！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション5: 実用例と活用法 ===== -->
+<div class="section-divider">
+    <h3>実用例と活用法</h3>
+</div>
+
+<div class="section-layout">
+
+<!-- カード⑬ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.3s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-box-archive fa-5x" style="animation: fa-bounce 3s infinite;"></i>
+        <h2>⑬ 商品パッケージ作成: 実際の活用事例</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-box fa-lg" aria-hidden="true"></i><span><span class="highlight">お菓子のパッケージ</span>や<span class="highlight">お薬のパッケージ</span>のデザインに活用されている</span></li>
+            <li><i class="fa-solid fa-plus-circle fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">「コンテンツを追加」</span>から参考情報を入れると、それを<span class="keyword-tag success">デフォルメしたデザイン</span>を作ってくれる</span></li>
+            <li><i class="fa-solid fa-industry fa-lg" aria-hidden="true"></i><span><span class="highlight">自社製品</span>のパッケージデザインにも活用可能</span></li>
+            <li><i class="fa-solid fa-users fa-lg" aria-hidden="true"></i><span>実際に<span class="keyword-tag success">やりたいと言っているお客様</span>がいて、一緒に試したら結構うまく出来た</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-gift fa-lg" style="color: var(--ui-color-1);"></i>
+            パッケージデザインもAIで — これからのスタンダード！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑭ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.4s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-people-group fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑭ 発注側の変化: ラフからリアルなイメージへ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-handshake fa-lg" aria-hidden="true"></i><span>発注側が<span class="highlight">ある程度のアウトプットを出せる</span>ようになったことで、釣り合わせが早くなる</span></li>
+            <li><i class="fa-solid fa-file-pen fa-lg" aria-hidden="true"></i><span>以前は<span class="keyword-tag">手書きや文字で説明</span>していたものを、<span class="keyword-tag success">リアルに作れる</span>ように</span></li>
+            <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>デザイナーとの<span class="highlight">コミュニケーション精度が向上</span></span></li>
+            <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">「とりあえず作ってみる」</span>という新しいワークフローが誕生</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-handshake-angle fa-lg" style="color: var(--ui-color-5);"></i>
+            発注側がラフを出せる → デザイナーとの認識ズレが激減！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑮ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.5s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-presentation-screen fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>⑮ 会議・ワークショップでの活用: イメージのすり合わせ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-users-rectangle fa-lg" aria-hidden="true"></i><span>会議のプロジェクト立ち上げや<span class="highlight">ワークショップ</span>で大活躍</span></li>
+            <li><i class="fa-solid fa-file-word fa-lg" aria-hidden="true"></i><span>WordやOneNoteの<span class="keyword-tag">文字だけの資料</span>だとイメージが涌きにくい</span></li>
+            <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">ポンと図がある</span>と、細かく議論しなくても<span class="highlight">イメージがすり合う</span></span></li>
+            <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>チャッと書いてパッと出せるので<span class="keyword-tag success">時短にもなる</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-people-arrows fa-lg" style="color: var(--ui-color-1);"></i>
+            図があるだけで会議が進みやすい — これ大事！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション6: ベストプラクティスとまとめ ===== -->
+<div class="section-divider">
+    <h3>ベストプラクティスとまとめ</h3>
+</div>
+
+<div class="section-layout">
+
+<!-- カード⑯ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.6s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑯ 効果的なプロンプトのコツ: 文字は一緒に添える</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-keyboard fa-lg" aria-hidden="true"></i><span>手書き図だけだと<span class="keyword-tag danger">文字の読み取りミス</span>が発生しやすい</span></li>
+            <li><i class="fa-solid fa-text-height fa-lg" aria-hidden="true"></i><span><span class="highlight">文字データを一緒に添える</span>と精度が大幅に向上する</span></li>
+            <li><i class="fa-solid fa-pen-ruler fa-lg" aria-hidden="true"></i><span>手書きラフをベースにしつつ、<span class="keyword-tag">テキストで内容を補足</span>するのがベスト</span></li>
+            <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>指示で修正する方が<span class="highlight">画面で直接編集するより確実</span>な場合が多い</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            図 ＋ テキスト — この組み合わせが最強！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑰ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.7s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-route fa-5x" style="animation: fa-bounce 2.5s infinite;"></i>
+        <h2>⑰ 使い分けの指針: チャット・画像作成・パワポ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-message fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">チャットモード</span>：インフォグラフィックや資料用の図を作りたい時</span></li>
+            <li><i class="fa-solid fa-palette fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">画像作成モード</span>：ポスターやパッケージなどデザイン性の高いもの</span></li>
+            <li><i class="fa-solid fa-file-powerpoint fa-lg" aria-hidden="true"></i><span><span class="keyword-tag success">PowerPoint Copilot</span>：パワポファイルとして出力したい時</span></li>
+            <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span><span class="highlight">用途に応じて適切なツールを選ぶ</span>のが生産性向上のカギ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-compass fa-lg" style="color: var(--ui-color-5);"></i>
+            目的に合わせてツールを使い分けよう！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑱ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.8s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑱ まとめ: 手書きから高品質な図をサクッと作成</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-pen-fancy fa-lg" aria-hidden="true"></i><span><span class="highlight">手書きのラフをベース</span>に、Copilotでインフォグラフィックを自動生成</span></li>
+            <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>文字の読み取りミスがあっても<span class="keyword-tag">リトライで修正可能</span></span></li>
+            <li><i class="fa-solid fa-object-group fa-lg" aria-hidden="true"></i><span>生成された図は<span class="keyword-tag success">オブジェクトとして編集</span>でき、ロゴ追加なども可能</span></li>
+            <li><i class="fa-solid fa-palette fa-lg" aria-hidden="true"></i><span>スタイルや<span class="keyword-tag">ブランドカラー</span>を指定してデザイン性の高い図も作れる</span></li>
+            <li><i class="fa-solid fa-bullhorn fa-lg" aria-hidden="true"></i><span>会議、ワークショップ、パッケージデザインなど<span class="highlight">活用シーンは幅広い</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-1);"></i>
+            手書き → Copilot → 完成 — この流れが一番早い！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- フッター -->
+<footer>
+    🎬 動画: <a href="https://www.youtube.com/watch?v=8kyE6dkeKc4" target="_blank" style="color: #64B5F6;">シゴTV - Copilotで画像作成</a> | 📅 2026年7月27日<br>
+    <span style="font-size: 14px; opacity: 0.8;">AIニュースインフォグラフィック by OpenClaw</span>
+</footer>
+
+</body>
+</html>

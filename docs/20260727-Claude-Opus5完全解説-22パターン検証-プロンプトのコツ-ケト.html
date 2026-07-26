@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Opus 5 完全解説 - 22パターン検証とプロンプトのコツ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+    --ui-color-1: #6A1B9A;
+    --ui-color-2: #AB47BC;
+    --ui-color-3: #F3E5F5;
+    --ui-color-4: #311B92;
+    --ui-color-5: #E1BEE7;
+    --color-1: #7B1FA2;
+    --color-2: #4A148C;
+    --color-3: #BA68C8;
+    --color-4: #1A0033;
+    --color-5: #CE93D8;
+    --bg-canvas: #FAF5FF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    background-color: var(--bg-canvas);
+    font-family: 'Zen Kurenaido', sans-serif;
+    color: #333333;
+    line-height: 1.6;
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header {
+    text-align: center; padding: 40px 20px 30px;
+    background: linear-gradient(135deg, var(--color-1), var(--color-2), var(--color-4));
+    border-radius: 24px; margin-bottom: 30px; color: white;
+    box-shadow: 8px 8px 25px rgba(0,0,0,0.2);
+    position: relative; overflow: hidden;
+}
+.header::before {
+    content: ''; position: absolute; top: -50%; left: -50%;
+    width: 200%; height: 200%;
+    background: radial-gradient(circle, rgba(171,71,188,0.15) 0%, transparent 70%);
+    animation: headerGlow 6s ease-in-out infinite;
+}
+@keyframes headerGlow { 0%,100% { transform: translate(0,0); } 50% { transform: translate(5%,5%); } }
+.header-icon { font-size: 80px; margin-bottom: 15px; animation: fa-bounce 2s infinite; position: relative; z-index: 1; }
+.header h1 { font-family: 'Kaisei Decol', serif; font-size: 42px; margin-bottom: 10px; position: relative; z-index: 1; }
+.header .subtitle { font-size: 20px; opacity: 0.9; font-family: 'Yomogi', cursive; position: relative; z-index: 1; }
+.header .date { margin-top: 12px; font-size: 16px; opacity: 0.8; position: relative; z-index: 1; }
+
+.section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 30px; }
+
+.section-card {
+    flex: 1; min-width: 280px; max-width: 450px;
+    background-color: white; border-radius: 20px; padding: 20px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative; overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-top: 4px solid var(--ui-color-1);
+}
+.section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(106,27,154,0.2); }
+.section-card::before {
+    content: ''; position: absolute; top: 0; right: 0;
+    width: 60px; height: 60px;
+    background: linear-gradient(135deg, transparent 50%, rgba(171,71,188,0.08) 50%);
+    border-radius: 0 20px 0 0;
+}
+
+.fade-in-scale { animation: fadeInScale 0.6s ease-out both; }
+@keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.mega-icon-container { text-align: center; margin: 10px 0 15px; }
+.mega-icon-container i { color: var(--ui-color-1); }
+.mega-icon-container h2 { font-family: 'Kaisei Decol', serif; font-size: 22px; color: #555555; margin-top: 10px; font-weight: bold; }
+
+.card-content { padding: 0 5px 10px; }
+
+.keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+.keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+.keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 18px; margin-top: 3px; }
+.keyword-list li span { flex: 1; }
+
+.keyword-tag {
+    background-color: var(--ui-color-3); color: var(--ui-color-4);
+    padding: 2px 8px; border-radius: 5px; margin-right: 4px;
+    display: inline-block; font-weight: bold; font-size: 13px;
+}
+.keyword-tag.danger { background-color: #FFEBEE; color: #B71C1C; }
+.keyword-tag.success { background-color: #E8F5E9; color: #1B5E20; }
+.keyword-tag.info { background-color: #E3F2FD; color: #0D47A1; }
+
+.highlight {
+    background: linear-gradient(120deg, rgba(171,71,188,0.3) 0%, rgba(171,71,188,0.15) 100%);
+    padding: 1px 6px; border-radius: 4px; font-weight: bold; color: var(--ui-color-4);
+}
+
+.speech-bubble {
+    position: relative; background: #FFF;
+    border: 2.5px solid var(--ui-color-1); border-radius: 18px;
+    padding: 10px 14px; margin: 12px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.08);
+    transform: rotate(-0.8deg);
+}
+.speech-bubble::after {
+    content: ''; position: absolute; bottom: -12px; left: 20px;
+    border-width: 11px 7px 0; border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block; width: 0;
+}
+.speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+.speech-bubble.top::after { bottom: auto; top: -12px; border-width: 0 7px 11px; transform: rotate(-5deg); }
+.speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(0.8deg); }
+.speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+.speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-1.5deg); }
+.speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+.handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+
+pre {
+    background: #2D2D2D; color: #F8F8F2;
+    padding: 10px 14px; border-radius: 8px; font-size: 13px;
+    font-family: 'Courier New', monospace; margin-top: 10px;
+    overflow-x: auto; border-left: 4px solid var(--ui-color-2);
+}
+
+footer {
+    text-align: center; padding: 25px 20px;
+    background: linear-gradient(135deg, var(--color-4), var(--color-2));
+    border-radius: 16px; color: white; margin-top: 20px;
+    font-family: 'Yomogi', cursive; font-size: 16px;
+}
+footer a { color: #CE93D8; text-decoration: none; font-weight: bold; transition: color 0.3s; }
+footer a:hover { color: white; }
+
+.section-divider { text-align: center; padding: 15px 20px; margin: 10px 0 20px; position: relative; }
+.section-divider h3 {
+    font-family: 'Kaisei Decol', serif; font-size: 28px; color: var(--ui-color-4);
+    position: relative; display: inline-block; padding: 0 30px;
+}
+.section-divider h3::before, .section-divider h3::after {
+    content: '\2728'; position: absolute; top: 50%; transform: translateY(-50%); font-size: 24px;
+}
+.section-divider h3::before { left: -5px; }
+.section-divider h3::after { right: -5px; }
+
+@media (max-width: 1600px) { .section-card { min-width: 320px; } }
+@media (max-width: 1200px) { .section-card { min-width: 350px; } }
+@media (max-width: 900px) { .section-card { min-width: 400px; } }
+@media (max-width: 768px) { .section-layout { flex-direction: column; } .section-card { width: 100%; min-width: auto; } .header h1 { font-size: 28px; } }
+</style>
+</head>
+<body>
+
+<!-- ヘッダー -->
+<header class="header">
+    <div class="header-icon"><i class="fa-solid fa-brain" style="color: #CE93D8;"></i></div>
+    <h1><i class="fa-solid fa-rocket" style="font-size: 36px;"></i> Claude Opus 5 完全解説</h1>
+    <p class="subtitle">Fable 5と同等の賢さで価格は半分、22パターンの検証と<br>プロンプトのコツを徹底解説</p>
+    <p class="date">📅 2026年7月27日</p>
+</header>
+
+<!-- ===== セクション1: Opus 5の登場 ===== -->
+<div class="section-divider"><h3>Opus 5の登場</h3></div>
+<div class="section-layout">
+
+<!-- カード① -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>① Opus 5登場: Fable 5並みの賢さで半額</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-calendar fa-lg" aria-hidden="true"></i><span>7月24日に<span class="highlight">Claude Opus 5</span>がリリース。Fable 5とほぼ同じ賢さで<span class="keyword-tag success">価格は半分</span></span></li>
+            <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>発表から7時間で<span class="highlight">1032万回の表示</span>を記録し、世界的な注目を集めた</span></li>
+            <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>前世代のOpus 4.8と<span class="keyword-tag">同額</span>で世代交代。入力$5、出力$25</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            今後はOpus 5を使っていけばいいんです！
+        </span>
+    </div>
+</div>
+
+<!-- カード② -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>② エフォート5段階とファストモード</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span><span class="highlight">エフォート設定</span>で考える能力を5段階で調整可能。低から高の順で設定</span></li>
+            <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>最大は<span class="keyword-tag">ウルトラコード</span>、次いで最大、そして低まで選べる</span></li>
+            <li><i class="fa-solid fa-forward fa-lg" aria-hidden="true"></i><span>ファストモードは通常の<span class="highlight">約2.5倍の速さ</span>。GPTのコデックス（1.5倍）を大きく上回る</span></li>
+            <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>ファストモードでも<span class="keyword-tag info">考える量は変わらない</span>。ただしトークン使用量は増える</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-clock fa-lg" style="color: var(--ui-color-1);"></i>
+            急いでる時はファストモードが便利！
+            <br>考える量はそのままで早くなるよ
+        </span>
+    </div>
+</div>
+
+<!-- カード③ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>③ 安全性と図作成が劇的に向上</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-check-double fa-lg" aria-hidden="true"></i><span>安全性テストで<span class="highlight">過去一番嘘をつかないモデル</span>に。正確性が大幅に向上</span></li>
+            <li><i class="fa-solid fa-image fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">図作成</span>がめちゃくちゃ得意に。SVGとCSSだけで正確な図を生成</span></li>
+            <li><i class="fa-solid fa-wind fa-lg" aria-hidden="true"></i><span>エアコンの空気の流れを断面図で説明する図が<span class="highlight">教科書レベル</span>で完成</span></li>
+            <li><i class="fa-solid fa-microscope fa-lg" aria-hidden="true"></i><span>細胞の図も非常に精細に作成可能。実務やコンテンツ作成にすぐ活用できる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-5);"></i>
+            画像生成じゃなくてSVGとCSSだけで
+            <br>ここまでできるんだ...！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション2: Fable 5との違い ===== -->
+<div class="section-divider"><h3>Fable 5との違いと位置づけ</h3></div>
+<div class="section-layout">
+
+<!-- カード④ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.4s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-crown fa-5x" style="animation: fa-bounce 3s infinite;"></i>
+        <h2>④ Fable 5は特別枠、Opus 5は普段使い</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>Fable 5は<span class="highlight">フロンティア最上位モデル</span>として君臨。ただし非常に高くて時間がかかる</span></li>
+            <li><i class="fa-solid fa-user fa-lg" aria-hidden="true"></i><span>Opus 5は<span class="keyword-tag success">普段使いのモデル</span>として位置づけ。Fable 5の知能を若干落としたレベル</span></li>
+            <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span>Fable 5は入力$10・出力$50だが、Opus 5は<span class="highlight">入力$5・出力$25で半額</span></span></li>
+            <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>ただしOpus 5は裏でよく考えるため<span class="keyword-tag danger">トークンを多く消費</span>するので注意</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-2);"></i>
+            普段はOpus 5で十分！
+            <br>気に食わなかったらFable 5を使う感じでOK
+        </span>
+    </div>
+</div>
+
+<!-- カード⑤ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.5s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-trophy fa-5x" style="animation: fa-beat-fade 2.5s infinite;"></i>
+        <h2>⑤ エージェント系ベンチマーク: Opus 5がFable 5に勝利</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>ターミナルコーディングテストでOpus 5が<span class="highlight">Fable 5より10ポイント上</span></span></li>
+            <li><i class="fa-solid fa-desktop fa-lg" aria-hidden="true"></i><span>PC操作テストでもOpus 5が<span class="keyword-tag success">4ポイント上</span></span></li>
+            <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>エージェント検索で3ポイント上、業務ワークフローでは<span class="highlight">26% vs 17%で9ポイント差</span></span></li>
+            <li><i class="fa-solid fa-flask fa-lg" aria-hidden="true"></i><span>推論テストでも若干上回る結果</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i>
+            エージェント系5種目すべてで
+            <br>Fable 5に勝ってる...！すごい！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑥ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.6s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-puzzle-piece fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>⑥ ARCAGI 3テスト: 他モデルの3倍のひらめき</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span><span class="highlight">ARCAGI 3</span>は初めて見るパズルをその場で解くひらめきテスト。記憶がないので自頭がもろに出る</span></li>
+            <li><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i><span>Opus 5は<span class="keyword-tag success">他モデルの3倍</span>の成果を記録。前世代Opus 4.8から約20倍賢くなった</span></li>
+            <li><i class="fa-solid fa-desktop fa-lg" aria-hidden="true"></i><span>PC操作の実技テスト（OSワールド）では<span class="highlight">Fable 5と同じ点数を1/3の費用</span>で達成</span></li>
+            <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>ただし数学と法律の難問は<span class="keyword-tag danger">Fable 5の方が上</span>。専門性の高いタスクはFable 5推奨</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-5);"></i>
+            ひらめき（自頭）が3倍って...！
+            <br>Opus 4.8から20倍賢くなったみたい
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション3: プロンプトのコツ ===== -->
+<div class="section-divider"><h3>プロンプトのコツ</h3></div>
+<div class="section-layout">
+
+<!-- カード⑦ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.7s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-scissors fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑦ プロンプトは8割削除: 細かいルールは逆効果</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-quote-left fa-lg" aria-hidden="true"></i><span>Anthropicの中の人は<span class="highlight">プロンプトを8割削除</span>したと発表。細かいルールと例文は逆効果</span></li>
+            <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>制約条件を細かく書くより<span class="keyword-tag">判断をAIに任せる</span>方が良い結果が出る</span></li>
+            <li><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i><span>「あなたは何々です」「ルールはこれとこれ」のような<span class="keyword-tag danger">長いプロンプト</span>はもはや不要</span></li>
+            <li><i class="fa-solid fa-balance-scale fa-lg" aria-hidden="true"></i><span>なるべくプロンプトは短くして、AIの判断力に任せるのがベストプラクティス</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i>
+            今までの「丁寧なプロンプト」が
+            <br>逆効果だったなんて...衝撃！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑧ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.8s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-handshake fa-5x" style="animation: fa-bounce 3s infinite;"></i>
+        <h2>⑧ AIは上司、自分は部下という考え方</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-user-tie fa-lg" aria-hidden="true"></i><span><span class="highlight">「AIは上司、自分は部下」</span>という意識で使うのがおすすめ</span></li>
+            <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>必要なものがあれば<span class="keyword-tag">AIの方から質問してくる</span>ので、それに答えるだけで良い</span></li>
+            <li><i class="fa-solid fa-memory fa-lg" aria-hidden="true"></i><span>先回りして全部教えるのではなく、<span class="highlight">自動メモリに覚えさせる</span>のが正解</span></li>
+            <li><i class="fa-solid fa-folder-open fa-lg" aria-hidden="true"></i><span>デスクトップ上のファイルやMCP接続先のドライブから<span class="keyword-tag info">自動で参照</span>してくれる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-check fa-lg" style="color: #4CAF50;"></i>
+            「必要なものくれ」と言われたら渡す。
+            <br>それだけでいいんだ！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑨ -->
+<div class="section-card fade-in-scale" style="animation-delay: 0.9s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>⑨ 分厚い説明書は不要、HTMLモックで十分</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-book fa-lg" aria-hidden="true"></i><span>分厚い説明書ドキュメントを渡すのは<span class="keyword-tag danger">もう不要</span></span></li>
+            <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span><span class="highlight">薄いガイドライン＋HTMLモック</span>を入れておけば十分</span></li>
+            <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>HTMLだと視覚情報として取得でき、ビジョン機能＋テキスト情報から<span class="keyword-tag info">正確に解釈</span>できる</span></li>
+            <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>CLAUDE.mdも200行でも長い。<span class="highlight">もっと短くて良い</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+            マークダウンよりHTMLモックの方が
+            <br>伝わりやすいんだ...！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション4: 従来の定番が逆効果 ===== -->
+<div class="section-divider"><h3>従来の定番が逆効果に</h3></div>
+<div class="section-layout">
+
+<!-- カード⑩ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.0s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-trash-can fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑩ 検証ステップの指示は捨ててOK</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>「出来上がったものを検証して修正して」のような指示は<span class="highlight">もう不要</span></span></li>
+            <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>サブエージェントで検証すると<span class="keyword-tag danger">過剰検証</span>を呼んでトークンを無駄に消費</span></li>
+            <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>Opus 5は<span class="keyword-tag success">デフォルトで検証と修正</span>を行うループエンジニアリングで設計されている</span></li>
+            <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span>「自分で直して」も不要。言わなくてもやる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i>
+            検証して修正して...って今まで
+            <br>ずっと書いてたよ！もったいない...！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑪ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.1s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-gift fa-5x" style="animation: fa-bounce 3s infinite;"></i>
+        <h2>⑪ メタプロンプトを無料配布</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i><span>Opus 5に適用した<span class="highlight">メタプロンプト（プロンプト作成プロンプト）</span>を無料配布中</span></li>
+            <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>LINE公式アカウントに「Opus 5メタプロンプト」と送信で受け取り可能</span></li>
+            <li><i class="fa-solid fa-folder-plus fa-lg" aria-hidden="true"></i><span>Claudeの<span class="keyword-tag">プロジェクト機能</span>の「手順」にメタプロンプトを貼り付けるだけ</span></li>
+            <li><i class="fa-solid fa-microphone fa-lg" aria-hidden="true"></i><span>音声入力で「〇〇のプロンプトを作成してください」と言えば<span class="highlight">自動で適切なプロンプト</span>を生成</span></li>
+            <li><i class="fa-solid fa-file-alt fa-lg" aria-hidden="true"></i><span>日本語の言い回しリスト（MEMORY.md）も同梱。不自然な表現を防ぐ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            プロンプトを短くして判断を任せる
+            <br>それがOpus 5流の正解！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑫ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.2s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-code fa-5x" style="animation: fa-beat-fade 2.5s infinite;"></i>
+        <h2>⑫ クロードコードとカーソルで即利用可能</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>Claude Codeで<span class="highlight">Opus 5が即座に利用可能</span>。高速モードも解禁済み</span></li>
+            <li><i class="fa-solid fa-pen fa-lg" aria-hidden="true"></i><span>Cursor（テキストエディタ）でも利用可能。しかも<span class="keyword-tag success">半額</span>で使える</span></li>
+            <li><i class="fa-solid fa-file-powerpoint fa-lg" aria-hidden="true"></i><span>今回の219ページの資料もOpus 5で作成。テキスト・図・スクショを自動生成</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-check fa-lg" style="color: #4CAF50;"></i>
+            Cursorなら半額で使えるなんて
+            <br>めちゃくちゃお得ですね！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション5: 22パターン検証 ===== -->
+<div class="section-divider"><h3>22パターンの検証結果</h3></div>
+<div class="section-layout">
+
+<!-- カード⑬ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.3s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-gamepad fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑬ ゲーム作成: Opus 5がダントツの進化</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-crosshairs fa-lg" aria-hidden="true"></i><span>同じプロンプトでバリスタゲームを作成。Opus 5は<span class="highlight">リッチなUIと音効果</span>を実現</span></li>
+            <li><i class="fa-solid fa-chart-bar fa-lg" aria-hidden="true"></i><span>Opus 4.8はチープ、Fable 5は意外としょぼい、GPT-5.6は操作性が異なるという結果</span></li>
+            <li><i class="fa-solid fa-trophy fa-lg" aria-hidden="true"></i><span>全く同じプロンプトで<span class="keyword-tag success">Opus 5が圧倒的に高品質</span>。ゲーム作成が得意な分野</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-1);"></i>
+            同じプロンプトなのにここまで違う！
+            <br>Opus 5の進化がすごい
+        </span>
+    </div>
+</div>
+
+<!-- カード⑭ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.4s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-pie fa-5x" style="animation: fa-beat-fade 2.5s infinite;"></i>
+        <h2>⑭ データ分析とSVG描画: 正確さが光る</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-bug fa-lg" aria-hidden="true"></i><span>売上CSVに4つの異常を仕込んだテスト。Opus 5は<span class="highlight">4箇所すべて発見</span></span></li>
+            <li><i class="fa-solid fa-search fa-lg" aria-hidden="true"></i><span>Opus 4.8は3/4、GPT-5.6は<span class="keyword-tag danger">2箇所のみ</span>。Fable 5も4箇所すべて発見</span></li>
+            <li><i class="fa-solid fa-pen-nib fa-lg" aria-hidden="true"></i><span>SVG描画テスト（ペリカンが自転車に乗る図）では<span class="highlight">Opus 5が最も綺麗</span>に描画</span></li>
+            <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>正確性と図作成能力の両方で<span class="keyword-tag success">Opus 5とFable 5が上位</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-circle-check fa-lg" style="color: #4CAF50;"></i>
+            データ分析も図作成もOpus 5で十分！
+            <br>嘘つかないモデルの強みが出てる
+        </span>
+    </div>
+</div>
+
+<!-- カード⑮ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.5s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-paintbrush fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>⑮ Webツール作成: 漫画ツールと音楽アプリ</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>漫画作成ツール: Opus 5は<span class="highlight">めちゃくちゃ操作しやすい</span>。4コマ漫画が簡単に作れるレベル</span></li>
+            <li><i class="fa-solid fa-music fa-lg" aria-hidden="true"></i><span>音楽ツール（Web Audio）: Opus 5は<span class="keyword-tag">プロフェッショナル級</span>のUIを構築</span></li>
+            <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>GPT-5.6は漫画ツールが<span class="keyword-tag danger">操作不可</span>。Webツール系はClaudeが得意</span></li>
+            <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>見積もりシミュレーター付きのWebサイトも<span class="highlight">実用的なレベル</span>で完成</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+            Webツール関連はOpus 5で
+            <br>全然十分いける！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- ===== セクション6: さらに興味深い検証 ===== -->
+<div class="section-divider"><h3>さらに興味深い検証結果</h3></div>
+<div class="section-layout">
+
+<!-- カード⑯ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.6s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-sushi fa-5x" style="animation: fa-bounce 2s infinite;"></i>
+        <h2>⑯ CSS寿司と物理シミュレーション</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-utensils fa-lg" aria-hidden="true"></i><span>CSSだけで寿司を描くテスト（画像・SVG・絵文字禁止）。Opus 5は<span class="highlight">一番リアルで美味しそう</span>に完成</span></li>
+            <li><i class="fa-solid fa-wind fa-lg" aria-hidden="true"></i><span>布の物理シミュレーション: Opus 5は<span class="keyword-tag success">ハサミでスパッと切れる</span>感触が気持ち良い</span></li>
+            <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i><span>掴む感覚も再現でき、Opus 4.8の「破ってる感覚」とは別物</span></li>
+            <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>CSSだけでWebサイトにそのまま乗せれるクオリティ</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten">
+            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i>
+            CSSだけで寿司が描けるなんて...！
+            <br>しかも美味しそうだし！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑰ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.7s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-map fa-5x" style="animation: fa-beat-fade 2s infinite;"></i>
+        <h2>⑰ 記憶だけで日本地図と縦書き小説</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-globe fa-lg" aria-hidden="true"></i><span>Web検索も画像も見せずに<span class="highlight">記憶だけで日本地図を描画</span>させるテスト</span></li>
+            <li><i class="fa-solid fa-map-location fa-lg" aria-hidden="true"></i><span>Opus 4.8はざっくり合っているが微妙。Opus 5は<span class="keyword-tag success">クオリティがかなり高い</span></span></li>
+            <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>縦書き小説テスト: Opus 5は<span class="highlight">美しい縦書きレイアウト</span>を実現。本として成立するレベル</span></li>
+            <li><i class="fa-solid fa-face-laugh fa-lg" aria-hidden="true"></i><span>GPT-5.6の日本地図は<span class="keyword-tag danger">トゲトゲしくて別の国</span>のようだった（笑）</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten">
+            <i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-2);"></i>
+            記憶だけでここまで描けるなんて
+            <br>地理知識がそのまま絵になってる！
+        </span>
+    </div>
+</div>
+
+<!-- カード⑱ -->
+<div class="section-card fade-in-scale" style="animation-delay: 1.8s;">
+    <div class="mega-icon-container">
+        <i class="fa-solid fa-cube fa-5x" style="animation: fa-flip 4s infinite;"></i>
+        <h2>⑱ 3Dとアニメーション: Opus 5の新境地</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list">
+            <li><i class="fa-solid fa-cubes fa-lg" aria-hidden="true"></i><span>Blenderで3Dジオラマ作成: Opus 5は<span class="highlight">非常に綺麗な浮島</span>を生成。Fable 5はぐちゃぐちゃ</span></li>
+            <li><i class="fa-solid fa-chess fa-lg" aria-hidden="true"></i><span>チェスのスタジオ撮影をプロシージャル生成。Opus 5は<span class="keyword-tag">光の表現</span>が特に優秀</span></li>
+            <li><i class="fa-solid fa-city fa-lg" aria-hidden="true"></i><span>夜景都市の3D生成: 車の動きや朝夜の変化まで再現。<span class="highlight">シミュレーションゲームが作れそう</span>なレベル</span></li>
+            <li><i class="fa-solid fa-film fa-lg" aria-hidden="true"></i><span>Claude Designでアニメーション作成も可能。画像生成AIの学習過程を<span class="keyword-tag success">自動アニメ化</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten">
+            <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-5);"></i>
+            3DもアニメーションもOpus 5なら
+            <br>ここまでできるんだ...！
+        </span>
+    </div>
+</div>
+
+</div>
+
+<!-- フッター -->
+<footer>
+    🎬 動画: <a href="https://www.youtube.com/watch?v=8-AntQFFJA4" target="_blank">ケト - 生成AI最新情報チャンネル</a> | 📅 2026年7月27日<br>
+    🧠 Claude Opus 5 完全解説 - 22パターン検証とプロンプトのコツ
+</footer>
+
+</body>
+</html>

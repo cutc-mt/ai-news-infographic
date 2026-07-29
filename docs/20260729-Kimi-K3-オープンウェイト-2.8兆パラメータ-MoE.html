@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kimi K3 オープンウェイトモデル解説 - 2.8兆パラメータ MoEアーキテクチャ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+:root{--c1:#7B2D8E;--c2:#C2185B;--c3:#F3E5F5;--c4:#4A1259;--c5:#E91E90;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#FDF5FF;font-family:'Kaisei Decol',serif;color:#333;line-height:1.6;}
+.container{max-width:2000px;margin:0 auto;padding:20px;}
+.header{text-align:center;padding:40px 20px;margin-bottom:30px;background:linear-gradient(135deg,var(--c4),var(--c1),var(--c2),var(--c5));border-radius:30px;color:#fff;position:relative;overflow:hidden;}
+.header::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:radial-gradient(circle,rgba(255,255,255,.12) 0%,transparent 60%);animation:glow 8s ease-in-out infinite;}
+@keyframes glow{0%,100%{transform:translate(0,0);}50%{transform:translate(20px,20px);}}
+.hi{font-size:5em;margin-bottom:10px;animation:fa-bounce 2s infinite;}
+.header h1{font-size:2.2em;font-weight:900;margin-bottom:10px;text-shadow:2px 2px 4px rgba(0,0,0,.3);}
+.header .sub{font-size:1.2em;opacity:.9;font-family:'Yomogi',cursive;}
+.header .dt{font-size:.9em;opacity:.7;margin-top:10px;}
+.layout{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;margin-bottom:20px;}
+.card{flex:1;min-width:280px;max-width:450px;background:#fff;border-radius:20px;padding:20px;box-shadow:5px 5px 15px rgba(0,0,0,.1);position:relative;overflow:hidden;transition:transform .3s,box-shadow .3s;animation:fadeIn .5s ease forwards;}
+.card:hover{transform:translateY(-5px);box-shadow:8px 8px 25px rgba(123,45,142,.25);}
+.card::before{content:'';position:absolute;top:0;left:0;width:100%;height:5px;background:linear-gradient(90deg,var(--c1),var(--c2),var(--c5));}
+@keyframes fadeIn{from{opacity:0;transform:scale(.9);}to{opacity:1;transform:scale(1);}}
+.ci{text-align:center;margin:10px 0;font-size:4em;}
+.card h2{font-size:1.15em;color:var(--c4);margin-bottom:8px;line-height:1.4;}
+.kl{margin:8px 0;padding:0;list-style:none;}
+.kl li{margin-bottom:8px;display:flex;align-items:flex-start;font-size:15px;line-height:1.6;}
+.kl li i{margin-right:8px;color:var(--c1);min-width:16px;margin-top:4px;}
+.tag{background:var(--c3);color:var(--c4);padding:3px 8px;border-radius:5px;margin-right:5px;display:inline-block;font-weight:bold;font-size:14px;}
+.hl{background:linear-gradient(transparent 60%,rgba(194,24,91,.25) 60%);font-weight:bold;}
+.sb{position:relative;background:#fff;border:3px solid var(--c1);border-radius:20px;padding:12px 15px;margin:15px 5px;font-family:'Yomogi',cursive;box-shadow:3px 3px 10px rgba(0,0,0,.1);transform:rotate(-1deg);}
+.sb::after{content:'';position:absolute;bottom:-13px;left:20px;border-width:12px 8px 0;border-style:solid;border-color:var(--c1) transparent;display:block;width:0;}
+.sb.v1{background:#FCE4EC;border-color:var(--c2);transform:rotate(1deg);}
+.sb.v1::after{border-color:var(--c2) transparent;}
+.sb.v2{background:#F3E5F5;border-color:var(--c5);transform:rotate(-2deg);}
+.sb.v2::after{border-color:var(--c5) transparent;}
+.hw{font-family:'Yomogi',cursive;font-size:15px;line-height:1.5;color:#333;}
+pre{background:#f5f5f5;padding:8px;border-radius:5px;font-size:12px;margin-top:10px;overflow-x:auto;}
+footer{text-align:center;padding:20px;margin-top:30px;background:linear-gradient(135deg,var(--c4),var(--c1),var(--c2));border-radius:20px;color:#fff;font-family:'Yomogi',cursive;}
+footer a{color:#fff;text-decoration:underline;}
+@media(max-width:768px){.layout{flex-direction:column;}.card{width:100%;min-width:auto;max-width:100%;}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+<div class="hi"><i class="fas fa-moon" aria-hidden="true"></i></div>
+<h1>Kimi K3 — 2.8兆パラメータのオープンウェイトLLM</h1>
+<p class="sub">Moonshot AIが放つ、GPT-5.5 / Claude Opus 4.8 クラスのMoEモデル</p>
+<p class="dt">📅 2026年7月29日</p>
+</div>
+<div class="layout">
+
+<div class="card">
+<div class="ci"><i class="fas fa-circle-info" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>①Kimi K3概要: 月ノ掛学園が公開した超巨大LLM</h2>
+<ul class="kl">
+<li><i class="fas fa-building"></i><span>Moonshot AI（月ノ掛学園）が開発した<span class="hl">オープンウェイトの超大規模言語モデル</span>。</span></li>
+<li><i class="fas fa-layer-group"></i><span>Mixture of Experts（MoE）アーキテクチャを採用して、効率と性能を両立。</span></li>
+<li><i class="fas fa-globe-asia"></i><span>中国発のAIモデルとして世界的な注目を集めている。</span></li>
+</ul>
+<div class="sb v1"><span class="hw"><i class="fas fa-moon fa-lg" style="color:var(--c2);"></i> 「中国版GPT-5」と称される衝撃のオープンウェイトモデル</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-microchip" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>②基本スペック: 2.8兆パラメータ・370Bトークン訓練</h2>
+<ul class="kl">
+<li><i class="fas fa-database"></i><span>総パラメータ数は<span class="hl">2.8兆（2.8 Trillion）</span>、MoEでアクティブパラメータは約400B。</span></li>
+<li><i class="fas fa-graduation-cap"></i><span>訓練には<span class="hl">3700億トークン</span>を使用した大規模学習を実施。</span></li>
+<li><i class="fas fa-circle-nodes"></i><span>アクティブパラメータ400Bは、GPT-4クラスと同等の計算量で動作する。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-microchip fa-lg" style="color:var(--c1);"></i> 全パラメータの一部だけを活性化させるMoEの賢さ</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-gears" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>③アーキテクチャの革新: MoEで推論効率を劇的に向上</h2>
+<ul class="kl">
+<li><i class="fas fa-arrows-split-up-and-left"></i><span>従来のDenseモデルとは異なり、<span class="hl">MoEで必要なエキスパートだけを活性化</span>する。</span></li>
+<li><i class="fas fa-bolt"></i><span>同規模の計算量で<span class="hl">2.5倍の知能</span>を実現するという画期的な効率性。</span></li>
+<li><i class="fas fa-chart-line"></i><span>推論コストを抑えつつフロントティアレベルの性能を達成している。</span></li>
+</ul>
+<div class="sb v2"><span class="hw"><i class="fas fa-gears fa-lg" style="color:var(--c5);"></i> 専門家をオンデマンドで呼び出す仕組みが鍵</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-ranking-star" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>④性能ベンチマーク: GPT-5.5・Opus 4.8と同等レベル</h2>
+<ul class="kl">
+<li><i class="fas fa-trophy"></i><span><span class="hl">GPT-5.5やClaude Opus 4.8と同等の性能</span>をベンチマークで実証。</span></li>
+<li><i class="fas fa-list-check"></i><span>MMLU、HumanEval、GPQAなどの主要ベンチマークでフロントティアに到達。</span></li>
+<li><i class="fas fa-chart-bar"></i><span>クローズドモデルに対抗するオープンウェイトとしての歴史的快挙。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-ranking-star fa-lg" style="color:var(--c1);"></i> オープンウェイトでトップクラスの性能を実現した</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-laptop-code" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑤コーディング能力: HumanEval 97%超の驚異的スコア</h2>
+<ul class="kl">
+<li><i class="fas fa-code"></i><span><span class="hl">HumanEvalで97%を超えるスコア</span>を記録するコーディング能力の高さ。</span></li>
+<li><i class="fas fa-bug"></i><span>SWE-benchでも高いスコアを獲得し、実務レベルのコード生成に対応。</span></li>
+<li><i class="fas fa-plug"></i><span>Claude CodeやCodexと組み合わせてエージェントツールとして活用可能。</span></li>
+</ul>
+<div class="sb v1"><span class="hw"><i class="fas fa-laptop-code fa-lg" style="color:var(--c2);"></i> プロのエンジニアも唸るレベルのコードが書ける</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-server" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑥ローカル実行: B300 GPU 8枚で自社インフラで稼働</h2>
+<ul class="kl">
+<li><i class="fas fa-desktop"></i><span><span class="hl">NVIDIA B300 GPU 8枚でローカル実行可能</span>という手軽な要件。</span></li>
+<li><i class="fas fa-dollar-sign"></i><span>APIコストがゼロになるため、長期間の運用でもランニングコストを抑えられる。</span></li>
+<li><i class="fas fa-building-shield"></i><span>エンタープライズ企業でも自社インフラでセキュアに稼働させられる。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-server fa-lg" style="color:var(--c1);"></i> クラウドに頼らず自社のサーバーで動かせるのは大きい</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-lock-open" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑦オープンウェイト公開: Apache 2.0で商用利用可能</h2>
+<ul class="kl">
+<li><i class="fas fa-scale-balanced"></i><span><span class="hl">Apache 2.0ライセンス</span>でモデルウェイトと技術レポートを同時公開。</span></li>
+<li><i class="fas fa-briefcase"></i><span>商用利用・改変・再配布が自由にできるため、ビジネスへの導入ハードルが低い。</span></li>
+<li><i class="fas fa-download"></i><span>Hugging Faceからダウンロード可能で、コミュニティでの利用も活発。</span></li>
+</ul>
+<div class="sb v2"><span class="hw"><i class="fas fa-lock-open fa-lg" style="color:var(--c5);"></i> 商用利用OKだから企業も安心して使える</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-file-lines" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑧技術レポートの詳細: 訓練の透明性が極めて高い</h2>
+<ul class="kl">
+<li><i class="fas fa-book-open"></i><span>訓練データの構成や<span class="hl">最適化手法の詳細</span>が技術レポートで公開されている。</span></li>
+<li><i class="fas fa-route"></i><span>MoEのルーティング最適化についても具体的に解説されている。</span></li>
+<li><i class="fas fa-magnifying-glass-chart"></i><span>透明性の高さが研究コミュニティから高い評価を受けている。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-file-lines fa-lg" style="color:var(--c1);"></i> 「どのように学習したか」まで全部オープンにしている</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-gauge-high" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑨推論速度: MoEによる高速で効率的なトークン生成</h2>
+<ul class="kl">
+<li><i class="fas fa-bolt-lightning"></i><span>MoEアーキテクチャにより<span class="hl">推論速度が高速</span>で、トークン生成がスムーズ。</span></li>
+<li><i class="fas fa-layer-group"></i><span>バッチ推論にも対応しており、大量のリクエストを処理できる。</span></li>
+<li><i class="fas fa-clock"></i><span>アクティブパラメータを絞ることでメモリ使用量も最適化されている。</span></li>
+</ul>
+<div class="sb v1"><span class="hw"><i class="fas fa-gauge-high fa-lg" style="color:var(--c2);"></i> 大きなモデルなのに速いのがMoEの強み</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-text-width" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑩ロングコンテキスト: 128Kコンテキストウィンドウ搭載</h2>
+<ul class="kl">
+<li><i class="fas fa-maximize"></i><span><span class="hl">128Kトークンのコンテキストウィンドウ</span>で長文書の処理が可能。</span></li>
+<li><i class="fas fa-scroll"></i><span>論文やレポートなどの長文ドキュメントを丸ごと入力して要約・分析できる。</span></li>
+<li><i class="fas fa-diagram-project"></i><span>RAGワークフローとの相性が良く、大規模なナレッジベースにも対応。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-text-width fa-lg" style="color:var(--c1);"></i> 本1冊分くらいのテキストを一度に読み込める</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-magnifying-glass" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑪Webリサーチ能力: 検索→推論→分析のエージェントワークフロー</h2>
+<ul class="kl">
+<li><i class="fas fa-search"></i><span><span class="hl">検索→推論→分析のパイプライン</span>を自動で実行するエージェントワークフロー。</span></li>
+<li><i class="fas fa-brain"></i><span>長時間のタスクでも集中力を維持して、一貫した品質で出力を続ける。</span></li>
+<li><i class="fas fa-robot"></i><span>自律的に情報を収集して、分析レポートを生成するマルチステップ対応。</span></li>
+</ul>
+<div class="sb v2"><span class="hw"><i class="fas fa-magnifying-glass fa-lg" style="color:var(--c5);"></i> 調べて考えてまとめるまで全部やってくれる</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-atom" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑫物理シミュレーション: 3D破壊シミュレーションで最強に</h2>
+<ul class="kl">
+<li><i class="fas fa-cubes"></i><span>3Dブラウザベースの破壊シミュレーションテストで<span class="hl">トップのスコア</span>を獲得。</span></li>
+<li><i class="fas fa-trophy"></i><span>GPT-5.6 Soul、Grok 4.5、GLM 5.2といった強豪を上回る結果。</span></li>
+<li><i class="fas fa-explosion"></i><span>空間認識と物理法則の理解において優れた能力を示している。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-atom fa-lg" style="color:var(--c1);"></i> 物理シミュレーションで強豪モデルたちを打ち負かした</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-language" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑬日本語性能: マルチリンガル対応で日本語も強化</h2>
+<ul class="kl">
+<li><i class="fas fa-torii-gate"></i><span><span class="hl">日本語のベンチマークでも良好な結果</span>を示す日本語性能の向上。</span></li>
+<li><i class="fas fa-earth-americas"></i><span>マルチリンガル対応で、英語・中国語・日本語など幅広い言語に対応。</span></li>
+<li><i class="fas fa-comments"></i><span>日本語のニュアンスや表現も自然に処理できるレベルに達している。</span></li>
+</ul>
+<div class="sb v1"><span class="hw"><i class="fas fa-language fa-lg" style="color:var(--c2);"></i> 日本語ユーザーにも十分に使える品質</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-users" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑭コミュニティの反応: オープンソース界隈で大騒ぎ</h2>
+<ul class="kl">
+<li><i class="fas fa-fire"></i><span>「<span class="hl">中国版GPT-5</span>」と称されて、オープンソース界隈で大注目を浴びている。</span></li>
+<li><i class="fas fa-download"></i><span>Hugging Faceでのダウンロード数が急速に増加中。</span></li>
+<li><i class="fas fa-message"></i><span>X（Twitter）やRedditで活発な議論が行われている。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-users fa-lg" style="color:var(--c1);"></i> 公開直後から世界中の開発者がこぞって試している</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-mouse-pointer" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑮Cursor対応: 人気エディタでKimi K3を使える</h2>
+<ul class="kl">
+<li><i class="fas fa-wand-magic-sparkles"></i><span><span class="hl">CursorエディタでKimi K3をモデルとして選択可能</span>。</span></li>
+<li><i class="fas fa-code-branch"></i><span>ClaudeやGPTに代わる強力な選択肢としての利用が期待される。</span></li>
+<li><i class="fas fa-laptop"></i><span>開発環境に統合して、コード生成やコードレビューに活用できる。</span></li>
+</ul>
+<div class="sb v2"><span class="hw"><i class="fas fa-mouse-pointer fa-lg" style="color:var(--c5);"></i> Cursorの中でGPTやClaudeの代わりに使える</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-terminal" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑯Ollama対応: ローカル環境で手軽に実行可能</h2>
+<ul class="kl">
+<li><i class="fas fa-box-open"></i><span><span class="hl">Ollama経由でローカル環境にインストール</span>してすぐに試せる。</span></li>
+<li><i class="fas fa-terminal"></i><span>コマンド1行でKimi K3を起動できて、セットアップが簡単。</span></li>
+<li><i class="fas fa-shield-halved"></i><span>インターネット接続なしでもローカルで完全にオフラインで動作する。</span></li>
+</ul>
+<div class="sb"><span class="hw"><i class="fas fa-terminal fa-lg" style="color:var(--c1);"></i> ollama run kimi-k3 で数分で試せる手軽さ</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-scale-balanced" style="color:var(--c1);animation:fa-bounce 2s;"></i></div>
+<h2>⑰競合比較: オープンウェイトのトップコンテンダー</h2>
+<ul class="kl">
+<li><i class="fas fa-dragon"></i><span>DeepSeek V3やQwen 3といった<span class="hl">中国系オープンモデルのトップ</span>で競い合う。</span></li>
+<li><i class="fas fa-chart-column"></i><span>オープンウェイトのカテゴリでは圧倒的なパラメータ数と性能を誇る。</span></li>
+<li><i class="fas fa-medal"></i><span>クローズドモデルと互角に渡り合えるオープンウェイトの最有力候補。</span></li>
+</ul>
+<div class="sb v1"><span class="hw"><i class="fas fa-scale-balanced fa-lg" style="color:var(--c2);"></i> オープンウェイト戦争は中国系モデルがリード中</span></div>
+</div>
+
+<div class="card">
+<div class="ci"><i class="fas fa-rocket" style="color:var(--c2);animation:fa-bounce 2s;"></i></div>
+<h2>⑱今後の展望: KimiエコシステムとオープンソースLLMの新時代</h2>
+<ul class="kl">
+<li><i class="fas fa-arrow-up-right-dots"></i><span>K3の<span class="hl">進化版</span>の登場が期待されており、さらなる性能向上が見込まれる。</span></li>
+<li><i class="fas fa-sitemap"></i><span>Kimiエコシステムの拡張により、SDKやツールチェーンも充実していく。</span></li>
+<li><i class="fas fa-sun"></i><span>オープンソースLLMの新時代を切り開く象徴的な存在としての役割。</span></li>
+</ul>
+<div class="sb v2"><span class="hw"><i class="fas fa-rocket fa-lg" style="color:var(--c5);"></i> オープンウェイトがクローズドモデルを追い抜く日も近いかも</span></div>
+</div>
+
+</div>
+<footer>
+🎬 動画: <a href="https://www.youtube.com/watch?v=RQJBmrAxzn0" target="_blank">Kimi K3 オープンウェイトモデル解説（2.8兆パラメータ, GPT-5.5/Opus 4.8クラス）</a> | 📅 2026年7月29日
+</footer>
+</div>
+</body>
+</html>

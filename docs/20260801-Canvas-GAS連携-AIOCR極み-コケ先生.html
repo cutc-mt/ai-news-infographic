@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI OCR製品をぶっ潰せ 極み編 — Canvas + GAS連携で抽出領域をクラウド保存</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap');
+        :root {
+            --color-1: #2C4A6E; --color-2: #3D5A80; --color-3: #98C1D9; --color-4: #1B2A41; --color-5: #EE6C4D;
+            --ui-color-1: #2C4A6E; --ui-color-2: #3D5A80; --ui-color-3: #98C1D9; --ui-color-4: #1B2A41; --ui-color-5: #EE6C4D;
+        }
+        body { font-family: 'Noto Sans JP', sans-serif; background: #F0F4F8; color: #1B2A41; min-height: 100vh; }
+        .gradient-text { background: linear-gradient(135deg, #1B2A41 0%, #3D5A80 50%, #EE6C4D 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .card { background: white; border: 2px solid rgba(61,90,128,0.2); border-radius: 20px; padding: 24px; transition: all 0.4s ease; box-shadow: 4px 4px 15px rgba(44,74,110,0.08); position: relative; overflow: hidden; }
+        .card::before { content: ''; position: absolute; top: 0; left: 0; width: 5px; height: 100%; background: linear-gradient(180deg, #3D5A80 0%, #EE6C4D 100%); border-radius: 20px 0 0 20px; }
+        .card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(44,74,110,0.15); border-color: rgba(61,90,128,0.45); }
+        .mega-icon { font-size: 3rem; color: var(--ui-color-2); margin-bottom: 8px; filter: drop-shadow(2px 2px 4px rgba(44,74,110,0.15)); }
+        .accent-icon { color: var(--ui-color-5); }
+        .tag { background: var(--ui-color-3); color: var(--ui-color-4); padding: 3px 10px; border-radius: 8px; font-weight: 600; font-size: 0.85rem; display: inline-block; margin: 2px 3px; }
+        .tag-accent { background: #FFD8CC; color: #9C3A1F; }
+        .highlight { background: linear-gradient(180deg, transparent 60%, #98C1D9 60%); color: #1B2A41; font-weight: 700; padding: 0 3px; }
+        .highlight-accent { background: linear-gradient(180deg, transparent 60%, #FFD8CC 60%); color: #9C3A1F; font-weight: 700; padding: 0 3px; }
+        .speech-bubble { position: relative; background: #FFF; border: 2.5px solid var(--ui-color-2); border-radius: 18px; padding: 12px 16px; margin: 12px 5px; font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(44,74,110,0.1); transform: rotate(-0.8deg); }
+        .speech-bubble::after { content: ''; position: absolute; bottom: -11px; left: 22px; border-width: 10px 7px 0; border-style: solid; border-color: var(--ui-color-2) transparent; width: 0; }
+        .speech-bubble.right::after { left: auto; right: 22px; transform: rotate(12deg); }
+        .speech-bubble.top::after { bottom: auto; top: -11px; border-width: 0 7px 10px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-4); transform: rotate(0.8deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-4) transparent; }
+        .speech-bubble.variant-2 { background: #FFE9E0; border-color: var(--ui-color-5); transform: rotate(-1.5deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.6; color: #2C4A6E; }
+        .keyword-list { margin: 12px 0; padding: 0; list-style-type: none; }
+        .keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 0.95rem; line-height: 1.6; }
+        .keyword-list li i { margin-right: 10px; color: var(--ui-color-2); min-width: 18px; margin-top: 3px; }
+        @keyframes fadeInScale { from { opacity: 0; transform: translateY(25px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        .animate-fade-in-scale { animation: fadeInScale 0.6s ease-out forwards; opacity: 0; }
+        .icon-beat { animation: fa-beat 2s ease-in-out infinite; }
+        .icon-bounce { animation: fa-bounce 2s ease-in-out infinite; }
+        .icon-flip { animation: fa-flip 3s ease-in-out infinite; }
+        .stat-box { background: rgba(44,74,110,0.06); border: 1px solid rgba(61,90,128,0.2); border-radius: 12px; padding: 10px 14px; }
+        .flow-arrow { text-align: center; color: var(--ui-color-2); font-size: 1.3rem; margin: 4px 0; }
+        .section-divider { background: linear-gradient(90deg, transparent, #3D5A80, #EE6C4D, transparent); height: 2px; margin: 32px 0; opacity: 0.5; }
+        .code-preview { background: #1B2A41; color: #98C1D9; padding: 12px; border-radius: 8px; font-family: 'Courier New', monospace; font-size: 0.8rem; margin-top: 10px; overflow-x: auto; }
+        .code-preview .keyword { color: #EE6C4D; font-weight: bold; }
+        .code-preview .comment { color: #6B8CAE; }
+        footer { text-align: center; padding: 32px 16px 24px; color: #2C4A6E; }
+        footer a { color: #3D5A80; text-decoration: underline; font-weight: 600; }
+        @media (max-width: 768px) { .card { padding: 16px; } .mega-icon { font-size: 2.2rem; } }
+    </style>
+</head>
+<body>
+    <div class="container mx-auto px-4 py-8" style="max-width: 2000px;">
+        <header class="text-center mb-12 animate-fade-in-scale">
+            <div style="font-size: 5rem; color: #3D5A80; margin-bottom: 10px;"><i class="fa-solid fa-cloud-arrow-up icon-bounce"></i></div>
+            <h1 class="text-4xl md:text-5xl font-black mb-3 gradient-text" style="font-family: 'Kaisei Decol', serif;">AI OCR製品をぶっ潰せ 極み編</h1>
+            <p class="text-lg text-gray-600 mb-2">Canvas + GAS連携で抽出領域をクラウド保存 — 再利用性を手に入れる</p>
+            <div style="width: 120px; height: 3px; background: linear-gradient(90deg, #3D5A80, #EE6C4D); margin: 12px auto; border-radius: 2px;"></div>
+            <p class="text-gray-500 mt-3"><i class="fa-regular fa-calendar"></i> 2026年8月1日 ／ <i class="fa-solid fa-clock"></i> 17:00</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+            <!-- ① AI OCRとは -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.1s;">
+                <div class="text-center"><i class="fa-solid fa-magnifying-glass-chart mega-icon icon-bounce"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">① AI OCRとは何か</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-brain"></i><span>OCR（光学文字認識）に<span class="highlight">AIを融合</span>させた技術</span></li>
+                    <li><i class="fa-solid fa-graduation-cap"></i><span>AIが<span class="highlight">自己学習</span>して文字の形状を理解する</span></li>
+                    <li><i class="fa-solid fa-circle-check"></i><span>従来のOCRでは読めなかった文字も認識できる</span></li>
+                    <li><i class="fa-solid fa-file-pdf"></i><span>主な用途は <span class="tag">PDF読込</span><span class="tag">CSV出力</span></span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-lightbulb accent-icon"></i> AIのおかげで、昔なら読めなかった手書き文字や特殊フォントも判別できるよ！</span></div>
+            </div>
+
+            <!-- ② 既存製品の弱点 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.15s;">
+                <div class="text-center"><i class="fa-solid fa-triangle-exclamation mega-icon icon-beat accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">② 既存製品の弱点</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-hand-pointer"></i><span><span class="highlight-accent">抽出領域を手動で作る</span>必要がある</span></li>
+                    <li><i class="fa-solid fa-file-lines"></i><span>例：調書を読み込む際、どこを読むか人間が指定</span></li>
+                    <li><i class="fa-solid fa-hourglass-half"></i><span>毎回同じ作業の繰り返しで<span class="highlight-accent">時間がかかる</span></span></li>
+                    <li><i class="fa-solid fa-ban"></i><span>設定の<span class="tag tag-accent">再利用ができない</span>のが最大の課題</span></li>
+                </ul>
+                <div class="speech-bubble variant-2 right"><span class="handwritten"><i class="fa-solid fa-fire accent-icon"></i> 毎日同じ形式のPDFが来るのに、毎回領域を設定するのは本当に面倒…</span></div>
+            </div>
+
+            <!-- ③ コケ先生の挑戦 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.2s;">
+                <div class="text-center"><i class="fa-solid fa-trophy mega-icon icon-bounce"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">③ コケ先生の挑戦</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-fire"></i><span>「AI OCR製品をぶっ潰せ」<span class="highlight">第3回・極み編</span></span></li>
+                    <li><i class="fa-solid fa-gem"></i><span>単なるノリではなく、<span class="highlight">本気で既存製品を超える</span></span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>武器は <span class="tag">Gemini Canvas</span></span></li>
+                    <li><i class="fa-solid fa-bullseye"></i><span>目標：<span class="highlight-accent">人間の作業をほぼゼロに</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-star accent-icon"></i> 第1回・第2回を経て、いよいよ最終形態に到達！</span></div>
+            </div>
+
+            <!-- ④ 前回までの成果 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.25s;">
+                <div class="text-center"><i class="fa-solid fa-history mega-icon icon-flip"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">④ 前回までの成果</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1"></i><span>PDFをアップロードして<span class="highlight">セット構成を自動判定</span></span></li>
+                    <li><i class="fa-solid fa-2"></i><span>Geminiが<span class="highlight">抽出領域を自動で特定</span></span></li>
+                    <li><i class="fa-solid fa-3"></i><span>必要に応じて人間が微調整</span></li>
+                    <li><i class="fa-solid fa-4"></i><span>PDF全体のOCRを実行して完了</span></li>
+                </ul>
+                <div class="stat-box mt-3"><p class="text-sm text-gray-700 mb-1"><strong><i class="fa-solid fa-bolt accent-icon"></i> ここまでで実現したこと</strong></p><p class="text-sm">画像を理解して抽出ポイントを決める所まで自動化済み。でも、まだ大きな問題が残っていた…</p></div>
+            </div>
+
+            <!-- ⑤ 今回の課題 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.3s;">
+                <div class="text-center"><i class="fa-solid fa-circle-question mega-icon icon-beat accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑤ 今回の課題</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-comment-dots"></i><span>視聴者からのリクエスト：<span class="highlight-accent">「抽出領域を保存できないか」</span></span></li>
+                    <li><i class="fa-solid fa-calendar-day"></i><span>同じようなPDFが<span class="highlight">毎日・毎週</span>届く現場が多い</span></li>
+                    <li><i class="fa-solid fa-rotate"></i><span>毎回抽出領域を設定するのは非常に非効率</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece"></i><span><span class="tag tag-accent">再現性が確保されていない</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-users accent-icon"></i> 視聴者のリアルな声から始まった改良。実務の課題をそのまま拾っているのが凄い！</span></div>
+            </div>
+
+            <!-- ⑥ 試した解決策（失敗） -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.35s;">
+                <div class="text-center"><i class="fa-solid fa-xmark mega-icon icon-beat accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑥ 試した解決策（失敗）</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-code"></i><span><span class="tag">案1</span> JSONファイルに書き出す</span></li>
+                    <li><i class="fa-solid fa-ban"></i><span>→ ローカル保存になり<span class="highlight-accent">Google Workspaceの外に出てしまう</span></span></li>
+                    <li><i class="fa-solid fa-database"></i><span><span class="tag">案2</span> ブラウザのローカルストレージ</span></li>
+                    <li><i class="fa-solid fa-shield-halved"></i><span>→ Canvasは<span class="highlight-accent">サンドボックス環境</span>で動くため弾かれる</span></li>
+                </ul>
+                <div class="speech-bubble variant-1 right"><span class="handwritten"><i class="fa-solid fa-lightbulb accent-icon"></i> シンプルな方法から試したけど、Canvasの制限に阻まれてしまった…</span></div>
+            </div>
+
+            <!-- ⑦ 解決策のひらめき -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.4s;">
+                <div class="text-center"><i class="fa-solid fa-lightbulb mega-icon icon-bounce accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑦ 解決策のひらめき</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-comments"></i><span>LINEのチャットボット構築の<span class="highlight">経験からヒント</span></span></li>
+                    <li><i class="fa-solid fa-link"></i><span>フロント（Canvas）＋ バックエンド（GAS）の<span class="highlight">連携</span></span></li>
+                    <li><i class="fa-solid fa-network-wired"></i><span>Canvas単独ではなく、<span class="highlight-accent">外部サービスと繋ぐ</span>発想</span></li>
+                    <li><i class="fa-solid fa-handshake-angle"></i><span>GASを<span class="tag">受け口</span>として使う</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-arrow-right accent-icon"></i> 過去の経験が新しいアイデアの種になる。引き出しを増やすのが大事！</span></div>
+            </div>
+
+            <!-- ⑧ アーキテクチャ -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.45s;">
+                <div class="text-center"><i class="fa-solid fa-sitemap mega-icon icon-flip"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑧ 全体アーキテクチャ</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-display accent-icon"></i><span><span class="tag tag-accent">フロント</span> Gemini Canvas（画面・操作）</span></li>
+                    <li><i class="fa-solid fa-server accent-icon"></i><span><span class="tag tag-accent">バック</span> Google Apps Script（GAS）</span></li>
+                    <li><i class="fa-solid fa-table accent-icon"></i><span><span class="tag tag-accent">DB</span> Googleスプレッドシート</span></li>
+                </ul>
+                <div class="code-preview"><span class="comment">// データの流れ</span><br>Canvas <span class="keyword">→</span> GAS <span class="keyword">→</span> Spreadsheet<br>Canvas <span class="keyword">←</span> GAS <span class="keyword">←</span> Spreadsheet</div>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-puzzle-piece accent-icon"></i> Canvasの弱点をGASで補う、まさに最強のコンビネーション！</span></div>
+            </div>
+
+            <!-- ⑨ GASの役割 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.5s;">
+                <div class="text-center"><i class="fa-solid fa-gears mega-icon icon-beat"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑨ GASの役割</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cloud-arrow-up accent-icon"></i><span><span class="highlight-accent">doPost</span>: Canvas → GAS 書き込み指示</span></li>
+                    <li><i class="fa-solid fa-arrow-down-to-bracket accent-icon"></i><span>スプレッドシートにデータを保存</span></li>
+                    <li><i class="fa-solid fa-cloud-arrow-down accent-icon"></i><span><span class="highlight-accent">doGet</span>: GAS → Canvas 読み込み</span></li>
+                    <li><i class="fa-solid fa-globe"></i><span>GASのWebアプリとして<span class="highlight">デプロイ</span>して利用</span></li>
+                </ul>
+                <div class="speech-bubble right"><span class="handwritten"><i class="fa-solid fa-rocket accent-icon"></i> doPostとdoGetの2つだけで、書き込みも読み込みも自由自在！</span></div>
+            </div>
+
+            <!-- ⑩ 保存されるデータ -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.55s;">
+                <div class="text-center"><i class="fa-solid fa-table-list mega-icon icon-bounce"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑩ スプレッドシートに保存されるデータ</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-tag"></i><span><span class="highlight">抽出領域の保存名</span>（テンプレート名）</span></li>
+                    <li><i class="fa-solid fa-location-crosshairs"></i><span><span class="highlight">抽出領域の場所</span>（座標データ）</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span><span class="highlight">保存日時</span></span></li>
+                </ul>
+                <div class="code-preview"><span class="comment">// スプレッドシートのイメージ</span><br>| 保存名 | 座標データ | 日時 |<br>| 調書A | <span class="keyword">{x:10,y:20...}</span> | 2026/8/1 |</div>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-database accent-icon"></i> スプレッドシートだから、後から見直すのも編集するのも簡単！</span></div>
+            </div>
+
+            <!-- ⑪ 実際の使い方 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.6s;">
+                <div class="text-center"><i class="fa-solid fa-shoe-prints mega-icon icon-bounce"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑪ 実際の使い方</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-1"></i><span>GASのWebアプリURLを<span class="highlight">データベース設定に入力</span></span></li>
+                    <li><i class="fa-solid fa-2"></i><span>新しいPDFを読み込む</span></li>
+                    <li><i class="fa-solid fa-3"></i><span>過去のテンプレートを選ぶと<span class="highlight-accent">自動で抽出領域が適用</span></span></li>
+                    <li><i class="fa-solid fa-4"></i><span>ドラッグ＆ドロップで微調整</span></li>
+                    <li><i class="fa-solid fa-5"></i><span>「保存」または「上書き」で<span class="highlight">クラウドに保存</span></span></li>
+                </ul>
+                <div class="speech-bubble right"><span class="handwritten"><i class="fa-solid fa-mouse-pointer accent-icon"></i> 一回設定すれば、次からはテンプレート選ぶだけ。劇的にラクになる！</span></div>
+            </div>
+
+            <!-- ⑫ Canvasの弱点 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.65s;">
+                <div class="text-center"><i class="fa-solid fa-bug mega-icon icon-beat accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑫ Canvasの致命的な弱点</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-eraser"></i><span><span class="highlight-accent">保存機能がない</span>のが最大の問題</span></li>
+                    <li><i class="fa-solid fa-rotate-left"></i><span>1回1回<span class="highlight">データが初期化</span>されてしまう</span></li>
+                    <li><i class="fa-solid fa-lock"></i><span>サンドボックス環境で<span class="tag tag-accent">外部アクセス制限</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-end"></i><span>設定作業が毎回<span class="highlight-accent">無駄に消える</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-1"><span class="handwritten"><i class="fa-solid fa-triangle-exclamation accent-icon"></i> どんなに頑張って設定しても、画面を閉じたら全部消える…それがCanvas。</span></div>
+            </div>
+
+            <!-- ⑬ GASで弱点を克服 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.7s;">
+                <div class="text-center"><i class="fa-solid fa-shield-halved mega-icon icon-bounce"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑬ GASで弱点を克服</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-circle-check"></i><span>Canvasの弱点を<span class="highlight">GASで完全にカバー</span></span></li>
+                    <li><i class="fa-solid fa-infinity"></i><span>GASを通すことで<span class="highlight-accent">継続性が生まれる</span></span></li>
+                    <li><i class="fa-solid fa-repeat"></i><span>設定が消えずに<span class="highlight">何度でも再利用</span>可能</span></li>
+                    <li><i class="fa-solid fa-handshake"></i><span>Canvas + GASの<span class="tag">最強タッグ</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2 right"><span class="handwritten"><i class="fa-solid fa-heart accent-icon"></i> 弱点を補い合う関係。まさにソフトウェア版・ベストパートナー！</span></div>
+            </div>
+
+            <!-- ⑭ システム化の全体像 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.75s;">
+                <div class="text-center"><i class="fa-solid fa-layer-group mega-icon icon-flip"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑭ 完全なシステム化</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cubes"></i><span><span class="tag tag-accent">フロント</span> + <span class="tag tag-accent">DB</span> + <span class="tag tag-accent">バック</span>の3層構造</span></li>
+                    <li><i class="fa-solid fa-building"></i><span>本格的な<span class="highlight">システムアーキテクチャ</span>と同じ構成</span></li>
+                    <li><i class="fa-solid fa-circle-nodes"></i><span>CanvasがUI、GASがAPI、シートがDB</span></li>
+                    <li><i class="fa-solid fa-rocket"></i><span>ノーコードで<span class="highlight-accent">完全システム化</span>が可能</span></li>
+                </ul>
+                <div class="stat-box mt-3"><p class="text-sm text-gray-700 mb-1"><strong><i class="fa-solid fa-star accent-icon"></i> 何がすごいって</strong></p><p class="text-sm">専門知識がなくても、この3つを組み合わせれば本格的なシステムが作れる。</p></div>
+            </div>
+
+            <!-- ⑮ Geminiが全部書いてくれる -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.8s;">
+                <div class="text-center"><i class="fa-solid fa-wand-magic-sparkles mega-icon icon-bounce accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑮ Geminiが全部書いてくれる</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-comment"></i><span>概念を伝えれば<span class="highlight">GAS呼び出しを実装</span></span></li>
+                    <li><i class="fa-solid fa-code"></i><span>GASのコードも<span class="highlight-accent">ジェミニが書いてくれる</span></span></li>
+                    <li><i class="fa-solid fa-terminal"></i><span>doGet/doPostの中身も自動生成</span></li>
+                    <li><i class="fa-solid fa-github"></i><span>コードは<span class="tag">GitHubで公開</span>済み</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-magic accent-icon"></i> ノーコードどころか、コードさえAIが書いてくれる時代が到来！</span></div>
+            </div>
+
+            <!-- ⑯ ワークフロー全体 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.85s;">
+                <div class="text-center"><i class="fa-solid fa-diagram-project mega-icon icon-beat"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑯ ワークフロー全体像</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-file-pdf accent-icon"></i><span>PDFをCanvasにアップロード</span></li>
+                </ul>
+                <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-gem accent-icon"></i><span>Geminiがセット構成と抽出領域を<span class="highlight">自動特定</span></span></li>
+                </ul>
+                <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-cloud accent-icon"></i><span>設定をGAS経由で<span class="highlight-accent">スプレッドシートに保存</span></span></li>
+                </ul>
+                <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-recycle accent-icon"></i><span>次回は<span class="highlight">テンプレート選択だけで再利用</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-1 right"><span class="handwritten"><i class="fa-solid fa-bolt accent-icon"></i> 一回作れば、あとは自動で回り続ける。これぞ真の自動化！</span></div>
+            </div>
+
+            <!-- ⑰ AI OCR製品を超えた理由 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.9s;">
+                <div class="text-center"><i class="fa-solid fa-crown mega-icon icon-bounce"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑰ なぜ既存製品を超えたか</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-brain"></i><span>Geminiが<span class="highlight">画像を理解して</span>領域を自動決定</span></li>
+                    <li><i class="fa-solid fa-ban"></i><span>手動での領域作成が<span class="highlight-accent">不要</span></span></li>
+                    <li><i class="fa-solid fa-cloud"></i><span>設定が<span class="highlight">クラウドに保存</span>され再利用可能</span></li>
+                    <li><i class="fa-solid fa-coins"></i><span>既存製品は高額だが、これは<span class="highlight-accent">無料のGoogleサービスで完結</span></span></li>
+                </ul>
+                <div class="speech-bubble variant-2"><span class="handwritten"><i class="fa-solid fa-trophy accent-icon"></i> 高い製品を買わなくても、無料ツールの組み合わせで超えられる！</span></div>
+            </div>
+
+            <!-- ⑱ コケ先生のコミュ術 -->
+            <div class="card animate-fade-in-scale" style="animation-delay: 0.95s;">
+                <div class="text-center"><i class="fa-solid fa-people-arrows mega-icon icon-beat accent-icon"></i><h2 class="text-xl font-bold mb-2" style="color: #1B2A41;">⑱ おまけ：コミュニケーション術</h2></div>
+                <ul class="keyword-list">
+                    <li><i class="fa-solid fa-key"></i><span>初対面で打ち解けるコツ：<span class="highlight-accent">「気にしない」</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass"></i><span>相手が自分をどう思うか<span class="highlight">気にしすぎると壁ができる</span></span></li>
+                    <li><i class="fa-solid fa-book-open"></i><span>365日の行事を読んで<span class="highlight">引き出しを増やす</span></span></li>
+                    <li><i class="fa-solid fa-antenna"></i><span>日々<span class="tag">アンテナを張る</span>のが大事</span></li>
+                </ul>
+                <div class="speech-bubble"><span class="handwritten"><i class="fa-solid fa-face-smile accent-icon"></i> 技術だけでなく、人との関わりも大切。引き出しが多い人ほど面白い！</span></div>
+            </div>
+
+        </div>
+
+        <div class="section-divider"></div>
+
+        <footer>
+            <p class="mb-2"><i class="fa-brands fa-youtube accent-icon" style="font-size: 1.4rem;"></i> このインフォグラフィックは以下の動画を元に作成しました</p>
+            <p>🎬 動画: <a href="https://www.youtube.com/watch?v=TYONsITlwaA" target="_blank" rel="noopener">コケ先生「AI OCR製品をぶっ潰せ 極み編 〜Canvas + GAS連携で抽出領域をクラウド保存〜」</a></p>
+            <p class="mt-2 text-gray-500"><i class="fa-regular fa-calendar"></i> 2026年8月1日 ／ <i class="fa-solid fa-clock"></i> 17:00</p>
+        </footer>
+    </div>
+</body>
+</html>

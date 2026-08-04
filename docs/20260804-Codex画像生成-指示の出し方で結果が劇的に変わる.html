@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codex画像生成の落とし穴 〜細かい指示ほど画像が崩れる〜</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            /* === Royal Plum & Amber Theme === */
+            --ui-color-1: #6B46C1;   /* primary - deep purple */
+            --ui-color-2: #ED8936;   /* accent - warm orange */
+            --ui-color-3: #E9D8FD;   /* tag background - light lavender */
+            --ui-color-4: #2D1B69;   /* darkest - header/footer gradient */
+            --ui-color-5: #F6AD55;   /* secondary accent - soft amber */
+            --bg-color: #FAF5FF;     /* soft lavender page background */
+            --card-bg: #FFFFFF;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Kaisei Decol', sans-serif;
+            color: #333333;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 2000px; margin: 0 auto; padding: 30px 20px; }
+
+        /* === HEADER === */
+        .header {
+            text-align: center; padding: 40px 20px 50px;
+            background: linear-gradient(135deg, var(--ui-color-4) 0%, #44337A 40%, var(--ui-color-1) 100%);
+            border-radius: 30px; margin-bottom: 40px; color: white;
+            position: relative; overflow: hidden;
+        }
+        .header::before {
+            content: ''; position: absolute; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(246,173,85,0.22) 0%, transparent 70%);
+            animation: headerShine 8s ease-in-out infinite;
+        }
+        @keyframes headerShine {
+            0%, 100% { transform: translateX(-30%) translateY(-30%); }
+            50% { transform: translateX(30%) translateY(30%); }
+        }
+        .header i { font-size: 5rem; margin-bottom: 20px; display: block; animation: fa-bounce 2s; color: var(--ui-color-5); }
+        .header h1 { font-size: 2.4rem; margin-bottom: 10px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .header .subtitle { font-size: 1.2rem; opacity: 0.9; }
+        .header .date-badge {
+            display: inline-block; background: rgba(255,255,255,0.2);
+            padding: 5px 20px; border-radius: 20px; margin-top: 15px; font-size: 0.95rem;
+        }
+
+        /* === CARD LAYOUT === */
+        .section-layout { display: flex; flex-wrap: wrap; gap: 25px; justify-content: center; margin-bottom: 40px; }
+        .section-card {
+            flex: 1; min-width: 220px; max-width: 450px;
+            background-color: var(--card-bg); border-radius: 20px; padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .section-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container i { color: var(--ui-color-1); }
+        .mega-icon-container h2 { font-size: 1.15rem; color: var(--ui-color-4); margin-top: 8px; }
+        .card-content { padding: 0 10px 15px; }
+
+        /* === KEYWORD LIST === */
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li {
+            margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 0.95rem;
+        }
+        .keyword-list li i {
+            margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 3px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3); color: var(--ui-color-4);
+            padding: 3px 8px; border-radius: 5px; margin-right: 5px;
+            display: inline-block; font-weight: bold; font-size: 0.85rem;
+        }
+
+        /* === SPEECH BUBBLES === */
+        .speech-bubble {
+            position: relative; background: #FFF; border: 3px solid var(--ui-color-1);
+            border-radius: 20px; padding: 10px 15px; margin: 15px 5px;
+            font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -13px; left: 20px;
+            border-width: 12px 8px 0; border-style: solid;
+            border-color: var(--ui-color-1) transparent; display: block; width: 0;
+        }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+        .speech-bubble.variant-2 { background: #FFF0E8; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+
+        /* === CODE PREVIEW === */
+        pre {
+            background: #f5f5f5; padding: 10px; border-radius: 5px;
+            font-size: 12px; margin-top: 10px; overflow-x: auto;
+            font-family: 'Courier New', monospace; line-height: 1.4;
+        }
+
+        /* === HIGHLIGHT + FOOTER === */
+        .highlight { color: var(--ui-color-1); font-weight: bold; }
+        footer {
+            text-align: center; padding: 30px 20px;
+            background: linear-gradient(135deg, var(--ui-color-4), #44337A);
+            color: #ddd; border-radius: 20px; margin-top: 40px; font-size: 0.95rem;
+        }
+        footer a { color: var(--ui-color-5); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+
+        /* === ANIMATION === */
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out forwards; }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px) { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="header">
+            <i class="fa-solid fa-image"></i>
+            <h1>Codex画像生成の落とし穴</h1>
+            <div class="subtitle">〜細かい指示ほど画像が崩れる〜</div>
+            <div class="date-badge"><i class="fa-regular fa-calendar"></i> 2026年8月4日</div>
+        </div>
+
+        <!-- ===== CARDS 1-6 (row 1) ===== -->
+        <div class="section-layout">
+
+            <!-- CARD ① -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-exclamation fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>①問題: Codexの画像がダサくなる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-robot"></i>
+                            <span>Codexで<span class="highlight">画像生成</span>をさせてみた</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-face-frown"></i>
+                            <span>なぜか<span class="highlight">ダサい画像</span>ばかり出来上がる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>何度直しても<span class="keyword-tag">直らない</span>ループ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magnifying-glass"></i>
+                            <span>原因は<span class="highlight">ユーザー自身</span>にあった</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        画像が悪いんじゃなくて<br>
+                        <span class="highlight">指示</span>が悪かった…！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ② -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-rotate fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>②現象: 直そうとするほど悪化</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-comment-dots"></i>
+                            <span>修正指示を<span class="highlight">何度も</span>出す</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-trend-down"></i>
+                            <span>直すほど<span class="keyword-tag">品質低下</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>堂々めぐりの<span class="highlight">無限ループ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-face-tired"></i>
+                            <span>時間だけが<span class="keyword-tag">浪費</span>される</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                        頑張る方向が<br>
+                        <span class="highlight">間違ってた</span>！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ③ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="animation: fa-shake 2s;"></i>
+                    <h2>③真の原因: 指示の出しすぎ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-list-ul"></i>
+                            <span>指示の<span class="highlight">数が多すぎる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hand-holding-droplet"></i>
+                            <span>あれもこれもと<span class="keyword-tag">詰め込み</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-brain"></i>
+                            <span>AIの判断を<span class="highlight">奪って</span>いた</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-info"></i>
+                            <span><span class="keyword-tag">過剰指示</span>が最大の敵</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        よかれと思って出した指示が<br>
+                        <span class="highlight">邪魔</span>になってた！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ④ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-puzzle-piece fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>④Codexの性質: 頭脳はあれど</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-brain"></i>
+                            <span>コード生成は<span class="highlight">めちゃくちゃ賢い</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-palette"></i>
+                            <span>しかし<span class="keyword-tag">デザインセンス</span>は別</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced"></i>
+                            <span>理屈は得意、<span class="highlight">感性</span>は苦手</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-secret"></i>
+                            <span>得意分野を<span class="keyword-tag">間違える</span>と崩れる</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        画像生成AIと<br>
+                        <span class="highlight">役割が違う</span>！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑤ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-ban fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑤NG例: 細かすぎる指定</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-text-height"></i>
+                            <span><span class="keyword-tag">文字の位置</span>を座標で指定</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-droplet"></i>
+                            <span><span class="keyword-tag">色</span>を細かく指定</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-text-width"></i>
+                            <span><span class="keyword-tag">サイズ</span>を数値で固定</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-font"></i>
+                            <span><span class="keyword-tag">フォント</span>まで全部決める</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                        この4つを指定すると<br>
+                        <span class="highlight">ほぼ確実</span>に崩れる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑥ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-shapes fa-5x" style="animation: fa-shake 2s;"></i>
+                    <h2>⑥崩れる仕組み: バランス崩壊</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-link-slash"></i>
+                            <span>要素間の<span class="highlight">整合性</span>が消える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-unbalanced"></i>
+                            <span>全体の<span class="keyword-tag">バランス</span>が崩壊</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-image"></i>
+                            <span><span class="highlight">グダグダ</span>な画像に</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-triangle-exclamation"></i>
+                            <span>部分最適の<span class="keyword-tag">罠</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        細部は合っても<br>
+                        <span class="highlight">全体</span>が壊れる…！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CARDS 7-12 (row 2) ===== -->
+        <div class="section-layout">
+
+            <!-- CARD ⑦ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-bullseye fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑦コツ①: 目的を伝える</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-flag"></i>
+                            <span>何を<span class="highlight">作りたいか</span>を明確に</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bullhorn"></i>
+                            <span><span class="keyword-tag">訴求</span>したい内容を伝える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-tag"></i>
+                            <span>誰に<span class="highlight">見せたいか</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span><span class="keyword-tag">目的</span>さえ伝わればOK</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        「<span class="highlight">何を</span>」作るか<br>
+                        これだけ伝えよう！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑧ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-table-cells-large fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑧コツ②: 構図だけ伝える</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-vector-square"></i>
+                            <span>大まかな<span class="highlight">骨組み</span>のみ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>要素の<span class="keyword-tag">配置</span>のイメージ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                            <span><span class="highlight">大枠</span>のレイアウト</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye"></i>
+                            <span>細部は<span class="keyword-tag">見ない</span>のが正解</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                        設計図だけ渡して<br>
+                        <span class="highlight">装飾</span>は任せる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑨ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-hand-holding-heart fa-5x" style="animation: fa-shake 2s;"></i>
+                    <h2>⑨コツ③: 詳細はすべて任せる</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-ban"></i>
+                            <span><span class="highlight">文字サイズ</span>は指定しない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban"></i>
+                            <span><span class="highlight">フォント</span>も任せる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban"></i>
+                            <span><span class="highlight">色</span>の指定は絶対にしない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span><span class="keyword-tag">生成AI</span>の自由にさせる</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        コントロール欲を<br>
+                        <span class="highlight">手放す</span>のが鍵！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑩ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-people-arrows fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑩コツ④: 役割分担を意識</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-user-pen"></i>
+                            <span>人は<span class="highlight">設計</span>する係</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-paintbrush"></i>
+                            <span>絵を描くのは<span class="keyword-tag">生成AI</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake"></i>
+                            <span>境界を<span class="highlight">守る</span>こと</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>得意分野を<span class="keyword-tag">生かし合う</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        人とAIの<br>
+                        <span class="highlight">分業</span>こそ正解！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑪ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-medal fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑪コツ⑤: 得意分野を活かす</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-rocket"></i>
+                            <span>強みを<span class="highlight">伸ばす</span>指示を</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban"></i>
+                            <span>得意を<span class="keyword-tag">殺す</span>指示はNG</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-up"></i>
+                            <span>能力を<span class="highlight">最大化</span>する</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-heart"></i>
+                            <span>AIの<span class="keyword-tag">良さ</span>を信じる</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                        AIの<span class="highlight">得意技</span>を<br>
+                        教える側に回ろう！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑫ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scale-balanced fa-5x" style="animation: fa-shake 2s;"></i>
+                    <h2>⑫正しい指示の分量</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gauge-low"></i>
+                            <span>指示は<span class="highlight">少なめ</span>が正解</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-feather"></i>
+                            <span><span class="keyword-tag">ポイント</span>だけ厳選</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-broom"></i>
+                            <span>余計な指定は<span class="highlight">削る</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>質より<span class="keyword-tag">内容</span>重視</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        あれもこれもより<br>
+                        <span class="highlight">これだけ</span>！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CARDS 13-18 (row 3) ===== -->
+        <div class="section-layout">
+
+            <!-- CARD ⑬ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-xmark fa-5x" style="animation: fa-beat-fade 2s; color: var(--ui-color-5);"></i>
+                    <h2>⑬ビフォー: 悪いパターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-list-check"></i>
+                            <span>指示を<span class="highlight">箇条書き</span>で大量</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ruler"></i>
+                            <span>数値まで<span class="keyword-tag">全部指定</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-thumbs-down"></i>
+                            <span><span class="highlight">グダグダ</span>に崩れた画像</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span>修正ほど<span class="keyword-tag">悪化</span>する</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        親切のつもりが<br>
+                        <span class="highlight">逆効果</span>に…！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑭ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-circle-check fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑭アフター: 良いパターン</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-feather-pointed"></i>
+                            <span>目的と<span class="highlight">構図だけ</span>伝える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>後は<span class="keyword-tag">AI</span>にお任せ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-star"></i>
+                            <span><span class="highlight">整った美しい</span>画像</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-thumbs-up"></i>
+                            <span>バランスも<span class="keyword-tag">自然</span>に整う</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                        手を<span class="highlight">抜く</span>ほど<br>
+                        結果が良くなる！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑮ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-key fa-5x" style="animation: fa-shake 2s;"></i>
+                    <h2>⑮本質: 核心は「役割分担」</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-users-gear"></i>
+                            <span>プロンプト術の<span class="highlight">核心</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                            <span>適切な<span class="keyword-tag">分業</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-balance-scale"></i>
+                            <span>得意分野の<span class="highlight">組み合わせ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-graduation-cap"></i>
+                            <span>これが<span class="keyword-tag">最重要</span>ルール</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        テクニックより<br>
+                        <span class="highlight">分業</span>がすべて！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑯ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-user-pen fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑯人間の役割: 伝える係</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bullseye"></i>
+                            <span><span class="highlight">目的</span>を明確にする</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-table-cells"></i>
+                            <span><span class="highlight">構図</span>の骨組みを伝える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-comments"></i>
+                            <span>あとは<span class="keyword-tag">伝える</span>だけ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hand-back-fist"></i>
+                            <span><span class="keyword-tag">指示欲</span>を抑える</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+                        人は<span class="highlight">監督</span><br>
+                        俳優はAI！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑰ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-paintbrush fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑰AIの役割: 描く係</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-palette"></i>
+                            <span>色や<span class="highlight">バランス</span>はAIが決める</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-text-height"></i>
+                            <span>文字や<span class="keyword-tag">フォント</span>も任す</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-layer-group"></i>
+                            <span>細部の<span class="highlight">調整</span>もお任せ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-magic-wand-sparkles"></i>
+                            <span>AIの<span class="keyword-tag">感性</span>を信じる</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+                        描く作業は<br>
+                        <span class="highlight">全部</span>AIに！
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑱ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-trophy fa-5x" style="animation: fa-shake 2s;"></i>
+                    <h2>⑱教訓: 得意を伸ばす指示を</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-arrow-up"></i>
+                            <span>得意を<span class="highlight">伸ばす</span>指示を心がける</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ban"></i>
+                            <span>能力を<span class="keyword-tag">殺す</span>指示は絶対NG</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-handshake-angle"></i>
+                            <span>信頼こそ<span class="highlight">最大のコツ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rocket"></i>
+                            <span>結果は<span class="keyword-tag">劇的</span>に変わる</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+                        指示の出し方ひとつで<br>
+                        画像が<span class="highlight">劇的に</span>変わる！
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FOOTER ===== -->
+        <footer>
+            🎬 動画: <a href="https://www.youtube.com/watch?v=d-z8s-_mq5g" target="_blank">Jun Suzuki AI Agency「Codex画像生成の落とし穴 - 細かい指示ほど画像が崩れる」</a> | 📅 2026年8月4日
+        </footer>
+    </div>
+</body>
+</html>

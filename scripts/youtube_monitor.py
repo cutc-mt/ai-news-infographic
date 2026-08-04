@@ -3,11 +3,17 @@ YouTube チャンネル監視システム (Phase 5c)
 
 channels.yamlから監視対象チャンネルを読み込み、
 YouTube Data API v3で新着動画を検知する。
+
+最適化: search API(100 units)の代わりに playlistItems API(1 unit)を使用。
+チャンネルIDはスクレイピングで取得しAPI消費を削減。
 """
 import os
+import re
 import json
+import time
 import urllib.request
 import urllib.parse
+import urllib.error
 from typing import Optional
 from datetime import datetime, timedelta, timezone
 import yaml
@@ -35,19 +41,89 @@ def load_channels(yaml_path: Optional[str] = None, only_enabled: bool = False) -
 # --- HTTP ヘルパー（テスト用にモック可能） ---
 
 def requests_get(url: str) -> dict:
-    """urllibでGETリクエスト（requests互換の戻り値）"""
+    """urllibでGETリクエスト（requests互換の戻り値）。429は例外ではなく空で返す。"""
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        status_code = resp.status
-        body = resp.read().decode('utf-8')
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            status_code = resp.status
+            body = resp.read().decode('utf-8')
+    except urllib.error.HTTPError as e:
+        if e.code == 429:
+            # クォータ枯渇: 空の結果を返す
+            print(f"  ⚠️ Rate limited (429), skipping request")
+            return {'status_code': 429, 'json': lambda: {}}
+        raise
     return {'status_code': status_code, 'json': lambda: json.loads(body)}
 
 
-# --- YouTube API ---
+# --- チャンネルIDキャッシュ（ファイルベース） ---
+
+CHANNEL_ID_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'channel_ids_cache.json'
+)
+
+
+def load_channel_id_cache() -> dict:
+    """チャンネルIDのキャッシュをファイルから読み込む"""
+    try:
+        with open(CHANNEL_ID_CACHE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_channel_id_cache(cache: dict):
+    """チャンネルIDのキャッシュをファイルに保存"""
+    with open(CHANNEL_ID_CACHE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cache, f, ensure_ascii=False, indent=2)
+
+
+# --- チャンネルID取得 ---
+
+def get_channel_id_scrape(handle: str) -> Optional[str]:
+    """YouTubeチャンネルページをスクレイピングしてchannel_idを取得（API不要）"""
+    clean = handle.lstrip('@')
+    url = f"https://www.youtube.com/@{clean}"
+    req = urllib.request.Request(url, headers={
+        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept-Language': 'en-US,en;q=0.9',
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            html = resp.read().decode('utf-8', errors='ignore')
+        # "channelId":"UC..." または "externalId":"UC..." を探す
+        match = re.search(r'"channelId":"(UC[A-Za-z0-9_-]{22})"', html)
+        if match:
+            return match.group(1)
+        match = re.search(r'"externalId":"(UC[A-Za-z0-9_-]{22})"', html)
+        if match:
+            return match.group(1)
+        return None
+    except Exception:
+        return None
+
 
 def get_channel_id(handle: str, api_key: str) -> Optional[str]:
-    """handle（@xxx）からチャンネルIDを取得"""
+    """handle（@xxx）からチャンネルIDを取得。
+
+    優先順位: ファイルキャッシュ → スクレイピング → API(forHandle)
+    search API（100 units）は使わない。
+    """
     clean = handle.lstrip('@')
+
+    # 1. ファイルキャッシュを確認
+    cache = load_channel_id_cache()
+    if handle in cache:
+        return cache[handle]
+
+    # 2. スクレイピング（API消費ゼロ）
+    cid = get_channel_id_scrape(handle)
+    if cid:
+        cache[handle] = cid
+        save_channel_id_cache(cache)
+        return cid
+
+    # 3. API forHandle（1 unit）をフォールバックとして使用
     url = (
         f"https://www.googleapis.com/youtube/v3/channels"
         f"?part=snippet&forHandle={urllib.parse.quote(handle)}&key={api_key}"
@@ -59,29 +135,40 @@ def get_channel_id(handle: str, api_key: str) -> Optional[str]:
         return None
     items = json_fn().get('items', [])
     if items:
-        return items[0].get('id')
-    # forHandleが効かない場合はsearchでフォールバック
-    url2 = (
-        f"https://www.googleapis.com/youtube/v3/search"
-        f"?part=snippet&q={urllib.parse.quote(clean)}&type=channel&maxResults=1&key={api_key}"
-    )
-    result2 = requests_get(url2)
-    status_code2 = getattr(result2, 'status_code', result2.get('status_code') if isinstance(result2, dict) else None)
-    json_fn2 = getattr(result2, 'json', None) or (lambda: result2['json']() if isinstance(result2, dict) else {})
-    items2 = json_fn2().get('items', [])
-    if items2:
-        return items2[0].get('id', {}).get('channelId')
+        cid = items[0].get('id')
+        if cid:
+            cache[handle] = cid
+            save_channel_id_cache(cache)
+        return cid
+
     return None
 
 
+# --- 動画取得（playlistItems API使用、search APIは使わない） ---
+
+def get_uploads_playlist_id(channel_id: str) -> str:
+    """channel_idからuploads playlist IDを生成"""
+    if channel_id.startswith('UC'):
+        return 'UU' + channel_id[2:]
+    return channel_id
+
+
 def get_latest_videos(channel_id: str, api_key: str, max_results: int = 5) -> list:
-    """チャンネルの最新動画を取得"""
+    """チャンネルの最新動画を取得。
+
+    playlistItems API(1 unit)を使用。search API(100 units)は使わない。
+    """
+    playlist_id = get_uploads_playlist_id(channel_id)
     url = (
-        f"https://www.googleapis.com/youtube/v3/search"
-        f"?part=snippet&channelId={channel_id}"
-        f"&order=date&type=video&maxResults={max_results}&key={api_key}"
+        f"https://www.googleapis.com/youtube/v3/playlistItems"
+        f"?part=snippet&playlistId={playlist_id}"
+        f"&maxResults={max_results}&key={api_key}"
     )
-    result = requests_get(url)
+    try:
+        result = requests_get(url)
+    except Exception:
+        return []
+
     status_code = getattr(result, 'status_code', result.get('status_code') if isinstance(result, dict) else None)
     json_fn = getattr(result, 'json', None) or (lambda: result['json']() if isinstance(result, dict) else {})
     if status_code != 200:
@@ -90,10 +177,10 @@ def get_latest_videos(channel_id: str, api_key: str, max_results: int = 5) -> li
     items = json_fn().get('items', [])
     videos = []
     for item in items:
-        video_id = item.get('id', {}).get('videoId')
+        snippet = item.get('snippet', {})
+        video_id = snippet.get('resourceId', {}).get('videoId')
         if not video_id:
             continue
-        snippet = item.get('snippet', {})
         videos.append({
             'video_id': video_id,
             'title': snippet.get('title', ''),
@@ -153,7 +240,7 @@ class YouTubeMonitor:
     def __init__(self, api_key: str, yaml_path: Optional[str] = None):
         self.api_key = api_key
         self.channels = load_channels(yaml_path, only_enabled=True)
-        # チャンネルIDキャッシュ
+        # チャンネルIDキャッシュ（ファイルベース + インスタンス）
         self._channel_id_cache: dict = {}
 
     def get_channel_id(self, handle: str) -> Optional[str]:
@@ -172,7 +259,6 @@ class YouTubeMonitor:
         """既存のインフォグラフィックから既知のvideo_idを取得"""
         script_dir = os.path.dirname(os.path.abspath(__file__))
         docs_dir = os.path.join(script_dir, '..', 'docs')
-        import re
         known = set()
         if not os.path.isdir(docs_dir):
             return known

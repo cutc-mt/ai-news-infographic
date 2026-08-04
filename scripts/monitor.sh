@@ -6,7 +6,7 @@
 set -e
 
 export YOUTUBE_API_KEY="$(cat /home/victo/.hermes/secrets/youtube_api_key 2>/dev/null || echo '')"
-NEWS_API_URL="https://ai-news-api-1071356095208.asia-northeast1.run.app/api/news"
+export NEWS_API_URL="https://ai-news-api-1071356095208.asia-northeast1.run.app/api/news"
 
 if [ -z "$YOUTUBE_API_KEY" ]; then
   echo "ERROR: YouTube API key not found"

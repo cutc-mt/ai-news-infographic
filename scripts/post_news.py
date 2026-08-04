@@ -67,6 +67,14 @@ def post_news(payload: dict, api_url: str = 'http://localhost:8000/api/news') ->
         return False
 
 
+def cap_videos(videos: list, max_count: int = 30) -> list:
+    """1回の監視で処理する動画数の上限を設定（安全装置）"""
+    if len(videos) <= max_count:
+        return videos
+    print(f"⚠️ 新着{len(videos)}件が上限{max_count}件を超過。先頭{max_count}件を処理します。")
+    return videos[:max_count]
+
+
 def batch_post_news(
     videos: list,
     api_url: str = 'http://localhost:8000/api/news'
@@ -114,7 +122,10 @@ if __name__ == '__main__':
         print("\n✅ 新着動画なし")
         sys.exit(0)
 
-    print(f"\n=== {len(new_videos)}本の新着動画をAPIにPOST ===")
+    print(f"\n=== {len(new_videos)}本の新着動画を処理（上限30件） ===")
+
+    # 上限チェック
+    new_videos = cap_videos(new_videos, max_count=30)
 
     # 2. APIにPOST
     results = batch_post_news(new_videos, api_url=news_api_url)

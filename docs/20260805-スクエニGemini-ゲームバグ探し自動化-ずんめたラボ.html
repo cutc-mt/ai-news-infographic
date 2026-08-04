@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>スクエニがGeminiでゲームのバグ探しを自動化 — AIが画面を見て操作 | ずんめたラボ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            /* === Royal Plum × Teal × Amber Gold — スクエニ / Gemini / ゲームQA === */
+            --ui-color-1: #6B2D5C;   /* primary: 深いプラム（RPGの夜） */
+            --ui-color-2: #138A97;   /* accent: ティール（AIの知性） */
+            --ui-color-3: #F0E6EE;   /* tag bg: 薄い藤色 */
+            --ui-color-4: #2D0F26;   /* darkest: ほぼ黒の紫 */
+            --ui-color-5: #E89A2B;   /* secondary: アンバーゴールド（Gemini の光） */
+            --bg-color: #F8F4F6;
+            --card-bg: #FFFFFF;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-color);
+            font-family: 'Kaisei Decol', sans-serif;
+            color: #333333;
+            line-height: 1.6;
+        }
+
+        .container { max-width: 2000px; margin: 0 auto; padding: 30px 20px; }
+
+        /* === HEADER === */
+        .header {
+            text-align: center; padding: 40px 20px 50px;
+            background: linear-gradient(135deg, var(--ui-color-4) 0%, #4A1F40 50%, var(--ui-color-1) 100%);
+            border-radius: 30px; margin-bottom: 40px; color: white;
+            position: relative; overflow: hidden;
+        }
+        .header::before {
+            content: ''; position: absolute; top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            background: radial-gradient(circle, rgba(232,154,43,0.22) 0%, transparent 70%);
+            animation: headerShine 9s ease-in-out infinite;
+        }
+        @keyframes headerShine {
+            0%, 100% { transform: translateX(-30%) translateY(-30%); }
+            50% { transform: translateX(30%) translateY(30%); }
+        }
+        .header i.brand {
+            font-size: 5rem; margin-bottom: 20px; display: block;
+            color: var(--ui-color-5); animation: fa-bounce 2s;
+        }
+        .header h1 {
+            font-size: 2.3rem; margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            font-family: 'Zen Kurenaido', sans-serif;
+        }
+        .header .subtitle { font-size: 1.2rem; opacity: 0.95; }
+        .header .date-badge {
+            display: inline-block; background: rgba(255,255,255,0.2);
+            padding: 5px 20px; border-radius: 20px; margin-top: 15px; font-size: 0.95rem;
+        }
+
+        /* === SECTION TITLE === */
+        .section-title {
+            text-align: center; font-size: 28px; color: var(--ui-color-1);
+            margin: 40px 0 20px; font-family: 'Zen Kurenaido', sans-serif;
+            position: relative;
+        }
+        .section-title::after {
+            content: ''; display: block; width: 80px; height: 3px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+            margin: 8px auto 0; border-radius: 2px;
+        }
+
+        /* === CARD LAYOUT === */
+        .section-layout {
+            display: flex; flex-wrap: wrap; gap: 25px;
+            justify-content: center; margin-bottom: 20px;
+        }
+        .section-card {
+            flex: 1; min-width: 220px; max-width: 450px;
+            background-color: var(--card-bg); border-radius: 20px; padding: 15px;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+            position: relative; overflow: hidden;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .section-card:hover { transform: translateY(-5px); box-shadow: 8px 8px 25px rgba(0,0,0,0.15); }
+        .section-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(90deg, var(--ui-color-1), var(--ui-color-2));
+        }
+        .mega-icon-container { text-align: center; margin: 15px 0; }
+        .mega-icon-container i { color: var(--ui-color-1); filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.2)); }
+        .mega-icon-container h2 {
+            font-size: 1.15rem; color: var(--ui-color-4); margin-top: 8px;
+            font-family: 'Zen Kurenaido', sans-serif;
+        }
+        .card-content { padding: 0 10px 15px; }
+
+        /* === KEYWORD LIST === */
+        .keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+        .keyword-list li {
+            margin-bottom: 8px; display: flex; align-items: flex-start;
+            font-size: 0.95rem; line-height: 1.6;
+        }
+        .keyword-list li i {
+            margin-right: 8px; color: var(--ui-color-2); min-width: 16px; margin-top: 3px;
+        }
+        .keyword-tag {
+            background-color: var(--ui-color-3); color: var(--ui-color-4);
+            padding: 3px 8px; border-radius: 5px; margin-right: 5px;
+            display: inline-block; font-weight: bold; font-size: 0.85rem;
+        }
+        .keyword-tag.teal   { background-color: #D4EDEF; color: #0E5A63; }
+        .keyword-tag.gold   { background-color: #FBEFD6; color: #8A5A0E; }
+        .keyword-tag.plum   { background-color: #EADAE6; color: #5A1F4F; }
+
+        /* === SPEECH BUBBLES (3 variants + 3 positions) === */
+        .speech-bubble {
+            position: relative; background: #FFF; border: 3px solid var(--ui-color-1);
+            border-radius: 20px; padding: 10px 15px; margin: 15px 5px;
+            font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+            transform: rotate(-1deg);
+        }
+        .speech-bubble::after {
+            content: ''; position: absolute; bottom: -13px; left: 20px;
+            border-width: 12px 8px 0; border-style: solid;
+            border-color: var(--ui-color-1) transparent; display: block; width: 0;
+        }
+        .speech-bubble.right::after { left: auto; right: 20px; transform: rotate(15deg); }
+        .speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; transform: rotate(-5deg); }
+        .speech-bubble.variant-1 { background: #FFF6E6; border-color: var(--ui-color-5); transform: rotate(1deg); }
+        .speech-bubble.variant-1::after { border-color: var(--ui-color-5) transparent; }
+        .speech-bubble.variant-2 { background: #E4F2F4; border-color: var(--ui-color-2); transform: rotate(-2deg); }
+        .speech-bubble.variant-2::after { border-color: var(--ui-color-2) transparent; }
+        .handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.6; color: #333; }
+
+        /* === HIGHLIGHT === */
+        .highlight { color: var(--ui-color-1); font-weight: bold; }
+        .highlight-accent { color: var(--ui-color-2); font-weight: bold; }
+        .highlight-gold { color: var(--ui-color-5); font-weight: bold; }
+
+        /* === FLOW BOX === */
+        .flow-box {
+            background: var(--ui-color-3); border-radius: 10px;
+            padding: 10px 12px; margin: 8px 0; font-size: 0.9rem;
+        }
+        .flow-box .step { display: flex; align-items: flex-start; margin: 4px 0; }
+        .flow-box .step i { color: var(--ui-color-2); margin-right: 6px; margin-top: 3px; }
+        .flow-box .arrow { color: var(--ui-color-5); text-align: center; font-weight: bold; margin: 2px 0; }
+
+        /* === FOOTER === */
+        footer {
+            text-align: center; padding: 30px 20px;
+            background: linear-gradient(135deg, var(--ui-color-4), #4A1F40);
+            color: #ddd; border-radius: 20px; margin-top: 40px; font-size: 0.95rem;
+        }
+        footer a { color: var(--ui-color-5); text-decoration: none; font-weight: bold; }
+        footer a:hover { text-decoration: underline; }
+
+        /* === ANIMATION === */
+        @keyframes fadeInScale { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        .fade-in-scale { animation: fadeInScale 0.6s ease-out both; }
+
+        /* === RESPONSIVE === */
+        @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+        @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+        @media (max-width: 900px)  { .section-card { min-width: 380px; } }
+        @media (max-width: 768px) {
+            .section-layout { flex-direction: column; }
+            .section-card { width: 100%; min-width: auto; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ===== HEADER ===== -->
+        <div class="header">
+            <i class="fa-solid fa-gamepad brand"></i>
+            <h1>スクエニが Gemini で バグ探し を 自動化</h1>
+            <div class="subtitle">AI が画面を見て コントローラーを握る — ずんめたラボ</div>
+            <div class="date-badge"><i class="fa-regular fa-calendar"></i> 2026年8月4日 公開</div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- セクション1: 発表の 概要 -->
+        <!-- ============================================= -->
+        <h3 class="section-title"><i class="fa-solid fa-bullhorn"></i> 発表の 概要</h3>
+        <div class="section-layout">
+
+            <!-- CARD ① -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-handshake-angle fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>①スクエニ × Google Gemini</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-building"></i>
+                            <span><span class="keyword-tag plum">スクウェア・エニックス</span> が取り組みを発表</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-robot"></i>
+                            <span>Google の <span class="highlight-accent">Gemini</span> を使って品質テストを自動化</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-bug"></i>
+                            <span>ゲームの <span class="highlight">バグ探し</span> を AI に任せる仕組み</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-check"></i>
+                            <span>対象は <span class="highlight">QA テスト</span>（品質を確かめる作業）</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i>
+                        RPG の大手が <span class="highlight">AI にテストを任せる</span> 時代が来たのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ② -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-microphone-lines fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>②発表の 場</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span><span class="keyword-tag teal">Google Cloud Tokyo</span> の基調講演</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-tie"></i>
+                            <span>スクエニの <span class="highlight">AI 開発部門トップ</span> が登壇</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-video"></i>
+                            <span>AI が <span class="highlight">自らゲームをプレイ</span> してテストする動画を公開</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye"></i>
+                            <span>品質テストが進む様子を 実際に見せた</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);"></i>
+                        動画で <span class="highlight">動いている姿</span> を見せたのが大きいのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ③ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-eye fa-5x" style="animation: fa-flip 2s;"></i>
+                    <h2>③AI が やること</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-desktop"></i>
+                            <span><span class="highlight">画面を見て</span> 今の状況を把握</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-gamepad"></i>
+                            <span>コントローラーを操作して 確認したい場所へ進む</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-map-location-dot"></i>
+                            <span>自分から <span class="highlight-accent">ゲーム内の地図</span> を開いて場所確認</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-route"></i>
+                            <span>行き方も AI が <span class="highlight">自分で判断</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-1);"></i>
+                        見て・考えて・動かす。人間と <span class="highlight">同じ入り口</span> なのだ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- セクション2: QA テスト と 課題 -->
+        <!-- ============================================= -->
+        <h3 class="section-title"><i class="fa-solid fa-clipboard-check"></i> QA テスト と 課題</h3>
+        <div class="section-layout">
+
+            <!-- CARD ④ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>④QA テスト とは</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-check-double"></i>
+                            <span>ゲームの <span class="highlight">品質を確かめる</span> 仕事</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-image"></i>
+                            <span>表示が崩れていないか 片っ端から確認</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-align-left"></i>
+                            <span>文章が変じゃないかも念入りに</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-ol"></i>
+                            <span>手順書に沿って <span class="highlight-accent">数百パターン</span> を確かめる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-face-tired"></i>
+                            <span>とても <span class="highlight">地味で根気のいる</span> 仕事</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-mug-hot fa-lg" style="color: var(--ui-color-5);"></i>
+                        華やかな開発の裏で <span class="highlight">黙々と支える</span> 仕事なのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑤ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-arrow-trend-up fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑤ゲーム 規模 の 問題</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-expand"></i>
+                            <span>ゲームが大きくなるほど <span class="highlight">確認箇所が増える</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-infinity"></i>
+                            <span>この数の <span class="highlight-accent">膨張</span> がずっと課題だった</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-people-group"></i>
+                            <span>人手だけで回すのには限界がある</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hand-holding-heart"></i>
+                            <span>だからこそ <span class="highlight">AI への委託</span> が望まれていた</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i>
+                        規模が大きいほど <span class="highlight">人の限界</span> が見えるのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑥ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-landmark fa-5x" style="animation: fa-flip 2s;"></i>
+                    <h2>⑥経産省 支援 プロジェクト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-file-shield"></i>
+                            <span><span class="keyword-tag plum">経済産業省</span> の支援に採択された</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tag"></i>
+                            <span>名称は <span class="highlight">「AI 駆動型 品質チェック プラットフォーム」</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-simple"></i>
+                            <span>申請 <span class="highlight-accent">105 件</span> の中から選ばれた</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-trophy"></i>
+                            <span>採択は <span class="highlight">15 件</span> のみ。かなり厳選</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-certificate fa-lg" style="color: var(--ui-color-1);"></i>
+                        国が <span class="highlight">お墨付き</span> を出した取り組みなのだ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- セクション3: 技術 の 中身 -->
+        <!-- ============================================= -->
+        <h3 class="section-title"><i class="fa-solid fa-microchip"></i> 技術 の 中身</h3>
+        <div class="section-layout">
+
+            <!-- CARD ⑦ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-layer-group fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑦マルチモーダル AI</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-image"></i>
+                            <span>画像も音も動画も <span class="highlight">一緒に扱える</span> AI</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-quote-left"></i>
+                            <span>文字だけのやり取りではない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye"></i>
+                            <span><span class="keyword-tag teal">目の入り口</span> で映像を受け取る</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-ear-listen"></i>
+                            <span><span class="keyword-tag teal">耳の入り口</span> で音を受け取る</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-keyboard"></i>
+                            <span><span class="keyword-tag teal">文字の入り口</span> を全部持つ</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-5);"></i>
+                        五感をまるごと <span class="highlight">AI に渡す</span> 仕組みなのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑧ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-gamepad fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑧ゲーム画面 の 難しさ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-circle-question"></i>
+                            <span>ゲーム画面は <span class="highlight">文字にできない</span> ものばかり</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-location-crosshairs"></i>
+                            <span>今 どこにいるか は数値で書けない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-skull"></i>
+                            <span>敵が何体いるかも 文字化が難しい</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-heart-pulse"></i>
+                            <span>体力がどれだけ残っているかも同様</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-check"></i>
+                            <span>だから <span class="highlight-accent">マルチモーダル</span> でないと扱えない</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-2);"></i>
+                        言葉にできない世界を <span class="highlight">見て分かる</span> 必要があるのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑨ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-cubes fa-5x" style="animation: fa-flip 2s;"></i>
+                    <h2>⑨土台 は Vertex AI</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-cloud"></i>
+                            <span>Google Cloud の <span class="highlight">Vertex AI</span> を使用</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-code-branch"></i>
+                            <span>旧称は <span class="highlight-accent">Project Marlowe</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-tag"></i>
+                            <span>別名 <span class="highlight-accent">ex-AI</span> とも呼ばれていた</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-server"></i>
+                            <span>企業向けの AI プラットフォームが土台</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-1);"></i>
+                        遊びの裏側は <span class="highlight">ガチの業務用 AI</span> なのだ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- セクション4: 従来 との 違い -->
+        <!-- ============================================= -->
+        <h3 class="section-title"><i class="fa-solid fa-arrows-left-right"></i> 従来 との 違い</h3>
+        <div class="section-layout">
+
+            <!-- CARD ⑩ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-scroll fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑩従来 の 自動テスト</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-pen-nib"></i>
+                            <span>動きを <span class="highlight">全部人が台本に書いていた</span></span>
+                        </li>
+                    </ul>
+                    <div class="flow-box">
+                        <div class="step"><i class="fa-solid fa-1"></i><span>画面のこの <span class="highlight">座標</span> を押す</span></div>
+                        <div class="arrow">▼</div>
+                        <div class="step"><i class="fa-solid fa-2"></i><span><span class="highlight">3 秒</span> 待つ</span></div>
+                        <div class="arrow">▼</div>
+                        <div class="step"><i class="fa-solid fa-3"></i><span>次は <span class="highlight">ここ</span> を押す</span></div>
+                    </div>
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-keyboard"></i>
+                            <span>これを <span class="highlight-accent">1 行ずつ人が書いていた</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-feather fa-lg" style="color: var(--ui-color-5);"></i>
+                        手順のすべてを <span class="highlight">人が書き下ろす</span> 世界なのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑪ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-heart-crack fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑪台本 の 問題点</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-paintbrush"></i>
+                            <span>画面の <span class="highlight">デザインが少し変わる</span> だけで全部壊れる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-up-down-left-right"></i>
+                            <span>ボタンの位置が <span class="highlight">ずれたら終わり</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-rotate"></i>
+                            <span><span class="highlight-accent">作っては直し</span> の応酬を繰り返す</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-face-frown"></i>
+                            <span>結局 <span class="highlight">手間が減らない</span> のが悩みの種</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-2);"></i>
+                        壊れては直しの <span class="highlight">いたちごっこ</span> だったのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑫ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-flip 2s;"></i>
+                    <h2>⑫新しい アプローチ</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bullseye"></i>
+                            <span>渡すのは <span class="highlight">目的だけ</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-location-dot"></i>
+                            <span>「この場所まで行って」</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-vial-circle-check"></i>
+                            <span>「この動作を 確認して」という <span class="highlight">タスク</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-xmark"></i>
+                            <span>行き方は <span class="highlight-accent">書かない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-map-location-dot"></i>
+                            <span>AI が <span class="highlight">自分で地図を開いて</span> 場所を確認</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-compass fa-lg" style="color: var(--ui-color-1);"></i>
+                        <span class="highlight">目的を渡す</span> だけで 行き方は AI が決めるのだ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- セクション5: 構想 と 応用 -->
+        <!-- ============================================= -->
+        <h3 class="section-title"><i class="fa-solid fa-lightbulb"></i> 構想 と 応用</h3>
+        <div class="section-layout">
+
+            <!-- CARD ⑬ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-brain fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑬AI の 思考 が 見える</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-eye"></i>
+                            <span>公開画面には <span class="highlight">AI の思考</span> が表示</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-comment-dots"></i>
+                            <span>今 <span class="highlight-accent">何を考えているか</span> が見える</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-check"></i>
+                            <span><span class="highlight">次にやること</span> の一覧も表示</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-head-side-goggles"></i>
+                            <span>頭の中まで <span class="highlight">見える状態</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-5);"></i>
+                        ブラックボックスではなく <span class="highlight">ガラス張り</span> なのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑭ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑭4 工程 の 統合 構想</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-1"></i>
+                            <span><span class="keyword-tag plum">テスト の 設計</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-2"></i>
+                            <span><span class="keyword-tag plum">自動で プレイ する</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-3"></i>
+                            <span><span class="keyword-tag plum">絵 の 崩れ を 見つける</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-4"></i>
+                            <span><span class="keyword-tag plum">文章 の チェック</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-object-group"></i>
+                            <span>この <span class="highlight-accent">4 つを 1 つ</span> にしようとしている</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-layer-group fa-lg" style="color: var(--ui-color-2);"></i>
+                        バラバラの工程を <span class="highlight">1 本の流れ</span> にまとめるのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑮ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-dragon fa-5x" style="animation: fa-flip 2s;"></i>
+                    <h2>⑮プレイヤー へ の 応用</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-gamepad"></i>
+                            <span><span class="highlight">ドラゴンクエスト本編</span> への応用を計画</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-user-group"></i>
+                            <span>相棒 AI <span class="highlight-accent">「おしりスラミー」</span> を入れる予定</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-eye"></i>
+                            <span>画面を見て <span class="highlight">向こうから話しかけてくる</span> AI キャラ</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-microphone"></i>
+                            <span>Gemini と <span class="highlight">音声でやり取り</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-question"></i>
+                            <span>ただし <span class="highlight-gold">導入時期は未定</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-comment fa-lg" style="color: var(--ui-color-1);"></i>
+                        テスト用が <span class="highlight">遊ぶ体験</span> にも届く構想なのだ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- セクション6: 読み解き方 と 視座 -->
+        <!-- ============================================= -->
+        <h3 class="section-title"><i class="fa-solid fa-scale-balanced"></i> 読み解き方 と 視座</h3>
+        <div class="section-layout">
+
+            <!-- CARD ⑯ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-magnifying-glass-minus fa-5x" style="animation: fa-bounce 2s;"></i>
+                    <h2>⑯慎重 な 発表 内容</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bug"></i>
+                            <span>バグを <span class="highlight">見つけたとは断言</span> していない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-circle-question"></i>
+                            <span>判定できるとも <span class="highlight">言っていない</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-chart-line"></i>
+                            <span>効果の <span class="highlight-accent">数字は 1 つも公表</span> されていない</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-hourglass-half"></i>
+                            <span><span class="highlight-gold">まだ言える段階ではない</span> と読むべき</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-balance-scale fa-lg" style="color: var(--ui-color-5);"></i>
+                        大風呂敷ではなく <span class="highlight">慎重な言葉</span> が逆に誠実なのだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑰ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-fire-flame-curved fa-5x" style="animation: fa-beat-fade 2s;"></i>
+                    <h2>⑰ゲーム は 最も 難しい 対象</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-bolt"></i>
+                            <span>画面は <span class="highlight">1 秒に何十回も</span> 絵が変わる</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-forward"></i>
+                            <span>ずっと <span class="highlight-accent">動きっぱなし</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-volume-high"></i>
+                            <span>音も鳴り続ける</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-shuffle"></i>
+                            <span>同じボタンでも <span class="highlight">状況で結果が変わる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-table"></i>
+                            <span>表計算より <span class="highlight-gold">ずっと難しい</span> 対象</span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-1">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-mountain fa-lg" style="color: var(--ui-color-2);"></i>
+                        一番ややこしい場所で <span class="highlight">勝負している</span> のだ
+                    </span>
+                </div>
+            </div>
+
+            <!-- CARD ⑱ -->
+            <div class="section-card fade-in-scale">
+                <div class="mega-icon-container">
+                    <i class="fa-solid fa-users-gear fa-5x" style="animation: fa-flip 2s;"></i>
+                    <h2>⑱あなた の 仕事 に も 来る</h2>
+                </div>
+                <div class="card-content">
+                    <ul class="keyword-list">
+                        <li>
+                            <i class="fa-solid fa-check"></i>
+                            <span>難しい方で <span class="highlight">先に成立</span> したという事実</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-desktop"></i>
+                            <span>あなたの画面を 代わりに 操作する AI も <span class="highlight-accent">近い</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-list-check"></i>
+                            <span>手順が決まっている作業は <span class="highlight">渡せる</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-scale-balanced"></i>
+                            <span>良し悪しを決めるところは <span class="highlight-gold">残る</span></span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-robot"></i>
+                            <span>Google は <span class="highlight">映像を見てロボットを動かす</span> 研究も進行</span>
+                        </li>
+                        <li>
+                            <i class="fa-solid fa-arrows-split-up-and-left"></i>
+                            <span>出口が違うだけで <span class="highlight-accent">同じ設計思想</span></span>
+                        </li>
+                    </ul>
+                </div>
+                <div class="speech-bubble variant-2">
+                    <span class="handwritten">
+                        <i class="fa-solid fa-arrow-right fa-lg" style="color: var(--ui-color-1);"></i>
+                        ゲームで成功した技術は <span class="highlight">あなたの仕事</span> にも来るのだ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== FOOTER ===== -->
+        <footer>
+            <p><i class="fa-solid fa-circle-info"></i> 出典：YouTube動画の内容をインフォグラフィック化</p>
+            <p style="margin-top: 10px;">
+                🎬 動画: <a href="https://www.youtube.com/watch?v=0mN3GdDl3lQ" target="_blank" rel="noopener">スクエニがGeminiでゲームのバグ探しを自動化 AIが画面を見てコントローラーを握る</a>
+            </p>
+            <p style="margin-top: 5px;">
+                📺 チャンネル: <a href="https://www.youtube.com/@zumetarabo" target="_blank" rel="noopener">ずんめたラボ</a>
+            </p>
+            <p style="margin-top: 5px; font-size: 0.85rem; opacity: 0.8;">
+                <i class="fa-regular fa-calendar"></i> 2026年8月4日 公開
+            </p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -109,6 +109,18 @@ def filter_new_videos(videos: list, known_video_ids: set) -> list:
     return [v for v in videos if v['video_id'] not in known_video_ids]
 
 
+def is_likely_short(video: dict) -> bool:
+    """タイトル/説明文からショート動画か判定する"""
+    text = (video.get('title', '') + ' ' + video.get('description', '')).lower()
+    indicators = ['#shorts', '#short', '[short]', '(short)', 'short']
+    return any(ind in text for ind in indicators)
+
+
+def filter_shorts(videos: list) -> list:
+    """ショート動画を除外する"""
+    return [v for v in videos if not is_likely_short(v)]
+
+
 # --- 統合クラス ---
 
 class YouTubeMonitor:
@@ -169,6 +181,7 @@ class YouTubeMonitor:
                 continue
 
             videos = self.get_latest_videos(channel_id, max_per_channel)
+            videos = filter_shorts(videos)
             fresh = filter_new_videos(videos, known_ids)
 
             for v in fresh:

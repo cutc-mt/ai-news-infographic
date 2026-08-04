@@ -9,6 +9,7 @@ import json
 import urllib.request
 import urllib.parse
 from typing import Optional
+from datetime import datetime, timedelta, timezone
 import yaml
 
 
@@ -121,6 +122,29 @@ def filter_shorts(videos: list) -> list:
     return [v for v in videos if not is_likely_short(v)]
 
 
+def is_recent(published_at: str, max_days: int = 1) -> bool:
+    """動画が指定日数以内に公開されたか判定"""
+    if not published_at:
+        return False
+    try:
+        # ISO 8601形式をパース（例: 2026-08-04T10:00:00Z）
+        pub_date = datetime.fromisoformat(
+            published_at.replace('Z', '+00:00')
+        )
+        if pub_date.tzinfo is None:
+            pub_date = pub_date.replace(tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        age = now - pub_date
+        return age <= timedelta(days=max_days)
+    except (ValueError, TypeError):
+        return False
+
+
+def filter_by_date(videos: list, max_days: int = 1) -> list:
+    """指定日数以内に公開された動画のみを残す"""
+    return [v for v in videos if is_recent(v.get('publishedAt', ''), max_days)]
+
+
 # --- 統合クラス ---
 
 class YouTubeMonitor:
@@ -166,8 +190,13 @@ class YouTubeMonitor:
                 pass
         return known
 
-    def check_all_channels(self, max_per_channel: int = 5) -> list:
-        """全チャンネルをチェックして新着動画を返す"""
+    def check_all_channels(self, max_per_channel: int = 5, max_days: int = 2) -> list:
+        """全チャンネルをチェックして新着動画を返す
+
+        Args:
+            max_per_channel: チャンネルあたり最大取得数
+            max_days: 監視時点から遡って何日以内の動画を対象とするか
+        """
         known_ids = self.get_known_video_ids()
         new_videos = []
 
@@ -182,6 +211,7 @@ class YouTubeMonitor:
 
             videos = self.get_latest_videos(channel_id, max_per_channel)
             videos = filter_shorts(videos)
+            videos = filter_by_date(videos, max_days=max_days)
             fresh = filter_new_videos(videos, known_ids)
 
             for v in fresh:

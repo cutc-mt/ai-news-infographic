@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Spark × Chrome Auto Browse — プロンプト1つでブラウザを自動操作</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #0D5C63;   /* 深いティール */
+            --c2: #4FBDBA;   /* ミント */
+            --c3: #E0F7F6;   /* 薄いアクア */
+            --c4: #122C2F;   /* 最暗 */
+            --c5: #FF7A45;   /* コーラルアクセント */
+            --c6: #FFD166;   /* 黄金 */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FFF8F0; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c1) 0%,var(--c2) 55%,var(--c4) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(13,92,99,.35);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(255,209,102,.18) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:#fff; font-size:92px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.25); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:#FFD166; font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:#B2EBE9; font-size:14px; margin-top:12px; position:relative; z-index:1; }
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(13,92,99,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(13,92,99,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c2),var(--c5));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c2); min-width:18px; margin-top:4px; }
+        .tag {
+            background:var(--c3);
+            color:var(--c4);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.coral {
+            background:#FFE6DC;
+            color:#A33A12;
+        }
+        .tag.gold {
+            background:#FFF3CC;
+            color:#8A6500;
+        }
+        .hl {
+            color:var(--c1);
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--c3) 60%);
+        }
+        .hl-coral {
+            color:#C04E1E;
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, #FFE6DC 60%);
+        }
+        .hl-gold {
+            color:#8A6500;
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, #FFF3CC 60%);
+        }
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFF9E3;
+            border-color:var(--c6);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c6) transparent; }
+        .bubble.v2 {
+            background:#FFE9E0;
+            border-color:var(--c5);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c5) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c5); }
+        .pre-box {
+            background:#122C2F;
+            color:#B2EBE9;
+            padding:12px 14px;
+            border-radius:10px;
+            font-family:'Zen Kurenaido',monospace;
+            font-size:13px;
+            margin-top:12px;
+            line-height:1.5;
+            border-left:4px solid var(--c5);
+        }
+        .pre-box .pr { color:#FFD166; }
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:30px 20px;
+            background:linear-gradient(135deg,var(--c1),var(--c2));
+            border-radius:24px;
+            color:#fff;
+        }
+        .footer a { color:#FFD166; text-decoration:none; font-weight:bold; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { margin-top:10px; font-size:14px; color:#B2EBE9; }
+        @keyframes fis { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
+        .card { animation:fis .5s ease-out; }
+        @media(max-width:1200px){ .card{min-width:320px} }
+        @media(max-width:768px){ .layout{flex-direction:column} .card{width:100%;min-width:auto} .header h1{font-size:26px} }
+    </style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+    <i class="fa-solid fa-wand-magic-sparkles fa-7x main"></i>
+    <h1>Gemini Spark × Chrome Auto Browse</h1>
+    <div class="sub">プロンプト1つで、あなたのChromeが勝手に動く時代が到来</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月5日配信 ／ Julian Goldie SEO</div>
+</div>
+<div class="layout">
+
+<!-- ① -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-bolt fa-5x" style="animation:fa-bounce 2s"></i><h2>①プロンプト1つでChrome操作</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-circle-info"></i><span>GoogleのAIエージェント<span class="hl">Gemini Spark</span>が、新機能<span class="tag">Chrome Auto Browse</span>を獲得</span></li>
+            <li><i class="fa-solid fa-keyboard"></i><span>ユーザーは<span class="hl">1つのプロンプト</span>を書くだけで、ブラウザを自動で動かせる</span></li>
+            <li><i class="fa-solid fa-gears"></i><span>これまでの「答えるだけAI」から、<span class="hl-coral">実際に操作するエージェント</span>へ進化</span></li>
+            <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>日常のWeb作業を<span class="tag">まるごと自動化</span>できる可能性を秘める</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-bolt fa-lg"></i> いよいよAIが「ブラウザの中で手を動かす」。これが<span style="font-weight:bold">新時代のスタート</span>！</span></div>
+</div>
+
+<!-- ② -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-user-shield fa-5x" style="animation:fa-beat-fade 3s"></i><h2>②ログイン状態をそのまま活用</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-right-to-bracket"></i><span>最大の進歩は、<span class="hl">ログイン済みのアカウント</span>を使えるようになったこと</span></li>
+            <li><i class="fa-solid fa-key"></i><span>ブラウザに<span class="tag">保存済みのパスワード</span>も、そのまま利用可能</span></li>
+            <li><i class="fa-solid fa-ban"></i><span>以前は<span class="hl-coral">ログイン画面で停止</span>していたのが、大きな壁を突破</span></li>
+            <li><i class="fa-solid fa-house-laptop"></i><span>ユーザー自身の<span class="hl">Chromeを直接操作</span>する設計に切り替わった</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-user-shield fa-lg"></i> 「ログイン済み」をAIに渡せる。これが今までとの<span style="font-weight:bold">決定的な違い</span>！</span></div>
+</div>
+
+<!-- ③ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-house-laptop fa-5x" style="animation:fa-flip 3s"></i><h2>③バックグラウンドで自動実行</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-mug-hot"></i><span>指示を出せば、<span class="hl">画面の裏側で勝手にタスク</span>が進行</span></li>
+            <li><i class="fa-solid fa-building-circle-check"></i><span>具体例：アパートの<span class="tag">物件予定</span>を勝手にチェック</span></li>
+            <li><i class="fa-solid fa-plane-departure"></i><span>具体例：<span class="tag">フライト検索</span>から<span class="tag">予約開始</span>まで自動で</span></li>
+            <li><i class="fa-solid fa-hourglass-half"></i><span>ユーザーは<span class="hl-coral">別の作業</span>に集中できるのが魅力</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2 r"><span class="hw"><i class="fa-solid fa-mug-hot fa-lg"></i> 依頼してコーヒーを淹れている間に、予約手続きが始まっているかも！</span></div>
+</div>
+
+<!-- ④ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-network-wired fa-5x" style="animation:fa-bounce 2s"></i><h2>④他ツールとの強力連携</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-briefcase"></i><span><span class="hl">Workspace</span>（Gmail・ドキュメント等）とシームレスに接続</span></li>
+            <li><i class="fa-solid fa-clock-rotate-left"></i><span>ユーザーの<span class="tag">検索履歴</span>を文脈として活用可能</span></li>
+            <li><i class="fa-solid fa-code"></i><span><span class="tag">コード実行環境</span>も内蔵し、複雑な処理にも対応</span></li>
+            <li><i class="fa-solid fa-pen-ruler"></i><span>図表作成の<span class="hl-gold">Canvas</span>とも組み合わせて、成果物を効率化</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-network-wired fa-lg"></i> メール・検索・コード・図表、全部つながる。<span style="font-weight:bold">Google圏内で完結</span>！</span></div>
+</div>
+
+<!-- ⑤ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-handshake-angle fa-5x" style="animation:fa-beat-fade 2s"></i><h2>⑤ガードレール1：初回接続の許可</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-link"></i><span>Chrome Auto Browseを使い始める前に、<span class="hl">最初の1回は許可</span>が必須</span></li>
+            <li><i class="fa-solid fa-circle-exclamation"></i><span>ユーザーが<span class="tag">意図せず</span>繋がらないように、確認の扉を設置</span></li>
+            <li><i class="fa-solid fa-lock"></i><span>勝手にアカウントが操作される<span class="hl-coral">事故を防止</span>する設計</span></li>
+            <li><i class="fa-solid fa-shield-halved"></i><span>安全性を<span class="hl">最優先</span>したアプローチが明確</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-shield-halved fa-lg"></i> まずは<span style="font-weight:bold">ユーザーのOK</span>が要る。安心の第一歩！</span></div>
+</div>
+
+<!-- ⑥ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-clipboard-check fa-5x" style="animation:fa-bounce 3s"></i><h2>⑥ガードレール2：タスクごとに確認</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-list-check"></i><span>新しいタスクを実行するたびに、<span class="hl">都度確認</span>を要求</span></li>
+            <li><i class="fa-solid fa-circle-question"></i><span>「本当にこの作業を進めていい？」を<span class="tag">毎回</span>ユーザーに問う</span></li>
+            <li><i class="fa-solid fa-eye"></i><span>AIが<span class="hl-coral">見えないところで勝手に動く</span>のを防ぐ仕組み</span></li>
+            <li><i class="fa-solid fa-scale-balanced"></i><span>便利さと安全性を、<span class="hl">バランス良く</span>両立する設計</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2 r"><span class="hw"><i class="fa-solid fa-clipboard-check fa-lg"></i> 毎回「これやっていい？」と聞いてくれる。まさに<span style="font-weight:bold">安心設計</span>！</span></div>
+</div>
+
+<!-- ⑦ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-hand fa-5x" style="animation:fa-beat-fade 3s"></i><h2>⑦ガードレール3：機密ステップは返す</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-id-card"></i><span><span class="hl">個人情報の入力</span>場面では、操作をユーザーに戻す</span></li>
+            <li><i class="fa-solid fa-credit-card"></i><span><span class="tag">注文を確定</span>する重要ステップも、AIは踏み込まない</span></li>
+            <li><i class="fa-solid fa-hand-holding"></i><span>「ここから先は<span class="hl-coral">人間が握る</span>」という境界線を明確化</span></li>
+            <li><i class="fa-solid fa-user-check"></i><span>結果として、<span class="hl-gold">大事な決断は人間</span>が行える安心感</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-hand fa-lg"></i> 支払いや個人情報は<span style="font-weight:bold">自分で確定</span>。これぞ「人任せにしない」安全設計！</span></div>
+</div>
+
+<!-- ⑧ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-shield-virus fa-5x" style="animation:fa-flip 3s"></i><h2>⑧プロンプトインジェクション対策</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-triangle-exclamation"></i><span>悪意ある指示（<span class="hl-coral">プロンプトインジェクション</span>）の脅威に対応</span></li>
+            <li><i class="fa-solid fa-shield"></i><span>Webページ内に埋め込まれた<span class="tag">罠の命令</span>を実行しない仕組みを搭載</span></li>
+            <li><i class="fa-solid fa-brain"></i><span>信頼できない<span class="hl">コンテンツの指示</span>を弾く判断基準を内蔵</span></li>
+            <li><i class="fa-solid fa-lock"></i><span>自動操作を安全に使うための<span class="hl-gold">根幹の防御</span>となる</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-shield-virus fa-lg"></i> 「偽の指示」に騙されない。ブラウザ自動化の<span style="font-weight:bold">命綱</span>がここに！</span></div>
+</div>
+
+<!-- ⑨ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-flag-usa fa-5x" style="animation:fa-bounce 2s"></i><h2>⑨提供条件：米国・個人・18歳以上</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-location-dot"></i><span>現時点では<span class="hl-coral">米国限定</span>のローンチとなっている</span></li>
+            <li><i class="fa-solid fa-user"></i><span>対象は<span class="tag">個人Googleアカウント</span>のみ</span></li>
+            <li><i class="fa-solid fa-cake-candles"></i><span>利用には<span class="hl">18歳以上</span>であることが条件</span></li>
+            <li><i class="fa-solid fa-building"></i><span><span class="tag">Workspace（法人）</span>アカウントは今回の対象外</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2 r"><span class="hw"><i class="fa-solid fa-flag-usa fa-lg"></i> まずは米国の個人ユーザー向け。<span style="font-weight:bold">日本は今後の拡大を待とう</span>！</span></div>
+</div>
+
+<!-- ⑩ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-crown fa-5x" style="animation:fa-beat-fade 2s"></i><h2>⑩必要なのは AI Pro または Ultra</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-star"></i><span>Chrome Auto Browseを使うには<span class="hl">Google AI Pro</span>プランが必要</span></li>
+            <li><i class="fa-solid fa-gem"></i><span>または上位の<span class="hl-gold">Google AI Ultra</span>プランでも利用可能</span></li>
+            <li><i class="fa-solid fa-coins"></i><span>つまり、<span class="tag">有料プラン</span>への加入が前提条件</span></li>
+            <li><i class="fa-solid fa-circle-info"></i><span>無料枠では<span class="hl-coral">動かせない</span>点に注意が必要</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-crown fa-lg"></i> ProかUltraに加入すれば、<span style="font-weight:bold">ブラウザ自動操作の世界</span>が開ける！</span></div>
+</div>
+
+<!-- ⑪ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-earth-americas fa-5x" style="animation:fa-flip 3s"></i><h2>⑪Proで160カ国以上に拡大</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-globe"></i><span>Proプランの範囲で、<span class="hl">160カ国以上</span>にSparkを一般公開</span></li>
+            <li><i class="fa-solid fa-map-location-dot"></i><span>ただし<span class="tag">Chrome Auto Browse機能</span>自体は米国が中心</span></li>
+            <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>Sparkエンジンの利用範囲は、<span class="hl-gold">世界的に広がりつつ</span>ある</span></li>
+            <li><i class="fa-solid fa-hourglass-half"></i><span>日本でも、順次<span class="hl">機能が開放</span>される期待が高まる</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-earth-americas fa-lg"></i> 160カ国に広がるSpark。<span style="font-weight:bold">次の波</span>はもうすぐそこかも！</span></div>
+</div>
+
+<!-- ⑫ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-desktop fa-5x" style="animation:fa-bounce 3s"></i><h2>⑫デスクトップChrome限定</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-display"></i><span>動作対象は<span class="hl">デスクトップ版Chrome</span>のみ</span></li>
+            <li><i class="fa-solid fa-mobile-screen-button"></i><span>現在のところ、<span class="hl-coral">モバイル非対応</span>という制約がある</span></li>
+            <li><i class="fa-solid fa-laptop"></i><span>PC環境で<span class="tag">ログイン済み</span>のブラウザを使うのが前提</span></li>
+            <li><i class="fa-solid fa-circle-info"></i><span>スマホでの自動操作は、<span class="hl">今後の展開待ち</span>という状況</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2 r"><span class="hw"><i class="fa-solid fa-desktop fa-lg"></i> まずは<span style="font-weight:bold">PCのChrome</span>で体験。モバイル対応はこれから！</span></div>
+</div>
+
+<!-- ⑬ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-bars-progress fa-5x" style="animation:fa-beat-fade 2s"></i><h2>⑬操作中はトップバーに表示</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-eye"></i><span>AIが動いている間、画面上部に<span class="hl">インジケーター</span>を表示</span></li>
+            <li><i class="fa-solid fa-circle-info"></i><span>ユーザーは<span class="tag">今動いているか</span>を一目で把握可能</span></li>
+            <li><i class="fa-solid fa-circle-check"></i><span>勝手に進んでいるか不安にならない<span class="hl-gold">可視化の工夫</span></span></li>
+            <li><i class="fa-solid fa-hand-pointer"></i><span>状況に応じて、いつでも<span class="hl">止める</span>こともできる</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-bars-progress fa-lg"></i> 「今AIが動いてるよ」が見える。これで<span style="font-weight:bold">不安ゼロ</span>で任せられる！</span></div>
+</div>
+
+<!-- ⑭ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-seedling fa-5x" style="animation:fa-bounce 2s"></i><h2>⑭Tip 1：低リスクタスクから試す</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-shoe-prints"></i><span>まずは<span class="hl">影響の小さい作業</span>から始めるのが賢明</span></li>
+            <li><i class="fa-solid fa-magnifying-glass"></i><span>例：<span class="tag">情報検索</span>や<span class="tag">予定確認</span>など、安全な範囲で</span></li>
+            <li><i class="fa-solid fa-graduation-cap"></i><span>動きや精度を<span class="hl-gold">確認しながら</span>慣れていくのがコツ</span></li>
+            <li><i class="fa-solid fa-triangle-exclamation"></i><span>最初から<span class="hl-coral">大きな決済</span>に使うのは避けるべき</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-seedling fa-lg"></i> 小さく始めて、少しずつ<span style="font-weight:bold">任せる範囲</span>を広げよう！</span></div>
+</div>
+
+<!-- ⑮ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-user-clock fa-5x" style="animation:fa-beat-fade 3s"></i><h2>⑮Tip 2：ログイン中のアカウントに注意</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-triangle-exclamation"></i><span>AIは<span class="hl-coral">今ログインしているアカウント</span>で動く</span></li>
+            <li><i class="fa-solid fa-circle-exclamation"></i><span>複数アカウントを切り替えている場合は<span class="tag">要確認</span></span></li>
+            <li><i class="fa-solid fa-user-secret"></i><span>意図しない<span class="hl">アカウントでの操作</span>を防ぐ意味でも重要</span></li>
+            <li><i class="fa-solid fa-hand-pointer"></i><span>作業前には<span class="hl-gold">どの画面に入っているか</span>を必ず把握</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2 r"><span class="hw"><i class="fa-solid fa-user-clock fa-lg"></i> 「どのアカウントで動くか」を<span style="font-weight:bold">毎回見直す</span>習慣が命！</span></div>
+</div>
+
+<!-- ⑯ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-circle-check fa-5x" style="animation:fa-flip 3s"></i><h2>⑯Tip 3：引き継ぎは安全設計の機能</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-hand-holding"></i><span>機密操作を<span class="hl">ユーザーに返す</span>のは、不便ではなく安全策</span></li>
+            <li><i class="fa-solid fa-shield-halved"></i><span>「AIが勝手に決済」を防ぐための<span class="tag">重要な設計</span></span></li>
+            <li><i class="fa-solid fa-heart"></i><span>この仕組みを<span class="hl-gold">過剰に邪魔</span>に感じないことが大切</span></li>
+            <li><i class="fa-solid fa-scale-balanced"></i><span>便利さと安全性の<span class="hl">絶妙なバランス</span>を楽しむ視点を</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-circle-check fa-lg"></i> 引き継ぎは「面倒」じゃなく<span style="font-weight:bold">守ってくれている</span>と捉えよう！</span></div>
+</div>
+
+<!-- ⑰ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-hourglass-half fa-5x" style="animation:fa-bounce 3s"></i><h2>⑰Tip 4・5：待つ姿勢と片付け</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-earth-asia"></i><span><span class="hl">Tip 4</span>：米国外の人は、<span class="hl-gold">拡大を待つ</span>のが正解</span></li>
+            <li><i class="fa-solid fa-globe"></i><span>日本では順次開放される可能性が高いので<span class="tag">焦らず</span></span></li>
+            <li><i class="fa-solid fa-window-restore"></i><span><span class="hl">Tip 5</span>：始める前に<span class="hl-coral">不要なタブは閉じる</span>のが秘訣</span></li>
+            <li><i class="fa-solid fa-broom"></i><span>画面を<span class="tag">スッキリ</span>させると、AIの精度と安全性が上がる</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-broom fa-lg"></i> 待つ姿勢 ＋ 画面の片付け。この2つで<span style="font-weight:bold">快適自動化</span>！</span></div>
+</div>
+
+<!-- ⑱ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-rocket fa-5x" style="animation:fa-beat-fade 2s"></i><h2>⑱まとめ：答えるAIから動くエージェントへ</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-arrow-right-arrow-left"></i><span>「質問に答えるAI」から、<span class="hl">ブラウザ内で実行するエージェント</span>へ進化</span></li>
+            <li><i class="fa-solid fa-shield-halved"></i><span>3重のガードレールで、<span class="hl-gold">安全に自動化</span>を体験できる</span></li>
+            <li><i class="fa-solid fa-users"></i><span>日常のWeb作業を、<span class="tag">まるごとAIに任せる</span>未来がもうそこに</span></li>
+            <li><i class="fa-solid fa-flag-checkered"></i><span>日本上陸を待ちつつ、<span class="hl-coral">今から心構え</span>を整えておく価値あり</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-rocket fa-lg"></i> AIが「手を動かす」時代へ。<span style="font-weight:bold">ブラウザの自動化</span>、いよいよ本格始動！</span></div>
+</div>
+
+</div>
+<div class="footer">
+    🎬 動画: <a href="https://www.youtube.com/watch?v=UaR9g7vRwTg" target="_blank">Julian Goldie SEO</a> | 📅 2026年8月5日
+    <div class="src">📰 元記事: <a href="https://cutc-mt.github.io/ai-news-infographic/docs/20260805-gemini-spark-chrome-autobrowse.html" target="_blank">Gemini Spark Automates Chrome With One Prompt</a></div>
+</div>
+</div>
+</body>
+</html>

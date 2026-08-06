@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NotebookLM × Antigravity で Word・Excel・PowerPoint を高品質で自動生成</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #4338CA;   /* インディゴ濃 */
+            --c2: #6366F1;   /* インディゴ */
+            --c3: #E0E7FF;   /* 薄いインディゴ */
+            --c4: #312E81;   /* 最暗インディゴ */
+            --c5: #F97316;   /* コーラル */
+            --c6: #FFEDD5;   /* 薄いコーラル */
+            --c7: #FB7185;   /* ローズ */
+            --c8: #FFE4E6;   /* 薄いローズ */
+            --c9: #10B981;   /* エメラルド */
+            --ca: #6B7280;   /* グレー */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F5F3FF; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:54px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c2) 45%,var(--c5) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(67,56,202,.4);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(249,115,22,.20) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:#fff; font-size:92px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.45; }
+        .header .sub { color:#FFEDD5; font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:#E0E7FF; font-size:14px; margin-top:12px; position:relative; z-index:1; }
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(67,56,202,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(67,56,202,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c7));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .ic-indigo { color:var(--c1); }
+        .ic-coral { color:var(--c5); }
+        .ic-rose { color:var(--c7); }
+        .ic-emerald { color:var(--c9); }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c2); min-width:18px; margin-top:4px; }
+        ul.kl li i.c { color:var(--c5); }
+        ul.kl li i.r { color:var(--c7); }
+        ul.kl li i.e { color:var(--c9); }
+        ul.kl li i.g { color:var(--ca); }
+        .tag {
+            background:var(--c3);
+            color:var(--c4);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.coral { background:var(--c6); color:#9A3412; }
+        .tag.rose { background:var(--c8); color:#9F1239; }
+        .tag.emerald { background:#D1FAE5; color:#065F46; }
+        .tag.gray { background:#E5E7EB; color:#374151; }
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-coral { color:#C2410C; font-weight:bold; background:linear-gradient(transparent 60%, var(--c6) 60%); }
+        .hl-rose { color:#BE123C; font-weight:bold; background:linear-gradient(transparent 60%, var(--c8) 60%); }
+        .hl-emerald { color:#047857; font-weight:bold; background:linear-gradient(transparent 60%, #D1FAE5 60%); }
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFF7ED;
+            border-color:var(--c5);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c5) transparent; }
+        .bubble.v2 {
+            background:#FFF1F2;
+            border-color:var(--c7);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c7) transparent; }
+        .bubble.v3 {
+            background:#ECFDF5;
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c9) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c5); }
+        pre.code {
+            background:#1E1B4B;
+            color:#E0E7FF;
+            padding:10px;
+            border-radius:8px;
+            font-size:12px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+        pre.code .k { color:#FB923C; }
+        pre.code .s { color:#A7F3D0; }
+        pre.code .c { color:#94A3B8; }
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:32px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c2));
+            border-radius:24px;
+            color:#fff;
+        }
+        .footer a { color:#FED7AA; text-decoration:none; font-weight:bold; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .yt { color:#FB923C; }
+        @keyframes fis { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
+        .card { animation:fis .5s ease-out; }
+        .badge {
+            display:inline-block;
+            background:var(--c5);
+            color:#fff;
+            padding:3px 12px;
+            border-radius:20px;
+            font-size:13px;
+            font-weight:bold;
+            margin-bottom:8px;
+        }
+        .badge.indigo { background:var(--c1); }
+        .badge.rose { background:var(--c7); }
+        .badge.emerald { background:var(--c9); }
+        @media(max-width:1200px){ .card{min-width:320px} }
+        @media(max-width:768px){ .layout{flex-direction:column} .card{width:100%;min-width:auto} .header h1{font-size:26px} }
+    </style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+    <i class="fa-solid fa-wand-magic-sparkles fa-7x main"></i>
+    <h1>NotebookLM × Antigravity でファイル自動生成</h1>
+    <div class="sub">Word・Excel・PowerPoint を高品質で、そのまま実務で使える形へ</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月7日配信 ／ AI共創イノベーション</div>
+</div>
+<div class="layout">
+
+<!-- ① -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-fire fa-5x ic-coral" style="animation:fa-beat-fade 3s"></i><h2>①最大の変更点</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-cloud c"></i><span>各ノートブックの裏側に<span class="hl-coral">安全なクラウド環境</span>が用意された</span></li>
+            <li><i class="fa-solid fa-code"></i><span>AIが必要な<span class="hl">コードを自ら記述</span>し、その場で実行</span></li>
+            <li><i class="fa-solid fa-gears"></i><span>分析から<span class="tag coral">ファイル作成</span>までワンストップで完結</span></li>
+            <li><i class="fa-solid fa-triangle-exclamation r"></i><span>単なるテキスト応答ではなく、<span class="hl-rose">実行環境</span>を持つ点が画期的</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1 r"><span class="hw"><i class="fa-solid fa-lightbulb fa-lg"></i> 裏側で「<span style="font-weight:bold">動き続けるAI</span>」がいる、というのが今回の真の革新だよ！</span></div>
+</div>
+
+<!-- ② -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-brain fa-5x ic-indigo" style="animation:fa-bounce 2s"></i><h2>②驚異の頭脳 Gemini 3.5</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-crown"></i><span>基盤モデルには最高峰の<span class="hl">Gemini 3.5</span>を搭載</span></li>
+            <li><i class="fa-solid fa-microchip"></i><span>Googleテクノロジーの<span class="tag">最新版</span>で駆動</span></li>
+            <li><i class="fa-solid fa-bolt"></i><span>複雑な分析と生成を<span class="hl">高速で処理</span></span></li>
+            <li><i class="fa-solid fa-shield-halved e"></i><span>安全性も担保された<span class="hl-emerald">信頼の頭脳</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-star fa-lg"></i> Googleの<span style="font-weight:bold">最強モデル</span>が、ファイル生成を支えている。</span></div>
+</div>
+
+<!-- ③ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-layer-group fa-5x ic-rose" style="animation:fa-flip 4s"></i><h2>③エージェント基盤 Antigravity</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-cube r"></i><span>さらに進化を遂げた<span class="hl-rose">エージェント基盤</span>を統合</span></li>
+            <li><i class="fa-solid fa-diagram-project"></i><span>AIが<span class="tag rose">自律的にタスク</span>を設計・実行</span></li>
+            <li><i class="fa-solid fa-link"></i><span>100種類以上のソフトウェア群と<span class="hl">連携</span></span></li>
+            <li><i class="fa-solid fa-rocket c"></i><span>「Antigravity」＝<span class="hl-coral">重力的制約を超える</span>基盤</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-rocket fa-lg"></i> Gemini 3.5 × Antigravity の<span style="font-weight:bold">組合せ</span>が強力！</span></div>
+</div>
+
+<!-- ④ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-toolbox fa-5x ic-emerald" style="animation:fa-bounce 2.5s"></i><h2>④厳選ソフトウェア群</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-shield e"></i><span>Googleが<span class="hl-emerald">厳選した100種類以上</span>のソフトウェア</span></li>
+            <li><i class="fa-solid fa-handshake"></i><span>クラウド上で<span class="tag emerald">安全に連携</span>して動作</span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>文書・表・スライドを扱う<span class="hl">専門ツール</span>を統合</span></li>
+            <li><i class="fa-solid fa-check-circle e"></i><span>実務で使える<span class="hl-emerald">品質</span>を担保</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-circle-check fa-lg"></i> Googleおまかせの<span style="font-weight:bold">安心セット</span>で動くから信頼できる。</span></div>
+</div>
+
+<!-- ⑤ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-file-word fa-5x ic-indigo" style="animation:fa-beat-fade 3s"></i><h2>⑤Word を自動生成</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-file-lines"></i><span>資料の分析結果から<span class="hl">構造化された文書</span>を作成</span></li>
+            <li><i class="fa-solid fa-pen-nib"></i><span>見出し・段落・リストを<span class="tag">適切に配置</span></span></li>
+            <li><i class="fa-solid fa-table"></i><span>表や図も含めた<span class="hl">実務レベル</span>のWord</span></li>
+            <li><i class="fa-solid fa-clock"></i><span>手作業の<span class="hl-coral">作成時間を大幅カット</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble top"><span class="hw"><i class="fa-solid fa-magic-wand-sparkles fa-lg"></i> 「書いて」の<span style="font-weight:bold">一歩先</span>。完成品が出てくる！</span></div>
+</div>
+
+<!-- ⑥ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-file-excel fa-5x ic-emerald" style="animation:fa-bounce 2s"></i><h2>⑥Excel を自動生成</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-table-cells e"></i><span>データ処理と計算を<span class="hl-emerald">裏側で実行</span></span></li>
+            <li><i class="fa-solid fa-calculator"></i><span>関数や集計もAIが<span class="tag emerald">自ら組む</span></span></li>
+            <li><i class="fa-solid fa-chart-line"></i><span>グラフ化まで<span class="hl">自動で仕上げる</span></span></li>
+            <li><i class="fa-solid fa-flask"></i><span>分析から出力まで<span class="hl-emerald">一本化</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v3 r"><span class="hw"><i class="fa-solid fa-lightbulb fa-lg"></i> 計算もやってくれるから<span style="font-weight:bold">数値の信頼性</span>も高い！</span></div>
+</div>
+
+<!-- ⑦ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-file-powerpoint fa-5x ic-coral" style="animation:fa-flip 4s"></i><h2>⑦PowerPoint を自動生成</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-display c"></i><span>資料内容を整理して<span class="hl-coral">スライド構成</span>を作成</span></li>
+            <li><i class="fa-solid fa-image"></i><span>図解やレイアウトも<span class="tag coral">AIが設計</span></span></li>
+            <li><i class="fa-solid fa-arrows-up-down-left-right"></i><span>プレゼンそのまま使える<span class="hl">品質</span></span></li>
+            <li><i class="fa-solid fa-star"></i><span>訴求力のある<span class="hl-coral">資料</span>に仕上げる</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-chalkboard-user fa-lg"></i> 「スライド作って」が、もう<span style="font-weight:bold">疲れる作業じゃない</span>。</span></div>
+</div>
+
+<!-- ⑧ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-terminal fa-5x ic-indigo" style="animation:fa-beat-fade 2.8s"></i><h2>⑧コードを自ら記述</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-keyboard"></i><span>AIがファイル作成に必要な<span class="hl">コードを記述</span></span></li>
+            <li><i class="fa-solid fa-play"></i><span>書いたコードを<span class="tag">その場で実行</span>して成果物を構築</span></li>
+            <li><i class="fa-solid fa-rotate"></i><span>結果を見て<span class="hl">修正も自己完結</span></span></li>
+            <li><i class="fa-solid fa-eye-slash g"></i><span>ユーザーは<span class="hl-coral">コードを意識しない</span>で済む</span></li>
+        </ul>
+    </div>
+    <pre class="code"><span class="c"># AIが裏側で動かす</span>
+<span class="k">def</span> build_report(data):
+    <span class="c"># 分析 → 構築 → 出力</span>
+    <span class="k">return</span> <span class="s">"成果物.docx"</span></pre>
+</div>
+
+<!-- ⑨ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-shield-halved fa-5x ic-emerald" style="animation:fa-bounce 2.2s"></i><h2>⑨安全なクラウド環境</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-lock e"></i><span>各ノートブック裏側に<span class="hl-emerald">安全なサンドボックス</span></span></li>
+            <li><i class="fa-solid fa-server"></i><span>クラウド上で<span class="tag emerald">隔離実行</span></span></li>
+            <li><i class="fa-solid fa-user-shield"></i><span>データ保護と<span class="hl">安全性</span>を両立</span></li>
+            <li><i class="fa-solid fa-circle-check e"></i><span>安心して<span class="hl-emerald">業務データ</span>も扱える</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-shield-heart fa-lg"></i> 「安全な場所」で動くから、<span style="font-weight:bold">安心</span>して任せられる。</span></div>
+</div>
+
+<!-- ⑩ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-cogs fa-5x ic-coral" style="animation:fa-flip 4s"></i><h2>⑩実行して成果物を構築</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-microchip c"></i><span>テキスト応答の<span class="hl-coral">先</span>にある実行</span></li>
+            <li><i class="fa-solid fa-diagram-successor"></i><span>計算・データ処理を<span class="tag coral">裏で実行</span></span></li>
+            <li><i class="fa-solid fa-file-export"></i><span>完成品を<span class="hl">そのまま出力</span></span></li>
+            <li><i class="fa-solid fa-clipboard-check"></i><span>出力＝<span class="hl-coral">実務で使える形</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1 r"><span class="hw"><i class="fa-solid fa-gears fa-lg"></i> 「答えるAI」から<span style="font-weight:bold">「作るAI」</span>への進化！</span></div>
+</div>
+
+<!-- ⑪ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-chart-pie fa-5x ic-indigo" style="animation:fa-beat-fade 3s"></i><h2>⑪分析と処理を実行</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>資料の<span class="hl">分析</span>を自ら実行</span></li>
+            <li><i class="fa-solid fa-calculator"></i><span>必要な<span class="tag">計算</span>も裏側で完結</span></li>
+            <li><i class="fa-solid fa-arrows-rotate"></i><span>処理結果を<span class="hl">成果物に反映</span></span></li>
+            <li><i class="fa-solid fa-database"></i><span>データ処理まで<span class="hl">一本化</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble top"><span class="hw"><i class="fa-solid fa-flask-vial fa-lg"></i> 考えるだけじゃなく<span style="font-weight:bold">処理する</span>。ここが新しい。</span></div>
+</div>
+
+<!-- ⑫ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-briefcase fa-5x ic-coral" style="animation:fa-bounce 2.4s"></i><h2>⑫そのまま実務で使える</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-circle-check c"></i><span>出力されたファイルは<span class="hl-coral">実務レベル</span></span></li>
+            <li><i class="fa-solid fa-clock-rotate-left"></i><span>作成・修正の<span class="tag coral">時間を短縮</span></span></li>
+            <li><i class="fa-solid fa-users-gear"></i><span>現場で<span class="hl">すぐ活用</span>可能</span></li>
+            <li><i class="fa-solid fa-thumbs-up c"></i><span>「使えるもの」が出るのが<span class="hl-coral">最大の価値</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-handshake fa-lg"></i> 修正の手間が減って<span style="font-weight:bold">仕事が速くなる</span>！</span></div>
+</div>
+
+<!-- ⑬ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-book-bookmark fa-5x ic-rose" style="animation:fa-flip 4.5s"></i><h2>⑬ノートブックが主役に</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-folder-open r"></i><span>各ノートブックが<span class="hl-rose">実行環境を持つ</span>空間へ</span></li>
+            <li><i class="fa-solid fa-link"></i><span>資料と<span class="tag rose">生成機能</span>が一体化</span></li>
+            <li><i class="fa-solid fa-arrows-to-circle"></i><span>一カ所で<span class="hl">分析から出力</span>まで完結</span></li>
+            <li><i class="fa-solid fa-lightbulb r"></i><span>ノートブック＝<span class="hl-rose">作業の中心</span>に昇格</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2 r"><span class="hw"><i class="fa-solid fa-book fa-lg"></i> ノートブックが、<span style="font-weight:bold">仕事部屋</span>になった。</span></div>
+</div>
+
+<!-- ⑭ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-google fa-5x ic-indigo" style="animation:fa-beat-fade 3.2s"></i><h2>⑭Google テクノロジーの結晶</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-gem"></i><span>最新Google技術で<span class="hl">駆動</span></span></li>
+            <li><i class="fa-solid fa-microchip"></i><span>基盤モデルは<span class="tag">Gemini 3.5</span></span></li>
+            <li><i class="fa-solid fa-network-wired"></i><span>エージェント基盤は<span class="hl">Antigravity</span></span></li>
+            <li><i class="fa-solid fa-award"></i><span>Googleの<span class="hl">最先端</span>が集結</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-trophy fa-lg"></i> これぞGoogleの<span style="font-weight:bold">フル装備</span>。</span></div>
+</div>
+
+<!-- ⑮ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-comments fa-5x ic-coral" style="animation:fa-bounce 2.6s"></i><h2>⑮テキスト応答の先へ</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-comment-dots c"></i><span>従来は<span class="hl-coral">文章で返す</span>だけだった</span></li>
+            <li><i class="fa-solid fa-arrow-right-long"></i><span>今回は<span class="tag coral">実行 + 出力</span>まで到達</span></li>
+            <li><i class="fa-solid fa-file-circle-check c"></i><span>成果物が<span class="hl">手元に届く</span>体験</span></li>
+            <li><i class="fa-solid fa-forward c"></i><span>AIの段階を<span class="hl-coral">一段進化</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1 r"><span class="hw"><i class="fa-solid fa-flag-checkered fa-lg"></i> 「話すAI」から<span style="font-weight:bold">「納品するAI」</span>へ。</span></div>
+</div>
+
+<!-- ⑯ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-arrows-split-up-and-left fa-5x ic-emerald" style="animation:fa-flip 3.5s"></i><h2>⑯連携の威力</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-puzzle-piece e"></i><span>100種以上の<span class="hl-emerald">ソフトウェア群</span>と連携</span></li>
+            <li><i class="fa-solid fa-cubes"></i><span>多様な形式の<span class="tag emerald">ファイル処理</span></span></li>
+            <li><i class="fa-solid fa-arrows-to-circle"></i><span>複数ツールを<span class="hl">統合的に活用</span></span></li>
+            <li><i class="fa-solid fa-bolt-lightning e"></i><span>出力の幅と<span class="hl-emerald">質</span>が飛躍</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-handshake-angle fa-lg"></i> たくさんの道具を<span style="font-weight:bold">AIが使いこなす</span>。</span></div>
+</div>
+
+<!-- ⑰ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-rocket fa-5x ic-rose" style="animation:fa-bounce 2.3s"></i><h2>⑰画期的な生成機能</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-wand-magic-sparkles r"></i><span>ドキュメント・ファイル生成が<span class="hl-rose">画期的</span>と評される</span></li>
+            <li><i class="fa-solid fa-graduation-cap"></i><span>学習から実務まで<span class="tag rose">幅広く活用</span></span></li>
+            <li><i class="fa-solid fa-gauge-high"></i><span>スピードと<span class="hl">品質</span>を両立</span></li>
+            <li><i class="fa-solid fa-seedling r"></i><span>新しい<span class="hl-rose">働き方</span>の起点に</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-fire fa-lg"></i> 「画期的」の言葉が、<span style="font-weight:bold">これほど似合う</span>機能！</span></div>
+</div>
+
+<!-- ⑱ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-gauge-high fa-5x ic-indigo" style="animation:fa-beat-fade 2.9s"></i><h2>⑱業務効率の革命</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-stopwatch"></i><span>資料作成の<span class="hl">時間を劇的に短縮</span></span></li>
+            <li><i class="fa-solid fa-user-tie"></i><span>人は<span class="tag">内容の確認</span>に集中できる</span></li>
+            <li><i class="fa-solid fa-chart-line"></i><span>品質を保ったまま<span class="hl">量産</span>が可能</span></li>
+            <li><i class="fa-solid fa-trophy c"></i><span>生産性向上の<span class="hl-coral">決定打</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble top"><span class="hw"><i class="fa-solid fa-bolt fa-lg"></i> あなたの仕事が、<span style="font-weight:bold">圧倒的に速く・楽に</span>。</span></div>
+</div>
+
+</div><!-- /layout -->
+
+<div class="footer">
+    <p style="font-size:18px; margin-bottom:10px;"><i class="fa-brands fa-youtube yt"></i> 出典動画</p>
+    <p>🎬 動画: <a href="https://youtu.be/G6lNE4GfJjs" target="_blank" rel="noopener">AI共創イノベーション ｜ NotebookLMでWord・Excel・PowerPointを高品質で自動生成！</a></p>
+    <p style="margin-top:8px; font-size:14px; color:#C7D2FE;"><i class="fa-solid fa-link"></i> 本編: <a href="https://youtu.be/hsCA-Kio_NI" target="_blank" rel="noopener">NotebookLMにAntigravityが統合！</a></p>
+    <p style="margin-top:12px; font-size:13px; color:#A5B4FC;">配信日: 2026年8月7日 ／ video_id: G6lNE4GfJjs</p>
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

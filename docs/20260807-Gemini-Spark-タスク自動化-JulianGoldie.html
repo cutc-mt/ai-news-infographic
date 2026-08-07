@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Sparkでタスクを自動化 — Julian Goldie Agency</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #4C1D95;   /* ディープパープル */
+            --c2: #7C3AED;   /* バイオレット */
+            --c3: #EDE9FE;   /* 薄ラベンダー */
+            --c4: #2E1065;   /* 最暗パープル */
+            --c5: #F59E0B;   /* アンバー */
+            --c6: #FEF3C7;   /* 薄いアンバー */
+            --c7: #D97706;   /* ミディアムアンバー */
+            --c8: #059669;   /* エメラルド */
+            --c9: #D1FAE5;   /* 薄エメラルド */
+            --c10: #6B7280;  /* グレー */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FAF5FF; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:50px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c2) 45%,var(--c5) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(76,29,149,.4);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(245,158,11,.18) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:#fff; font-size:90px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:#FEF3C7; font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:#EDE9FE; font-size:14px; margin-top:12px; position:relative; z-index:1; }
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(76,29,149,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeInScale .6s ease-out;
+        }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(76,29,149,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c8));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .ic-purple { color:var(--c1); }
+        .ic-amber { color:var(--c5); }
+        .ic-emerald { color:var(--c8); }
+        .ic-violet { color:var(--c2); }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c2); min-width:18px; margin-top:4px; }
+        ul.kl li i.a { color:var(--c5); }
+        ul.kl li i.e { color:var(--c8); }
+        ul.kl li i.p { color:var(--c1); }
+        .tag {
+            background:var(--c3);
+            color:var(--c4);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.amber {
+            background:var(--c6);
+            color:#9A3412;
+        }
+        .tag.emerald {
+            background:var(--c9);
+            color:#065F46;
+        }
+        .tag.gray {
+            background:#E5E7EB;
+            color:#374151;
+        }
+        .hl {
+            color:var(--c1);
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--c3) 60%);
+        }
+        .hl-amber {
+            color:#C2410C;
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--c6) 60%);
+        }
+        .hl-emerald {
+            color:#065F46;
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--c9) 60%);
+        }
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFFBEB;
+            border-color:var(--c5);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c5) transparent; }
+        .bubble.v2 {
+            background:#ECFDF5;
+            border-color:var(--c8);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c8) transparent; }
+        .hw { font-family:'Yomogi',cursive; font-size:15px; line-height:1.6; color:#333; }
+        pre {
+            background:#F5F3FF;
+            padding:10px;
+            border-radius:8px;
+            font-size:13px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Zen Kurenaido',monospace;
+            color:var(--c4);
+            border-left:4px solid var(--c2);
+        }
+        .footer {
+            text-align:center;
+            margin-top:50px;
+            padding:30px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1));
+            border-radius:25px;
+            color:#EDE9FE;
+        }
+        .footer a { color:#FCD34D; text-decoration:none; font-weight:bold; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .ch { font-size:18px; margin-bottom:8px; }
+        .footer .url { font-size:14px; margin-top:10px; word-break:break-all; }
+        .arrow-row {
+            text-align:center;
+            color:var(--c2);
+            font-size:24px;
+            margin:10px 0;
+        }
+        @media (max-width:1200px){ .card{min-width:320px;} }
+        @media (max-width:768px){
+            .layout{flex-direction:column;}
+            .card{width:100%;max-width:none;}
+            .header h1{font-size:28px;}
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-wand-magic-sparkles main" aria-hidden="true"></i>
+        <h1>Gemini Sparkで<br>タスクを自動化する</h1>
+        <div class="sub">Googleがそっと渡した、ほんもののAIエージェント</div>
+        <div class="date">2026年8月7日 / 動画: Julian Goldie Agency</div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1: ヘッダーカード -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-bolt fa-5x ic-purple" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>Sparkって何が違う？</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-check e" aria-hidden="true"></i><span>Googleが数百万人に<strong>動くAIエージェント</strong>をひっそり提供</span></li>
+                    <li><i class="fa-solid fa-robot p" aria-hidden="true"></i><span>多くの人は「<span class="hl">ただのチャットボット</span>」だと思っている</span></li>
+                    <li><i class="fa-solid fa-fire a" aria-hidden="true"></i><span>実態は<strong>バックグラウンドで動く</strong>自律型</span></li>
+                    <li><i class="fa-solid fa-user-clock a" aria-hidden="true"></i><span>あなたが離席している間に<span class="hl-amber">仕事を終わらせる</span></span></li>
+                </ul>
+                <div class="bubble top v1">
+                    <span class="hw"><i class="fa-solid fa-lightbulb a" aria-hidden="true"></i> ここが大事：<br>「話す」AIじゃなく<br>「<strong>動く</strong>」AIなんです！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: チャットボットではない -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x ic-amber" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>ただのチャットボットじゃない</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-xmark a" aria-hidden="true"></i><span>質問→回答の<span class="tag gray">1回きり</span>型ではない</span></li>
+                    <li><i class="fa-solid fa-repeat e" aria-hidden="true"></i><span><strong>継続的に動き続ける</strong>プロセス型</span></li>
+                    <li><i class="fa-solid fa-people-arrows p" aria-hidden="true"></i><span>人間との<span class="hl">やり取り</span>を最小限に設計</span></li>
+                    <li><i class="fa-solid fa-hourglass-half a" aria-hidden="true"></i><span>待つ必要なし、結果だけ届く</span></li>
+                </ul>
+                <div class="bubble r">
+                    <span class="hw"><i class="fa-solid fa-circle-info p" aria-hidden="true"></i> チャットは「入口」<br>本体は<span class="tag">バックグラウンド実行</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: Gemini Sparkとは -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-microchip fa-5x ic-emerald" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>Gemini Sparkとは</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-building p" aria-hidden="true"></i><span>Googleの<strong>持続的AIエージェント</strong></span></li>
+                    <li><i class="fa-solid fa-cloud e" aria-hidden="true"></i><span>クラウド上で<span class="hl-emerald">ずっと稼働</span>し続ける</span></li>
+                    <li><i class="fa-solid fa-link a" aria-hidden="true"></i><span>Googleアカウントと<span class="tag amber">連携</span>して動く</span></li>
+                    <li><i class="fa-solid fa-shield-halved p" aria-hidden="true"></i><span>安全ルールの中で<strong>自律的に判断</strong></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-brain e" aria-hidden="true"></i> いつでも動いている<br>「<strong>専属アシスタント</strong>」<br>みたいな存在だね</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード4: I/O 2026 発表 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-microphone-lines fa-5x ic-violet" style="animation:fa-bounce 2.2s;" aria-hidden="true"></i>
+                <h2>I/O 2026で登場</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-calendar-days p" aria-hidden="true"></i><span>Google I/O <strong>2026</strong>で発表</span></li>
+                    <li><i class="fa-solid fa-cloud-arrow-up e" aria-hidden="true"></i><span>「<span class="hl">クラウドエージェント</span>」として公開</span></li>
+                    <li><i class="fa-solid fa-rocket a" aria-hidden="true"></i><span>デベロッパー向けから<span class="tag amber">一般開放</span>へ</span></li>
+                    <li><i class="fa-solid fa-eye p" aria-hidden="true"></i><span>当初は<strong>目立たない</strong>形で展開</span></li>
+                </ul>
+                <div class="bubble top">
+                    <span class="hw"><i class="fa-solid fa-bullhorn a" aria-hidden="true"></i> 大々PRより<br>「<strong>黙って使える状態</strong>」を<br>優先したみたい</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: バックグラウンド実行 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-layer-group fa-5x ic-amber" style="animation:fa-flip 2.8s;" aria-hidden="true"></i>
+                <h2>バックグラウンドで実行</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-power-off e" aria-hidden="true"></i><span>画面を<span class="hl">閉じていても</span>動き続ける</span></li>
+                    <li><i class="fa-solid fa-moon a" aria-hidden="true"></i><span>寝ている間に<strong>仕上がっている</strong></span></li>
+                    <li><i class="fa-solid fa-bell p" aria-hidden="true"></i><span>完了したら<span class="tag amber">通知</span>で知らせる</span></li>
+                    <li><i class="fa-solid fa-laptop e" aria-hidden="true"></i><span>端末を<strong>占有しない</strong>のが特徴</span></li>
+                </ul>
+                <div class="bubble r v1">
+                    <span class="hw"><i class="fa-solid fa-bed a" aria-hidden="true"></i> 依頼して寝て、<br>起きたら<span class="tag">完成</span><br>これが当たり前に</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: 15タスク同時並行 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project fa-5x ic-purple" style="animation:fa-beat-fade 2s;" aria-hidden="true"></i>
+                <h2>15タスク同時並行</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 p" aria-hidden="true"></i><span>最大<strong>15個</strong>のジョブを並列実行</span></li>
+                    <li><i class="fa-solid fa-code-branch e" aria-hidden="true"></i><span>ひとつずつではなく<span class="hl">同時に</span>処理</span></li>
+                    <li><i class="fa-solid fa-gauge-high a" aria-hidden="true"></i><span>全体の<span class="tag amber">スループット</span>が跳ね上がる</span></li>
+                    <li><i class="fa-solid fa-list-check p" aria-hidden="true"></i><span>進行状況は<strong>一覧で把握</strong>できる</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-bolt a" aria-hidden="true"></i> 人間なら<br><span class="tag">1件ずつ</span>の作業を<br>Sparkは<strong>15ルート同時</strong>で</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7: 3つの構成要素 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-cubes fa-5x ic-emerald" style="animation:fa-bounce 2.4s;" aria-hidden="true"></i>
+                <h2>3つの構成要素</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 e" aria-hidden="true"></i><span><span class="tag emerald">Tasks</span> — やらせたい<span class="hl-emerald">仕事</span>の定義</span></li>
+                    <li><i class="fa-solid fa-2 a" aria-hidden="true"></i><span><span class="tag amber">Skills</span> — 実行できる<strong>能力</strong>のセット</span></li>
+                    <li><i class="fa-solid fa-3 p" aria-hidden="true"></i><span><span class="tag">Schedules</span> — いつ動くかの<span class="hl">時間指定</span></span></li>
+                    <li><i class="fa-solid fa-puzzle-piece e" aria-hidden="true"></i><span>この3つを<strong>組み合わせ</strong>て構築</span></li>
+                </ul>
+                <div class="bubble top v2">
+                    <span class="hw"><i class="fa-solid fa-gear e" aria-hidden="true"></i> 仕事・能力・時間<br>これさえ決めれば<br><span class="tag emerald">自動化セット</span>完成</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: 連携 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-network-wired fa-5x ic-violet" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>Workspace・ブラウザと連携</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-envelope p" aria-hidden="true"></i><span>Gmail・カレンダーなど<span class="hl">Workspace</span>と直結</span></li>
+                    <li><i class="fa-solid fa-globe e" aria-hidden="true"></i><span><strong>ブラウザ</strong>を通じてウェブ作業も</span></li>
+                    <li><i class="fa-brands fa-chrome a" aria-hidden="true"></i><span><span class="tag amber">Chrome</span>経由でサイトを操作</span></li>
+                    <li><i class="fa-solid fa-arrows-rotate p" aria-hidden="true"></i><span>データを<strong>双方向</strong>でやり取り</span></li>
+                </ul>
+                <div class="bubble r">
+                    <span class="hw"><i class="fa-solid fa-handshake p" aria-hidden="true"></i> いつも使っている<br>ツール群を<br><span class="tag">そのまま活用</span>できる</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: 安全ルール -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved fa-5x ic-amber" style="animation:fa-beat-fade 2.6s;" aria-hidden="true"></i>
+                <h2>安全ルール</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-exclamation a" aria-hidden="true"></i><span>送金・削除などは<span class="hl-amber">確認が必要</span></span></li>
+                    <li><i class="fa-solid fa-user-shield p" aria-hidden="true"></i><span>重要な操作は<strong>人間が承認</strong></span></li>
+                    <li><i class="fa-solid fa-lock e" aria-hidden="true"></i><span><span class="tag emerald">境界線</span>を明確に設定</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation a" aria-hidden="true"></i><span>勝手に進めない領域を<strong>定義済み</strong></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-hand a" aria-hidden="true"></i> 「ここは止まって」<br>という<span class="tag amber">確認ステップ</span>が<br>ちゃんと用意されてる</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10: 利用可能地域 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-earth-americas fa-5x ic-purple" style="animation:fa-bounce 2.1s;" aria-hidden="true"></i>
+                <h2>どこで使える？</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-star p" aria-hidden="true"></i><span><span class="tag">Ultra</span> プランから展開</span></li>
+                    <li><i class="fa-solid fa-arrow-down e" aria-hidden="true"></i><span><span class="tag emerald">Pro</span> まで段階的に拡大</span></li>
+                    <li><i class="fa-solid fa-globe a" aria-hidden="true"></i><span><strong>160カ国以上</strong>で利用可能</span></li>
+                    <li><i class="fa-solid fa-chart-line p" aria-hidden="true"></i><span>提供範囲は<span class="hl">順次拡大中</span></span></li>
+                </ul>
+                <div class="bubble top">
+                    <span class="hw"><i class="fa-solid fa-flag-checkered e" aria-hidden="true"></i> 日本からも<br><span class="tag">アクセス可能</span><br>プラン次第で使える</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: 利用できない地域 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-ban fa-5x ic-emerald" style="animation:fa-flip 3.2s;" aria-hidden="true"></i>
+                <h2>まだ使えない地域</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-map-location-dot a" aria-hidden="true"></i><span>一部の<strong>地域は除外</strong>されている</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left p" aria-hidden="true"></i><span>規制・調整のため<span class="hl-emerald">後回し</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-end e" aria-hidden="true"></i><span>順次<span class="tag emerald">追加予定</span>と表明</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass a" aria-hidden="true"></i><span>自分の地域は<strong>公式で確認</strong>を</span></li>
+                </ul>
+                <div class="bubble r v2">
+                    <span class="hw"><i class="fa-solid fa-circle-info e" aria-hidden="true"></i> 入れない地域も<br>あるけど、<br><span class="tag emerald">段階開放</span>の途上</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: 要件 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-check fa-5x ic-violet" style="animation:fa-beat-fade 2.3s;" aria-hidden="true"></i>
+                <h2>利用の要件</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cake-candles p" aria-hidden="true"></i><span><strong>年齢</strong>条件のクリアが必要</span></li>
+                    <li><i class="fa-solid fa-user-a e" aria-hidden="true"></i><span>Google<span class="hl">アカウント</span>が必須</span></li>
+                    <li><i class="fa-solid fa-sliders a" aria-hidden="true"></i><span><span class="tag amber">アクティビティ</span>設定をオンに</span></li>
+                    <li><i class="fa-solid fa-key e" aria-hidden="true"></i><span>該当プランの<strong>契約</strong>が必要</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-clipboard-list p" aria-hidden="true"></i> まずは設定を見直そう<br><span class="tag">3つの条件</span>を<br>そろえるだけ</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13: 働き方の変化 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows fa-5x ic-amber" style="animation:fa-bounce 2.5s;" aria-hidden="true"></i>
+                <h2>「レビューする」働き方へ</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-right a" aria-hidden="true"></i><span>作業する → <span class="hl-amber">確認する</span>へ変化</span></li>
+                    <li><i class="fa-solid fa-eye p" aria-hidden="true"></i><span>人間は<strong>承認・修正</strong>に専念</span></li>
+                    <li><i class="fa-solid fa-file-circle-check e" aria-hidden="true"></i><span>出来上がりを<span class="tag emerald">レビュー</span></span></li>
+                    <li><i class="fa-solid fa-feather a" aria-hidden="true"></i><span>負担が<span class="hl-amber">大幅に軽く</span>なる</span></li>
+                </ul>
+                <div class="bubble top v1">
+                    <span class="hw"><i class="fa-solid fa-lightbulb a" aria-hidden="true"></i> 「やる」から「<strong>見る</strong>」へ<br>これが一番の<br><span class="tag amber">変化</span>かも</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: デスクトップ＋モバイル -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-display fa-5x ic-purple" style="animation:fa-flip 2.9s;" aria-hidden="true"></i>
+                <h2>デスクトップもモバイルも</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-brands fa-apple p" aria-hidden="true"></i><span><span class="hl">Mac</span>上でもしっかり動作</span></li>
+                    <li><i class="fa-solid fa-mobile-screen a" aria-hidden="true"></i><span>スマホから<strong>指示・確認</strong>が可能</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right e" aria-hidden="true"></i><span>端末間で<span class="tag emerald">連携</span></span></li>
+                    <li><i class="fa-solid fa-wifi a" aria-hidden="true"></i><span>外出先からも<span class="hl">管理</span>できる</span></li>
+                </ul>
+                <div class="bubble r">
+                    <span class="hw"><i class="fa-solid fa-phone e" aria-hidden="true"></i> PCでセットして<br>スマホで<strong>状況確認</strong><br>使い分けがラク</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: リアルタイム追跡 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-satellite-dish fa-5x ic-emerald" style="animation:fa-beat-fade 2.7s;" aria-hidden="true"></i>
+                <h2>リアルタイム追跡</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-tower-broadcast p" aria-hidden="true"></i><span>話題を<strong>監視</strong>し続けられる</span></li>
+                    <li><i class="fa-solid fa-chart-line e" aria-hidden="true"></i><span>変化を<span class="hl-emerald">即時</span>で検知</span></li>
+                    <li><i class="fa-solid fa-bell-concierge a" aria-hidden="true"></i><span>条件を満たすと<span class="tag amber">通知</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass-chart p" aria-hidden="true"></i><span>情報収集が<strong>自動化</strong>される</span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-radar e" aria-hidden="true"></i> 「あのテーマ、<br>動きがあったら教えて」<br>が<span class="tag emerald">ずっと監視</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード16: 新しい連携 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-puzzle-piece fa-5x ic-violet" style="animation:fa-bounce 2.3s;" aria-hidden="true"></i>
+                <h2>新しい連携サービス</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-palette a" aria-hidden="true"></i><span><span class="tag amber">Canva</span> — デザイン作成を自動化</span></li>
+                    <li><i class="fa-solid fa-box-archive p" aria-hidden="true"></i><span><span class="tag">Dropbox</span> — ファイル管理と連動</span></li>
+                    <li><i class="fa-solid fa-house e" aria-hidden="true"></i><span><span class="tag emerald">Zillow</span> — 不動産情報を追跡</span></li>
+                    <li><i class="fa-solid fa-plus a" aria-hidden="true"></i><span>対応サービスは<strong>順次増加中</strong></span></li>
+                </ul>
+                <div class="bubble top">
+                    <span class="hw"><i class="fa-solid fa-plug p" aria-hidden="true"></i> 普段使いのアプリが<br>次々と<span class="tag">接続</span>対象<br>対応範囲が広がってる</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: 始め方 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag fa-5x ic-amber" style="animation:fa-flip 3.1s;" aria-hidden="true"></i>
+                <h2>はじめの一歩</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-seedling e" aria-hidden="true"></i><span><strong>小さなタスク</strong>を1つ選ぶ</span></li>
+                    <li><i class="fa-solid fa-mug-hot a" aria-hidden="true"></i><span>例：毎朝の<span class="hl-amber">ニュースまとめ</span></span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles p" aria-hidden="true"></i><span>動きを<span class="tag">確認</span>してから広げる</span></li>
+                    <li><i class="fa-solid fa-stairs e" aria-hidden="true"></i><span>少しずつ<strong>段階的に</strong>拡張</span></li>
+                </ul>
+                <div class="bubble r v1">
+                    <span class="hw"><i class="fa-solid fa-shoe-prints a" aria-hidden="true"></i> 最初は<span class="tag amber">小さく</span><br>確実に動くことを<br><strong>体験する</strong>のが大事</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: 正直な評価 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-5x ic-purple" style="animation:fa-beat-fade 2.2s;" aria-hidden="true"></i>
+                <h2>正直な評価</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-broom e" aria-hidden="true"></i><span>得意なのは<span class="hl-emerald">雑務の処理</span></span></li>
+                    <li><i class="fa-solid fa-brain a" aria-hidden="true"></i><span><strong>思考そのもの</strong>は代替しない</span></li>
+                    <li><i class="fa-solid fa-thumbs-up p" aria-hidden="true"></i><span>定型的な作業に<span class="tag">最適</span></span></li>
+                    <li><i class="fa-solid fa-circle-info e" aria-hidden="true"></i><span>期待値を<strong>正しく持つ</strong>ことが鍵</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-heart e" aria-hidden="true"></i> 「考える」は人間<br>「<strong>片付ける</strong>」はSpark<br>こういう<span class="tag emerald">分担</span>が正解</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div class="ch">🎬 動画: <a href="https://www.youtube.com/watch?v=S97eqUt9NkE" target="_blank" rel="noopener">Julian Goldie Agency — How to Automate Online Tasks With Gemini Spark</a></div>
+        <div class="url"><i class="fa-solid fa-link" aria-hidden="true"></i> https://www.youtube.com/watch?v=S97eqUt9NkE</div>
+        <div style="margin-top:14px;font-size:13px;color:#EDE9FE;">このインフォグラフィックは動画内容を日本語で再構成したものです</div>
+    </div>
+
+</div>
+</body>
+</html>

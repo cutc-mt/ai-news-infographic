@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAMB.AI × Google Cloud — リアルタイム多言語ダビングの衝撃</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gb: #1A73E8;   /* Google Blue */
+            --gr: #EA4335;   /* Google Red */
+            --gy: #FBBC04;   /* Google Yellow */
+            --gg: #34A853;   /* Google Green */
+            --gbL: #E8F0FE;  /* 薄い青 */
+            --grL: #FCE8E6;  /* 薄い赤 */
+            --gyL: #FEF7E0;  /* 薄い黄 */
+            --ggL: #E6F4EA;  /* 薄い緑 */
+            --gD: #1E3A5F;   /* ディープネイビー */
+            --gM: #5F6368;   /* グレー */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F8FAFF; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:50px 20px;
+            background:linear-gradient(135deg,var(--gD) 0%,var(--gb) 40%,var(--gg) 80%,var(--gy) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(26,115,232,.35);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(251,188,4,.18) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:#fff; font-size:90px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:#FEF7E0; font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:#E8F0FE; font-size:14px; margin-top:12px; position:relative; z-index:1; }
+        .header .palette { margin-top:14px; position:relative; z-index:1; display:flex; gap:8px; justify-content:center; }
+        .header .palette span { width:24px; height:24px; border-radius:50%; display:inline-block; box-shadow:0 2px 6px rgba(0,0,0,.2); }
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(26,115,232,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(26,115,232,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+        }
+        .cb::before { background:linear-gradient(90deg,var(--gb),var(--gbL)); }
+        .cr::before { background:linear-gradient(90deg,var(--gr),var(--grL)); }
+        .cy::before { background:linear-gradient(90deg,var(--gy),var(--gyL)); }
+        .cg::before { background:linear-gradient(90deg,var(--gg),var(--ggL)); }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--gD); margin-top:10px; line-height:1.4; }
+        .ic-b { color:var(--gb); }
+        .ic-r { color:var(--gr); }
+        .ic-y { color:var(--gy); }
+        .ic-g { color:var(--gg); }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; min-width:18px; margin-top:4px; }
+        ul.kl li i.b { color:var(--gb); }
+        ul.kl li i.r { color:var(--gr); }
+        ul.kl li i.y { color:#B8860B; }
+        ul.kl li i.g { color:var(--gg); }
+        .tag {
+            background:var(--gbL);
+            color:var(--gb);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.r { background:var(--grL); color:var(--gr); }
+        .tag.y { background:var(--gyL); color:#B8860B; }
+        .tag.g { background:var(--ggL); color:var(--gg); }
+        .hl {
+            color:var(--gb);
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--gbL) 60%);
+        }
+        .hl-r {
+            color:var(--gr);
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--grL) 60%);
+        }
+        .hl-y {
+            color:#B8860B;
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--gyL) 60%);
+        }
+        .hl-g {
+            color:var(--gg);
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--ggL) 60%);
+        }
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--gb);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--gb) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FEF7E0;
+            border-color:var(--gy);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--gy) transparent; }
+        .bubble.v2 {
+            background:#FCE8E6;
+            border-color:var(--gr);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--gr) transparent; }
+        .bubble.v3 {
+            background:#E6F4EA;
+            border-color:var(--gg);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--gg) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--gb); }
+        .stats-row {
+            display:flex;
+            justify-content:center;
+            gap:30px;
+            margin:35px 0;
+            flex-wrap:wrap;
+        }
+        .stat-box {
+            text-align:center;
+            background:#fff;
+            border-radius:18px;
+            padding:20px 28px;
+            box-shadow:5px 5px 15px rgba(26,115,232,.12);
+            min-width:160px;
+        }
+        .stat-box .num { font-size:42px; font-weight:bold; }
+        .stat-box .num.b { color:var(--gb); }
+        .stat-box .num.r { color:var(--gr); }
+        .stat-box .num.y { color:#B8860B; }
+        .stat-box .num.g { color:var(--gg); }
+        .stat-box .lbl { font-size:14px; color:var(--gM); margin-top:4px; }
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--gD),var(--gb));
+            border-radius:24px;
+            color:#fff;
+        }
+        .footer a { color:#FBBC04; text-decoration:none; font-weight:bold; }
+        .footer a:hover { text-decoration:underline; }
+        @keyframes fis { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
+        .card { animation:fis .5s ease-out; }
+        @media(max-width:1200px){ .card{min-width:320px} }
+        @media(max-width:768px){ .layout{flex-direction:column} .card{width:100%;min-width:auto} .header h1{font-size:26px} .stats-row{gap:15px} }
+    </style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+    <i class="fa-solid fa-language fa-7x main"></i>
+    <h1>CAMB.AI × Google Cloud<br>リアルタイム多言語ダビングの衝撃</h1>
+    <div class="sub">英語の壁を壊す。声も感情も、そのまま世界へ届ける</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月7日 ／ Google Cloud Tech「New Way Now」</div>
+    <div class="palette">
+        <span style="background:var(--gb)"></span>
+        <span style="background:var(--gr)"></span>
+        <span style="background:var(--gy)"></span>
+        <span style="background:var(--gg)"></span>
+    </div>
+</div>
+
+<!-- 数値ハイライト -->
+<div class="stats-row">
+    <div class="stat-box"><div class="num b">150+</div><div class="lbl">対応言語</div></div>
+    <div class="stat-box"><div class="num r">&lt;2秒</div><div class="lbl">ライブ遅延</div></div>
+    <div class="stat-box"><div class="num y">24/7</div><div class="lbl">稼働時間</div></div>
+    <div class="stat-box"><div class="num g">∞</div><div class="lbl">スケール</div></div>
+</div>
+
+<div class="layout">
+
+<!-- ① -->
+<div class="card cb">
+    <div class="icon-box"><i class="fa-solid fa-globe fa-5x ic-b" style="animation:fa-bounce 2s"></i><h2>①CAMB.AIとは何か</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-circle-info b"></i><span>あらゆるコンテンツの<span class="hl">言語ローカライズ</span>を実現する企業</span></li>
+            <li><i class="fa-solid fa-file-lines g"></i><span>静的なWebページから、<span class="tag g">VOD</span>・ライブまで対応</span></li>
+            <li><i class="fa-solid fa-tower-broadcast r"></i><span>世界最大級の<span class="hl-r">放送事業者</span>をサポート</span></li>
+            <li><i class="fa-solid fa-handshake y"></i><span>Google Cloudと連携し、<span class="tag y">インフラ</span>を構築</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-lightbulb fa-lg"></i> 言語の「壁」を、<span style="font-weight:bold">技術で取り除く</span>。それがCAMB.AIの使命！</span></div>
+</div>
+
+<!-- ② -->
+<div class="card cr">
+    <div class="icon-box"><i class="fa-solid fa-microphone-lines fa-5x ic-r" style="animation:fa-beat-fade 3s"></i><h2>②AIダビングとは</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-volume-high r"></i><span>音声を<span class="hl-r">別の言語</span>に吹き替える技術</span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles y"></i><span>AIが自動で、<span class="tag y">翻訳＋音声合成</span>を行う</span></li>
+            <li><i class="fa-solid fa-clone b"></i><span>元の<span class="hl">声の特徴</span>を、そのまま再現</span></li>
+            <li><i class="fa-solid fa-bolt g"></i><span>従来の<span class="tag g">人手</span>による吹替を、超高速化</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-fire fa-lg"></i> 単なる翻訳じゃない。<span style="font-weight:bold">声まで再現</span>するのが凄さ！</span></div>
+</div>
+
+<!-- ③ -->
+<div class="card cy">
+    <div class="icon-box"><i class="fa-solid fa-users-gear fa-5x ic-y" style="animation:fa-flip 3s"></i><h2>③レガシー手法の限界</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-triangle-exclamation r"></i><span>従来のローカライズは、<span class="hl-r">スケールしない</span>のが問題</span></li>
+            <li><i class="fa-solid fa-person y"></i><span>世界中に<span class="tag y">解説者</span>を24時間配置は非現実的</span></li>
+            <li><i class="fa-solid fa-clock b"></i><span>翻訳・録音に、<span class="hl">数日〜数週間</span>もかかる</span></li>
+            <li><i class="fa-solid fa-money-bill-trend-up g"></i><span>コストも<span class="tag g">天井知らず</span>で、拡張が困難</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-triangle-exclamation fa-lg"></i> 人海戦術には限界があった。だから<span style="font-weight:bold">AIの出番</span>！</span></div>
+</div>
+
+<!-- ④ -->
+<div class="card cg">
+    <div class="icon-box"><i class="fa-solid fa-gauge-high fa-5x ic-g" style="animation:fa-bounce 2s"></i><h2>④2秒未満のライブダビング</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-stopwatch g"></i><span>遅延<span class="hl-g">2秒未満</span>で、ライブ配信を吹き替え</span></li>
+            <li><i class="fa-solid fa-tower-cell b"></i><span>スポーツ中継など、<span class="tag">リアルタイム</span>性が命の現場で</span></li>
+            <li><i class="fa-solid fa-bolt r"></i><span>視聴者が、<span class="hl-r">ストレスなく</span>母国語で視聴可能</span></li>
+            <li><i class="fa-solid fa-infinity y"></i><span>24時間365日、<span class="tag y">途切れず</span>稼働</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-gauge-high fa-lg"></i> ライブで、ほぼ<span style="font-weight:bold">同時</span>に他言語へ。これが革命！</span></div>
+</div>
+
+<!-- ⑤ -->
+<div class="card cb">
+    <div class="icon-box"><i class="fa-solid fa-cloud fa-5x ic-b" style="animation:fa-beat-fade 2s"></i><h2>⑤Google Cloudが支える基盤</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-database b"></i><span><span class="hl">Cloud Storage</span>で、大量の音声データを管理</span></li>
+            <li><i class="fa-solid fa-server g"></i><span><span class="tag g">Databases</span>で、高速な検索・参照を実現</span></li>
+            <li><i class="fa-solid fa-shield-halved r"></i><span>Google級の<span class="hl-r">セキュリティ</span>とインフラ品質</span></li>
+            <li><i class="fa-solid fa-arrow-trend-up y"></i><span>需要増にも、<span class="tag y">柔軟にスケール</span>アウト</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-cloud fa-lg"></i> 土台がGoogle Cloudだから、<span style="font-weight:bold">安心して任せられる</span>！</span></div>
+</div>
+
+<!-- ⑥ -->
+<div class="card cr">
+    <div class="icon-box"><i class="fa-solid fa-clone fa-5x ic-r" style="animation:fa-flip 3s"></i><h2>⑥音声クローン技術</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-microphone r"></i><span>英語の放送者の<span class="hl-r">声</span>を、そのままクローン</span></li>
+            <li><i class="fa-solid fa-ear-listen b"></i><span>アクセントや<span class="tag">話し方</span>の癖も保持</span></li>
+            <li><i class="fa-solid fa-language g"></i><span>任意の言語で、<span class="hl-g">リアルな体験</span>を提供</span></li>
+            <li><i class="fa-solid fa-heart y"></i><span>聞き手に、<span class="tag y">親しみやすさ</span>と信頼感</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-clone fa-lg"></i> 別人の声じゃない。<span style="font-weight:bold">本人のまま</span>別言語へ！</span></div>
+</div>
+
+<!-- ⑦ -->
+<div class="card cy">
+    <div class="icon-box"><i class="fa-solid fa-wand-sparkles fa-5x ic-y" style="animation:fa-bounce 2s"></i><h2>⑦Gemini Enterprise Agent Platform</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-diagram-project b"></i><span>CAMB.AIは、<span class="hl">Gemini Agent Platform</span>へ直接アクセス</span></li>
+            <li><i class="fa-solid fa-plug g"></i><span>開発者が<span class="tag g">プラグ＆プレイ</span>で利用可能</span></li>
+            <li><i class="fa-solid fa-code r"></i><span>ローカライズ機能を、<span class="hl-r">API感覚</span>で組み込み</span></li>
+            <li><i class="fa-solid fa-puzzle-piece y"></i><span>自社サービスに、<span class="tag y">即統合</span>できる手軽さ</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-wand-sparkles fa-lg"></i> つなぐだけで、<span style="font-weight:bold">多言語対応</span>完了。開発者に優しい！</span></div>
+</div>
+
+<!-- ⑧ -->
+<div class="card cg">
+    <div class="icon-box"><i class="fa-solid fa-people-arrows fa-5x ic-g" style="animation:fa-beat-fade 2s"></i><h2>⑧Googleの研究チームと連携</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-flask g"></i><span>Googleの<span class="hl-g">研究チーム</span>に直接アクセス可能</span></li>
+            <li><i class="fa-solid fa-brain b"></i><span>最先端の<span class="tag">AIチーム</span>と、共同で開発を推進</span></li>
+            <li><i class="fa-solid fa-handshake-angle r"></i><span>単なる顧客じゃない、<span class="hl-r">パートナー</span>関係</span></li>
+            <li><i class="fa-solid fa-rocket y"></i><span>未来の技術を、<span class="tag y">いち早く</span>実装</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-people-arrows fa-lg"></i> Googleの中の人と、<span style="font-weight:bold">一緒に開発</span>できる！</span></div>
+</div>
+
+<!-- ⑨ -->
+<div class="card cb">
+    <div class="icon-box"><i class="fa-solid fa-comments fa-5x ic-b" style="animation:fa-flip 3s"></i><h2>⑨コメント解説の自動化</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-comment-dots b"></i><span>実況や<span class="hl">解説</span>も、AIが自動で生成</span></li>
+            <li><i class="fa-solid fa-earth-americas g"></i><span>世界中に人を置かず、<span class="tag g">多言語</span>で同時配信</span></li>
+            <li><i class="fa-solid fa-stopwatch r"></i><span>24時間体制は、もはや<span class="hl-r">夢ではない</span></span></li>
+            <li><i class="fa-solid fa-headset y"></i><span>視聴者ごとに、<span class="tag y">最適な言語</span>を提供</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-comments fa-lg"></i> 解説者を世界中に雇う必要が、<span style="font-weight:bold">もうなくなった</span>！</span></div>
+</div>
+
+<!-- ⑩ -->
+<div class="card cr">
+    <div class="icon-box"><i class="fa-solid fa-futbol fa-5x ic-r" style="animation:fa-bounce 2s"></i><h2>⑩スポーツ中継の変革</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-trophy r"></i><span>海外リーグも、<span class="hl-r">母国語</span>で楽しめる</span></li>
+            <li><i class="fa-solid fa-tower-broadcast b"></i><span>ライブ実況を、<span class="tag">2秒未満</span>で吹き替え</span></li>
+            <li><i class="fa-solid fa-users g"></i><span>ファン層が、<span class="hl-g">世界中に拡大</span></span></li>
+            <li><i class="fa-solid fa-fire y"></i><span>視聴率と<span class="tag y">収益</span>も、大きく伸びる可能性</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-futbol fa-lg"></i> 海外スポーツが、<span style="font-weight:bold">もっと身近</span>になる！</span></div>
+</div>
+
+<!-- ⑪ -->
+<div class="card cy">
+    <div class="icon-box"><i class="fa-solid fa-photo-film fa-5x ic-y" style="animation:fa-beat-fade 3s"></i><h2>⑪放送コンテンツの広がり</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-tv y"></i><span>ドラマや<span class="hl-y">ニュース</span>も、多言語で同時配信</span></li>
+            <li><i class="fa-solid fa-clapperboard r"></i><span>レガシーコンテンツの、<span class="hl-r">再価値化</span>も可能</span></li>
+            <li><i class="fa-solid fa-globe-asia b"></i><span>アジア・欧米など、<span class="tag">新市場</span>へ一気に展開</span></li>
+            <li><i class="fa-solid fa-star g"></i><span>「観たかったけど、<span class="tag g">言葉が壁で」</span>を解消</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-photo-film fa-lg"></i> 古い名作も、<span style="font-weight:bold">世界で蘇る</span>！</span></div>
+</div>
+
+<!-- ⑫ -->
+<div class="card cg">
+    <div class="icon-box"><i class="fa-solid fa-earth-asia fa-5x ic-g" style="animation:fa-flip 3s"></i><h2>⑫150以上の言語に対応</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-language g"></i><span>主要言語から<span class="hl-g">少数言語</span>まで、幅広く</span></li>
+            <li><i class="fa-solid fa-people-group b"></i><span>英語を解さない、<span class="tag">数百万人</span>にリーチ</span></li>
+            <li><i class="fa-solid fa-map-location-dot r"></i><span>地域に応じた、<span class="hl-r">最適化</span>も実現</span></li>
+            <li><i class="fa-solid fa-universal-access y"></i><span>情報の<span class="tag y">平等なアクセス</span>に貢献</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-earth-asia fa-lg"></i> 150言語って、世界の<span style="font-weight:bold">大多数</span>をカバー！</span></div>
+</div>
+
+<!-- ⑬ -->
+<div class="card cb">
+    <div class="icon-box"><i class="fa-solid fa-scale-balanced fa-5x ic-b" style="animation:fa-bounce 2s"></i><h2>⑬声の「個性」を保持</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-fingerprint b"></i><span>声の<span class="hl">個性</span>を、言語を超えて維持</span></li>
+            <li><i class="fa-solid fa-face-smile g"></i><span>感情や<span class="tag g">トーン</span>も、自然に伝わる</span></li>
+            <li><i class="fa-solid fa-comment r"></i><span>「別人が話している感」を、<span class="hl-r">最小化</span></span></li>
+            <li><i class="fa-solid fa-masks-theater y"></i><span>ナレーションから、<span class="tag y">演技</span>まで再現</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-scale-balanced fa-lg"></i> 言語が変わっても、<span style="font-weight:bold">人は同じ人</span>！</span></div>
+</div>
+
+<!-- ⑭ -->
+<div class="card cr">
+    <div class="icon-box"><i class="fa-solid fa-lock fa-5x ic-r" style="animation:fa-beat-fade 2s"></i><h2>⑭セキュリティと信頼性</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-shield r"></i><span>Google Cloudの、<span class="hl-r">エンタープライズ級</span>セキュリティ</span></li>
+            <li><i class="fa-solid fa-circle-check g"></i><span>データ保護と、<span class="tag g">コンプライアンス</span>も万全</span></li>
+            <li><i class="fa-solid fa-server b"></i><span>インフラの<span class="hl">品質</span>と安定性を保証</span></li>
+            <li><i class="fa-solid fa-building y"></i><span>大企業でも、<span class="tag y">安心</span>して導入可能</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-lock fa-lg"></i> 放送級の要件も、<span style="font-weight:bold">Googleならクリア</span>！</span></div>
+</div>
+
+<!-- ⑮ -->
+<div class="card cy">
+    <div class="icon-box"><i class="fa-solid fa-chart-line fa-5x ic-y" style="animation:fa-flip 3s"></i><h2>⑮市場を劇的に拡大</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-arrow-up-right-dots y"></i><span>言語の壁を除けば、<span class="hl-y">市場が一気に広がる</span></span></li>
+            <li><i class="fa-solid fa-users-viewfinder b"></i><span>英語圏以外の、<span class="tag">数百万人</span>が新たな視聴者</span></li>
+            <li><i class="fa-solid fa-coins g"></i><span>広告収入や<span class="hl-g">配信権</span>の、価値も上昇</span></li>
+            <li><i class="fa-solid fa-bolt r"></i><span>これは間違いなく、<span class="hl-r">ゲームチェンジャー</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-chart-line fa-lg"></i> 翻訳するだけで、<span style="font-weight:bold">客が何倍にも</span>！</span></div>
+</div>
+
+<!-- ⑯ -->
+<div class="card cg">
+    <div class="icon-box"><i class="fa-solid fa-handshake fa-5x ic-g" style="animation:fa-bounce 2s"></i><h2>⑯スケールパートナーの必要性</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-rocket g"></i><span>グローバル展開には、<span class="hl-g">強力な基盤</span>が不可欠</span></li>
+            <li><i class="fa-solid fa-network-wired b"></i><span>自社だけでは、<span class="tag">限界</span>がある</span></li>
+            <li><i class="fa-solid fa-building-columns r"></i><span>信頼できる<span class="hl-r">パートナー</span>選びが鍵</span></li>
+            <li><i class="fa-solid fa-medal y"></i><span>Google Cloudは、その<span class="tag y">最適解</span>の一つ</span></li>
+        </ul>
+    </div>
+    <div class="bubble v3"><span class="hw"><i class="fa-solid fa-handshake fa-lg"></i> 一人でやるより、<span style="font-weight:bold">強い味方</span>と一緒に！</span></div>
+</div>
+
+<!-- ⑰ -->
+<div class="card cb">
+    <div class="icon-box"><i class="fa-solid fa-lightbulb fa-5x ic-b" style="animation:fa-beat-fade 2s"></i><h2>⑰Google Cloudがもたらす価値</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-heart b"></i><span>何より、<span class="hl">信頼感</span>が違う</span></li>
+            <li><i class="fa-solid fa-flask g"></i><span>絶え間ない<span class="tag g">イノベーション</span>能力</span></li>
+            <li><i class="fa-solid fa-magnifying-glass-chart r"></i><span>研究から商用化まで、<span class="hl-r">一気通貫</span></span></li>
+            <li><i class="fa-solid fa-seedling y"></i><span>将来の成長も、<span class="tag y">見込める</span>安心感</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-lightbulb fa-lg"></i> ブランドの重みが、<span style="font-weight:bold">事業の安心感</span>に！</span></div>
+</div>
+
+<!-- ⑱ -->
+<div class="card cr">
+    <div class="icon-box"><i class="fa-solid fa-flag-checkered fa-5x ic-r" style="animation:fa-fade 3s"></i><h2>⑱まとめ：業界を変える力</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-1 b"></i><span>CAMB.AIが、<span class="hl">ローカライズ</span>の常識を覆す</span></li>
+            <li><i class="fa-solid fa-2 g"></i><span>Google Cloudが、<span class="tag g">基盤</span>を支える</span></li>
+            <li><i class="fa-solid fa-3 r"></i><span>声も感情も、そのまま<span class="hl-r">世界へ</span></span></li>
+            <li><i class="fa-solid fa-seedling y"></i><span>言語の壁が消えた未来が、<span class="tag y">もうすぐそこ</span>に</span></li>
+        </ul>
+    </div>
+    <div class="bubble r v2"><span class="hw"><i class="fa-solid fa-flag-checkered fa-lg"></i> これが「New Way Now」。<span style="font-weight:bold">新しい放送のかたち</span>！</span></div>
+</div>
+
+</div>
+
+<div class="footer">
+    🎬 動画: <a href="https://www.youtube.com/watch?v=JBnxe_vEOhY" target="_blank" style="color:inherit;">Google Cloud Tech「New Way Now: How CAMB.AI uses Google AI to localize content」</a> | 📅 2026年8月7日
+</div>
+</div>
+</body>
+</html>

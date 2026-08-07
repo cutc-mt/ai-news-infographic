@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.6B モデルを オフラインで動かす — プライベートAIの始め方</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #047857;   /* Emerald 700 - メイン緑 */
+            --c2: #F97316;   /* Orange 500 - アクセント */
+            --c3: #D1FAE5;   /* Emerald 100 - 薄緑 */
+            --c4: #064E3B;   /* Emerald 900 - 深緑 */
+            --c5: #F59E0B;   /* Amber 500 - 黄金 */
+            --c6: #FED7AA;   /* Orange 200 - 薄オレンジ */
+            --c7: #FFFBEB;   /* Amber 50 - クリーム */
+            --c8: #0F766E;   /* Teal 700 - 補助青緑 */
+            --c9: #B45309;   /* Amber 700 - 濃黄金 */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F5FBF6; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 45%,var(--c8) 80%,var(--c2) 120%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(4,120,87,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(249,115,22,.25) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:#FEF3C7; font-size:92px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.25); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:#ECFDF5; font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:#FED7AA; font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(6,78,59,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(4,120,87,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c2),var(--c5));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.orange { color:var(--c2); }
+        .icon-box i.amber { color:var(--c5); }
+        .icon-box i.teal { color:var(--c8); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#9CA3AF; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.o { color:var(--c2); }
+        ul.kl li i.a { color:var(--c5); }
+        ul.kl li i.t { color:var(--c8); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--c4);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.orange { background:var(--c6); color:var(--c9); }
+        .tag.gold { background:#FEF3C7; color:#92400E; }
+        .tag.amber { background:#FDE68A; color:var(--c9); }
+        .tag.teal { background:#CCFBF1; color:var(--c8); }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-orange { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--c6) 60%); }
+        .hl-gold { color:#B45309; font-weight:bold; background:linear-gradient(transparent 60%, #FEF3C7 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFF7ED;
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:var(--c7);
+            border-color:var(--c5);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c5) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c5); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:#ECFDF5;
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+
+        /* スタックバー */
+        .stack-bar {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,#ECFDF5 0%,#FED7AA 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .stack-bar .label { color:var(--c1); font-weight:bold; font-size:15px; }
+        .stack-bar .label.orange { color:var(--c9); }
+        .stack-bar .sep { color:var(--c5); font-size:22px; }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--c3),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c8));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(6,78,59,.25);
+        }
+        .footer a { color:#FED7AA; text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:#D1FAE5; word-break:break-all; }
+        .footer i { color:var(--c5); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <i class="fa-solid fa-laptop-code main" aria-hidden="true"></i>
+        <h1>2.6B モデルを<br>オフラインで動かそう</h1>
+        <p class="sub">プライベートで、無料で、手元で動く。自分だけのAIアシスタント</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月7日 ／ Julian Goldie Agency</p>
+    </div>
+
+    <!-- SECTION 1: モデルの基礎 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-flag-checkered fa-lg"></i> 第1章：このモデル って何者？</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 1: ヘッダー紹介 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-rocket fa-5x orange" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>ロケットで飛ぶ プライベートAI</h2>
+                <div class="ch">Intro</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-info o" aria-hidden="true"></i><span><span class="tag orange">2.6B</span> の軽量モデル</span></li>
+                    <li><i class="fa-solid fa-house-laptop o" aria-hidden="true"></i><span>自分の<span class="hl-orange">マシン</span>だけで動く</span></li>
+                    <li><i class="fa-solid fa-wifi-slash o" aria-hidden="true"></i><span>ネット<span class="tag gold">なし</span>で稼働</span></li>
+                    <li><i class="fa-solid fa-coins o" aria-hidden="true"></i><span>利用料は<span class="hl-gold">ゼロ</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c2);"></i>
+                        クラウドに頼らない。<br>
+                        <span class="hl-orange">手元</span>で完結するAIだよ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 2: ローカルAIの魅力 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart fa-5x" style="animation:fa-beat-fade 3s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>ローカルAIの 魅力とは</h2>
+                <div class="ch">Why Local</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>プライバシーが<span class="hl">守られる</span></span></li>
+                    <li><i class="fa-solid fa-gift" aria-hidden="true"></i><span>ずっと<span class="tag gold">無料</span>で使える</span></li>
+                    <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>利用制限が<span class="hl-orange">ない</span></span></li>
+                    <li><i class="fa-solid fa-hand-holding-heart" aria-hidden="true"></i><span>自分だけの<span class="tag">相棒</span>に</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        データは<span class="hl">外へ出ない</span>。<br>
+                        これが一番の強み
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: 2.6Bパラメータとは -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-microchip fa-5x teal" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>2.6B パラメータ って？</h2>
+                <div class="ch">2.6B Params</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-diagram-project t" aria-hidden="true"></i><span>26億個の<span class="hl">パラメータ</span></span></li>
+                    <li><i class="fa-solid fa-feather t" aria-hidden="true"></i><span>小型で<span class="tag teal">軽量</span></span></li>
+                    <li><i class="fa-solid fa-memory t" aria-hidden="true"></i><span>メモリ<span class="hl">負荷が低い</span></span></li>
+                    <li><i class="fa-solid fa-bolt t" aria-hidden="true"></i><span>普通のPCでも<span class="tag gold">動く</span></span></li>
+                </ul>
+                <div class="stack-bar">
+                    <span class="label"><i class="fa-solid fa-microchip"></i> 26億</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label orange"><i class="fa-solid fa-laptop"></i> 手元で動く</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 4: 128Kコンテキスト -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-book-open fa-5x amber" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>128K コンテキストの 意義</h2>
+                <div class="ch">128K Context</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-paragraph a" aria-hidden="true"></i><span><span class="hl-gold">長文</span>も一度に読める</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right a" aria-hidden="true"></i><span>前後の<span class="tag amber">文脈</span>を保持</span></li>
+                    <li><i class="fa-solid fa-file-lines a" aria-hidden="true"></i><span>資料まるごと<span class="hl-gold">把握</span></span></li>
+                    <li><i class="fa-solid fa-comments a" aria-hidden="true"></i><span>長い会話も<span class="tag gold">途切れない</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        約12万語。<br>
+                        本1冊分を<span class="hl-gold">記憶</span>できる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 2: オフラインの強みと得意分野 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-bolt fa-lg"></i> 第2章：オフラインの 強みと得意なこと</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 5: 完全オフライン -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-plane-departure fa-5x teal" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>完全 オフラインの メリット</h2>
+                <div class="ch">Fully Offline</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-wifi-slash t" aria-hidden="true"></i><span>通信<span class="hl">不要</span>で動く</span></li>
+                    <li><i class="fa-solid fa-plane t" aria-hidden="true"></i><span>機内でも<span class="tag teal">使える</span></span></li>
+                    <li><i class="fa-solid fa-mountain-sun t" aria-hidden="true"></i><span>山奥でも<span class="hl">稼働</span></span></li>
+                    <li><i class="fa-solid fa-stopwatch t" aria-hidden="true"></i><span>通信待ち<span class="tag gold">ゼロ</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c2);"></i>
+                        圏外でも止まらない。<br>
+                        これが<span class="hl-orange">強さ</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 6: コーディングの限界 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-5x orange" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>複雑な コーディングは 苦手</h2>
+                <div class="ch">Coding Limits</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-code o" aria-hidden="true"></i><span>難しい実装は<span class="hl-orange">厳しい</span></span></li>
+                    <li><i class="fa-solid fa-bug o" aria-hidden="true"></i><span>複雑なバグは<span class="tag orange">苦手</span></span></li>
+                    <li><i class="fa-solid fa-puzzle-piece o" aria-hidden="true"></i><span>大規模開発には<span class="hl-orange">不向き</span></span></li>
+                    <li><i class="fa-solid fa-circle-info o" aria-hidden="true"></i><span>用途を<span class="tag gold">見極める</span>のが大事</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        何でもできるわけじゃない。<br>
+                        <span class="hl">得意分野</span>で活かそう
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 7: アジェンダ管理 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-check fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>アジェンダ管理 が得意</h2>
+                <div class="ch">Agenda Master</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-calendar-check" aria-hidden="true"></i><span>予定の<span class="hl">整理</span>が得意</span></li>
+                    <li><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span>議題を<span class="tag">構造化</span></span></li>
+                    <li><i class="fa-solid fa-flag" aria-hidden="true"></i><span>優先順位の<span class="hl">判定</span></span></li>
+                    <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>タスクの<span class="tag gold">完了管理</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        会議の流れや議題を<br>
+                        <span class="hl-gold">きっちり</span>まとめてくれる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 8: デイリータスク自動化 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-wand-magic-sparkles fa-5x amber" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>デイリータスク の自動化</h2>
+                <div class="ch">Daily Auto</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrows-rotate a" aria-hidden="true"></i><span>毎日の<span class="hl-gold">繰り返し</span>を任せる</span></li>
+                    <li><i class="fa-solid fa-bell a" aria-hidden="true"></i><span>リマインドの<span class="tag amber">作成</span></span></li>
+                    <li><i class="fa-solid fa-pen-to-square a" aria-hidden="true"></i><span>メモ書きを<span class="hl-gold">整える</span></span></li>
+                    <li><i class="fa-solid fa-clock a" aria-hidden="true"></i><span>時間の<span class="tag gold">節約</span>に</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        単調な作業を<br>
+                        <span class="hl">まるっと</span>お任せ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 3: セットアップ手順 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-screwdriver-wrench fa-lg"></i> 第3章：無料で セットアップする手順</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 9: 無料セットアップ手順 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-gift fa-5x orange" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>無料で 始める 手順</h2>
+                <div class="ch">Free Setup</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 o" aria-hidden="true"></i><span>モデルを<span class="hl-orange">入手</span></span></li>
+                    <li><i class="fa-solid fa-2 o" aria-hidden="true"></i><span>実行ツールを<span class="tag orange">導入</span></span></li>
+                    <li><i class="fa-solid fa-3 o" aria-hidden="true"></i><span>設定を<span class="hl-orange">整える</span></span></li>
+                    <li><i class="fa-solid fa-4 o" aria-hidden="true"></i><span>すぐに<span class="tag gold">起動</span></span></li>
+                </ul>
+                <pre>① Hugging Face でモデルを探す
+② LM Studio を install
+③ モデルを読み込む
+④ chat を始める — 完了!</pre>
+            </div>
+        </div>
+
+        <!-- CARD 10: Hugging Faceから取得 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-face-smile fa-5x teal" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>Hugging Face から 取得</h2>
+                <div class="ch">Hugging Face</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-magnifying-glass t" aria-hidden="true"></i><span>モデルを<span class="hl">検索</span></span></li>
+                    <li><i class="fa-solid fa-download t" aria-hidden="true"></i><span>無料で<span class="tag teal">ダウンロード</span></span></li>
+                    <li><i class="fa-solid fa-file-zipper t" aria-hidden="true"></i><span>GGUF形式が<span class="hl">おすすめ</span></span></li>
+                    <li><i class="fa-solid fa-circle-check t" aria-hidden="true"></i><span> license を<span class="tag gold">確認</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        世界最大のモデル置き場。<br>
+                        <span class="hl-gold">無料</span>で手に入るよ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 11: LM Studioで実行 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-laptop-code fa-5x" style="animation:fa-beat-fade 3s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>LM Studio で 実行</h2>
+                <div class="ch">LM Studio</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-window-restore" aria-hidden="true"></i><span>GUIで<span class="hl">簡単操作</span></span></li>
+                    <li><i class="fa-solid fa-folder-open" aria-hidden="true"></i><span>モデルを<span class="tag">読み込む</span>だけ</span></li>
+                    <li><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>パラメータも<span class="hl">調整可</span></span></li>
+                    <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>すぐに<span class="tag gold">会話開始</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        プログラム不要。<br>
+                        <span class="hl">クリック</span>だけで動く
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 12: カスタムAIプロファイル -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-id-card fa-5x amber" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>カスタム AIプロファイル 構築</h2>
+                <div class="ch">AI Profile</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-pen a" aria-hidden="true"></i><span>性格を<span class="hl-gold">設定</span></span></li>
+                    <li><i class="fa-solid fa-user-tag a" aria-hidden="true"></i><span>役割を<span class="tag amber">与える</span></span></li>
+                    <li><i class="fa-solid fa-book-bookmark a" aria-hidden="true"></i><span>知識を<span class="hl-gold">仕込む</span></span></li>
+                    <li><i class="fa-solid fa-wand-sparkles a" aria-hidden="true"></i><span>自分専用に<span class="tag gold">育てる</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c2);"></i>
+                        秘書・コーチ・相棒…<br>
+                        <span class="hl-orange">好きな役</span>を作れる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 4: 活用と比較、コミュニティ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-scale-balanced fa-lg"></i> 第4章：活用法と コミュニティの力</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 13: プライバシー重視アシスタント -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-lock fa-5x orange" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>プライバシー 重視の アシスタント</h2>
+                <div class="ch">Private Assistant</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-lock o" aria-hidden="true"></i><span>データは<span class="hl-orange">外に漏れない</span></span></li>
+                    <li><i class="fa-solid fa-eye-slash o" aria-hidden="true"></i><span>誰にも<span class="tag orange">見られない</span></span></li>
+                    <li><i class="fa-solid fa-key o" aria-hidden="true"></i><span>鍵は<span class="hl-orange">自分</span>が持つ</span></li>
+                    <li><i class="fa-solid fa-building-shield o" aria-hidden="true"></i><span>機密も<span class="tag gold">安心</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        会社の資料も<br>
+                        <span class="hl">安全</span>に預けられる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 14: ローカル vs クラウド -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-5x" style="animation:fa-flip 4s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>ローカル vs クラウド 比較</h2>
+                <div class="ch">Local vs Cloud</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-house" aria-hidden="true"></i><span>ローカル：<span class="hl">無料・安全</span></span></li>
+                    <li><i class="fa-solid fa-cloud" aria-hidden="true"></i><span>クラウド：<span class="hl-orange">性能重視</span></span></li>
+                    <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>速度は<span class="tag">ローカル</span>が速い</span></li>
+                    <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>使い分けが<span class="tag gold">カギ</span></span></li>
+                </ul>
+                <div class="stack-bar">
+                    <span class="label"><i class="fa-solid fa-house"></i> ローカル</span>
+                    <i class="fa-solid fa-arrows-left-right sep"></i>
+                    <span class="label orange"><i class="fa-solid fa-cloud"></i> クラウド</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 15: コミュニティサポート -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-users fa-5x teal" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>コミュニティ サポート</h2>
+                <div class="ch">AI Profit Boardroom</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-people-group t" aria-hidden="true"></i><span><span class="hl">AI Profit Boardroom</span> へ</span></li>
+                    <li><i class="fa-solid fa-comments t" aria-hidden="true"></i><span>仲間と<span class="tag teal">情報交換</span></span></li>
+                    <li><i class="fa-solid fa-graduation-cap t" aria-hidden="true"></i><span>エージェント<span class="hl">訓練</span>も学べる</span></li>
+                    <li><i class="fa-solid fa-handshake t" aria-hidden="true"></i><span>直接の<span class="tag gold">助け合い</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        一人で悩まない。<br>
+                        <span class="hl-gold">仲間</span>がいる強さ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 16: 週次コーチング -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-chalkboard-user fa-5x amber" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>週次コーチング と 直接サポート</h2>
+                <div class="ch">Weekly Coaching</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-calendar-week a" aria-hidden="true"></i><span>毎週の<span class="hl-gold">コーチング</span></span></li>
+                    <li><i class="fa-solid fa-comment-dots a" aria-hidden="true"></i><span>質問を<span class="tag amber">直接</span>投げられる</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up a" aria-hidden="true"></i><span>成長を<span class="hl-gold">加速</span></span></li>
+                    <li><i class="fa-solid fa-medal a" aria-hidden="true"></i><span>最新手法も<span class="tag gold">共有</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        迷ったら<span class="hl">聞ける</span>。<br>
+                        これが成長の近道
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 5: 展望とまとめ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-seedling fa-lg"></i> 第5章：これからの展望と、始め方</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 17: 今後の展望 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-seedling fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>ローカルAI の 今後の展望</h2>
+                <div class="ch">Future</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>モデルは<span class="hl">進化</span>し続ける</span></li>
+                    <li><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i><span>スマホでも<span class="tag">動く</span>時代へ</span></li>
+                    <li><i class="fa-solid fa-network-wired" aria-hidden="true"></i><span>エージェントの<span class="hl">連携</span>も広がる</span></li>
+                    <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>主役は<span class="tag gold">手元</span>に</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c2);"></i>
+                        小さいモデルが<br>
+                        <span class="hl-orange">世界</span>を変えていく
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 18: まとめ・始め方 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag-checkered fa-5x orange" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>まとめ と 始め方</h2>
+                <div class="ch">Get Started</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-download o" aria-hidden="true"></i><span>モデルを<span class="hl-orange">落とす</span></span></li>
+                    <li><i class="fa-solid fa-laptop o" aria-hidden="true"></i><span>LM Studio で<span class="tag orange">起動</span></span></li>
+                    <li><i class="fa-solid fa-id-card o" aria-hidden="true"></i><span>プロファイルを<span class="hl-orange">作る</span></span></li>
+                    <li><i class="fa-solid fa-rocket o" aria-hidden="true"></i><span>自分のAIを<span class="tag gold">飛ばす</span></span></li>
+                </ul>
+                <div class="stack-bar">
+                    <span class="label"><i class="fa-solid fa-download"></i> 入手</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label orange"><i class="fa-solid fa-rocket"></i> 実行</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p class="src">
+            <i class="fa-solid fa-clapperboard"></i>
+            🎬 動画: <a href="https://www.youtube.com/watch?v=-czTps0F9EM" target="_blank" rel="noopener">Julian Goldie Agency — Run this private 2.6B AI model offline! 🚀</a>
+        </p>
+        <p class="url">
+            <i class="fa-solid fa-link"></i>
+            https://www.youtube.com/watch?v=-czTps0F9EM
+        </p>
+    </div>
+
+</div>
+</body>
+</html>

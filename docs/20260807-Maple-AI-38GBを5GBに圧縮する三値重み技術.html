@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maple AI — 38GBを5GBに圧縮する三値重みの技術</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #9D174D;   /* ローズマゼンタ */
+            --c2: #DB2777;   /* ピンクローズ */
+            --c3: #FCE7F3;   /* 薄ローズ */
+            --c4: #831843;   /* 最暗マゼンタ */
+            --c5: #0F766E;   /* ターコイズ */
+            --c6: #CCFBF1;   /* 薄ターコイズ */
+            --c7: #14B8A6;   /* ミディアムターコイズ */
+            --c8: #6B7280;   /* グレー */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FFF5F8; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:50px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c2) 45%,var(--c7) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(157,23,77,.4);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(20,184,166,.20) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:#fff; font-size:90px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:#FCE7F3; font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:#CCFBF1; font-size:14px; margin-top:12px; position:relative; z-index:1; }
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(157,23,77,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(157,23,77,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c7),var(--c2));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .ic-rose { color:var(--c1); }
+        .ic-teal { color:var(--c5); }
+        .ic-pink { color:var(--c2); }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c2); min-width:18px; margin-top:4px; }
+        ul.kl li i.g { color:var(--c5); }
+        ul.kl li i.a { color:var(--c7); }
+        .tag {
+            background:var(--c3);
+            color:var(--c4);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.teal {
+            background:var(--c6);
+            color:#115E59;
+        }
+        .tag.gray {
+            background:#E5E7EB;
+            color:#374151;
+        }
+        .hl {
+            color:var(--c1);
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--c3) 60%);
+        }
+        .hl-teal {
+            color:#115E59;
+            font-weight:bold;
+            background:linear-gradient(transparent 60%, var(--c6) 60%);
+        }
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFFBEB;
+            border-color:var(--c5);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c5) transparent; }
+        .bubble.v2 {
+            background:#FFF5F8;
+            border-color:var(--c2);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c2) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c5); }
+        pre {
+            background:#f5f5f5;
+            padding:8px;
+            border-radius:5px;
+            font-size:12px;
+            margin-top:10px;
+            overflow-x:auto;
+        }
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c2));
+            border-radius:24px;
+            color:#fff;
+        }
+        .footer a { color:#FCE7F3; text-decoration:none; font-weight:bold; }
+        .footer a:hover { text-decoration:underline; }
+        @keyframes fis { from{opacity:0;transform:scale(.92)} to{opacity:1;transform:scale(1)} }
+        .card { animation:fis .5s ease-out; }
+        @media(max-width:1600px){ .card{min-width:280px} }
+        @media(max-width:1200px){ .card{min-width:320px} }
+        @media(max-width:900px){ .card{min-width:380px} }
+        @media(max-width:768px){ .layout{flex-direction:column} .card{width:100%;min-width:auto} .header h1{font-size:26px} }
+    </style>
+</head>
+<body>
+<div class="container">
+<div class="header">
+    <i class="fa-solid fa-feather-pointed fa-7x main"></i>
+    <h1>Maple AIが38GBを5GBへ圧縮する技術</h1>
+    <div class="sub">三値重みとエキスパートシステムで、巨大モデルを手のひらサイズに</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月7日配信 ／ Julian Goldie SEO</div>
+</div>
+<div class="layout">
+
+<!-- ① -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-feather-pointed fa-5x ic-rose" style="animation:fa-bounce 2s"></i><h2>①Maple AIとは何か</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-circle-info"></i><span>巨大モデルを<span class="hl">軽く</span>する、新しい手法のAI</span></li>
+            <li><i class="fa-solid fa-seedling g"></i><span>20Bの賢さを、<span class="tag teal">1B</span>の体格で再現</span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles a"></i><span>これまで<span class="hl">無理</span>だったことを、現実に変える</span></li>
+            <li><i class="fa-solid fa-rocket g"></i><span>スマートフォンでも、<span class="hl-teal">動く</span>軽さが特徴</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-feather-pointed fa-lg"></i> 大きい賢さを、<span style="font-weight:bold">羽のように軽く</span>。それがMaple！</span></div>
+</div>
+
+<!-- ② -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-arrows-down-to-line fa-5x ic-teal" style="animation:fa-beat-fade 3s"></i><h2>②圧縮の前後を比べる</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-database a"></i><span>元のサイズは<span class="hl-teal">約38GB</span></span></li>
+            <li><i class="fa-solid fa-compress"></i><span>圧縮後は<span class="hl">わずか5GB</span>へ</span></li>
+            <li><i class="fa-solid fa-percent g"></i><span>削減率は<span class="tag">約87%</span>という劇的な数字</span></li>
+            <li><i class="fa-solid fa-scale-balanced a"></i><span>小さくても、<span class="hl-teal">性能は維持</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-arrows-down-to-line fa-lg"></i> 38GB → 5GB。<span style="font-weight:bold">87%も小さく</span>なった！</span></div>
+</div>
+
+<!-- ③ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-hashtag fa-5x ic-rose" style="animation:fa-flip 3s"></i><h2>③三値重みの基本的な考え</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-minus g"></i><span>使うのは<span class="hl-teal">−1</span>・<span class="hl-teal">0</span>・<span class="hl-teal">+1</span>の3つだけ</span></li>
+            <li><i class="fa-solid fa-hashtag"></i><span>従来の<span class="tag gray">複雑な小数</span>を、この3値に置き換え</span></li>
+            <li><i class="fa-solid fa-bolt a"></i><span>保存すべき値が減り、<span class="hl">サイズ</span>が激減</span></li>
+            <li><i class="fa-solid fa-star g"></i><span>計算も単純になり、<span class="hl-teal">処理が速い</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-hashtag fa-lg"></i> 重みを<span style="font-weight:bold">3種類だけ</span>にする。それが鍵！</span></div>
+</div>
+
+<!-- ④ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-code-compare fa-5x ic-teal" style="animation:fa-bounce 2s"></i><h2>④従来の重み保存との違い</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-square-root-variable g"></i><span>従来は<span class="hl-teal">float16</span>など複雑な小数で保存</span></li>
+            <li><i class="fa-solid fa-file-zipper a"></i><span>小数のせいで、ファイルが<span class="tag">巨大化</span></span></li>
+            <li><i class="fa-solid fa-arrow-right-arrow-left"></i><span>三値なら、値を<span class="hl">単純</span>に記録できる</span></li>
+            <li><i class="fa-solid fa-circle-check g"></i><span>精度を保ちつつ、<span class="hl-teal">容量</span>だけ削減</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-code-compare fa-lg"></i> 小数はいっぱい場所をとる。<span style="font-weight:bold">3値なら省スペース</span>！</span></div>
+</div>
+
+<!-- ⑤ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-people-group fa-5x ic-rose" style="animation:fa-beat-fade 2s"></i><h2>⑤エキスパートシステムの仕組み</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-users g"></i><span>複数の<span class="hl-teal">専門家</span>を用意し、分担させる</span></li>
+            <li><i class="fa-solid fa-circle-question a"></i><span>タスクに応じて、<span class="tag teal">必要な専門家</span>だけ起動</span></li>
+            <li><i class="fa-solid fa-gauge-high g"></i><span>全部を常時使わないから、<span class="hl">効率的</span></span></li>
+            <li><i class="fa-solid fa-puzzle-piece"></i><span>これを<span class="hl-teal">MoE</span>（Mixture of Experts）と呼ぶ</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-people-group fa-lg"></i> 全員で毎回動くより、<span style="font-weight:bold">分担した方が早い</span>！</span></div>
+</div>
+
+<!-- ⑥ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-microchip fa-5x ic-teal" style="animation:fa-flip 3s"></i><h2>⑥20Bの力を1Bに詰め込む</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-brain g"></i><span>200億パラメータの<span class="hl-teal">賢さ</span>を継承</span></li>
+            <li><i class="fa-solid fa-compress-arrows-alt"></i><span>実行時は<span class="hl">10億</span>規模の軽さで稼働</span></li>
+            <li><i class="fa-solid fa-bolt a"></i><span>重い計算を、<span class="tag teal">サクサク</span>こなす</span></li>
+            <li><i class="fa-solid fa-mountain g"></i><span>「<span class="hl-teal">小さくて賢い</span>」の究極形</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-microchip fa-lg"></i> 20Bの<span style="font-weight:bold">脳みそ</span>を、1Bの体に。すごい技！</span></div>
+</div>
+
+<!-- ⑦ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-magnifying-glass-chart fa-5x ic-rose" style="animation:fa-bounce 2s"></i><h2>⑦実効パラメータを抑える理由</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-sliders g"></i><span>全パラメータを、<span class="hl-teal">毎回使う</span>わけではない</span></li>
+            <li><i class="fa-solid fa-toggle-off a"></i><span>タスクごとに、<span class="tag">必要な分</span>だけ活性化</span></li>
+            <li><i class="fa-solid fa-gauge-high g"></i><span>実効的な動く量が<span class="hl-teal">少なくて済む</span></span></li>
+            <li><i class="fa-solid fa-feather"></i><span>だからこそ、<span class="hl">軽快</span>に動く</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-magnifying-glass-chart fa-lg"></i> 全部はいらない。<span style="font-weight:bold">いる時だけ起動</span>！</span></div>
+</div>
+
+<!-- ⑧ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-arrows-left-right-to-line fa-5x ic-teal" style="animation:fa-beat-fade 2s"></i><h2>⑧精度を落とさずに縮む秘密</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-bullseye g"></i><span>重要な接続は、<span class="hl-teal">3値でも保つ</span>設計</span></li>
+            <li><i class="fa-solid fa-shield-halved a"></i><span>賢さを<span class="tag teal">維持</span>したまま、ストレージを最小化</span></li>
+            <li><i class="fa-solid fa-wand-magic-sparkles g"></i><span>「<span class="hl">縮む＝劣化</span>」の常識を覆す</span></li>
+            <li><i class="fa-solid fa-star"></i><span>推論モデルとして、<span class="hl-teal">実用レベル</span>を確保</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-arrows-left-right-to-line fa-lg"></i> 小さくしても、<span style="font-weight:bold">バカにならない</span>。ここが画期的！</span></div>
+</div>
+
+<!-- ⑨ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-mobile-screen fa-5x ic-rose" style="animation:fa-flip 3s"></i><h2>⑨スマホでローカル実行</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-mobile g"></i><span>モバイル機器でも、<span class="hl-teal">ローカル</span>で動く</span></li>
+            <li><i class="fa-solid fa-wifi-slash a"></i><span><span class="tag">通信</span>不要、完全にオフライン</span></li>
+            <li><i class="fa-solid fa-hand-holding-medical g"></i><span>手のひらに、<span class="hl">高性能AI</span>が入る</span></li>
+            <li><i class="fa-solid fa-battery-three-quarters"></i><span>バッテリー駆動でも、<span class="hl-teal">実用的</span>な速度</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-mobile-screen fa-lg"></i> ポケットの中に、<span style="font-weight:bold">大物AI</span>が入る！</span></div>
+</div>
+
+<!-- ⑩ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-ruler-horizontal fa-5x ic-teal" style="animation:fa-bounce 2s"></i><h2>⑩128Kのコンテキスト窓</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-arrows-left-right g"></i><span>一度に読める幅は、<span class="hl-teal">128K</span>トークン</span></li>
+            <li><i class="fa-solid fa-book-open a"></i><span>長い文書も、<span class="tag teal">まるごと</span>把握可能</span></li>
+            <li><i class="fa-solid fa-list-check g"></i><span>大量の資料を、一度に<span class="hl">処理</span>できる</span></li>
+            <li><i class="fa-solid fa-bolt"></i><span>軽いのに、<span class="hl-teal">視野は広い</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-ruler-horizontal fa-lg"></i> 小さいのに、<span style="font-weight:bold">めちゃくちゃ読める</span>！</span></div>
+</div>
+
+<!-- ⑪ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-scale-balanced fa-5x ic-rose" style="animation:fa-beat-fade 2s"></i><h2>⑪MITライセンスで自由に</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-unlock-keyhole g"></i><span><span class="hl-teal">MIT</span>ライセンスで、商用利用もOK</span></li>
+            <li><i class="fa-solid fa-briefcase a"></i><span>仕事の製品に、<span class="tag teal">組み込み</span>やすい</span></li>
+            <li><i class="fa-solid fa-handshake g"></i><span>改変や再配布も、<span class="hl">自由</span></span></li>
+            <li><i class="fa-solid fa-heart"></i><span>開発者にとっても、<span class="hl-teal">扱いやすい</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-scale-balanced fa-lg"></i> 商用も自由。<span style="font-weight:bold">ビジネスに使いやすい</span>！</span></div>
+</div>
+
+<!-- ⑫ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-wifi-slash fa-5x ic-teal" style="animation:fa-flip 3s"></i><h2>⑫オフラインで活きる場面</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-plane g"></i><span>飛行機の中でも、<span class="hl-teal">作業</span>が止まらない</span></li>
+            <li><i class="fa-solid fa-mountain-sun a"></i><span>山や田舎でも、<span class="tag">使える</span></span></li>
+            <li><i class="fa-solid fa-shield-halved g"></i><span>データは端末から、<span class="hl">外に出ない</span></span></li>
+            <li><i class="fa-solid fa-lock"></i><span>プライバシーが、<span class="hl-teal">完全に保護</span>される</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-wifi-slash fa-lg"></i> ネットがない場所こそ、<span style="font-weight:bold">真価を発揮</span>！</span></div>
+</div>
+
+<!-- ⑬ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-shield-heart fa-5x ic-rose" style="animation:fa-bounce 2s"></i><h2>⑬プライバシーの確かさ</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-user-shield g"></i><span>機密データも、<span class="hl-teal">自分の端末</span>で処理</span></li>
+            <li><i class="fa-solid fa-cloud-arrow-down a"></i><span>クラウド送信の<span class="tag">不安</span>から解放</span></li>
+            <li><i class="fa-solid fa-building g"></i><span>企業でも、<span class="hl">安心</span>して運用</span></li>
+            <li><i class="fa-solid fa-fingerprint"></i><span>個人情報を、<span class="hl-teal">守り抜く</span>設計</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-shield-heart fa-lg"></i> 外に送らない。<span style="font-weight:bold">秘密はここで完結</span>！</span></div>
+</div>
+
+<!-- ⑭ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-gauge-high fa-5x ic-teal" style="animation:fa-beat-fade 2s"></i><h2>⑭速度が際立つ強み</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-bolt g"></i><span>三値だから、<span class="hl-teal">計算が軽い</span></span></li>
+            <li><i class="fa-solid fa-stopwatch a"></i><span>ネットの<span class="tag">遅延</span>も、ゼロに</span></li>
+            <li><i class="fa-solid fa-arrows-rotate g"></i><span>待ち時間が少なく、<span class="hl">サクサク</span>動く</span></li>
+            <li><i class="fa-solid fa-feather-pointed"></i><span>体感の<span class="hl-teal">軽快さ</span>が、好評の理由</span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-gauge-high fa-lg"></i> 通信なし＝<span style="font-weight:bold">遅延なし</span>。速さが違う！</span></div>
+</div>
+
+<!-- ⑮ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-triangle-exclamation fa-5x ic-rose" style="animation:fa-flip 3s"></i><h2>⑮知っておくべき限界</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-laptop-code g"></i><span>複雑なコーディングでは、<span class="hl-teal">トップ級</span>に及ばない</span></li>
+            <li><i class="fa-solid fa-circle-exclamation a"></i><span>高度な処理は、<span class="tag gray">得意外</span>の場面も</span></li>
+            <li><i class="fa-solid fa-balance-scale g"></i><span>賢さより<span class="hl">速さ・手軽さ</span>を優先</span></li>
+            <li><i class="fa-solid fa-flag"></i><span>得意な領域で、<span class="hl-teal">活かす</span>のが正解</span></li>
+        </ul>
+    </div>
+    <div class="bubble v2"><span class="hw"><i class="fa-solid fa-triangle-exclamation fa-lg"></i> 最強ではない。<span style="font-weight:bold">でも、すごく便利</span>！</span></div>
+</div>
+
+<!-- ⑯ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-microchip fa-5x ic-teal" style="animation:fa-bounce 2s"></i><h2>⑯エッジAIの可能性が広がる</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-network-wired g"></i><span>端末側で動く、<span class="hl-teal">エッジAI</span>の時代へ</span></li>
+            <li><i class="fa-solid fa-tower-cell a"></i><span>クラウド中心から、<span class="tag teal">分散</span>型へ変化</span></li>
+            <li><i class="fa-solid fa-leaf g"></i><span>通信負荷も、<span class="hl">減らせる</span></span></li>
+            <li><i class="fa-solid fa-seedling"></i><span>ローカルAIの<span class="hl-teal">本格普及</span>が近づく</span></li>
+        </ul>
+    </div>
+    <div class="bubble"><span class="hw"><i class="fa-solid fa-microchip fa-lg"></i> 雲から端末へ。<span style="font-weight:bold">主役が変わる</span>！</span></div>
+</div>
+
+<!-- ⑰ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-code fa-5x ic-rose" style="animation:fa-beat-fade 2s"></i><h2>⑰普段づかいに向いている</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-keyboard g"></i><span>軽い質問や文章作りに、<span class="hl-teal">即対応</span></span></li>
+            <li><i class="fa-solid fa-pen-nib a"></i><span>要約や翻訳も、<span class="tag teal">手軽</span>にこなす</span></li>
+            <li><i class="fa-solid fa-mug-hot g"></i><span>毎日の作業を、<span class="hl">助けて</span>くれる</span></li>
+            <li><i class="fa-solid fa-thumbs-up"></i><span>日常の相棒として、<span class="hl-teal">優秀</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble v1"><span class="hw"><i class="fa-solid fa-code fa-lg"></i> 毎日使うなら、<span style="font-weight:bold">速くて軽い方</span>が嬉しい！</span></div>
+</div>
+
+<!-- ⑱ -->
+<div class="card">
+    <div class="icon-box"><i class="fa-solid fa-flag-checkered fa-5x ic-teal" style="animation:fa-fade 3s"></i><h2>⑱まとめと今後の展望</h2></div>
+    <div class="body">
+        <ul class="kl">
+            <li><i class="fa-solid fa-1 g"></i><span>三値重みで、38GBを<span class="hl-teal">5GB</span>に圧縮</span></li>
+            <li><i class="fa-solid fa-2"></i><span>20Bの力を、<span class="hl">1B</span>の軽さで実現</span></li>
+            <li><i class="fa-solid fa-3 a"></i><span>スマホで動き、<span class="tag teal">オフライン</span>も可能</span></li>
+            <li><i class="fa-solid fa-seedling g"></i><span>ローカルAIの未来が、<span class="hl-teal">さらに広がる</span></span></li>
+        </ul>
+    </div>
+    <div class="bubble r v1"><span class="hw"><i class="fa-solid fa-flag-checkered fa-lg"></i> 高性能AIが、<span style="font-weight:bold">手のひらで動く時代</span>へ！</span></div>
+</div>
+
+</div>
+<div class="footer">
+    🎬 動画: <a href="https://www.youtube.com/watch?v=vUso511bgQs" target="_blank" style="color:inherit;">Julian Goldie SEO「Maple AI: 38GB shrunk to 5GB?! 🤯」</a> | 📅 2026年8月7日
+</div>
+</div>
+</body>
+</html>

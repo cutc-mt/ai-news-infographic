@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code｜URL 1本で 古いAPI問題を 止める</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #0369A1;   /* Sky 700 - メイン・空の青（独自：他と被らない） */
+            --c2: #EA580C;   /* Orange 600 - アクセント・橙 */
+            --c3: #E0F2FE;   /* Sky 100 - 薄い水色 */
+            --c4: #0C4A6E;   /* Sky 900 - 深い青 */
+            --c5: #C2410C;   /* Orange 700 - 焦げ橙 */
+            --c6: #FED7AA;   /* Orange 200 - 薄い橙 */
+            --c7: #FEF3C7;   /* Amber 100 - クリーム */
+            --c8: #7C2D12;   /* Orange 900 - 深い茶橙 */
+            --c9: #BE123C;   /* Rose 700 - 警告の赤薔薇 */
+            --tint-c1: #F0F9FF;   /* c1 の淡色背景 */
+            --tint-c2: #FFF7ED;   /* c2 の淡色背景 */
+            --tint-c9: #FFF1F2;   /* c9 の淡色背景 */
+            --ink-sky: #075985;   /* 青系の濃い文字 */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F0F9FF; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 45%,var(--c8) 80%,var(--c5) 120%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(12,74,110,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(224,242,254,.22) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c3); font-size:96px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c3); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c7); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(3,105,161,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(3,105,161,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c2),var(--c5));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.coral { color:var(--c2); }
+        .icon-box i.gold { color:var(--c5); }
+        .icon-box i.deep { color:var(--c8); }
+        .icon-box i.rose { color:var(--c9); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#9CA3AF; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.c { color:var(--c2); }
+        ul.kl li i.g { color:var(--c5); }
+        ul.kl li i.d { color:var(--c8); }
+        ul.kl li i.r { color:var(--c9); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--ink-sky);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.coral { background:var(--tint-c2); color:var(--c8); }
+        .tag.gold { background:var(--c7); color:var(--ink-sky); }
+        .tag.amber { background:#FDE68A; color:var(--ink-sky); }
+        .tag.rose { background:var(--tint-c9); color:var(--c9); }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-coral { color:var(--c8); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c2) 60%); }
+        .hl-gold { color:var(--ink-sky); font-weight:bold; background:linear-gradient(transparent 60%, var(--c7) 60%); }
+        .hl-rose { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c9) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:var(--tint-c2);
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:var(--c7);
+            border-color:var(--c5);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c5) transparent; }
+        .bubble.v3 {
+            background:var(--tint-c9);
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c9) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c5); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:var(--c3);
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+        pre.term {
+            background:var(--c4);
+            color:var(--c3);
+            padding:12px 14px;
+            border-radius:10px;
+            font-size:13px;
+            margin-top:12px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.6;
+            border-left:4px solid var(--c2);
+        }
+        pre.term .prompt { color:var(--c2); }
+
+        /* フロー棒 */
+        .flow-bar {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,var(--c3) 0%,var(--tint-c2) 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .flow-bar .label { color:var(--c1); font-weight:bold; font-size:15px; }
+        .flow-bar .label.coral { color:var(--c8); }
+        .flow-bar .sep { color:var(--c5); font-size:22px; }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--c3),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c8));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(12,74,110,.25);
+        }
+        .footer a { color:var(--c3); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:var(--c3); word-break:break-all; }
+        .footer i { color:var(--c7); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <i class="fa-solid fa-link main" aria-hidden="true"></i>
+        <h1>Claude Code｜URL 1本で<br>古いAPI問題を 止める</h1>
+        <p class="sub">「動かない」の原因は、URL 1本の差。公式ページを読ませて、最新仕様で書かせる</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月9日 ／ あきらパパのAI活用学習部屋</p>
+    </div>
+
+    <!-- SECTION 1: 問題の所在 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-triangle-exclamation fa-lg"></i> 第1章：AIが書いた コードが 動かない</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 1: よくある悩み -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-exclamation fa-5x coral" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>AIが書いた コードが 動かない</h2>
+                <div class="ch">Code Won't Run</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-face-sad-tear c" aria-hidden="true"></i><span>書いてもらったのに<span class="hl-coral">動かない</span></span></li>
+                    <li><i class="fa-solid fa-bug c" aria-hidden="true"></i><span>エラー ばかり<span class="tag coral">続く</span></span></li>
+                    <li><i class="fa-solid fa-clock c" aria-hidden="true"></i><span>直す時間 が<span class="hl-coral">かさむ</span></span></li>
+                    <li><i class="fa-solid fa-circle-question c" aria-hidden="true"></i><span>原因 が<span class="tag amber">見えない</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        「また 直すの？」<br>
+                        が、<span class="hl-coral">続いて</span>しまう
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 2: 原因はURL1本の差 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-link-slash fa-5x" style="animation:fa-beat-fade 3s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>原因 は URL 1本 の 差</h2>
+                <div class="ch">One URL Makes the Difference</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-bullseye" aria-hidden="true"></i><span>問題 の<span class="hl">根っこ</span>は1つ</span></li>
+                    <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>URL が<span class="tag">ある・ない</span></span></li>
+                    <li><i class="fa-solid fa-scale-unbalanced" aria-hidden="true"></i><span>その差 で<span class="hl">結果</span>が変わる</span></li>
+                    <li><i class="fa-solid fa-key" aria-hidden="true"></i><span>小さな習慣 の<span class="tag amber">差</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-face-meh"></i> 名前だけ</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label coral"><i class="fa-solid fa-link"></i> URL付き</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: よくある丸投げ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-hand-holding fa-5x gold" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>多くの人 は 丸投げ する</h2>
+                <div class="ch">Just the Library Name</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-tag g" aria-hidden="true"></i><span>ライブラリー の<span class="hl-gold">名前</span>だけ</span></li>
+                    <li><i class="fa-solid fa-comment-dots g" aria-hidden="true"></i><span>「これで 作って」と<span class="tag gold">投げる</span></span></li>
+                    <li><i class="fa-solid fa-shoe-prints g" aria-hidden="true"></i><span>URL は<span class="hl-gold">貼らない</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-half g" aria-hidden="true"></i><span>結果 は<span class="tag amber">運任せ</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        名前 だけ じゃ、<br>
+                        AI は<span class="hl-gold">探しに行けない</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 4: AIは記憶の古い書き方で -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-clock-rotate-left fa-5x deep" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>AI は 古い 書き方 で 出す</h2>
+                <div class="ch">Old API from Memory</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-brain d" aria-hidden="true"></i><span>記憶 の<span class="hl">なか</span>を探す</span></li>
+                    <li><i class="fa-solid fa-calendar-xmark d" aria-hidden="true"></i><span>学習日 が<span class="tag">古い</span>まま</span></li>
+                    <li><i class="fa-solid fa-code d" aria-hidden="true"></i><span>前 の<span class="hl">仕様</span>で書く</span></li>
+                    <li><i class="fa-solid fa-ghost d" aria-hidden="true"></i><span>もう 無い<span class="tag amber">書き方</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        悪気 じゃない。<br>
+                        AI は<span class="hl">知ってる範囲</span>でしか
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 5: 動かない→直すの繰り返し -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrows-rotate fa-5x rose" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>動かない→直す の 繰り返し</h2>
+                <div class="ch">Fix-Loop Trap</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-play r" aria-hidden="true"></i><span>動かす →<span class="hl-rose">エラー</span></span></li>
+                    <li><i class="fa-solid fa-wrench r" aria-hidden="true"></i><span>直す →<span class="tag rose">また</span>エラー</span></li>
+                    <li><i class="fa-solid fa-repeat r" aria-hidden="true"></i><span>ループ に<span class="hl-rose">入る</span></span></li>
+                    <li><i class="fa-solid fa-battery-empty r" aria-hidden="true"></i><span>体力 が<span class="tag amber">削れる</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c9);"></i>
+                        直してる のに、<br>
+                        <span class="hl-rose">進まない</span>泥沼
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 6: 本当の原因に気づかない -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-eye-slash fa-5x" style="animation:fa-flip 4s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>本当 の 原因 に 気づかない</h2>
+                <div class="ch">Missing the Real Cause</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>コード を<span class="hl">疑う</span></span></li>
+                    <li><i class="fa-solid fa-pen" aria-hidden="true"></i><span>書き直し を<span class="tag">繰り返す</span></span></li>
+                    <li><i class="fa-solid fa-comment" aria-hidden="true"></i><span>AI を<span class="hl">責める</span></span></li>
+                    <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>原因 は<span class="tag amber">入力</span>だった</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        コード じゃなく、<br>
+                        <span class="hl">渡し方</span>の問題
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 2: 解決策 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-lightbulb fa-lg"></i> 第2章：できる人 は URL を 渡す</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 7: できる人の違い -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-graduate fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>できる人 は 違い を 持つ</h2>
+                <div class="ch">What Pros Do Differently</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>公式ページ の<span class="hl">URL</span>を</span></li>
+                    <li><i class="fa-solid fa-hand-holding-hand" aria-hidden="true"></i><span>一緒 に<span class="tag">渡す</span></span></li>
+                    <li><i class="fa-solid fa-book" aria-hidden="true"></i><span>読むべき<span class="hl">場所</span>を示す</span></li>
+                    <li><i class="fa-solid fa-thumbs-up" aria-hidden="true"></i><span>結果 が<span class="tag amber">変わる</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        名前＋URL。<br>
+                        これ<span class="hl">だけ</span>の違い
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 8: Claude CodeのWeb Fetch -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-globe fa-5x coral" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>Claude Code の Web Fetch</h2>
+                <div class="ch">Web Fetch Feature</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-robot c" aria-hidden="true"></i><span>Claude Code の<span class="hl-coral">機能</span></span></li>
+                    <li><i class="fa-solid fa-download c" aria-hidden="true"></i><span>ページ を<span class="tag coral">取得</span>する</span></li>
+                    <li><i class="fa-solid fa-book-open c" aria-hidden="true"></i><span>中身 を<span class="hl-coral">読む</span></span></li>
+                    <li><i class="fa-solid fa-check-double c" aria-hidden="true"></i><span>最新 の<span class="tag amber">仕様</span>を知る</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        AI が自分で、<br>
+                        <span class="hl-coral">読みに行く</span>仕組み
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 9: ページを実際に取得 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-cloud-arrow-down fa-5x gold" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>ページ を 実際 に 取得</h2>
+                <div class="ch">Actually Fetches the Page</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 g" aria-hidden="true"></i><span>URL を<span class="hl-gold">受け取る</span></span></li>
+                    <li><i class="fa-solid fa-2 g" aria-hidden="true"></i><span>Web から<span class="tag gold">取得</span></span></li>
+                    <li><i class="fa-solid fa-3 g" aria-hidden="true"></i><span>内容 を<span class="hl-gold">読み込む</span></span></li>
+                    <li><i class="fa-solid fa-4 g" aria-hidden="true"></i><span>要点 を<span class="tag amber">抜き出す</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-link"></i> URL</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label coral"><i class="fa-solid fa-book-open"></i> 読む</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 10: 最新仕様で実装 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>最新 の 仕様 で 実装</h2>
+                <div class="ch">Based on Latest Docs</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-sparkles" aria-hidden="true"></i><span>読んだ 内容 を<span class="hl">下</span>に</span></li>
+                    <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>最新 の<span class="tag">書き方</span>で</span></li>
+                    <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>動く 確率 が<span class="hl">上がる</span></span></li>
+                    <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>手直し が<span class="tag amber">減る</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        古い 記憶 じゃなく、<br>
+                        <span class="hl">今</span>の事実で書く
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 11: 2つの道の違い -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-5x deep" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>2つの 道 の 違い</h2>
+                <div class="ch">Two Paths Compared</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-face-meh d" aria-hidden="true"></i><span>名前だけ：<span class="hl">古い</span>記憶</span></li>
+                    <li><i class="fa-solid fa-link d" aria-hidden="true"></i><span>URL付き：<span class="tag">最新</span>仕様</span></li>
+                    <li><i class="fa-solid fa-bug d" aria-hidden="true"></i><span>名前だけ：<span class="hl">動かない</span></span></li>
+                    <li><i class="fa-solid fa-circle-check d" aria-hidden="true"></i><span>URL付き：<span class="tag amber">動く</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-circle-question"></i> 推測</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label coral"><i class="fa-solid fa-circle-check"></i> 実測</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 12: 解決のしかけ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-puzzle-piece fa-5x coral" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>解決 の しかけ</h2>
+                <div class="ch">How It Solves the Problem</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-unlink c" aria-hidden="true"></i><span>記憶 と<span class="hl-coral">現実</span>のズレ</span></li>
+                    <li><i class="fa-solid fa-plug c" aria-hidden="true"></i><span>URL で<span class="tag coral">つなぐ</span></span></li>
+                    <li><i class="fa-solid fa-arrows-up-to-line c" aria-hidden="true"></i><span>最新 に<span class="hl-coral">合わせる</span></span></li>
+                    <li><i class="fa-solid fa-thumbs-up c" aria-hidden="true"></i><span>問題 が<span class="tag amber">消える</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        URL が、<br>
+                        <span class="hl-coral">橋</span>になる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 3: 使い方 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-hand-pointer fa-lg"></i> 第3章：使い方は、これだけ</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 13: やることは1つ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-1 fa-5x gold" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>やること は 1つ だけ</h2>
+                <div class="ch">Just One Thing to Do</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-link g" aria-hidden="true"></i><span>公式ページ の<span class="hl-gold">URL</span>を</span></li>
+                    <li><i class="fa-solid fa-clipboard g" aria-hidden="true"></i><span>チャット に<span class="tag gold">貼る</span></span></li>
+                    <li><i class="fa-solid fa-comment g" aria-hidden="true"></i><span>ひとこと<span class="hl-gold">添える</span></span></li>
+                    <li><i class="fa-solid fa-check g" aria-hidden="true"></i><span>以上 で<span class="tag amber">完了</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        難しい こと は、<br>
+                        <span class="hl-gold">何も</span>ない
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 14: 一言の魔法 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-quote-right fa-5x" style="animation:fa-beat-fade 3s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>添える の は ひとこと</h2>
+                <div class="ch">The Magic Phrase</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-book-open-reader" aria-hidden="true"></i><span>「これ を<span class="hl">読んで</span>から」</span></li>
+                    <li><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span>「実装 して」<span class="tag">と続く</span></span></li>
+                    <li><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><span>順番 が<span class="hl">大事</span></span></li>
+                    <li><i class="fa-solid fa-microphone" aria-hidden="true"></i><span>普段 話す<span class="tag amber">言葉</span>でOK</span></li>
+                </ul>
+                <pre class="term"><span class="prompt">&gt;</span> このURLを読んでから、
+   実装してください
+ https://docs.example.com/api</pre>
+            </div>
+        </div>
+
+        <!-- CARD 15: 全体の流れ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-ol fa-5x deep" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>全体 の 流れ</h2>
+                <div class="ch">The Whole Flow</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 d" aria-hidden="true"></i><span>公式 の<span class="hl">URL</span>を集める</span></li>
+                    <li><i class="fa-solid fa-2 d" aria-hidden="true"></i><span>チャット に<span class="tag amber">貼る</span></span></li>
+                    <li><i class="fa-solid fa-3 d" aria-hidden="true"></i><span>「読んで」の<span class="hl">一言</span></span></li>
+                    <li><i class="fa-solid fa-4 d" aria-hidden="true"></i><span>最新仕様 で<span class="tag amber">書かれる</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-link"></i> URL</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label coral"><i class="fa-solid fa-globe"></i> 取得</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label"><i class="fa-solid fa-code"></i> 実装</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 16: Web Fetchの限界 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-info fa-5x rose" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>Web Fetch の 限界</h2>
+                <div class="ch">Its Limitation</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-filter r" aria-hidden="true"></i><span>要点 だけ<span class="hl-rose">抜き出す</span></span></li>
+                    <li><i class="fa-solid fa-file-lines r" aria-hidden="true"></i><span>全部 は<span class="tag rose">読まない</span></span></li>
+                    <li><i class="fa-solid fa-eye-slash r" aria-hidden="true"></i><span>見落とし が<span class="hl-rose">ある</span>ことも</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation r" aria-hidden="true"></i><span>完璧 じゃ<span class="tag amber">ない</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c9);"></i>
+                        便利 だけど、<br>
+                        <span class="hl-rose">限界</span>はある
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 17: 「書いてません」の正体 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-comment-slash fa-5x coral" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>「書いてません」 の 正体</h2>
+                <div class="ch">Why "Not Found"</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-question c" aria-hidden="true"></i><span>「書いてません」と<span class="hl-coral">返る</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass c" aria-hidden="true"></i><span>実は 要点 に<span class="tag coral">ない</span>だけ</span></li>
+                    <li><i class="fa-solid fa-comment-dots c" aria-hidden="true"></i><span>聞き方 が<span class="hl-coral">足りない</span></span></li>
+                    <li><i class="fa-solid fa-lightbulb c" aria-hidden="true"></i><span>言葉 を<span class="tag amber">変える</span>と出る</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        AI が悪い んじゃなく、<br>
+                        <span class="hl-coral">質問</span>の問題
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 18: まとめ3ポイント -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag-checkered fa-5x" style="animation:fa-flip 4s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>まとめ の 3ポイント</h2>
+                <div class="ch">Three Takeaways</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-ban" aria-hidden="true"></i><span>丸投げ は<span class="hl">古い</span>APIを呼ぶ</span></li>
+                    <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>URL 1本 で<span class="tag">最新</span>を読ませる</span></li>
+                    <li><i class="fa-solid fa-gear" aria-hidden="true"></i><span>よく使うドメイン は<span class="hl">許可</span>へ</span></li>
+                    <li><i class="fa-solid fa-thumbs-up" aria-hidden="true"></i><span>この3つ で<span class="tag amber">結果</span>が変わる</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        小さな 習慣 で、<br>
+                        <span class="hl">大きく</span>違う
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p class="src">
+            <i class="fa-solid fa-clapperboard"></i>
+            🎬 動画: <a href="https://www.youtube.com/watch?v=g3yatXCkUaY" target="_blank" rel="noopener">あきらパパ — Claude Code｜URL1本で古いAPI問題を止める</a>
+        </p>
+        <p class="url">
+            <i class="fa-solid fa-link"></i>
+            https://www.youtube.com/watch?v=g3yatXCkUaY
+        </p>
+    </div>
+
+</div>
+</body>
+</html>

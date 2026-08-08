@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw｜移動中も同じAIに続きを頼む</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1: #E11D48;   /* Rose 600 - メイン・コーラルレッド */
+            --c2: #F97316;   /* Orange 500 - コーラルオレンジ */
+            --c3: #FFE4E6;   /* Rose 100 - ペールピンク背景 */
+            --c4: #881337;   /* Rose 900 - 深いローズ */
+            --c5: #FB7185;   /* Rose 400 - 明るいコーラル */
+            --c6: #FECDD3;   /* Rose 200 - 薄ピンク */
+            --c7: #FFF1F2;   /* Rose 50 - ごく薄ピンク */
+            --c8: #BE123C;   /* Rose 700 - 深めコーラル */
+            --c9: #F43F5E;   /* Rose 500 - 鮮やかローズ */
+            --c10: #FBBF24;  /* Amber 400 - ゴールド */
+            /* 派生色 */
+            --tint-c1: #FFF1F2;
+            --tint-c2: #FFF7ED;
+            --tint-c9: #FFF1F2;
+            --ink-rose: #9F1239;
+            --ink-gold: #92400E;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FFF5F6; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 40%,var(--c5) 70%,var(--c2) 110%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(136,19,55,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(255,228,230,.28) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c7); font-size:96px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c6); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c10); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(225,29,72,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(225,29,72,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c2));
+        }
+        .card.rose::before { background:linear-gradient(90deg,var(--c8),var(--c1),var(--c5)); }
+        .card.coral::before { background:linear-gradient(90deg,var(--c2),var(--c9),var(--c5)); }
+        .card.gold::before { background:linear-gradient(90deg,var(--c10),var(--c2),var(--c1)); }
+        .card.deep::before { background:linear-gradient(90deg,var(--c4),var(--c8),var(--c1)); }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.coral { color:var(--c2); }
+        .icon-box i.gold { color:var(--c10); }
+        .icon-box i.rose { color:var(--c9); }
+        .icon-box i.deep { color:var(--c4); }
+        .icon-box i.bright { color:var(--c5); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#9CA3AF; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.c { color:var(--c2); }
+        ul.kl li i.g { color:var(--c10); }
+        ul.kl li i.r { color:var(--c9); }
+        ul.kl li i.d { color:var(--c4); }
+        ul.kl li i.b { color:var(--c5); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--ink-rose);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.coral { background:#FFEDD5; color:var(--c8); }
+        .tag.gold { background:#FEF3C7; color:var(--ink-gold); }
+        .tag.bright { background:var(--c6); color:var(--c4); }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-coral { color:var(--c8); font-weight:bold; background:linear-gradient(transparent 60%, #FFEDD5 60%); }
+        .hl-gold { color:var(--ink-gold); font-weight:bold; background:linear-gradient(transparent 60%, #FEF3C7 60%); }
+        .hl-rose { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--c6) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFEDD5;
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:#FEF3C7;
+            border-color:var(--c10);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c10) transparent; }
+        .bubble.v3 {
+            background:var(--c6);
+            border-color:var(--c5);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c5) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c8); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:var(--c6);
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+
+        /* スタックバー */
+        .stack-bar {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,var(--c3) 0%,#FFEDD5 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .stack-bar .label { color:var(--c1); font-weight:bold; font-size:15px; }
+        .stack-bar .label.coral { color:var(--c8); }
+        .stack-bar .sep { color:var(--c9); font-size:22px; }
+
+        /* VSバッジ */
+        .vs-badge {
+            display:inline-block;
+            background:var(--c4);
+            color:#fff;
+            font-weight:bold;
+            padding:4px 16px;
+            border-radius:20px;
+            font-size:14px;
+            margin:8px 0;
+            box-shadow:2px 2px 8px rgba(0,0,0,.15);
+        }
+
+        /* チャット模擬 */
+        .chat-mock {
+            background:var(--c7);
+            border-radius:12px;
+            padding:12px;
+            margin:12px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:14px;
+        }
+        .chat-mock .msg {
+            background:#fff;
+            border-radius:14px 14px 14px 4px;
+            padding:8px 12px;
+            margin:6px 0;
+            display:inline-block;
+            max-width:88%;
+            box-shadow:1px 1px 4px rgba(0,0,0,.06);
+        }
+        .chat-mock .msg.ai {
+            background:var(--c3);
+            border-radius:14px 14px 4px 14px;
+            margin-left:0;
+        }
+        .chat-mock .msg .who { font-size:11px; color:#9CA3AF; margin-bottom:2px; }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--c3),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c8));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(136,19,55,.25);
+        }
+        .footer a { color:var(--c6); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:var(--c6); word-break:break-all; }
+        .footer i { color:var(--c10); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <i class="fa-solid fa-mobile-screen-button main" aria-hidden="true"></i>
+        <h1>OpenClaw｜移動中も<br>同じAIに 続きを頼む</h1>
+        <p class="sub">パソコンだけじゃない。外出先のスマホから、あのAIに 続きを お願いする</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月9日 ／ あきらパパ</p>
+    </div>
+
+    <!-- ============ セクション1: 2つの違い ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-users"></i> 同じAIでも つかい方が ふたつ</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1: パソコン前でしか頼めない人 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-laptop coral" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>パソコンの前で しか頼めない人</h2>
+                <p class="ch">アプリごとに AIを 使い分ける</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-chair c"></i><span>デスクに座ったときだけ <span class="tag coral">AI起動</span></span></li>
+                    <li><i class="fa-solid fa-window-restore c"></i><span>アプリを切り替えて <span class="hl-coral">別々に話す</span></span></li>
+                    <li><i class="fa-solid fa-circle-xmark c"></i><span>外出すると <span class="tag">会話が途切れる</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-face-frown c"></i> 出先で ふと思いついても、<br>家に帰るまで お預け…</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: 移動中も頼める人 -->
+        <div class="card rose">
+            <div class="icon-box">
+                <i class="fa-solid fa-person-walking" style="color:var(--c1); animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>移動中のスマホから 続きを頼める人</h2>
+                <p class="ch">1人のAIを どこからでも呼ぶ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-mobile-screen-button"></i><span>スマホ1台で <span class="tag">どこでも話せる</span></span></li>
+                    <li><i class="fa-solid fa-link"></i><span>1人のAIに <span class="hl">つながる</span></span></li>
+                    <li><i class="fa-solid fa-walking"></i><span>電車でも 歩きでも <span class="tag bright">継続 OK</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-face-smile"></i> 出先でも <span class="hl">続き</span> を そのまま お願いできる！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: 同じAI -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-equals gold" style="animation:fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+                <h2>実は 使っているAIは 同じ</h2>
+                <p class="ch">ちがいは「つなぎ方」だけ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-robot g"></i><span>中にいるAIは <span class="hl">どちらも同じ</span></span></li>
+                    <li><i class="fa-solid fa-key g"></i><span>ちがいは <span class="tag coral">入り口</span> のみ</span></li>
+                    <li><i class="fa-solid fa-lightbulb g"></i><span>切り替えるのは <span class="hl-gold">手法だけ</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-lightbulb g"></i> 難しい話じゃなくて、<br><span class="hl-gold">つなぎ方</span> を 変えるだけ！</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション2: OpenClawの特徴 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-network-wired"></i> OpenClawの 強み</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード4: 複数プラットフォーム対応 -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments coral" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>複数の プラットフォーム対応</h2>
+                <p class="ch">Discord・LINE・Telegram ほか</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-brands fa-discord c"></i><span>Discord で <span class="tag coral">作業の相談</span></span></li>
+                    <li><i class="fa-brands fa-line c"></i><span>LINE で <span class="tag coral">外出先のメモ</span></span></li>
+                    <li><i class="fa-solid fa-paper-plane c"></i><span>Telegram で <span class="tag coral">旅行中の依頼</span></span></li>
+                </ul>
+                <div class="stack-bar">
+                    <span class="label coral"><i class="fa-brands fa-discord"></i> Discord</span>
+                    <span class="sep"><i class="fa-solid fa-arrows-left-right"></i></span>
+                    <span class="label coral"><i class="fa-brands fa-line"></i> LINE</span>
+                    <span class="sep"><i class="fa-solid fa-arrows-left-right"></i></span>
+                    <span class="label coral"><i class="fa-solid fa-paper-plane"></i> Telegram</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: 同じ1人のエージェント -->
+        <div class="card deep">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-astronaut deep" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>同じ 1人のエージェントに 話す</h2>
+                <p class="ch">入口がちがっても 中身は同じ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-fingerprint d"></i><span>エージェントは <span class="hl">1体だけ</span></span></li>
+                    <li><i class="fa-solid fa-people-arrows d"></i><span>アプリを変えても <span class="tag">同じ相手</span></span></li>
+                    <li><i class="fa-solid fa-handshake d"></i><span>関係性は <span class="hl">つねに継続</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-handshake"></i> LINEでも Telegramでも、<br>あのAIと <span class="hl">同じ関係</span> を続けられる</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: 1人をどこからでも -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-globe bright" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>1人を どこからでも 呼べる</h2>
+                <p class="ch">場所をえらばない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-house b"></i><span>家のPCで <span class="tag bright">依頼</span></span></li>
+                    <li><i class="fa-solid fa-train b"></i><span>電車で <span class="tag bright">続き</span></span></li>
+                    <li><i class="fa-solid fa-mug-hot b"></i><span>カフェで <span class="tag bright">仕上げ</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-location-dot b"></i> 場所が変わっても、<br><span class="hl-rose">相手</span> は 変わらない！</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション3: 会話の継続性 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-arrows-rotate"></i> 会話が 続く 仕組み</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード7: 個人チャットは1つの会話に -->
+        <div class="card rose">
+            <div class="icon-box">
+                <i class="fa-solid fa-comment-dots" style="color:var(--c9); animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>個人チャットは 1つに まとまる</h2>
+                <p class="ch">初期設定で 統合される</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gear r"></i><span><span class="tag">初期設定</span> で 自動統合</span></li>
+                    <li><i class="fa-solid fa-layer-group r"></i><span>別アプリも <span class="hl-rose">1本のスレッド</span></span></li>
+                    <li><i class="fa-solid fa-folder-plus r"></i><span>会話は <span class="tag bright">すべて合流</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-layer-group b"></i> Discord・LINE・Telegram、<br>ぜんぶ <span class="hl-rose">同じ会話</span> に まとまる</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: 外出先でも続きから -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-route gold" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>外出先でも 前の続きから</h2>
+                <p class="ch">説明の やり直しが いらない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-forward g"></i><span>続きを <span class="hl-gold">すぐ</span> に 始められる</span></li>
+                    <li><i class="fa-solid fa-rotate-left g"></i><span>説明の <span class="tag">やり直し 不要</span></span></li>
+                    <li><i class="fa-solid fa-bolt g"></i><span>時間を <span class="hl-gold">無駄にしない</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-bolt g"></i> 「さっきの続き」が<br><span class="hl-gold">一瞬で</span> 再開できる！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: やり直しが消える -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-eraser" style="color:var(--c2); animation:fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+                <h2>説明の やり直しが 消える</h2>
+                <p class="ch">いちばん うれしい効果</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-xmark c"></i><span><span class="tag coral">同じ話</span> を 反復しない</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left c"></i><span>AIが <span class="hl-coral">文脈</span> を 覚えている</span></li>
+                    <li><i class="fa-solid fa-face-smile c"></i><span>ストレスが <span class="tag coral">減る</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-face-smile c"></i> 「あれ、これ言ったっけ？」<br>が <span class="hl-coral">ほぼ消える</span> のが快適</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション4: 今日の初回成功 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-rocket"></i> 今日 すぐ 試す手順</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード10: LINEかTelegramで送るだけ -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-paper-plane coral" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>LINEかTelegramで 送るだけ</h2>
+                <p class="ch">今日の 初回 成功ステップ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 c"></i><span>LINE or Telegram を <span class="tag coral">開く</span></span></li>
+                    <li><i class="fa-solid fa-2 c"></i><span>エージェントに <span class="hl-coral">話しかける</span></span></li>
+                    <li><i class="fa-solid fa-3 c"></i><span>続きを <span class="tag coral">お願いする</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-circle-check c"></i> 特別な操作は 不要。<br><span class="hl-coral">送るだけ</span> で 続く！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: さっきの続きを -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-comment-medical" style="color:var(--c1); animation:fa-flip 3.4s infinite;" aria-hidden="true"></i>
+                <h2>「さっきの続きを お願いします」</h2>
+                <p class="ch">この ひとことで 再開</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-quote-left"></i><span>送るのは <span class="hl">ひと言</span></span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>AIが <span class="tag">前回を参照</span></span></li>
+                    <li><i class="fa-solid fa-play"></i><span>続きが <span class="hl">すぐに始動</span></span></li>
+                </ul>
+                <div class="chat-mock">
+                    <div class="msg"><span class="who">あなた</span>さっきの続きを お願いします <i class="fa-solid fa-mobile-screen-button"></i></div><br>
+                    <div class="msg ai"><span class="who">AI</span>はい、あの続きから 進めます <i class="fa-solid fa-robot"></i></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: 初回成功のコツ -->
+        <div class="card deep">
+            <div class="icon-box">
+                <i class="fa-solid fa-trophy deep" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>初回成功の ここを確認</h2>
+                <p class="ch">つまずかない 3つの点</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gear d"></i><span><span class="tag">設定</span> は 済んでいるか</span></li>
+                    <li><i class="fa-solid fa-user-check d"></i><span>同じ <span class="hl">エージェント</span> か</span></li>
+                    <li><i class="fa-solid fa-message d"></i><span><span class="tag">個人チャット</span> で 送ったか</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-circle-check d"></i> この3点が 合っていれば、<br><span class="hl">今日</span> にでも 体感できる！</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション5: 重要な注意 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-triangle-exclamation"></i> ここだけ 気をつけて</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード13: まとまるのは個人チャットだけ -->
+        <div class="card rose">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-shield" style="color:var(--c9); animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>まとまるのは 個人チャットだけ</h2>
+                <p class="ch">ここが いちばん重要</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user r"></i><span>1対1の <span class="tag">個人チャット</span> のみ</span></li>
+                    <li><i class="fa-solid fa-circle-check r"></i><span>これらだけが <span class="hl-rose">統合</span> される</span></li>
+                    <li><i class="fa-solid fa-lock r"></i><span>会話は <span class="tag bright">1つに集約</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-triangle-exclamation b"></i> 「<span class="hl-rose">個人チャット</span> だけ」<br>これだけは 忘れないで！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: グループは別々 -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-users-rectangle gold" style="animation:fa-flip 2.8s infinite;" aria-hidden="true"></i>
+                <h2>グループや チャンネルは 別々</h2>
+                <p class="ch">場所ごとに 会話が 保たれる</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-people-group g"></i><span>グループは <span class="tag">独立</span></span></li>
+                    <li><i class="fa-solid fa-tower-broadcast g"></i><span>チャンネルも <span class="hl-gold">別物</span></span></li>
+                    <li><i class="fa-solid fa-signs-post g"></i><span>場所ごとに <span class="tag coral">保持</span></span></li>
+                </ul>
+                <div class="stack-bar">
+                    <span class="label coral"><i class="fa-solid fa-users"></i> グループA</span>
+                    <span class="sep"><i class="fa-solid fa-unlink"></i></span>
+                    <span class="label coral"><i class="fa-solid fa-users"></i> グループB</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: 場所ごとに別々に保たれる -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project" style="color:var(--c2); animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>場所ごとに 別々に 保たれる</h2>
+                <p class="ch">混ざらない という利点</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-shield-halved c"></i><span>文脈が <span class="hl-coral">混ざらない</span></span></li>
+                    <li><i class="fa-solid fa-box c"></i><span>テーマ別に <span class="tag coral">分離</span></span></li>
+                    <li><i class="fa-solid fa-circle-info c"></i><span>用途で <span class="hl-coral">使い分け</span> 可能</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-lightbulb c"></i> 逆に言えば、<br>「<span class="hl-coral">分けたい話</span>」は グループで、<br>「<span class="hl-coral">続けたい話</span>」は 個人チャット！</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション6: まとめと次のステップ ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-flag-checkered"></i> まとめ & 次の一手</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード16: 3行で振り返る -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-check coral" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>3行で 振り返る</h2>
+                <p class="ch">OpenClawの 続き頼み</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 c"></i><span>複数アプリで <span class="tag coral">同じAI</span> に</span></li>
+                    <li><i class="fa-solid fa-2 c"></i><span>個人チャットは <span class="hl-coral">1つに統合</span></span></li>
+                    <li><i class="fa-solid fa-3 c"></i><span>移動中も <span class="tag coral">続き</span> を頼める</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-key c"></i> 要は <span class="hl-coral">「入口がちがっても、<br>相手は同じ」</span> だけの話！</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: やり直しが消える -->
+        <div class="card deep">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart deep" style="color:var(--c4); animation:fa-beat 1.8s infinite;" aria-hidden="true"></i>
+                <h2>いちばんの うれしさ</h2>
+                <p class="ch">説明の やり直しが 消える</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-repeat d"></i><span>同じ説明を <span class="tag">2度しない</span></span></li>
+                    <li><i class="fa-solid fa-clock d"></i><span>時間の <span class="hl">ロスが減る</span></span></li>
+                    <li><i class="fa-solid fa-face-smile-beam d"></i><span>AIとの <span class="tag bright">信頼</span> が続く</span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-heart d"></i> 続きを頼めるって、<br>実は <span class="hl">いちばん</span> 楽になるポイント</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: 次のステップ・セミナー -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-graduation-cap gold" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>次のステップ</h2>
+                <p class="ch">あきらパパの OpenClawセミナーへ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-book-open g"></i><span>設定の <span class="hl-gold">詳しい手順</span></span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench g"></i><span>エージェントの <span class="tag coral">作り方</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass-chart g"></i><span>実例の <span class="hl-gold">深掘り</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-arrow-right g"></i> もっと知りたければ、<br><span class="hl-gold">あきらパパのセミナー</span> をチェック！</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p class="src"><i class="fa-solid fa-clapperboard"></i> 動画: <a href="https://www.youtube.com/watch?v=WQpTKOa5pDU" target="_blank" rel="noopener">OpenClaw｜移動中も同じAIに続きを頼む ／ あきらパパ</a></p>
+        <p class="url"><i class="fa-solid fa-link"></i> https://www.youtube.com/watch?v=WQpTKOa5pDU</p>
+        <p class="src" style="margin-top:14px; font-family:'Yomogi',cursive; font-size:14px;">
+            <i class="fa-solid fa-feather-pointed"></i> OpenClawで、場所をえらばず あのAIに 続きを お願いしよう
+        </p>
+    </div>
+
+</div>
+</body>
+</html>

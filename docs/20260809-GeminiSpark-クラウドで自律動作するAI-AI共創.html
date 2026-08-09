@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini Spark - クラウドで自律動作するAIエージェント</title>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  --gs-deep:   #0B3D5C;
+  --gs-blue:   #1A6FB5;
+  --gs-sky:    #4DA8E0;
+  --gs-mint:   #5FD3BC;
+  --gs-coral:  #FF6B6B;
+  --gs-gold:   #F4A93C;
+  --gs-cream:  #FFF9F0;
+  --gs-paper:  #FFFBF5;
+  --gs-dark:   #1A2B3C;
+  --gs-muted:  #6B7C8C;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Noto Sans JP', 'Kaisei Decol', sans-serif;
+  background-color: var(--gs-cream);
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(95,211,188,0.06) 0%, transparent 40%),
+    radial-gradient(circle at 90% 80%, rgba(244,169,60,0.05) 0%, transparent 40%);
+  color: var(--gs-dark);
+  line-height: 1.6;
+}
+
+.canvas {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 30px 20px 60px;
+}
+
+/* ===== HEADER ===== */
+.main-header {
+  background: linear-gradient(135deg, var(--gs-deep) 0%, var(--gs-blue) 50%, var(--gs-sky) 100%);
+  border-radius: 28px;
+  padding: 50px 40px;
+  text-align: center;
+  color: white;
+  margin-bottom: 40px;
+  box-shadow: 0 12px 40px rgba(11,61,92,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.main-header::before {
+  content: '';
+  position: absolute;
+  top: -50%; right: -20%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(95,211,188,0.15) 0%, transparent 60%);
+  border-radius: 50%;
+}
+.main-header::after {
+  content: '';
+  position: absolute;
+  bottom: -40%; left: -15%;
+  width: 500px; height: 500px;
+  background: radial-gradient(circle, rgba(244,169,60,0.12) 0%, transparent 60%);
+  border-radius: 50%;
+}
+.header-icon { font-size: 5em; margin-bottom: 15px; animation: fa-spin 12s linear infinite; display: inline-block; position: relative; z-index: 1; }
+.main-header h1 { font-size: 38px; font-weight: 700; margin-bottom: 12px; position: relative; z-index: 1; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+.main-header .subtitle { font-size: 18px; opacity: 0.92; position: relative; z-index: 1; margin-bottom: 18px; }
+.header-meta { display: flex; justify-content: center; gap: 20px; flex-wrap: wrap; position: relative; z-index: 1; }
+.header-meta span { background: rgba(255,255,255,0.15); padding: 6px 18px; border-radius: 20px; font-size: 14px; backdrop-filter: blur(4px); }
+.header-meta i { margin-right: 6px; }
+
+/* ===== GRID ===== */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+@media (max-width: 1600px) { .grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1200px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 768px)  { .grid { grid-template-columns: 1fr; } }
+
+/* ===== CARD ===== */
+.section-card {
+  background: var(--gs-paper);
+  border-radius: 20px;
+  padding: 24px 22px;
+  box-shadow: 0 6px 24px rgba(11,61,92,0.08);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--gs-blue);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.section-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 36px rgba(11,61,92,0.16);
+}
+.section-card.t-deep   { border-top-color: var(--gs-deep); }
+.section-card.t-coral  { border-top-color: var(--gs-coral); }
+.section-card.t-gold   { border-top-color: var(--gs-gold); }
+.section-card.t-mint   { border-top-color: var(--gs-mint); }
+.section-card.t-sky    { border-top-color: var(--gs-sky); }
+
+.mega-icon-container { text-align: center; margin: 8px 0 16px; }
+.mega-icon-container i { font-size: 3.5em; }
+.mega-icon-container h2 { font-size: 21px; color: var(--gs-deep); margin-top: 10px; font-weight: 700; }
+
+.card-content { padding: 0 4px; }
+
+.lead { font-size: 14px; color: var(--gs-muted); margin-bottom: 14px; line-height: 1.55; }
+
+/* keyword list */
+.keyword-list { list-style: none; margin: 12px 0; padding: 0; }
+.keyword-list li {
+  display: flex; align-items: flex-start;
+  margin-bottom: 9px; font-size: 15px; color: var(--gs-dark);
+}
+.keyword-list li > i { margin-right: 10px; margin-top: 4px; min-width: 18px; font-size: 14px; }
+
+/* tags */
+.keyword-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--gs-sky), var(--gs-blue));
+  color: white; font-size: 13px; font-weight: 700;
+  padding: 2px 10px; border-radius: 12px; margin: 2px 4px 2px 0;
+}
+.tag-gold  { background: linear-gradient(135deg, var(--gs-gold), #E8951A); }
+.tag-coral { background: linear-gradient(135deg, var(--gs-coral), #E84545); }
+.tag-mint  { background: linear-gradient(135deg, var(--gs-mint), #3DB89E); }
+.tag-deep  { background: linear-gradient(135deg, var(--gs-deep), #082E45); }
+.tag-plain { background: var(--gs-cream); color: var(--gs-deep); border: 1.5px solid var(--gs-sky); }
+
+/* speech bubble */
+.speech-bubble {
+  position: relative; background: #fff; border: 3px solid var(--gs-blue);
+  border-radius: 18px; padding: 12px 16px; margin: 16px 4px 4px;
+  font-family: 'Yomogi', cursive; font-size: 14.5px; color: var(--gs-dark);
+  box-shadow: 3px 3px 12px rgba(0,0,0,0.07);
+  transform: rotate(-1deg); line-height: 1.55;
+}
+.speech-bubble::after {
+  content: ''; position: absolute; bottom: -13px; left: 24px;
+  border-width: 12px 9px 0; border-style: solid;
+  border-color: var(--gs-blue) transparent; width: 0;
+}
+.speech-bubble.right::after { left: auto; right: 24px; }
+.speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 9px 12px; }
+.speech-bubble.variant-1 { background: #FFF6E0; border-color: var(--gs-gold); transform: rotate(1deg); }
+.speech-bubble.variant-1::after { border-color: var(--gs-gold) transparent; }
+.speech-bubble.variant-2 { background: #FFEEEE; border-color: var(--gs-coral); transform: rotate(-2deg); }
+.speech-bubble.variant-2::after { border-color: var(--gs-coral) transparent; }
+.speech-bubble.variant-3 { background: #E8FBF6; border-color: var(--gs-mint); transform: rotate(1.5deg); }
+.speech-bubble.variant-3::after { border-color: var(--gs-mint) transparent; }
+
+/* code preview */
+.code-preview {
+  background: var(--gs-deep); color: #cfe8ff;
+  border-radius: 10px; padding: 12px 14px;
+  font-family: 'Courier New', monospace; font-size: 13px;
+  margin: 12px 0; overflow-x: auto; line-height: 1.5;
+}
+.code-preview .cm { color: #7fb3d5; }
+.code-preview .kw { color: var(--gs-gold); }
+.code-preview .str { color: var(--gs-mint); }
+
+/* architecture diagram */
+.arch-diagram {
+  background: var(--gs-cream); border-radius: 14px; padding: 16px; margin: 12px 0;
+}
+.arch-layer {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  border-radius: 12px; margin-bottom: 8px; font-size: 14px;
+}
+.arch-layer i { font-size: 1.4em; }
+.arch-layer .lbl { font-weight: 700; }
+.arch-layer .desc { font-size: 12.5px; color: var(--gs-muted); }
+.arch-layer.l1 { background: linear-gradient(90deg, rgba(26,111,181,0.12), transparent); border-left: 4px solid var(--gs-blue); }
+.arch-layer.l2 { background: linear-gradient(90deg, rgba(244,169,60,0.12), transparent); border-left: 4px solid var(--gs-gold); }
+.arch-layer.l3 { background: linear-gradient(90deg, rgba(95,211,188,0.12), transparent); border-left: 4px solid var(--gs-mint); }
+
+/* compare table */
+.cmp-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-start; }
+.cmp-badge {
+  min-width: 90px; text-align: center; padding: 6px 8px; border-radius: 10px;
+  font-size: 13px; font-weight: 700; color: white;
+}
+.cmp-badge.gs { background: var(--gs-blue); }
+.cmp-badge.cl { background: var(--gs-coral); }
+.cmp-badge.cx { background: var(--gs-deep); }
+.cmp-text { font-size: 14px; padding-top: 4px; }
+
+/* number badge */
+.num-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--gs-blue); color: white; font-weight: 700;
+  font-size: 14px; margin-right: 8px;
+}
+
+/* fade animation */
+@keyframes fadeInScale { from { opacity: 0; transform: scale(0.94) translateY(12px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+.fade-in-scale { animation: fadeInScale 0.6s ease-out both; }
+.d1 { animation-delay: 0.05s; } .d2 { animation-delay: 0.1s; } .d3 { animation-delay: 0.15s; }
+.d4 { animation-delay: 0.2s; } .d5 { animation-delay: 0.25s; } .d6 { animation-delay: 0.3s; }
+.d7 { animation-delay: 0.35s; } .d8 { animation-delay: 0.4s; } .d9 { animation-delay: 0.45s; }
+
+/* highlight box */
+.highlight-box {
+  background: linear-gradient(135deg, rgba(95,211,188,0.1), rgba(244,169,60,0.1));
+  border-radius: 12px; padding: 14px; margin: 12px 0; font-size: 14px;
+}
+.highlight-box .htitle { font-weight: 700; color: var(--gs-deep); margin-bottom: 6px; font-size: 15px; }
+
+/* footer */
+.main-footer {
+  background: linear-gradient(135deg, var(--gs-deep), var(--gs-blue));
+  color: white; border-radius: 24px; padding: 36px 30px;
+  margin-top: 40px; text-align: center;
+}
+.main-footer a { color: var(--gs-mint); text-decoration: none; font-weight: 700; }
+.main-footer a:hover { text-decoration: underline; }
+.main-footer .fmeta { font-size: 14px; opacity: 0.85; margin-top: 10px; }
+
+/* wide card */
+.card-wide { grid-column: span 2; }
+@media (max-width: 768px) { .card-wide { grid-column: span 1; } }
+
+/* counter circle */
+.stat-circle {
+  display: inline-flex; flex-direction: column; align-items: center;
+  background: white; border-radius: 16px; padding: 12px 18px;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.08); margin: 4px;
+}
+.stat-circle .num { font-size: 28px; font-weight: 700; color: var(--gs-blue); }
+.stat-circle .lbl { font-size: 12px; color: var(--gs-muted); }
+
+/* pill list */
+.pill-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.pill {
+  background: var(--gs-cream); border: 1.5px solid var(--gs-sky);
+  border-radius: 20px; padding: 4px 14px; font-size: 13px; color: var(--gs-deep);
+}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+<!-- ===== HEADER ===== -->
+<div class="main-header">
+  <div class="header-icon"><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i></div>
+  <h1>Gemini Spark — クラウドで動く AIエージェント</h1>
+  <div class="subtitle">PCを閉じていても、クラウド上で自律的にタスクを実行し続ける</div>
+  <div class="header-meta">
+    <span><i class="fa-solid fa-cloud"></i>クラウド常駐型</span>
+    <span><i class="fa-solid fa-robot"></i>自律走行エージェント</span>
+    <span><i class="fa-solid fa-calendar-check"></i>2026.08.09</span>
+    <span><i class="fa-brands fa-youtube"></i>AI共創イノベーション</span>
+  </div>
+</div>
+
+<!-- ===== GRID ===== -->
+<div class="grid">
+
+<!-- 1. 概要 -->
+<div class="section-card fade-in-scale d1">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-cloud-bolt fa-bounce" style="color:var(--gs-blue); animation-duration:2.5s;" aria-hidden="true"></i>
+    <h2>Gemini Sparkとは</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">Geminiの画面の左上タブから切り替えて使う、クラウド常駐型の AIエージェント。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-laptop" style="color:var(--gs-blue);"></i><span>PCを閉じていてもクラウドで稼働</span></li>
+      <li><i class="fa-solid fa-arrows-rotate" style="color:var(--gs-blue);"></i><span>手動でも自動でも実行できる</span></li>
+      <li><i class="fa-solid fa-gauge-high" style="color:var(--gs-blue);"></i><span>サブスクの範囲でたっぷり回せる</span></li>
+      <li><i class="fa-solid fa-puzzle-piece" style="color:var(--gs-blue);"></i><span>MCP連携や外部ツールにも対応</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <i class="fa-solid fa-lightbulb" style="color:var(--gs-gold);"></i>
+      普通のGemini画面から、左上のタブをクリックするだけでSparkに切り替わります。
+    </div>
+  </div>
+</div>
+
+<!-- 2. 自立走行エージェント -->
+<div class="section-card t-mint fade-in-scale d2">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-route fa-flip" style="color:var(--gs-mint); animation-duration:3s;" aria-hidden="true"></i>
+    <h2>自立走行するエージェント</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">人がその場にいなくても、計画を立てて自分で動き続ける。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-brain" style="color:var(--gs-mint);"></i><span>タスクを理解して自ら計画を立案</span></li>
+      <li><i class="fa-solid fa-list-check" style="color:var(--gs-mint);"></i><span>ToDoリストを作って順に消化</span></li>
+      <li><i class="fa-solid fa-circle-nodes" style="color:var(--gs-mint);"></i><span>複数ステップを自動でつなぐ</span></li>
+    </ul>
+    <div class="highlight-box">
+      <div class="htitle"><i class="fa-solid fa-circle-info" style="color:var(--gs-mint);"></i> 3層アーキテクチャが鍵</div>
+      タスク・スケジュール・スキルの三つを設計すると、複雑な自動化が回る。
+    </div>
+  </div>
+</div>
+
+<!-- 3. 3層アーキテクチャ（wide） -->
+<div class="section-card t-deep card-wide fade-in-scale d3">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-layer-group fa-beat-fade" style="color:var(--gs-deep); animation-duration:2s;" aria-hidden="true"></i>
+    <h2>3層アーキテクチャで設計する</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">「何を」「いつ」「どうやって」の三層に分けて組み立てる。これがGemini Sparkの基本設計思想。</p>
+    <div class="arch-diagram">
+      <div class="arch-layer l1">
+        <i class="fa-solid fa-clipboard-list" style="color:var(--gs-blue);"></i>
+        <div><span class="lbl">① タスク</span> <span class="desc">— 何をするか（必須）</span><br><span class="desc">例: AIニュースを検索して、レポートを作る</span></div>
+      </div>
+      <div class="arch-layer l2">
+        <i class="fa-solid fa-calendar-day" style="color:var(--gs-gold);"></i>
+        <div><span class="lbl">② スケジュール</span> <span class="desc">— いつやるか（必須）</span><br><span class="desc">例: 毎日 8:00 / 毎週月曜 / 毎月も可能</span></div>
+      </div>
+      <div class="arch-layer l3">
+        <i class="fa-solid fa-screwdriver-wrench" style="color:var(--gs-mint);"></i>
+        <div><span class="lbl">③ スキル</span> <span class="desc">— どうやってやるか（任意）</span><br><span class="desc">出力をカチッとさせたい時に作る。無くても動く</span></div>
+      </div>
+    </div>
+    <div class="speech-bubble variant-3">
+      <i class="fa-solid fa-key" style="color:var(--gs-mint);"></i>
+      タスクとスケジュールさえ決まれば動きます。スキルは安定性を高めたい時の仕上げ。
+    </div>
+  </div>
+</div>
+
+<!-- 4. タスク -->
+<div class="section-card t-gold fade-in-scale d4">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-clipboard-check fa-bounce" style="color:var(--gs-gold); animation-duration:2.2s;" aria-hidden="true"></i>
+    <h2>タスク：何をするか</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">実行したい内容を自然言語で書くだけ。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-pen" style="color:var(--gs-gold);"></i><span>曖昧な指示でもGeminiが解釈</span></li>
+      <li><i class="fa-solid fa-magnifying-glass" style="color:var(--gs-gold);"></i><span>検索・要約・執筆・分析など</span></li>
+      <li><i class="fa-solid fa-comments" style="color:var(--gs-gold);"></i><span>チャット形式で相談しながら作成</span></li>
+    </ul>
+    <div class="code-preview">
+<span class="cm"># タスク例</span><br>
+毎日8時に<br>
+<span class="str">最新のAIニュースを検索して</span><br>
+<span class="str">ドキュメントにまとめて保存</span>
+    </div>
+    <div class="pill-list">
+      <span class="pill"><i class="fa-solid fa-newspaper"></i> ニュース取得</span>
+      <span class="pill"><i class="fa-solid fa-book"></i> 論文作成</span>
+      <span class="pill"><i class="fa-solid fa-feather"></i> 小説執筆</span>
+    </div>
+  </div>
+</div>
+
+<!-- 5. スケジュール -->
+<div class="section-card t-sky fade-in-scale d5">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-calendar-check fa-flip" style="color:var(--gs-sky); animation-duration:3s;" aria-hidden="true"></i>
+    <h2>スケジュール：いつやるか</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">実行タイミングを柔軟に指定できる。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-clock" style="color:var(--gs-sky);"></i><span>毎日 / 毎週 / 毎月を選べる</span></li>
+      <li><i class="fa-solid fa-bolt" style="color:var(--gs-sky);"></i><span>「たった今」ですぐ実行も可</span></li>
+      <li><i class="fa-solid fa-pen-to-square" style="color:var(--gs-sky);"></i><span>後から手動で時間を変更可能</span></li>
+      <li><i class="fa-solid fa-trash" style="color:var(--gs-sky);"></i><span>不要なものは削除、追加も自由</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <i class="fa-solid fa-flask" style="color:var(--gs-sky);"></i>
+      本番前に「実行」ボタンで試せる。チャット感覚で確認してから本稼働へ。
+    </div>
+  </div>
+</div>
+
+<!-- 6. スキル -->
+<div class="section-card t-mint fade-in-scale d6">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-screwdriver-wrench fa-beat-fade" style="color:var(--gs-mint); animation-duration:2.5s;" aria-hidden="true"></i>
+    <h2>スキル：安定させる仕上げ</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">出力品質を安定させたい時に作る。必須ではない。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-wand-sparkles" style="color:var(--gs-mint);"></i><span>Gemini上でも手動でも作成可</span></li>
+      <li><i class="fa-solid fa-folder-open" style="color:var(--gs-mint);"></i><span>ドライブ内のファイルを読ませて学習</span></li>
+      <li><i class="fa-solid fa-bullseye" style="color:var(--gs-mint);"></i><span>コンテキスト設計が良ければ不要</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <i class="fa-solid fa-circle-question" style="color:var(--gs-gold);"></i>
+      安定して動いているなら、スキルは作らなくて大丈夫。出力をカチッとさせたい時に。
+    </div>
+  </div>
+</div>
+
+<!-- 7. Googleドライブ連携 -->
+<div class="section-card t-sky fade-in-scale d7">
+  <div class="mega-icon-container">
+    <i class="fa-brands fa-google-drive fa-bounce" style="color:var(--gs-sky); animation-duration:2.5s;" aria-hidden="true"></i>
+    <h2>Googleドライブ連携</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">成果物は自動でドライブへ。指定すれば好きな場所に保存。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-floppy-disk" style="color:var(--gs-sky);"></i><span>指定しなくても保存される</span></li>
+      <li><i class="fa-solid fa-crosshairs" style="color:var(--gs-sky);"></i><span>「マイドライブのここに」と指定推奨</span></li>
+      <li><i class="fa-solid fa-repeat" style="color:var(--gs-sky);"></i><span>保存したファイルを読んで次を作る</span></li>
+      <li><i class="fa-solid fa-shuffle" style="color:var(--gs-sky);"></i><span>元データを書き換えることも可能</span></li>
+    </ul>
+    <div class="highlight-box">
+      <div class="htitle"><i class="fa-solid fa-lightbulb" style="color:var(--gs-gold);"></i> コツ</div>
+      ドライブとの相性を意識する。どのファイルを並べ、どこから取るかを決めるのが設計の要。
+    </div>
+  </div>
+</div>
+
+<!-- 8. ループ設計 -->
+<div class="section-card t-deep fade-in-scale d8">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-arrows-spin fa-spin" style="color:var(--gs-deep); animation-duration:6s;" aria-hidden="true"></i>
+    <h2>ループで進化させる</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">出力を保存 → それを読んで更新 → また保存。この繰り返しで成果物が育つ。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-lock" style="color:var(--gs-deep);"></i><span>元データを固定することも可能</span></li>
+      <li><i class="fa-solid fa-code-branch" style="color:var(--gs-deep);"></i><span>バージョン管理で履歴を残す</span></li>
+      <li><i class="fa-solid fa-infinity" style="color:var(--gs-deep);"></i><span>回すほど内容が豊かになる</span></li>
+    </ul>
+    <div class="code-preview">
+<span class="kw">while</span> True:<br>
+&nbsp;&nbsp;data = <span class="cm">drive.read</span>(<span class="str">"最新版"</span>)<br>
+&nbsp;&nbsp;new = <span class="cm">spark.upgrade</span>(data)<br>
+&nbsp;&nbsp;<span class="cm">drive.save</span>(new, <span class="str">"v+1"</span>)
+    </div>
+  </div>
+</div>
+
+<!-- 9. リモートブラウザー -->
+<div class="section-card t-coral fade-in-scale d9">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-window-restore fa-bounce" style="color:var(--gs-coral); animation-duration:2s;" aria-hidden="true"></i>
+    <h2>リモートブラウザー</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">クラウド上でブラウザが開き、ログイン操作も可能。Gemini Sparkならでは。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-cloud" style="color:var(--gs-coral);"></i><span>PCを閉じていても動く</span></li>
+      <li><i class="fa-solid fa-right-to-bracket" style="color:var(--gs-coral);"></i><span>中でログインして操作できる</span></li>
+      <li><i class="fa-solid fa-triangle-exclamation" style="color:var(--gs-coral);"></i><span>セキュリティには要 attention</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <i class="fa-solid fa-shield-halved" style="color:var(--gs-coral);"></i>
+      パスワード入力には抵抗感あり。試したら不正アクセスで弾かれることも。リスク認識は必須。
+    </div>
+  </div>
+</div>
+
+<!-- 10. Chromeオートブラウザ -->
+<div class="section-card t-coral fade-in-scale d1">
+  <div class="mega-icon-container">
+    <i class="fa-brands fa-chrome fa-flip" style="color:var(--gs-coral); animation-duration:3s;" aria-hidden="true"></i>
+    <h2>Chromeオートブラウザ</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">ログイン状態を引き継げる強力な選択肢。ただし制限あり。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check" style="color:var(--gs-coral);"></i><span>ログイン済み状態で操作可能</span></li>
+      <li><i class="fa-solid fa-circle-xmark" style="color:var(--gs-coral);"></i><span>現状は日本では使えない</span></li>
+      <li><i class="fa-solid fa-flag-usa" style="color:var(--gs-coral);"></i><span>米国のユーザーのみ利用可</span></li>
+      <li><i class="fa-solid fa-display" style="color:var(--gs-coral);"></i><span>PCを起動しておく必要あり</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <i class="fa-solid fa-clock-rotate-left" style="color:var(--gs-coral);"></i>
+      そのうち日本でも使えるようになったら活用したい。リモートブラウザはPC不要で優秀。
+    </div>
+  </div>
+</div>
+
+<!-- 11. 5時間ルール -->
+<div class="section-card t-gold fade-in-scale d2">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-gauge-simple-high fa-beat-fade" style="color:var(--gs-gold); animation-duration:1.8s;" aria-hidden="true"></i>
+    <h2>5時間ルールと制限</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">頻度が高いと制限に引っかかる。バランス感覚が大事。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-hourglass-half" style="color:var(--gs-gold);"></i><span>5時間制限と1時間制限の二本</span></li>
+      <li><i class="fa-solid fa-bell" style="color:var(--gs-gold);"></i><span>1時間に1回はギリギリになりがち</span></li>
+      <li><i class="fa-solid fa-thumbs-up" style="color:var(--gs-gold);"></i><span>1日1回なら十分 余裕で回る</span></li>
+      <li><i class="fa-solid fa-chart-line" style="color:var(--gs-gold);"></i><span>使用上限ページで都度 確認</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <i class="fa-solid fa-comment-dots" style="color:var(--gs-gold);"></i>
+      まず1時間で試して、厳しそうなら1日に切り替える。筆者も今はゆっくり運用中。
+    </div>
+  </div>
+</div>
+
+<!-- 12. Claude Routine vs Gemini Spark -->
+<div class="section-card t-deep card-wide fade-in-scale d3">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-scale-balanced fa-bounce" style="color:var(--gs-deep); animation-duration:2.5s;" aria-hidden="true"></i>
+    <h2>比較：Claude Routine vs Gemini Spark</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">役割の得意分野が明確に分かれる。用途で使い分けるのが正解。</p>
+    <div class="cmp-row">
+      <div class="cmp-badge gs">Gemini Spark</div>
+      <div class="cmp-text"><strong>AIの秘書</strong>。柔軟性が高く、回数制限が緩い。ドキュメント作成・Googleドライブ保存が得意。サブスク範囲でたくさん回したい時におすすめ。</div>
+    </div>
+    <div class="cmp-row">
+      <div class="cmp-badge cl">Claude Routine</div>
+      <div class="cmp-text"><strong>エンジニア</strong>。コーディングが強い。GitHubでどんどん更新、サイト構築も得意。ただし同時実行は5つまで。</div>
+    </div>
+    <div class="highlight-box">
+      <div class="htitle"><i class="fa-solid fa-arrow-right" style="color:var(--gs-blue);"></i> 使い分けの目安</div>
+      ニュース取得・メール管理・朝のルーティン → <span class="keyword-tag">Gemini Spark</span><br>
+      コーディング・サイト制作・GitHub運用 → <span class="keyword-tag tag-coral">Claude Routine</span>
+    </div>
+  </div>
+</div>
+
+<!-- 13. Codex Scheduleとの違い -->
+<div class="section-card t-deep fade-in-scale d4">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-code-branch fa-flip" style="color:var(--gs-deep); animation-duration:3s;" aria-hidden="true"></i>
+    <h2>Codex Scheduleとの違い</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">似た位置づけだが、Gemini Sparkにしかできない領域がある。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-venn-diagram" style="color:var(--gs-deep);"></i><span>どちらも自動スケジュール実行</span></li>
+      <li><i class="fa-solid fa-star" style="color:var(--gs-deep);"></i><span>Spark固有の機能で差別化</span></li>
+      <li><i class="fa-solid fa-handshake-angle" style="color:var(--gs-deep);"></i><span>ドライブ連携の深さが違う</span></li>
+    </ul>
+    <div class="pill-list">
+      <span class="pill"><i class="fa-solid fa-cloud"></i> クラウド常駐</span>
+      <span class="pill"><i class="fa-brands fa-google-drive"></i> ドライブ直結</span>
+      <span class="pill"><i class="fa-solid fa-window-restore"></i> リモートブラウザ</span>
+    </div>
+  </div>
+</div>
+
+<!-- 14. 実例：論文作成 -->
+<div class="section-card t-mint fade-in-scale d5">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-file-lines fa-beat-fade" style="color:var(--gs-mint); animation-duration:2s;" aria-hidden="true"></i>
+    <h2>実例：論文を自動で進化</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">独自理論（LFT）の論文を、毎日バージョンアップしていく実践例。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-1" style="color:var(--gs-mint);"></i><span>マイドライブから基本ファイルを取得</span></li>
+      <li><i class="fa-solid fa-2" style="color:var(--gs-mint);"></i><span>外部情報を検索で補強</span></li>
+      <li><i class="fa-solid fa-3" style="color:var(--gs-mint);"></i><span>理論をバージョンアップして保存</span></li>
+      <li><i class="fa-solid fa-4" style="color:var(--gs-mint);"></i><span>10個揃ったらV2フォルダへ</span></li>
+      <li><i class="fa-solid fa-5" style="color:var(--gs-mint);"></i><span>Pythonで整合性を計算・レビュー</span></li>
+    </ul>
+    <div class="speech-bubble variant-3">
+      <i class="fa-solid fa-bell" style="color:var(--gs-mint);"></i>
+      毎朝8時に「最新版を作成しました」と報告。更新履歴も自動で残る。
+    </div>
+  </div>
+</div>
+
+<!-- 15. 実例：小説制作 -->
+<div class="section-card t-coral fade-in-scale d6">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-book-open fa-bounce" style="color:var(--gs-coral); animation-duration:2.3s;" aria-hidden="true"></i>
+    <h2>実例：小説を自動執筆</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">スペースオペラ「青官の弾当大ガンガチュアロンド」。筆者は一文字も書いていない。</p>
+    <div style="text-align:center; margin:14px 0;">
+      <div class="stat-circle"><span class="num">70</span><span class="lbl">話まで到達</span></div>
+      <div class="stat-circle"><span class="num">17万</span><span class="lbl">文字</span></div>
+      <div class="stat-circle"><span class="num">100+</span><span class="lbl">登場人物</span></div>
+    </div>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-users" style="color:var(--gs-coral);"></i><span>人物が自動で追加されていく</span></li>
+      <li><i class="fa-solid fa-sitemap" style="color:var(--gs-coral);"></i><span>動的グランドデザインで矛盾防止</span></li>
+      <li><i class="fa-solid fa-puzzle-piece" style="color:var(--gs-coral);"></i><span>謎解きも自動で増えて解決する</span></li>
+    </ul>
+    <div class="speech-bubble variant-2">
+      <i class="fa-solid fa-feather" style="color:var(--gs-coral);"></i>
+      企画だけ人間が考えたら、あとは制作・執筆・アップロードまで全部AI任せ。
+    </div>
+  </div>
+</div>
+
+<!-- 16. 小説のファイル構成 -->
+<div class="section-card t-gold fade-in-scale d7">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-folder-tree fa-flip" style="color:var(--gs-gold); animation-duration:3s;" aria-hidden="true"></i>
+    <h2>小説の9ファイル構成</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">物語を支えるファイル構造。ここを設計するのがコンテキスト設計の実践。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-scroll" style="color:var(--gs-gold);"></i><span>あらすじ・企画構成</span></li>
+      <li><i class="fa-solid fa-user-group" style="color:var(--gs-gold);"></i><span>基本人物・世界観・相関図</span></li>
+      <li><i class="fa-solid fa-user-plus" style="color:var(--gs-gold);"></i><span>追加登場人物（動的に増える）</span></li>
+      <li><i class="fa-solid fa-diagram-project" style="color:var(--gs-gold);"></i><span>動的グランドデザイン</span></li>
+      <li><i class="fa-solid fa-key" style="color:var(--gs-gold);"></i><span>謎解き（増えて解決する）</span></li>
+    </ul>
+    <div class="highlight-box">
+      <div class="htitle"><i class="fa-solid fa-layer-group" style="color:var(--gs-gold);"></i> 三層構造で整合性</div>
+      マクロ層・ミクロ層・ミステリー層。破綻がないかを自動で点検。
+    </div>
+  </div>
+</div>
+
+<!-- 17. コンテキスト設計 -->
+<div class="section-card t-sky fade-in-scale d8">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-diagram-successor fa-beat-fade" style="color:var(--gs-blue); animation-duration:2.2s;" aria-hidden="true"></i>
+    <h2>コンテキスト設計が鍵</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">「情報環境をどう設計するか」が、Gemini Sparkの成果を左右する。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-folder-open" style="color:var(--gs-blue);"></i><span>どのファイルを使うか決める</span></li>
+      <li><i class="fa-solid fa-arrows-left-right" style="color:var(--gs-blue);"></i><span>並び順と読み込み順を設計</span></li>
+      <li><i class="fa-solid fa-globe" style="color:var(--gs-blue);"></i><span>外部情報・検索も組み合わせる</span></li>
+      <li><i class="fa-solid fa-repeat" style="color:var(--gs-blue);"></i><span>ループでどう変化するか想像</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <i class="fa-solid fa-lightbulb" style="color:var(--gs-gold);"></i>
+      曖昧なプロンプトでも動くが、情報の並びを工夫すると格段に豊かな成果物に。
+    </div>
+  </div>
+</div>
+
+<!-- 18. 修正とまとめ -->
+<div class="section-card t-deep fade-in-scale d9">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-wrench fa-bounce" style="color:var(--gs-deep); animation-duration:2s;" aria-hidden="true"></i>
+    <h2>修正と使い方まとめ</h2>
+  </div>
+  <div class="card-content">
+    <p class="lead">一括修正もタスクで完結。時間を入れなければスケジュールを汚さない。</p>
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-magnifying-glass" style="color:var(--gs-deep);"></i><span>全ファイルを走査して一括置換</span></li>
+      <li><i class="fa-solid fa-clock" style="color:var(--gs-deep);"></i><span>時間なし＝修正用スレッド扱い</span></li>
+      <li><i class="fa-solid fa-rotate" style="color:var(--gs-deep);"></i><span>数回回すうちに漏れが消える</span></li>
+    </ul>
+    <div class="highlight-box">
+      <div class="htitle"><i class="fa-solid fa-check-double" style="color:var(--gs-mint);"></i> 3ステップで始める</div>
+      <span class="num-badge">1</span>アプリ連携をオンにする<br>
+      <span class="num-badge">2</span>スケジュールで何をいつやるか決める<br>
+      <span class="num-badge">3</span>実行ボタンで試してから本稼働
+    </div>
+    <div class="speech-bubble variant-3 right">
+      <i class="fa-solid fa-rocket" style="color:var(--gs-mint);"></i>
+      タスク＋スケジュールさえ決まれば、あとは放置で回り続ける。
+    </div>
+  </div>
+</div>
+
+</div><!-- /grid -->
+
+<!-- ===== FOOTER ===== -->
+<div class="main-footer">
+  <h2 style="font-size:22px; margin-bottom:10px;"><i class="fa-solid fa-wand-magic-sparkles"></i> Gemini Spark — クラウドで自律動作する AIエージェント</h2>
+  <p style="font-size:15px;">
+    🎬 動画: <a href="https://youtu.be/_80hspnZsck" target="_blank" rel="noopener">AI共創イノベーション — Gemini Sparkの使い方を解説！</a>
+  </p>
+  <div class="fmeta">
+    <i class="fa-solid fa-link"></i> https://youtu.be/_80hspnZsck &nbsp;|&nbsp;
+    <i class="fa-solid fa-calendar"></i> 2026.08.09 &nbsp;|&nbsp;
+    <i class="fa-solid fa-clock"></i> 動画時間 34:59
+  </div>
+</div>
+
+</div><!-- /canvas -->
+</body>
+</html>

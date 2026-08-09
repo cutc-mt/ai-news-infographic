@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code｜2つのフォルダ、行き来しなくていい</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：モスグリーン × テラコッタ × 温もりクリーム */
+            --c1: #2F6B4F;   /* 深い森の緑 - メイン */
+            --c2: #D97742;   /* テラコッタオレンジ - アクセント */
+            --c3: #E8F0E5;   /* セージミント - 薄緑 */
+            --c4: #1A4332;   /* 深緑 - 濃い */
+            --c5: #B85A28;   /* 焼きテラコッタ - 濃い橙 */
+            --c6: #FCF3E3;   /* オーツミールクリーム */
+            --c7: #FAE7D3;   /* 薄い肌色 */
+            --c8: #8C4A1E;   /* 焦げ茶オレンジ */
+            --c9: #B33A3A;   /* 警告赤 */
+            --c10: #3B7A99;  /* ディープスカイ - 補足青 */
+            --c11: #D9ECF5;  /* 薄水色 */
+            --tint-c1: #EEF5EF;   /* c1 淡色 */
+            --tint-c2: #FDF1E6;   /* c2 淡色 */
+            --tint-c9: #FDECEC;   /* c9 淡色 */
+            --tint-c10: #EAF4F9;  /* c10 淡色 */
+            --ink-green: #1A4332;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F7F5EE; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 45%,var(--c8) 85%,var(--c5) 120%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(26,67,50,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(232,240,229,.22) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c7); font-size:96px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.30); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.35); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c6); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c3); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(47,107,79,.13);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(47,107,79,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c2),var(--c5));
+        }
+        .card.warn::before { background:linear-gradient(90deg,var(--c9),var(--c5),var(--c2)); }
+        .card.blue::before { background:linear-gradient(90deg,var(--c10),var(--c1),var(--c8)); }
+        .card.orange::before { background:linear-gradient(90deg,var(--c2),var(--c8),var(--c4)); }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.terra { color:var(--c2); }
+        .icon-box i.burnt { color:var(--c5); }
+        .icon-box i.deep { color:var(--c4); }
+        .icon-box i.brown { color:var(--c8); }
+        .icon-box i.sky { color:var(--c10); }
+        .icon-box i.red { color:var(--c9); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#9CA3AF; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.t { color:var(--c2); }
+        ul.kl li i.b { color:var(--c5); }
+        ul.kl li i.d { color:var(--c4); }
+        ul.kl li i.br { color:var(--c8); }
+        ul.kl li i.s { color:var(--c10); }
+        ul.kl li i.r { color:var(--c9); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--ink-green);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.terra { background:var(--tint-c2); color:var(--c5); }
+        .tag.cream { background:var(--c6); color:var(--c8); }
+        .tag.brown { background:var(--c7); color:var(--c8); }
+        .tag.sky { background:var(--c11); color:var(--c10); }
+        .tag.red { background:var(--tint-c9); color:var(--c9); }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-terra { color:var(--c5); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c2) 60%); }
+        .hl-sky { color:var(--c10); font-weight:bold; background:linear-gradient(transparent 60%, var(--c11) 60%); }
+        .hl-brown { color:var(--c8); font-weight:bold; background:linear-gradient(transparent 60%, var(--c7) 60%); }
+        .hl-red { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c9) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:#FFFBEB;
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:#FBF2E7;
+            border-color:var(--c8);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c8) transparent; }
+        .bubble.v3 {
+            background:#FEF2F2;
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c9) transparent; }
+        .bubble.v4 {
+            background:#EAF4F9;
+            border-color:var(--c10);
+            transform:rotate(-1deg);
+        }
+        .bubble.v4::after { border-color:var(--c10) transparent; }
+
+        /* コードプレビュー */
+        pre.code {
+            background:#16261F;
+            color:#E8F0E5;
+            padding:12px;
+            border-radius:8px;
+            font-size:13px;
+            font-family:'Courier New',monospace;
+            margin-top:10px;
+            overflow-x:auto;
+            line-height:1.5;
+        }
+        pre.code .k { color:#FBBF24; }
+        pre.code .s { color:#86EFAC; }
+        pre.code .c { color:#A5B4FC; }
+
+        /* ステップ番号 */
+        .step {
+            display:inline-block;
+            background:var(--c1);
+            color:#fff;
+            width:28px; height:28px;
+            line-height:28px;
+            text-align:center;
+            border-radius:50%;
+            font-weight:bold;
+            font-size:14px;
+            margin-right:8px;
+        }
+        .step.terra { background:var(--c2); }
+        .step.brown { background:var(--c8); }
+
+        /* 比較テーブル風 */
+        .vs-box { display:flex; gap:8px; margin:10px 0; }
+        .vs-side {
+            flex:1;
+            padding:10px;
+            border-radius:12px;
+            font-size:14px;
+        }
+        .vs-side.bad { background:var(--tint-c9); border:2px dashed var(--c9); }
+        .vs-side.good { background:var(--tint-c1); border:2px solid var(--c1); }
+        .vs-side.warm { background:var(--tint-c2); border:2px solid var(--c2); }
+        .vs-side h4 { font-size:14px; margin-bottom:6px; }
+        .vs-side.bad h4 { color:var(--c9); }
+        .vs-side.good h4 { color:var(--c1); }
+        .vs-side.warm h4 { color:var(--c5); }
+
+        /* フェードイン */
+        @keyframes fadeInScale {
+            from { opacity:0; transform:scale(.96); }
+            to { opacity:1; transform:scale(1); }
+        }
+        .fade-in { animation:fadeInScale .8s ease both; }
+
+        /* フッター */
+        .footer {
+            margin-top:50px;
+            padding:35px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1));
+            border-radius:25px;
+            text-align:center;
+            color:#fff;
+            box-shadow:6px 6px 25px rgba(26,67,50,.25);
+        }
+        .footer a { color:var(--c6); text-decoration:none; border-bottom:2px dotted var(--c6); }
+        .footer a:hover { color:#fff; border-bottom-style:solid; }
+        .footer .src { margin-top:12px; font-size:14px; color:var(--c3); }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px) { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; min-width:auto; }
+            .header h1 { font-size:28px; }
+            .header i.main { font-size:72px; }
+            .vs-box { flex-direction:column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-folder-tree main" aria-hidden="true"></i>
+        <h1>Claude Code｜2つのフォルダ、行き来しなくていい</h1>
+        <div class="sub">別のリポジトリを見ながら実装するとき、窓の往復とコピペをゼロにする方法</div>
+        <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月10日 ／ チャンネル：あきらパパのAI活用学習部屋</div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1：2つのフォルダ問題 -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-folder-tree fa-5x" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>ふたつのフォルダを行ったり来たり</h2>
+                <div class="ch">別リポジトリを見ながらの作業</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-info"></i><span>実装したい側と、<span class="hl">仕様がある側</span>がわかれている</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span>窓を切り替えて、中身を見比べる</span></li>
+                    <li><i class="fa-solid fa-clock"></i><span>この行き来が、じつは時間を食う</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-lightbulb" style="color:var(--c5);"></i>
+                    この<span class="tag terra">往復</span>を<br>
+                    なくす方法があるんだ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2：Claude Codeとは -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-terminal fa-5x deep" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>Claude Code ってなに？</h2>
+                <div class="ch">Anthropic 純正の CLI エージェント</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-building d"></i><span><span class="tag">Anthropic</span> 純正のコーディングエージェント</span></li>
+                    <li><i class="fa-solid fa-keyboard d"></i><span>ターミナル（黒い画面）から動かす</span></li>
+                    <li><i class="fa-solid fa-laptop-code d"></i><span>コードを読み書きして、かわりに作業する</span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-circle-info" style="color:var(--c8);"></i>
+                    いま動かしている場所が<br>
+                    そのまま「作業部屋」になるよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3：ビフォー 窓の往復 -->
+        <div class="card warn fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrows-spin fa-5x red" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>ビフォー：窓をぐるぐる</h2>
+                <div class="ch">いままでのつらいやり方</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-window-restore r"></i><span>仕様の窓と、実装の窓を<span class="hl-red">行ったり来たり</span></span></li>
+                    <li><i class="fa-solid fa-eye r"></i><span>必要な所を、いちいち探しては見る</span></li>
+                    <li><i class="fa-solid fa-copy r"></i><span>見つけたら、コピーして、はりつける</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-face-tired" style="color:var(--c9);"></i>
+                    これを何度も繰り返すから<br>
+                    ほんとに疲れるんだ…
+                </div>
+            </div>
+        </div>
+
+        <!-- カード4：ビフォー コピペのつらさ -->
+        <div class="card warn fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-hand-pointer fa-5x red" style="animation:fa-shake 2s;" aria-hidden="true"></i>
+                <h2>コピペだらけの手作業</h2>
+                <div class="ch">人の手が介在する問題</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clipboard r"></i><span>仕様を<span class="hl-red">コピー</span>して</span></li>
+                    <li><i class="fa-solid fa-paste r"></i><span>プロンプトに<span class="hl-red">はりつけ</span>して</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation r"></i><span>貼り忘れや、はみ出しも起きる</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-exclamation" style="color:var(--c9);"></i>
+                    人が介在すると、ミスも<br>
+                    一緒に入ってくるんだよね
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5：アフター 窓を往復しない -->
+        <div class="card orange fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-folder-plus fa-5x terra" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>アフター：窓を往復しない</h2>
+                <div class="ch">もうひとつのフォルダを足す</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-plus t"></i><span>作業中の場所に、もうひとつ<span class="hl-terra">フォルダを足す</span></span></li>
+                    <li><i class="fa-solid fa-eye t"></i><span>AIがその中身も、<span class="hl-terra">自分で見にいける</span></span></li>
+                    <li><i class="fa-solid fa-ban t"></i><span>もう窓の切替も、コピペもいらない</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-thumbs-up" style="color:var(--c5);"></i>
+                    ひとつの部屋に、もうひとつ<br>
+                    本棚を足すようなイメージ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6：起動時に追加 -->
+        <div class="card orange fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-play fa-5x burnt" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>① 起動時にフォルダを足す</h2>
+                <div class="ch">一番シンプルな書き方</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-terminal b"></i><span>立ち上げるときに、<span class="hl-terra">オプションをひとつ</span></span></li>
+                    <li><i class="fa-solid fa-folder-tree b"></i><span>これで、もうひとつの作業場所が見える</span></li>
+                    <li><i class="fa-solid fa-bolt b"></i><span>起動と同時に、準備が終わる</span></li>
+                </ul>
+                <pre class="code"><span class="c"># 起動時に追加フォルダを指定</span>
+<span class="k">$</span> claude <span class="k">--add-dir</span> <span class="s">../api-server</span></pre>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-rocket" style="color:var(--c5);"></i>
+                    <span class="tag terra">--add-dir</span> をつけるだけ。<br>
+                    たったこれだけで済むよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7：途中からでも追加 -->
+        <div class="card orange fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x burnt" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>② 話している途中からでも足せる</h2>
+                <div class="ch">スラッシュコマンドで追加</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-message b"></i><span>会話の途中で、<span class="hl-terra">「あ、あのフォルダも」</span></span></li>
+                    <li><i class="fa-solid fa-slash b"></i><span>スラッシュから始まるコマンドを打つ</span></li>
+                    <li><i class="fa-solid fa-circle-check b"></i><span>立ち上げ直さなくていいのが楽</span></li>
+                </ul>
+                <pre class="code"><span class="c"># 会話の途中で追加</span>
+&gt; <span class="k">/add-dir</span> <span class="s">../api-server</span></pre>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-comment-dots" style="color:var(--c8);"></i>
+                    「やっぱり必要だった」<br>
+                    と気づいたときも、安心だね
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8：設定に書いておく -->
+        <div class="card orange fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-gear fa-5x burnt" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>③ 毎回同じなら設定に書く</h2>
+                <div class="ch">何度も打つ手間を消す</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-repeat b"></i><span>いつも同じ場所を足すなら<span class="hl-terra">設定へ</span></span></li>
+                    <li><i class="fa-solid fa-file-lines b"></i><span>設定ファイルの <span class="tag terra">permissions</span> に書く</span></li>
+                    <li><i class="fa-solid fa-magic-wand-sparkles b"></i><span>書いておけば、次からは自動で</span></li>
+                </ul>
+                <pre class="code"><span class="c">// settings.json の例</span>
+{
+  <span class="s">"permissions"</span>: {
+    <span class="s">"additionalDirectories"</span>: [
+      <span class="k">"../api-server"</span>
+    ]
+  }
+}</pre>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-pen-nib" style="color:var(--c5);"></i>
+                    毎回同じなら、<span class="tag terra">設定</span>へ。<br>
+                    打つ手間そのものを消すよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9：3つの方法をくらべる -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-5x deep" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>3つの方法を ならべてみる</h2>
+                <div class="ch">場面で使い分ける</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-play d"></i><span><span class="step">1</span><span class="tag">--add-dir</span> ／ 起動時に一回だけ</span></li>
+                    <li><i class="fa-solid fa-comment-dots d"></i><span><span class="step terra">2</span><span class="tag terra">/add-dir</span> ／ 途中から追加したい</span></li>
+                    <li><i class="fa-solid fa-gear d"></i><span><span class="step brown">3</span><span class="tag brown">設定</span> ／ 毎回同じものを使う</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-lightbulb" style="color:var(--c1);"></i>
+                    どれも<span class="hl">目的は同じ</span>。<br>
+                    ただタイミングがちがうだけ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10：なにがうれしいか -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart fa-5x" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>結局、なにがうれしい？</h2>
+                <div class="ch">3つのメリットを整理</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-ban"></i><span>窓の切替が、<span class="hl">ゼロ</span>になる</span></li>
+                    <li><i class="fa-solid fa-clipboard-list"></i><span>コピペも、<span class="hl">ゼロ</span>になる</span></li>
+                    <li><i class="fa-solid fa-brain"></i><span>作業の手間を、AIに任せられる</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-face-smile" style="color:var(--c10);"></i>
+                    手戻りも減って、頭の切り替えも<br>
+                    ぐっとラクになるんだ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11：AIが自分で見にいく -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x deep" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>AIが 自分で見にいく</h2>
+                <div class="ch">指示しなくても参照できる</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-folder-open d"></i><span>追加した場所は、AIから<span class="hl">見える範囲</span>に入る</span></li>
+                    <li><i class="fa-solid fa-arrow-right d"></i><span>必要なとき、AIが自分で中身を読む</span></li>
+                    <li><i class="fa-solid fa-circle-check d"></i><span>人が「これ見て」と言わなくていい</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-robot" style="color:var(--c1);"></i>
+                    「あの仕様、どこだっけ？」<br>
+                    と探す手間が、不要になるよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12：注意 CLAUDE.mdは標準では読まれない -->
+        <div class="card warn fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-5x red" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>注意：CLAUDE.md は読まれない</h2>
+                <div class="ch">ここはよくつまずく所</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-circle-question r"></i><span>追加した側の <span class="tag red">CLAUDE.md</span> は標準では読まれない</span></li>
+                    <li><i class="fa-solid fa-eye-slash r"></i><span>ファイルの中身は見えても、<span class="hl-red">ルールは引継ぎされない</span></span></li>
+                    <li><i class="fa-solid fa-circle-info r"></i><span>この差、知らないとはまります</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-exclamation" style="color:var(--c9);"></i>
+                    「フォルダ足したのに、<br>
+                    ルールが効かない…」の原因はここ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13：ルールごと共有したいなら skills -->
+        <div class="card blue fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-share-nodes fa-5x sky" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>ルールごと共有したいなら</h2>
+                <div class="ch">.claude/skills/ に置く</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-folder-tree s"></i><span>ルールも渡したいなら <span class="tag sky">.claude/skills/</span> へ</span></li>
+                    <li><i class="fa-solid fa-arrow-right-arrow-left s"></i><span>ここなら、AIが<span class="hl-sky">参照しにいける</span></span></li>
+                    <li><i class="fa-solid fa-layer-group s"></i><span>作業の場所と、ルールを分けて持てる</span></li>
+                </ul>
+                <pre class="code"><span class="c"># ルールはこちらに置く</span>
+.claude/skills/
+  └─ <span class="s">api-server-rules.md</span></pre>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-lightbulb" style="color:var(--c10);"></i>
+                    ファイルを見せたいだけか、<br>
+                    ルールも渡したいかで変わるよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14：見える範囲のちがい -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-eye fa-5x deep" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>見える範囲が ひろがる</h2>
+                <div class="ch">追加の前後でくらべてみる</div>
+            </div>
+            <div class="body">
+                <div class="vs-box">
+                    <div class="vs-side bad">
+                        <h4><i class="fa-solid fa-circle-minus"></i> 前</h4>
+                        今の部屋だけ
+                    </div>
+                    <div class="vs-side warm">
+                        <h4><i class="fa-solid fa-circle-plus"></i> 後</h4>
+                        もうひとつの部屋も
+                    </div>
+                </div>
+                <div class="bubble">
+                    <i class="fa-solid fa-arrows-up-down-left-right" style="color:var(--c1);"></i>
+                    AIが<span class="hl">見渡せる範囲</span>が、<br>
+                    ぐっとひろがるよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15：よくある誤解 -->
+        <div class="card warn fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-question fa-5x red" style="animation:fa-flip 3s;" aria-hidden="true"></i>
+                <h2>よくある 誤解</h2>
+                <div class="ch">ここを押さえておこう</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-xmark r"></i><span>「ファイル全部を自動で読む」<span class="hl-red">わけではない</span></span></li>
+                    <li><i class="fa-solid fa-xmark r"></i><span>「書き換え自由」<span class="hl-red">でもない</span>（権限しだい）</span></li>
+                    <li><i class="fa-solid fa-circle-check r"></i><span>見える範囲が増える、というのが正しい理解</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info" style="color:var(--c9);"></i>
+                    「全部まるごと」じゃない。<br>
+                    必要な時に見に行ける、だよ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード16：まとめ① コピペゼロ -->
+        <div class="card orange fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-bullseye fa-5x terra" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>まとめ① コピペはゼロに</h2>
+                <div class="ch">窓の往復も消える</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-ban t"></i><span>窓の切替と、コピペが<span class="hl-terra">ゼロ</span>になる</span></li>
+                    <li><i class="fa-solid fa-folder-plus t"></i><span>もうひとつの場所を、<span class="hl-terra">ただ足すだけ</span></span></li>
+                    <li><i class="fa-solid fa-feather t"></i><span>人の手介在のミスも、減っていく</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-thumbs-up" style="color:var(--c5);"></i>
+                    手作業の分だけ<br>
+                    ミスも減っていくんだね
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17：まとめ② タイミングで選ぶ -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-check fa-5x deep" style="animation:fa-beat-fade 2.5s;" aria-hidden="true"></i>
+                <h2>まとめ② タイミングで選ぶ</h2>
+                <div class="ch">3つの追加方法を使い分け</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-play d"></i><span>起動時 ／ <span class="tag">--add-dir</span></span></li>
+                    <li><i class="fa-solid fa-comment-dots d"></i><span>途中から ／ <span class="tag sky">/add-dir</span></span></li>
+                    <li><i class="fa-solid fa-gear d"></i><span>毎回同じ ／ <span class="tag brown">設定</span> に書く</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-compass" style="color:var(--c1);"></i>
+                    場面に合わせて、<br>
+                    一番ラクな方を選ぼう
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18：出典・公式 -->
+        <div class="card blue fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-book fa-5x sky" style="animation:fa-bounce 2s;" aria-hidden="true"></i>
+                <h2>出典は公式ドキュメント</h2>
+                <div class="ch">より詳しくは本家へ</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-building s"></i><span><span class="tag sky">Anthropic</span> 純正の CLI エージェント</span></li>
+                    <li><i class="fa-solid fa-file-lines s"></i><span>CLI リファレンスと、権限設定の2本</span></li>
+                    <li><i class="fa-solid fa-up-right-from-square s"></i><span>最新の仕様は、本家ページで確認を</span></li>
+                </ul>
+                <pre class="code"><span class="c"># 公式ドキュメント</span>
+https://code.claude.com/<span class="k">docs</span>/en/cli-reference
+https://code.claude.com/<span class="k">docs</span>/en/permissions</pre>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-circle-info" style="color:var(--c10);"></i>
+                    仕様は変わることもあるから、<br>
+                    公式をチェックしよう
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div style="font-size:18px; margin-bottom:10px;">
+            <i class="fa-solid fa-film"></i> 出典：YouTube動画
+        </div>
+        <div style="font-size:16px; margin-bottom:6px;">
+            🎬 動画：<a href="https://www.youtube.com/watch?v=xFTh8Kx3mUE" target="_blank" rel="noopener">あきらパパのAI活用学習部屋「Claude Code｜2つのフォルダ、行き来しなくていい」</a>
+        </div>
+        <div class="src">
+            <i class="fa-solid fa-link"></i> 公式ドキュメント：
+            <a href="https://code.claude.com/docs/en/cli-reference" target="_blank" rel="noopener">CLI リファレンス</a> ／
+            <a href="https://code.claude.com/docs/en/permissions" target="_blank" rel="noopener">権限設定（permissions）</a>
+        </div>
+        <div class="src" style="margin-top:8px;">
+            <i class="fa-regular fa-calendar"></i> 2026年8月10日 ／ グラフィックレコーディング風まとめ
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

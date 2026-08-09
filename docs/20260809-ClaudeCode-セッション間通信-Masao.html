@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code｜セッション同士で伝言ができる</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：ロイヤルパープル × コーラルピンク × サフラン */
+            --c1: #7C3AED;   /* Violet 600 - メイン紫 */
+            --c2: #EC4899;   /* Pink 500 - アクセント・ピンク */
+            --c3: #EDE9FE;   /* Violet 100 - 薄い紫 */
+            --c4: #4C1D95;   /* Violet 900 - 深い紫 */
+            --c5: #F59E0B;   /* Amber 500 - サフラン金 */
+            --c6: #FEF3C7;   /* Amber 100 - クリーム */
+            --c7: #FCE7F3;   /* Pink 100 - 薄ピンク */
+            --c8: #BE185D;   /* Pink 700 - 深い赤紫 */
+            --c9: #DC2626;   /* Red 600 - 警告赤 */
+            --c10: #059669;  /* Emerald 600 - セーフ緑 */
+            --c11: #D1FAE5;  /* Emerald 100 - 薄ミント */
+            --tint-c1: #F5F3FF;
+            --tint-c2: #FDF2F8;
+            --tint-c9: #FEF2F2;
+            --ink-violet: #5B21B6;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F5F3FF; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 45%,var(--c8) 85%,var(--c2) 120%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(76,29,149,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(237,233,254,.22) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c3); font-size:96px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c3); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c6); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(124,58,237,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(124,58,237,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c2),var(--c5));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.pink { color:var(--c2); }
+        .icon-box i.gold { color:var(--c5); }
+        .icon-box i.deep { color:var(--c4); }
+        .icon-box i.rose { color:var(--c8); }
+        .icon-box i.green { color:var(--c10); }
+        .icon-box i.red { color:var(--c9); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#9CA3AF; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.p { color:var(--c2); }
+        ul.kl li i.g { color:var(--c5); }
+        ul.kl li i.d { color:var(--c4); }
+        ul.kl li i.r { color:var(--c8); }
+        ul.kl li i.gr { color:var(--c10); }
+        ul.kl li i.rd { color:var(--c9); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--ink-violet);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.pink { background:var(--tint-c2); color:var(--c8); }
+        .tag.gold { background:var(--c6); color:var(--ink-violet); }
+        .tag.amber { background:#FDE68A; color:var(--ink-violet); }
+        .tag.rose { background:var(--tint-c9); color:var(--c9); }
+        .tag.green { background:var(--c11); color:var(--c10); }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-pink { color:var(--c8); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c2) 60%); }
+        .hl-gold { color:var(--ink-violet); font-weight:bold; background:linear-gradient(transparent 60%, var(--c6) 60%); }
+        .hl-rose { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c9) 60%); }
+        .hl-green { color:var(--c10); font-weight:bold; background:linear-gradient(transparent 60%, var(--c11) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:var(--tint-c2);
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:var(--c6);
+            border-color:var(--c5);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c5) transparent; }
+        .bubble.v3 {
+            background:var(--tint-c9);
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c9) transparent; }
+        .bubble.v4 {
+            background:var(--c11);
+            border-color:var(--c10);
+            transform:rotate(-1deg);
+        }
+        .bubble.v4::after { border-color:var(--c10) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c5); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:var(--c3);
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+        pre.term {
+            background:var(--c4);
+            color:var(--c3);
+            padding:12px 14px;
+            border-radius:10px;
+            font-size:13px;
+            margin-top:12px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.6;
+            border-left:4px solid var(--c2);
+        }
+        pre.term .prompt { color:var(--c5); }
+        pre.term .ok { color:#34D399; }
+        pre.term .pink { color:var(--c2); }
+
+        /* フロー棒 */
+        .flow-bar {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,var(--c3) 0%,var(--tint-c2) 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .flow-bar .label { color:var(--c1); font-weight:bold; font-size:15px; }
+        .flow-bar .label.pink { color:var(--c8); }
+        .flow-bar .sep { color:var(--c5); font-size:22px; }
+
+        /* 比較テーブル */
+        .compare {
+            display:flex;
+            gap:8px;
+            margin:12px 0;
+        }
+        .compare .side {
+            flex:1;
+            padding:10px 8px;
+            border-radius:10px;
+            text-align:center;
+            font-size:14px;
+            line-height:1.5;
+        }
+        .compare .side.left {
+            background:var(--c11);
+            border:2px solid var(--c10);
+        }
+        .compare .side.right {
+            background:var(--tint-c9);
+            border:2px solid var(--c9);
+        }
+        .compare .side .ttl { font-weight:bold; display:block; margin-bottom:4px; }
+        .compare .side.left .ttl { color:var(--c10); }
+        .compare .side.right .ttl { color:var(--c9); }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--c3),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c8));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(76,29,149,.25);
+        }
+        .footer a { color:var(--c6); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:var(--c3); word-break:break-all; }
+        .footer i { color:var(--c6); }
+        .footer .note { font-size:13px; color:var(--c3); margin-top:10px; font-family:'Yomogi',cursive; }
+        .footer .refs { font-size:13px; color:var(--c3); margin-top:8px; }
+        .footer .refs a { color:var(--c6); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+            .compare { flex-direction:column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <i class="fa-solid fa-comments main" aria-hidden="true"></i>
+        <h1>Claude Code｜セッション同士 で<br>伝言 が できる よう に なった</h1>
+        <p class="sub">別々 のセッション が メッセージ を 送り合える。次 の一手 を 読む 新機能</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月9日 ／ まさおAIじっくり解説ch</p>
+    </div>
+
+    <!-- SECTION 1: 新機能の登場 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-sparkles fa-lg"></i> 第1章：セッション間通信 の 登場</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 2: セッション同士で会話 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x pink" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>セッション 同士 で 会話</h2>
+                <div class="ch">Sessions Talk to Each Other</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-paper-plane p" aria-hidden="true"></i><span>ある セッション から<br><span class="hl-pink">別 の セッション</span>へ</span></li>
+                    <li><i class="fa-solid fa-comment-dots p" aria-hidden="true"></i><span>「〇〇 やって」<br>と<span class="tag pink">依頼</span>できる</span></li>
+                    <li><i class="fa-solid fa-people-arrows p" aria-hidden="true"></i><span>双方向 で<span class="hl-pink">やり取り</span></span></li>
+                    <li><i class="fa-solid fa-network-wired p" aria-hidden="true"></i><span>複数 が<span class="tag gold">つながる</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        伝言 が<br>
+                        <span class="hl-pink">届く</span>時代 に
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: Codexアプリに感動 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart fa-5x gold" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>Codex アプリ に 感動</h2>
+                <div class="ch">Inspired by Codex App</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-mobile-screen g" aria-hidden="true"></i><span>Codex アプリ の<span class="hl-gold">UX</span></span></li>
+                    <li><i class="fa-solid fa-arrows-split-up-and-left g" aria-hidden="true"></i><span>チャット しながら<br>複数セッション を<span class="tag gold">行き来</span></span></li>
+                    <li><i class="fa-solid fa-face-surprise g" aria-hidden="true"></i><span>その 動き に<span class="hl-gold">感動</span></span></li>
+                    <li><i class="fa-solid fa-seedling g" aria-hidden="true"></i><span>ここ から<span class="tag amber">学んだ</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        「これ こそ」<br>
+                        と<span class="hl-gold">思う</span>体験
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 4: Resume と Branch の延長 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-code-branch fa-5x deep" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>Resume と Branch の 延長</h2>
+                <div class="ch">Beyond Resume and Branch</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clock-rotate-left d" aria-hidden="true"></i><span>Resume で<span class="hl">続き</span>から</span></li>
+                    <li><i class="fa-solid fa-code-branch d" aria-hidden="true"></i><span>Branch で<span class="tag">分岐</span></span></li>
+                    <li><i class="fa-solid fa-plus d" aria-hidden="true"></i><span>さらに その 先 の<span class="hl">一歩</span></span></li>
+                    <li><i class="fa-solid fa-arrow-up-right-from-square d" aria-hidden="true"></i><span>セッション 間 の<span class="tag gold">通信</span>へ</span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-clock-rotate-left"></i> Resume</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label pink"><i class="fa-solid fa-code-branch"></i> Branch</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label"><i class="fa-solid fa-envelope"></i> 通信</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 2: 未来を見据えた機能 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-rocket fa-lg"></i> 第2章：Claude アプリ への 布石</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 5: Claude アプリへの布石 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-microphone-lines fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>Claude アプリ への 布石</h2>
+                <div class="ch">Paving the Way for Claude App</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-mobile-screen" aria-hidden="true"></i><span>Codex の よう な<span class="hl">アプリ</span>が</span></li>
+                    <li><i class="fa-solid fa-microphone" aria-hidden="true"></i><span>ボイス で 操作 する<span class="tag">未来</span></span></li>
+                    <li><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i><span>その時 に<span class="hl">活きる</span></span></li>
+                    <li><i class="fa-solid fa-flag" aria-hidden="true"></i><span>セッション 間 の<span class="tag gold">通信</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        声 で 伝言 を<br>
+                        <span class="hl">回せる</span>未来
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 6: エージェントSDKと相性 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-puzzle-piece fa-5x pink" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>エージェント SDK と 相性 良し</h2>
+                <div class="ch">Fits the Agent SDK</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cubes p" aria-hidden="true"></i><span>エージェント SDK との<span class="hl-pink">連携</span></span></li>
+                    <li><i class="fa-solid fa-handshake p" aria-hidden="true"></i><span>複数エージェント の<span class="tag pink">協調</span></span></li>
+                    <li><i class="fa-solid fa-gear p" aria-hidden="true"></i><span>仕組み として<span class="hl-pink">自然</span></span></li>
+                    <li><i class="fa-solid fa-thumbs-up p" aria-hidden="true"></i><span>拡張性 も<span class="tag gold">高い</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        SDK と 組み合わせて<br>
+                        <span class="hl-pink">強力</span>に
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 3: 実際の使い方 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-terminal fa-lg"></i> 第3章：実際 の 使い方</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 8: /list-agents コマンド -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-list fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>/list-agents で 一覧</h2>
+                <div class="ch">List All Sessions</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-keyboard" aria-hidden="true"></i><span>コマンド：<span class="hl">/list-agents</span></span></li>
+                    <li><i class="fa-solid fa-table-list" aria-hidden="true"></i><span>セッション の<span class="tag">一覧</span>を表示</span></li>
+                    <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>複数 が 動いてる のを<span class="hl">確認</span></span></li>
+                    <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>まず は<span class="tag gold">見る</span>だけ</span></li>
+                </ul>
+                <pre class="term"><span class="prompt">&gt;</span> /list-agents
+<span class="ok">→ セッション一覧 が 表示</span></pre>
+            </div>
+        </div>
+
+        <!-- CARD 9: セッションIDをコピー -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-copy fa-5x pink" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>ID を コピー する</h2>
+                <div class="ch">Copy the Session ID</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-fingerprint p" aria-hidden="true"></i><span>送り先 の<span class="hl-pink">セッションID</span></span></li>
+                    <li><i class="fa-solid fa-clipboard p" aria-hidden="true"></i><span>それ を<span class="tag pink">コピー</span></span></li>
+                    <li><i class="fa-solid fa-bullseye p" aria-hidden="true"></i><span>宛先 を<span class="hl-pink">指定</span></span></li>
+                    <li><i class="fa-solid fa-arrow-right p" aria-hidden="true"></i><span>これ で<span class="tag gold">準備OK</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        宛先 は ID で<br>
+                        <span class="hl-pink">ピンポイント</span>に
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 10: リクエストを送る -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-paper-plane fa-5x gold" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>リクエスト を 送る</h2>
+                <div class="ch">Send the Request</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comment g" aria-hidden="true"></i><span>「〇〇 やって」<br>と<span class="hl-gold">依頼</span></span></li>
+                    <li><i class="fa-solid fa-share g" aria-hidden="true"></i><span>別 のセッション へ<span class="tag gold">送信</span></span></li>
+                    <li><i class="fa-solid fa-inbox g" aria-hidden="true"></i><span>相手 側 に<span class="hl-gold">届く</span></span></li>
+                    <li><i class="fa-solid fa-play g" aria-hidden="true"></i><span>相手 が<span class="tag amber">対応</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-paper-plane"></i> 送信</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label pink"><i class="fa-solid fa-inbox"></i> 受信</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label"><i class="fa-solid fa-play"></i> 実行</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 11: セッションAからBの例 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrow-right-arrow-left fa-5x deep" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>セッションA → B の 例</h2>
+                <div class="ch">A Asks B to Do Something</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user d" aria-hidden="true"></i><span>セッションA が<span class="hl">依頼側</span></span></li>
+                    <li><i class="fa-solid fa-user-tag d" aria-hidden="true"></i><span>セッションB が<span class="tag">受け手</span></span></li>
+                    <li><i class="fa-solid fa-comment-dots d" aria-hidden="true"></i><span>「テスト を 書いて」<br>と<span class="hl">投げる</span></span></li>
+                    <li><i class="fa-solid fa-circle-check d" aria-hidden="true"></i><span>B 側 で<span class="tag gold">処理</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        A と B が<br>
+                        <span class="hl">分業</span>できる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 12: 権限モードで承認ゲート -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved fa-5x rose" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>権限 モード で 承認 が 変わる</h2>
+                <div class="ch">Permission Modes Matter</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-sliders r" aria-hidden="true"></i><span>送信側 と 受信側 の<span class="hl-rose">組み合わせ</span></span></li>
+                    <li><i class="fa-solid fa-door-open r" aria-hidden="true"></i><span>その 両方 で<span class="tag rose">変わる</span></span></li>
+                    <li><i class="fa-solid fa-circle-question r" aria-hidden="true"></i><span>承認ゲート が<br><span class="hl-rose">要る か 要らない か</span></span></li>
+                    <li><i class="fa-solid fa-scale-balanced r" aria-hidden="true"></i><span>柔軟 な<span class="tag amber">制御</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c9);"></i>
+                        組み合わせ で<br>
+                        <span class="hl-rose">挙動</span>が変わる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 13: skip-permissions同士は直接通信 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-bolt-lightning fa-5x green" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>skip-permissions 同士 は 直接</h2>
+                <div class="ch">Direct When Both Skip</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-bolt gr" aria-hidden="true"></i><span>両方 とも<br><span class="hl-green">--dangerously-skip-permissions</span></span></li>
+                    <li><i class="fa-solid fa-circle-check gr" aria-hidden="true"></i><span>その 場合 は<span class="tag green">直接</span>通信</span></li>
+                    <li><i class="fa-solid fa-road gr" aria-hidden="true"></i><span>ゲート なし で<span class="hl-green">届く</span></span></li>
+                    <li><i class="fa-solid fa-gauge-high gr" aria-hidden="true"></i><span>スピード は<span class="tag gold">速い</span></span></li>
+                </ul>
+                <div class="compare">
+                    <div class="side left">
+                        <span class="ttl"><i class="fa-solid fa-bolt"></i> 両方 skip</span>
+                        直接 つながる
+                    </div>
+                    <div class="side right">
+                        <span class="ttl"><i class="fa-solid fa-shield"></i> それ以外</span>
+                        承認 が 要る
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 14: skip → manual は承認ゲート -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-check fa-5x rose" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>skip → manual は 承認</h2>
+                <div class="ch">Approval Gate for Manual</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-person-walking r" aria-hidden="true"></i><span>受信側 が<br><span class="hl-rose">manual モード</span>なら</span></li>
+                    <li><i class="fa-solid fa-hand r" aria-hidden="true"></i><span>承認 の<span class="tag rose">ゲート</span>が登場</span></li>
+                    <li><i class="fa-solid fa-circle-check r" aria-hidden="true"></i><span>人 が 確認 してから<span class="hl-rose">進む</span></span></li>
+                    <li><i class="fa-solid fa-lock r" aria-hidden="true"></i><span>安全 さ が<span class="tag amber">保たれる</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c9);"></i>
+                        manual 側 は<br>
+                        <span class="hl-rose">人</span>が審査
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 15: 自分の発言にはならない -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-5x red" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>自分 の 発言 に は ならない</h2>
+                <div class="ch">Not Your Own Message</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-info rd" aria-hidden="true"></i><span>届いた メッセージ は<br><span class="hl-rose">自分 の 発言 扱い</span>で ない</span></li>
+                    <li><i class="fa-solid fa-user-slash rd" aria-hidden="true"></i><span>あく まで<span class="tag rose">外部</span>から</span></li>
+                    <li><i class="fa-solid fa-eye rd" aria-hidden="true"></i><span>文脈 として<span class="hl-rose">見える</span></span></li>
+                    <li><i class="fa-solid fa-lightbulb rd" aria-hidden="true"></i><span>この 区別 が<span class="tag amber">大事</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c9);"></i>
+                        「自分 が 言った」<br>
+                        に は<span class="hl-rose">ならない</span>よ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 16: /compact は実行されない -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-ban fa-5x deep" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>/compact は 文字 として 届く</h2>
+                <div class="ch">Commands Arrive as Text</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-font d" aria-hidden="true"></i><span>本文 に コマンド が あっても</span></li>
+                    <li><i class="fa-solid fa-quote-right d" aria-hidden="true"></i><span>ただ の<span class="hl">文字</span>として届く</span></li>
+                    <li><i class="fa-solid fa-ban d" aria-hidden="true"></i><span>/compact は<span class="tag rose">実行されない</span></span></li>
+                    <li><i class="fa-solid fa-shield d" aria-hidden="true"></i><span>安全 な<span class="tag gold">作り</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        文字 は 文字。<br>
+                        <span class="hl">勝手</span>に動かない
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SECTION 4: ユースケースと発展 -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-lightbulb fa-lg"></i> 第4章：ユースケース と 発展</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 17: 確認ダイアログに使えない -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-window-restore fa-5x rose" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>確認 ダイアログ に は 使えない</h2>
+                <div class="ch">Can't Answer Dialogs</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-window-maximize r" aria-hidden="true"></i><span>確認ダイアログ の<span class="hl-rose">回答</span>として</span></li>
+                    <li><i class="fa-solid fa-xmark r" aria-hidden="true"></i><span>届いたメッセージ は<span class="tag rose">使えない</span></span></li>
+                    <li><i class="fa-solid fa-hand-pointer r" aria-hidden="true"></i><span>人 が 直接<span class="hl-rose">答える</span>必要</span></li>
+                    <li><i class="fa-solid fa-circle-exclamation r" aria-hidden="true"></i><span>ここ は<span class="tag amber">要注意</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c9);"></i>
+                        ダイアログ は<br>
+                        <span class="hl-rose">手動</span>で答える
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 18: コンテキストが溜まったら -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project fa-5x gold" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>コンテキスト が 溜まったら</h2>
+                <div class="ch">Offload to a Fresh Session</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-database g" aria-hidden="true"></i><span>古いセッション は<br><span class="hl-gold">コンテキスト</span>が重い</span></li>
+                    <li><i class="fa-solid fa-forward g" aria-hidden="true"></i><span>新しい セッション へ<span class="tag gold">指示出し</span></span></li>
+                    <li><i class="fa-solid fa-feather g" aria-hidden="true"></i><span>軽い 伝言 の<span class="hl-gold">感覚</span>で</span></li>
+                    <li><i class="fa-solid fa-rotate g" aria-hidden="true"></i><span>負担 を<span class="tag amber">分散</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                        重い ところ から<br>
+                        <span class="hl-gold">軽い</span>ところへ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 19: agmsgとの比較 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-code-compare fa-5x" style="animation:fa-bounce 2s infinite; color:var(--c1);" aria-hidden="true"></i>
+                <h2>agmsg と 似た パターン</h2>
+                <div class="ch">Like the agmsg OSS</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-brands fa-github" aria-hidden="true"></i><span><span class="hl">agmsg</span>（GitHub の OSS）</span></li>
+                    <li><i class="fa-solid fa-equals" aria-hidden="true"></i><span>同じ よう な<span class="tag">発想</span></span></li>
+                    <li><i class="fa-solid fa-crown" aria-hidden="true"></i><span>今回は<span class="hl">純正</span>で登場</span></li>
+                    <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>公式 の だけ あって<span class="tag gold">安心</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        OSS が 先 だった、<br>
+                        でも<span class="hl">純正</span>の意義 は 大きい
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 20: Managed Agent の更新 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-gears fa-5x pink" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>Managed Agent も 更新</h2>
+                <div class="ch">Managed Agent Updates</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-coins p" aria-hidden="true"></i><span>セッション ごと に<br><span class="hl-pink">予算 上限</span>を設定</span></li>
+                    <li><i class="fa-solid fa-book-bookmark p" aria-hidden="true"></i><span>リポジトリ 連携 で<br><span class="tag pink">スキル</span>を読み込み</span></li>
+                    <li><i class="fa-solid fa-user-tie p" aria-hidden="true"></i><span>アドバイザーモード の<span class="hl-pink">追加</span></span></li>
+                    <li><i class="fa-solid fa-arrow-up p" aria-hidden="true"></i><span>管理 が<span class="tag gold">細かく</span>できる</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                        予算 も スキル も<br>
+                        <span class="hl-pink">自在</span>に
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="footer">
+        <p class="src">
+            <i class="fa-solid fa-clapperboard"></i>
+            動画：<a href="https://www.youtube.com/watch?v=zFqO0YLGreA" target="_blank" rel="noopener">まさおAIじっくり解説ch「Claude Code のセッション同士で伝言が可能へ」</a>
+        </p>
+        <p class="url">
+            <i class="fa-solid fa-link"></i>
+            https://www.youtube.com/watch?v=zFqO0YLGreA
+        </p>
+        <p class="refs">
+            参考：<a href="https://github.com/fujibee/agmsg" target="_blank" rel="noopener">agmsg (GitHub)</a> ／
+            <a href="https://x.com/ClaudeDevs/status/2085817074816070014" target="_blank" rel="noopener">Claude Code devs (X)</a>
+        </p>
+        <p class="note">
+            このインフォグラフィック は 動画内容 を もと に 作成 しました
+        </p>
+    </div>
+
+</div>
+</body>
+</html>

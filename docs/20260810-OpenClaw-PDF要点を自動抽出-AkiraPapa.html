@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>資料、もう自分で読まなくていい｜OpenClawはPDFを渡すだけ</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* ターコイズ × サンゴ 独自テーマ */
+            --c1: #0D9488;   /* Teal 600 - ターコイズ メイン */
+            --c2: #F472B6;   /* Pink 400 - サンゴピンク */
+            --c3: #CCFBF1;   /* Teal 100 - 薄ターコイズ 背景 */
+            --c4: #134E4A;   /* Teal 900 - 深いターコイズ */
+            --c5: #14B8A6;   /* Teal 500 - 鮮やかターコイズ */
+            --c6: #FECDD3;   /* Rose 200 - 桃サンゴ */
+            --c7: #F0FDFA;   /* Teal 50 - ごく薄い水色 */
+            --c8: #FB7185;   /* Rose 400 - 鮮やかサンゴ */
+            --c9: #F43F5E;   /* Rose 500 - つよいサンゴ */
+            --c10: #F97316;  /* Orange 500 - アクセント */
+            /* 派生 */
+            --ink-teal: #134E4A;
+            --ink-coral: #9F1239;
+            --tint-teal: #CCFBF1;
+            --tint-coral: #FFE4E6;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F0FDFA; font-family:'Kaisei Decol',sans-serif; color:#2D2D2D; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 40%,var(--c8) 80%,var(--c2) 115%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(13,148,136,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(204,251,241,.28) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c6); font-size:7em; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--tint-teal); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c6); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(13,148,136,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(251,113,133,.20); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c8));
+        }
+        .card.teal::before { background:linear-gradient(90deg,var(--c4),var(--c1),var(--c5)); }
+        .card.coral::before { background:linear-gradient(90deg,var(--c2),var(--c8),var(--c9)); }
+        .card.aqua::before { background:linear-gradient(90deg,var(--c1),var(--c5),var(--c4)); }
+        .card.mixed::before { background:linear-gradient(90deg,var(--c5),var(--c8),var(--c2)); }
+        .card.orange::before { background:linear-gradient(90deg,var(--c10),var(--c8),var(--c9)); }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:5em; }
+        .icon-box i.coral { color:var(--c8); }
+        .icon-box i.aqua { color:var(--c5); }
+        .icon-box i.teal { color:var(--c4); }
+        .icon-box i.mixed { color:var(--c2); }
+        .icon-box i.bright { color:var(--c9); }
+        .icon-box i.orange { color:var(--c10); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#6B7280; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.o { color:var(--c8); }
+        ul.kl li i.a { color:var(--c5); }
+        ul.kl li i.m { color:var(--c2); }
+        ul.kl li i.g { color:var(--c4); }
+        ul.kl li i.b { color:var(--c9); }
+        ul.kl li i.x { color:var(--c10); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--ink-teal);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.coral { background:var(--tint-coral); color:var(--ink-coral); }
+        .tag.bright { background:var(--c6); color:var(--c9); }
+        .tag.orange { background:#FFEDD5; color:#9A3412; }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-coral { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-coral) 60%); }
+        .hl-orange { color:#9A3412; font-weight:bold; background:linear-gradient(transparent 60%, #FFEDD5 60%); }
+        .hl-aqua { color:var(--c4); font-weight:bold; background:linear-gradient(transparent 60%, #99F6E4 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:var(--tint-coral);
+            border-color:var(--c8);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c8) transparent; }
+        .bubble.v2 {
+            background:#FEF9C3;
+            border-color:var(--c10);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c10) transparent; }
+        .bubble.v3 {
+            background:var(--c3);
+            border-color:var(--c5);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c5) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#2D2D2D; }
+        .hw i { color:var(--c8); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:var(--tint-teal);
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+
+        /* フローバー */
+        .flow-bar {
+            display:flex;
+            align-items:center;
+            gap:10px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,var(--c3) 0%,var(--tint-coral) 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .flow-bar .label { color:var(--c1); font-weight:bold; font-size:15px; }
+        .flow-bar .label.coral { color:var(--c9); }
+        .flow-bar .sep { color:var(--c8); font-size:22px; }
+
+        /* チャット模擬 */
+        .chat-mock {
+            background:var(--c7);
+            border-radius:12px;
+            padding:12px;
+            margin:12px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:14px;
+        }
+        .chat-mock .msg {
+            background:#fff;
+            border-radius:14px 14px 14px 4px;
+            padding:8px 12px;
+            margin:6px 0;
+            display:inline-block;
+            max-width:88%;
+            box-shadow:1px 1px 4px rgba(0,0,0,.06);
+        }
+        .chat-mock .msg.ai {
+            background:var(--tint-coral);
+            border-radius:14px 14px 4px 14px;
+            margin-left:0;
+        }
+        .chat-mock .msg .who { font-size:11px; color:#6B7280; margin-bottom:2px; }
+
+        /* ステップ番号バッジ */
+        .step-num {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:24px; height:24px;
+            background:var(--c1);
+            color:#fff;
+            border-radius:50%;
+            font-size:13px;
+            font-weight:bold;
+            margin-right:8px;
+        }
+        .step-num.o { background:var(--c8); }
+        .step-num.a { background:var(--c5); }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--c3),var(--tint-coral),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* 比較テーブル */
+        .compare {
+            margin:12px 0;
+            border-radius:10px;
+            overflow:hidden;
+        }
+        .compare .row {
+            display:flex;
+            padding:8px 10px;
+            align-items:center;
+            font-size:14px;
+        }
+        .compare .row.head {
+            background:var(--c4);
+            color:#fff;
+            font-weight:bold;
+        }
+        .compare .row.a { background:var(--tint-coral); }
+        .compare .row.b { background:var(--c3); }
+        .compare .row > div:first-child { flex:0 0 32%; font-weight:bold; }
+        .compare .row > div:nth-child(2) { flex:1; }
+
+        /* タグクラウド */
+        .tag-cloud { margin:14px 0; text-align:center; }
+        .tag-cloud .tag { margin:4px; font-size:15px; padding:4px 11px; }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c8));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(19,78,74,.25);
+        }
+        .footer a { color:var(--c6); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:var(--c6); word-break:break-all; }
+        .footer i { color:var(--c6); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <i class="fa-solid fa-file-pdf fa-7x main" aria-hidden="true"></i>
+        <h1>資料、もう 自分で 読まなくて いい。<br>OpenClawは PDFを 渡すだけ</h1>
+        <p class="sub">PDFを そのまま 渡して、要点を きくだけ。手で 写す 時間は もう いりません</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月10日 ／ あきらパパの AI 活用 学習 部屋</p>
+    </div>
+
+    <!-- ============ セクション1: OpenClawって なに？ ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-circle-question"></i> OpenClawって なに？</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1: OpenClawとは -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-robot aqua fa-5x" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>OpenClawとは</h2>
+                <p class="ch">あなたの そばに いる AI</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-paw g"></i><span>パーソナル <span class="tag">AI エージェント</span></span></li>
+                    <li><i class="fa-solid fa-comments g"></i><span>Discordで <span class="hl">話しかけるだけ</span></span></li>
+                    <li><i class="fa-solid fa-file-pdf g"></i><span>PDFを 渡すと <span class="tag">要点を 返す</span></span></li>
+                    <li><i class="fa-solid fa-arrows-up-to-line g"></i><span>自分で <span class="hl">良く なっていく</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-lightbulb g"></i> 「開いて、読んで、まとめる」<br>この 手間を、ぜんぶ <span class="hl">AIに まかせる</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: Discordで動く -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-brands fa-discord coral fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>Discordで 動く AI</h2>
+                <p class="ch">話しかけるだけで 起動</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-message o"></i><span>チャットに <span class="tag coral">書き込む</span> だけ</span></li>
+                    <li><i class="fa-solid fa-paper-plane o"></i><span>ファイルも <span class="hl-coral">そのまま 投稿</span></span></li>
+                    <li><i class="fa-solid fa-mobile-screen-button o"></i><span>スマホからでも <span class="tag coral">そのまま 使える</span></span></li>
+                </ul>
+                <div class="chat-mock">
+                    <div class="msg"><span class="who">あなた</span>これ、三行で まとめて📄</div>
+                    <div class="msg ai"><span class="who">OpenClaw</span>かしこまりました。要点は...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: 自己改善型 -->
+        <div class="card aqua">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrows-rotate aqua fa-5x" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>じぶんを 改善する AI</h2>
+                <p class="ch">使うほどに 賢く なる</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-brain a"></i><span>過去の やりとりを <span class="tag">おぼえている</span></span></li>
+                    <li><i class="fa-solid fa-pen-to-square a"></i><span>指摘すれば <span class="hl-aqua">次に いかす</span></span></li>
+                    <li><i class="fa-solid fa-chart-line a"></i><span>くりかえすほど <span class="tag">あうようになる</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-heart g"></i> 最初は ぎこちなくても、<br><span class="hl">あなたの 仕事ぶり</span>に 合っていく。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション2: PDFを渡すだけ ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-file-arrow-up"></i> PDFを 渡す だけ</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード4: PDFを渡して要点抽出 -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-file-circle-question aqua fa-5x" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>PDFを 渡して 要点を きく</h2>
+                <p class="ch">本文を ひらく 必要 なし</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-upload g"></i><span>ファイルを <span class="tag">そのまま 投稿</span></span></li>
+                    <li><i class="fa-solid fa-comment-dots g"></i><span>「要点を 教えて」と <span class="hl">一文だけ</span></span></li>
+                    <li><i class="fa-solid fa-list-check g"></i><span>AIが <span class="tag">要点を まとめる</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-file-pdf"></i> PDF投稿</span>
+                    <span class="sep"><i class="fa-solid fa-arrow-right"></i></span>
+                    <span class="label coral"><i class="fa-solid fa-scroll"></i> 要点ゲット</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: 従来の手作業との違い -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced coral fa-5x" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>今までと どう ちがう</h2>
+                <p class="ch">手作業 vs OpenClaw</p>
+            </div>
+            <div class="body">
+                <div class="compare">
+                    <div class="row head"><div>手順</div><div>比較</div></div>
+                    <div class="row a"><div><i class="fa-solid fa-hand"></i> 従来</div><div>開いて、読んで、要点を 手で 写す</div></div>
+                    <div class="row b"><div><i class="fa-solid fa-robot"></i> OpenClaw</div><div>渡して、きくだけ</div></div>
+                </div>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-clock o"></i> 読む 時間も、<span class="hl-coral">写す 時間</span> も、<br>まるごと なくなります。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: 一度に10件まで -->
+        <div class="card aqua">
+            <div class="icon-box">
+                <i class="fa-solid fa-layer-group aqua fa-5x" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>一度に 10件 まで まとめて</h2>
+                <p class="ch">一括で 渡せる</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-files a"></i><span>まとめて <span class="tag">10個まで 投稿</span></span></li>
+                    <li><i class="fa-solid fa-grip a"></i><span>ばらばらに <span class="hl-aqua">何度も</span> しなくて OK</span></li>
+                    <li><i class="fa-solid fa-table-list a"></i><span>結果も <span class="tag">いっぺんに</span> 返ってくる</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-lightbulb a"></i> まとめ資料を つくるとき、<br><span class="hl-aqua">10個 ひとまとめ</span> で たのめる。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション3: ページ指定・パスワード ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-sliders"></i> ここを さわれる</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード7: ページ指定 -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-file-lines aqua fa-5x" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>いる ページ だけ 指定</h2>
+                <p class="ch">1-5 や 1,3,7-9 の ように</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 g"></i><span>範囲で <span class="tag">1-5</span> と 書ける</span></li>
+                    <li><i class="fa-solid fa-list-ol g"></i><span>とびとびで <span class="hl">1,3,7-9</span> も OK</span></li>
+                    <li><i class="fa-solid fa-bullseye g"></i><span>ぜんぶ 読む 必要は <span class="tag">ない</span></span></li>
+                </ul>
+                <pre>例:
+「1-3 ページと
+ 7 ページだけ
+ 要約して」</pre>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-thumbtack g"></i> みたい 所 だけ <span class="hl">ピンポイント</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: パスワード付き -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-lock coral fa-5x" style="animation:fa-flip 2.8s infinite;" aria-hidden="true"></i>
+                <h2>パスワード 付き でも 読める</h2>
+                <p class="ch">合言葉を いっしょに 渡す</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-key o"></i><span><span class="tag coral">合言葉</span> を 一緒に 投稿</span></li>
+                    <li><i class="fa-solid fa-unlock o"></i><span>ロック された 資料も <span class="hl-coral">開ける</span></span></li>
+                    <li><i class="fa-solid fa-shield-halved o"></i><span>社外秘や <span class="tag coral">限定 資料</span> にも 対応</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-key o"></i> 「パスは 〇〇」と<br>ひと言 そえる <span class="hl-coral">だけ</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: モデルにより 使えないことも -->
+        <div class="card mixed">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-info mixed fa-5x" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>モデルにより 制限 あり</h2>
+                <p class="ch">ページ指定・合言葉 は 要 確認</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-triangle-exclamation m"></i><span>ページ指定 は <span class="tag coral">機種による</span></span></li>
+                    <li><i class="fa-solid fa-lock-open m"></i><span>合言葉 も <span class="hl-coral">全部 ではない</span></span></li>
+                    <li><i class="fa-solid fa-circle-check m"></i><span>使えない 場合は <span class="tag coral">別の 機種で</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-circle-info o"></i> つかう 前に <span class="hl-coral">対応 表</span> を<br>ざっと みて おくと 安心。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション4: 上限を知っておく ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-ruler"></i> 上限を 知って おく</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード10: 1ファイル 10MB -->
+        <div class="card aqua">
+            <div class="icon-box">
+                <i class="fa-solid fa-database aqua fa-5x" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>1ファイル 10MB まで</h2>
+                <p class="ch">初期の 上限</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-weight-hanging a"></i><span>1つ あたり <span class="tag">10MB まで</span></span></li>
+                    <li><i class="fa-solid fa-circle-info a"></i><span>初期設定の <span class="hl-aqua">既定の 値</span></span></li>
+                    <li><i class="fa-solid fa-sliders a"></i><span>変更 できる 場合も <span class="tag">ある</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-file-zipper a"></i> おもい PDFは、<br><span class="hl-aqua">軽く してから</span> 渡すと たしか。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: 20ページまで -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-copy aqua fa-5x" style="animation:fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+                <h2>20ページ まで</h2>
+                <p class="ch">ページ数の 上限</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file g"></i><span>1ファイル <span class="tag">最大 20ページ</span></span></li>
+                    <li><i class="fa-solid fa-scissors g"></i><span>長い 資料は <span class="hl">ページ指定 で</span></span></li>
+                    <li><i class="fa-solid fa-circle-question g"></i><span>分けて 渡すのも <span class="tag">あり</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-lightbulb g"></i> 1-20 ページなら OK。<br>それより 長い ときは <span class="hl">わけよう</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: 上限の まとめ -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-list coral fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>上限を ひとめで</h2>
+                <p class="ch">覚えて おきたい 数字</p>
+            </div>
+            <div class="body">
+                <div class="compare">
+                    <div class="row head"><div>項目</div><div>初期の 上限</div></div>
+                    <div class="row a"><div><i class="fa-solid fa-weight-hanging"></i> サイズ</div><div>10MB まで</div></div>
+                    <div class="row b"><div><i class="fa-solid fa-copy"></i> ページ数</div><div>20ページ まで</div></div>
+                    <div class="row a"><div><i class="fa-solid fa-layer-group"></i> 一度に</div><div>10ファイル まで</div></div>
+                </div>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-circle-info o"></i> まずは <span class="hl-coral">この 3つ</span>。<br>わすれても だいたい だいじょうぶ。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション5: 今日、やってみる ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-flag-checkered"></i> 今日、 やって みる</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード13: 初回成功のステップ -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-shoe-prints aqua fa-5x" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>初回の 成功 手順</h2>
+                <p class="ch">手もとから 1つ 選ぶ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><span class="step-num">1</span><span>手もと の <span class="tag">資料を 選ぶ</span></span></li>
+                    <li><span class="step-num">2</span><span>PDFを <span class="hl">そのまま 投稿</span></span></li>
+                    <li><span class="step-num">3</span><span>「三行で 要約して」と <span class="tag">たのむ</span></span></li>
+                    <li><span class="step-num a">4</span><span>結果を <span class="hl-aqua">確認</span> して 終わり</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-lightbulb a"></i> これだけで <span class="hl-aqua">初回 成功</span>。<br>むずかしい 設定は ひつよう ない。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: 三行で要約して -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-align-left coral fa-5x" style="animation:fa-flip 2.6s infinite;" aria-hidden="true"></i>
+                <h2>「三行で 要約して」</h2>
+                <p class="ch">いちばん やさしい 最初の 一歩</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-quote-left o"></i><span>シンプルな <span class="tag coral">お願い 文</span></span></li>
+                    <li><i class="fa-solid fa-list-ol o"></i><span>三行 という <span class="hl-coral">制限 つき</span></span></li>
+                    <li><i class="fa-solid fa-bolt o"></i><span>短いから <span class="tag coral">すぐ かえる</span></span></li>
+                </ul>
+                <div class="chat-mock">
+                    <div class="msg"><span class="who">あなた</span>これ、三行で 要約して📄</div>
+                    <div class="msg ai"><span class="who">OpenClaw</span>①要点は...<br>②つぎに...<br>③さいごに...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: うまくいけば そのまま終わる -->
+        <div class="card aqua">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-check aqua fa-5x" style="animation:fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+                <h2>十分 なら、その まま 終わり</h2>
+                <p class="ch">無理に 深掘り しない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-thumbs-up a"></i><span>要点が <span class="tag">たりれば OK</span></span></li>
+                    <li><i class="fa-solid fa-forward a"></i><span>次の 仕事に <span class="hl-aqua">すぐ うつれる</span></span></li>
+                    <li><i class="fa-solid fa-fire a"></i><span>もっと ほしい 場合は <span class="tag">追加で</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw"><i class="fa-solid fa-face-smile a"></i> 「これで 十分」なら、<br><span class="hl-aqua">それで かんぺき</span>。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション6: こういう時に 便利 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-briefcase"></i> こういう 時に 便利</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード16: 仕事の資料 -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-briefcase aqua fa-5x" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>仕事の 資料を</h2>
+                <p class="ch">会議前の 予習に</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-powerpoint g"></i><span>提案書や <span class="tag">企画書</span></span></li>
+                    <li><i class="fa-solid fa-handshake g"></i><span>会議の <span class="hl">事前 打ち合わせ</span></span></li>
+                    <li><i class="fa-solid fa-people-group g"></i><span>議事録の <span class="tag">要点 整理</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-clock g"></i> 会議の 前 に ざっと。<br><span class="hl">予習の 時間</span> が ちぢむ。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: 学習や 調べ物 -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-graduation-cap coral fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>学習や 調べ物 にも</h2>
+                <p class="ch">論文や テキスト まとめ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-book o"></i><span>論文の <span class="tag coral">アブストラクト</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass o"></i><span>しらべものの <span class="hl-coral">とっかかり</span></span></li>
+                    <li><i class="fa-solid fa-bookmark o"></i><span>読む 前の <span class="tag coral">下調べ</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-lightbulb o"></i> あつい 本も、<br>まず <span class="hl-coral">三行</span> で つかむ。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: 他ツールとの違い -->
+        <div class="card mixed">
+            <div class="icon-box">
+                <i class="fa-solid fa-code-compare mixed fa-5x" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>他の ツールと どう 違う</h2>
+                <p class="ch">チャットで 住む エージェント</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-window-restore m"></i><span>ブラウザを <span class="tag coral">開かない</span></span></li>
+                    <li><i class="fa-solid fa-comments m"></i><span>いつもの <span class="hl-coral">チャットに いる</span></span></li>
+                    <li><i class="fa-solid fa-arrows-rotate m"></i><span>自動で <span class="tag coral">良く なっていく</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-paw m"></i> 住処は <span class="hl-coral">Discord</span>。<br>だから、そこで すませる。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション7: これから ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-seedling"></i> これから 広がる 可能</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード19: まだ ひろがる -->
+        <div class="card teal">
+            <div class="icon-box">
+                <i class="fa-solid fa-rocket aqua fa-5x" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>まだ まだ ひろがる</h2>
+                <p class="ch">PDF だけに とどまらない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-image g"></i><span>画像や <span class="tag">別の 形式</span> へ</span></li>
+                    <li><i class="fa-solid fa-table-columns g"></i><span>表や <span class="hl">グラフの 読みとり</span></span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles g"></i><span>要約 先も <span class="tag">くわしく なっていく</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-seedling g"></i> はじめは <span class="hl">三行</span>。<br>そのうち、もっと できる ように。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード20: まとめとアクション -->
+        <div class="card coral">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag coral fa-5x" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>まとめ ／ 今日の アクション</h2>
+                <p class="ch">まずは ひとつ、ためす</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-check o"></i><span>PDFを <span class="tag coral">そのまま 渡す</span></span></li>
+                    <li><i class="fa-solid fa-align-left o"></i><span>「三行で」と <span class="hl-coral">たのむ だけ</span></span></li>
+                    <li><i class="fa-solid fa-layer-group o"></i><span>10件、20ページ、<span class="tag coral">10MB まで</span></span></li>
+                    <li><i class="fa-solid fa-shoe-prints o"></i><span>今日、手もとから <span class="hl-coral">ひとつ</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-file-pdf"></i> PDF選ぶ</span>
+                    <span class="sep"><i class="fa-solid fa-arrow-right"></i></span>
+                    <span class="label coral"><i class="fa-solid fa-align-left"></i> 三行で</span>
+                    <span class="sep"><i class="fa-solid fa-arrow-right"></i></span>
+                    <span class="label"><i class="fa-solid fa-circle-check"></i> 終わり</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- キーワードタグ (カード扱い) -->
+        <div class="card aqua">
+            <div class="icon-box">
+                <i class="fa-solid fa-tags aqua fa-5x" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>キーワード</h2>
+                <p class="ch">おぼえて おきたい 言葉</p>
+            </div>
+            <div class="body">
+                <div class="tag-cloud">
+                    <span class="tag">OpenClaw</span>
+                    <span class="tag coral">PDF 要点</span>
+                    <span class="tag">三行で</span>
+                    <span class="tag coral">ページ指定</span>
+                    <span class="tag">10MB</span>
+                    <span class="tag coral">20ページ</span>
+                    <span class="tag">Discord</span>
+                    <span class="tag coral">パスワード対応</span>
+                    <span class="tag">10ファイルまで</span>
+                    <span class="tag coral">自己改善型</span>
+                </div>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-bookmark a"></i> この 言葉だけ <span class="hl-aqua">おさえて おけば</span> OK。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ フッター ============ -->
+    <div class="footer">
+        <p class="src"><i class="fa-brands fa-youtube"></i> 🎬 動画: <a href="https://www.youtube.com/watch?v=1lzRDQQ_11E" target="_blank" rel="noopener" style="color:var(--c6);">あきらパパの AI 活用 学習 部屋「資料、もう自分で読まなくていい。OpenClawはPDFを渡すだけで要点を返す」</a></p>
+        <p class="url"><i class="fa-solid fa-link"></i> 出典: <a href="https://www.youtube.com/watch?v=1lzRDQQ_11E" target="_blank" rel="noopener">https://www.youtube.com/watch?v=1lzRDQQ_11E</a></p>
+        <p class="url" style="margin-top:6px;"><i class="fa-solid fa-book"></i> ドキュメント: <a href="https://docs.openclaw.ai/tools/pdf" target="_blank" rel="noopener">https://docs.openclaw.ai/tools/pdf</a></p>
+        <p style="margin-top:10px; font-size:12px; color:var(--tint-teal);">作成日: 2026年8月10日 ／ インフォグラフィック by Hermes Agent</p>
+    </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebMCPとは？Cloudflareの新機能で変わるサイト設計</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：サフラン × インディゴ */
+            --c1: #E8A23D;   /* サフラン - メイン金 */
+            --c2: #4338CA;   /* インディゴ 700 - 深い青紫 */
+            --c3: #FEF3C7;   /* サフラン 100 - 薄金 */
+            --c4: #312E81;   /* インディゴ 900 - 深淵 */
+            --c5: #F59E0B;   /* 琥珀 500 */
+            --c6: #FFF7ED;   /* クリーム */
+            --c7: #E0E7FF;   /* インディゴ 100 */
+            --c8: #6366F1;   /* インディゴ 500 */
+            --c9: #DC2626;   /* 警告赤 */
+            --c10: #059669;  /* セーフ緑 */
+            --c11: #D1FAE5;  /* 薄ミント */
+            --c12: #F97316;  /* オレンジ 500 */
+            --tint-c2: #EEF2FF;
+            --tint-c9: #FEF2F2;
+            --tint-c12: #FFF7ED;
+            --ink-indigo: #3730A3;
+            --ink-saffron: #92400E;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FFF7ED; font-family:'Kaisei Decol',sans-serif; color:#333; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c2) 45%,var(--c8) 75%,var(--c1) 120%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(49,46,129,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(255,247,237,.22) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c3); font-size:96px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.28); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.3); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c3); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c6); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(67,56,202,.12);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(67,56,202,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c8));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c2); font-size:58px; }
+        .icon-box i.gold { color:var(--c1); }
+        .icon-box i.deep { color:var(--c4); }
+        .icon-box i.indigo { color:var(--c8); }
+        .icon-box i.orange { color:var(--c12); }
+        .icon-box i.green { color:var(--c10); }
+        .icon-box i.red { color:var(--c9); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#9CA3AF; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c2); min-width:18px; margin-top:4px; }
+        ul.kl li i.g { color:var(--c1); }
+        ul.kl li i.d { color:var(--c4); }
+        ul.kl li i.id { color:var(--c8); }
+        ul.kl li i.o { color:var(--c12); }
+        ul.kl li i.gr { color:var(--c10); }
+        ul.kl li i.rd { color:var(--c9); }
+
+        /* タグ */
+        .tag {
+            background:var(--c7);
+            color:var(--ink-indigo);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.gold { background:var(--c3); color:var(--ink-saffron); }
+        .tag.amber { background:#FDE68A; color:var(--ink-saffron); }
+        .tag.orange { background:var(--tint-c12); color:var(--c12); }
+        .tag.red { background:var(--tint-c9); color:var(--c9); }
+        .tag.green { background:var(--c11); color:var(--c10); }
+        .tag.indigo { background:var(--c7); color:var(--c4); }
+
+        /* ハイライト */
+        .hl { color:var(--c2); font-weight:bold; background:linear-gradient(transparent 60%, var(--c7) 60%); }
+        .hl-gold { color:var(--ink-saffron); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-indigo { color:var(--c4); font-weight:bold; background:linear-gradient(transparent 60%, var(--c7) 60%); }
+        .hl-orange { color:var(--c12); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c12) 60%); }
+        .hl-red { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c9) 60%); }
+        .hl-green { color:var(--c10); font-weight:bold; background:linear-gradient(transparent 60%, var(--c11) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c2);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c2) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:var(--c3);
+            border-color:var(--c1);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c1) transparent; }
+        .bubble.v2 {
+            background:var(--c7);
+            border-color:var(--c8);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c8) transparent; }
+        .bubble.v3 {
+            background:var(--tint-c9);
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c9) transparent; }
+        .bubble.v4 {
+            background:var(--c11);
+            border-color:var(--c10);
+            transform:rotate(-1deg);
+        }
+        .bubble.v4::after { border-color:var(--c10) transparent; }
+        .bubble.v5 {
+            background:var(--tint-c12);
+            border-color:var(--c12);
+            transform:rotate(1deg);
+        }
+        .bubble.v5::after { border-color:var(--c12) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c1); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:var(--c3);
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+        pre.term {
+            background:var(--c4);
+            color:var(--c3);
+            padding:12px 14px;
+            border-radius:10px;
+            font-size:13px;
+            margin-top:12px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.6;
+            border-left:4px solid var(--c1);
+        }
+        pre.term .prompt { color:var(--c5); }
+        pre.term .ok { color:#34D399; }
+        pre.term .pink { color:var(--c8); }
+
+        /* フロー棒 */
+        .flow-bar {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,var(--c3) 0%,var(--c7) 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .flow-bar .label { color:var(--c2); font-weight:bold; font-size:15px; }
+        .flow-bar .label.gold { color:var(--ink-saffron); }
+        .flow-bar .label.indigo { color:var(--c4); }
+        .flow-bar .sep { color:var(--c5); font-size:22px; }
+
+        /* 比較テーブル */
+        .compare {
+            display:flex;
+            gap:8px;
+            margin:12px 0;
+        }
+        .compare .side {
+            flex:1;
+            padding:10px 8px;
+            border-radius:10px;
+            text-align:center;
+            font-size:14px;
+            line-height:1.5;
+        }
+        .compare .side.left {
+            background:var(--tint-c9);
+            border:2px solid var(--c9);
+        }
+        .compare .side.right {
+            background:var(--c11);
+            border:2px solid var(--c10);
+        }
+        .compare .side .ttl { font-weight:bold; display:block; margin-bottom:4px; }
+        .compare .side.left .ttl { color:var(--c9); }
+        .compare .side.right .ttl { color:var(--c10); }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--c3),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:28px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c2),var(--c1));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(49,46,129,.25);
+        }
+        .footer a { color:var(--c3); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:var(--c3); word-break:break-all; }
+        .footer i { color:var(--c3); }
+        .footer .note { font-size:13px; color:var(--c3); margin-top:10px; font-family:'Yomogi',cursive; }
+        .footer .refs { font-size:13px; color:var(--c3); margin-top:8px; }
+        .footer .refs a { color:var(--c3); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+            .compare { flex-direction:column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ====================== HEADER ====================== -->
+    <div class="header">
+        <i class="fa-solid fa-globe main" aria-hidden="true"></i>
+        <h1>WebMCP とは？<br>Cloudflare の 新機能 で 変わる<br>サイト設計 の これから</h1>
+        <p class="sub">MCP が ブラウザ に やってきた。エージェント時代 の Web を 読み解く</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月10日 ／ まさおAIじっくり解説ch</p>
+    </div>
+
+    <!-- ====================== SECTION 1: WebMCP の基礎 ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-sparkles fa-lg"></i> 第1章：WebMCP って 何 か</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 1: WebMCP とは何か -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-question fa-5x gold" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>WebMCP とは 何 か</h2>
+                <div class="ch">What is WebMCP?</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-globe g" aria-hidden="true"></i><span>Webサイト に 対して<br><span class="hl-gold">MCP</span>を 通じた 操作 を 可能 に</span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench g" aria-hidden="true"></i><span>サイト側 が<span class="tag gold">ツール</span>を 公開</span></li>
+                    <li><i class="fa-solid fa-robot g" aria-hidden="true"></i><span>AIエージェント が それ を<span class="hl-gold">呼び出し</span></span></li>
+                    <li><i class="fa-solid fa-bolt g" aria-hidden="true"></i><span>確実 で<span class="tag amber">速い</span>操作 が 実現</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c1);"></i>
+                        推測 なし で<br>
+                        <span class="hl-gold">動かせる</span>、
+                        <br>それ が 最大 の 強み
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 2: MCPのブラウザ版 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-layer-group fa-5x" style="animation:fa-flip 4s infinite; color:var(--c8);" aria-hidden="true"></i>
+                <h2>MCP の ブラウザ版 と いう 位置づけ</h2>
+                <div class="ch">MCP, Now in the Browser</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>既存 の <span class="hl">MCP 仕様</span>を そのまま 拡張</span></li>
+                    <li><i class="fa-solid fa-window-maximize" aria-hidden="true"></i><span>ブラウザ 上 で<span class="tag">動作</span></span></li>
+                    <li><i class="fa-solid fa-recycle" aria-hidden="true"></i><span>概念 は 変わらず<span class="hl-indigo">場所 が違う</span></span></li>
+                    <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>ローカル ↔ Web の<span class="tag gold">架け橋</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c8);"></i>
+                        「MCP が<br>
+                        ブラウザ に<br>
+                        <span class="hl-indigo">来ただけ</span>」
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3: 従来のブラウザ自動化の課題 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-5x red" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>従来 の ブラウザ自動化 の 課題</h2>
+                <div class="ch">Old Browser Automation Woes</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-mouse-pointer rd" aria-hidden="true"></i><span>UI を 見て<span class="hl-red">クリック位置</span>を 推測</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass rd" aria-hidden="true"></i><span>ボタン が どこ か<span class="tag red">判別</span></span></li>
+                    <li><i class="fa-solid fa-link-break rd" aria-hidden="true"></i><span>デザイン 変更 で<span class="hl-red">即ダウン</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-half rd" aria-hidden="true"></i><span>動作 が 遅く<span class="tag red">不安定</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-face-sad-tear fa-lg" style="color:var(--c9);"></i>
+                        画面 を 見て<br>
+                        <span class="hl-red">頑張って</span>操作<br>
+                        する しか なかった
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== SECTION 2: 推測と壊れやすさ ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-wrench fa-lg"></i> 第2章：推測 と 壊れやすさ の 問題</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 4: 推測で動くことの限界 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-brain fa-5x deep" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>推測 で 動く こと の 限界</h2>
+                <div class="ch">Guessing Has Limits</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-eye d" aria-hidden="true"></i><span>AI が 画面 を 読んで<span class="hl-indigo">判断</span></span></li>
+                    <li><i class="fa-solid fa-dice d" aria-hidden="true"></i><span>でも それ は<span class="tag indigo">確率</span>で しかない</span></li>
+                    <li><i class="fa-solid fa-circle-exclamation d" aria-hidden="true"></i><span>間違える と<span class="hl-red">操作ミス</span>に</span></li>
+                    <li><i class="fa-solid fa-ban d" aria-hidden="true"></i><span>確実性 が<span class="tag red">足りない</span></span></li>
+                </ul>
+                <div class="compare">
+                    <div class="side left">
+                        <span class="ttl"><i class="fa-solid fa-xmark"></i> 従来</span>
+                        見て 推測<br>確率 的
+                    </div>
+                    <div class="side right">
+                        <span class="ttl"><i class="fa-solid fa-check"></i> WebMCP</span>
+                        ツール 呼び<br>確実 的
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 5: デザイン変更で壊れる -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart-crack fa-5x red" style="animation:fa-shake 3s infinite;" aria-hidden="true"></i>
+                <h2>デザイン変更 で 簡単 に 壊れる</h2>
+                <div class="ch">Fragile Against Redesigns</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-paintbrush rd" aria-hidden="true"></i><span>サイト の リニューアル で</span></li>
+                    <li><i class="fa-solid fa-location-crosshairs rd" aria-hidden="true"></i><span>ボタン位置 が<span class="hl-red">ズレる</span></span></li>
+                    <li><i class="fa-solid fa-link-slash rd" aria-hidden="true"></i><span>自動化スクリプト が<span class="tag red">即故障</span></span></li>
+                    <li><i class="fa-solid fa-repeat rd" aria-hidden="true"></i><span>メンテ が<span class="hl-red">毎度 必要</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw">
+                        <i class="fa-solid fa-triangle-exclamation fa-lg" style="color:var(--c9);"></i>
+                        見た目 に 依存 する から<br>
+                        <span class="hl-red">壊れやすい</span>ん だ
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 6: サイトがツールを公開すると -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-store fa-5x gold" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>サイト が ツール を 公開 する と</h2>
+                <div class="ch">Sites Exposing Tools</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-tag g" aria-hidden="true"></i><span>サイト側 から<span class="hl-gold">機能</span>を 提示</span></li>
+                    <li><i class="fa-solid fa-handshake g" aria-hidden="true"></i><span>AI は それ を<span class="tag gold">使うだけ</span></span></li>
+                    <li><i class="fa-solid fa-shield-halved g" aria-hidden="true"></i><span>UI 変更 でも<span class="hl-gold">影響なし</span></span></li>
+                    <li><i class="fa-solid fa-rocket g" aria-hidden="true"></i><span>頑丈 で<span class="tag amber">長持ち</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label gold"><i class="fa-solid fa-store"></i> サイト</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label indigo"><i class="fa-solid fa-tag"></i> ツール公開</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label gold"><i class="fa-solid fa-robot"></i> エージェント呼び</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== SECTION 3: registerTool の仕組み ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-code fa-lg"></i> 第3章：registerTool で ツール を 定義</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 7: registerTool とは -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-code fa-5x indigo" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>registerTool で 定義 する</h2>
+                <div class="ch">registerTool() Defines Tools</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-function id" aria-hidden="true"></i><span><span class="hl-indigo">registerTool()</span>で 機能 を 登録</span></li>
+                    <li><i class="fa-solid fa-list-check id" aria-hidden="true"></i><span>引数 と<span class="tag indigo">戻り値</span>を 明示</span></li>
+                    <li><i class="fa-solid fa-file-signature id" aria-hidden="true"></i><span>名前 と<span class="hl-indigo">説明</span>も 必須</span></li>
+                    <li><i class="fa-solid fa-circle-check id" aria-hidden="true"></i><span>型 が ある から<span class="tag">安全</span></span></li>
+                </ul>
+                <pre>navigator.mcp.<b>registerTool</b>({
+  name: "searchItems",
+  description: "商品 を 検索",
+  input: { query: "string" },
+  run: async (args) =&gt; { ... }
+});</pre>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c8);"></i>
+                        API みた い に<br>
+                        <span class="hl-indigo">型付き</span>で 定义 できる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 8: AIエージェントが呼ぶ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-robot fa-5x orange" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>エージェント が ツール を 呼ぶ</h2>
+                <div class="ch">Agents Call the Tools</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-list-ul o" aria-hidden="true"></i><span>公開 された ツール を<span class="hl-orange">一覧</span></span></li>
+                    <li><i class="fa-solid fa-hand-pointer o" aria-hidden="true"></i><span>必要 な もの を<span class="tag orange">選択</span></span></li>
+                    <li><i class="fa-solid fa-play o" aria-hidden="true"></i><span>引数 を 渡して<span class="hl-orange">実行</span></span></li>
+                    <li><i class="fa-solid fa-arrow-rotate-left o" aria-hidden="true"></i><span>結果 を 受け取って<br><span class="tag gold">次へ</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label indigo"><i class="fa-solid fa-globe"></i> サイト</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label gold"><i class="fa-solid fa-robot"></i> 呼び出し</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label indigo"><i class="fa-solid fa-check"></i> 完了</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 9: 使う側と提供する側 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows fa-5x deep" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>使う側 と 提供する側 の 視点</h2>
+                <div class="ch">User vs Provider Perspective</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user d" aria-hidden="true"></i><span>使う側：ツール を<span class="hl-indigo">呼ぶだけ</span></span></li>
+                    <li><i class="fa-solid fa-building d" aria-hidden="true"></i><span>提供側：ツール を<span class="tag indigo">用意</span>する</span></li>
+                    <li><i class="fa-solid fa-scale-balanced d" aria-hidden="true"></i><span>役割 が<span class="hl-gold">明確</span>に 分離</span></li>
+                    <li><i class="fa-solid fa-handshake-angle d" aria-hidden="true"></i><span>合意 の 上 で<span class="tag gold">連携</span></span></li>
+                </ul>
+                <div class="compare">
+                    <div class="side left">
+                        <span class="ttl"><i class="fa-solid fa-user"></i> 使う側</span>
+                        エージェント 経由<br>ツール を 呼ぶ
+                    </div>
+                    <div class="side right">
+                        <span class="ttl"><i class="fa-solid fa-building"></i> 提供側</span>
+                        サイト が ツール<br>を 定義・公開
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== SECTION 4: Cloudflare の新機能 ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-cloud fa-lg"></i> 第4章：Cloudflare の 新機能</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 10: Cloudflare の新機能の概要 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-cloud fa-5x indigo" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>Cloudflare の 新機能 の 概要</h2>
+                <div class="ch">Cloudflare's WebMCP Features</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-server id" aria-hidden="true"></i><span>エッジ から スクリプト を<span class="hl-indigo">差し込む</span></span></li>
+                    <li><i class="fa-solid fa-code-pull-request id" aria-hidden="true"></i><span>既存 の コード は<span class="tag indigo">そのまま</span></span></li>
+                    <li><i class="fa-solid fa-toggle-on id" aria-hidden="true"></i><span>2つの 機能 を<span class="hl-indigo">ON</span>に できる</span></li>
+                    <li><i class="fa-solid fa-flask id" aria-hidden="true"></i><span>現在 は<span class="tag amber">ベータ版</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg"></i>
+                        サイト 側 は<br>
+                        <span class="hl-indigo">何も変えず</span>に<br>
+                        エージェント対応 に
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 11: コード変更ゼロ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-code fa-5x green" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>コード変更 ゼロ で MCP 対応</h2>
+                <div class="ch">Zero Code Changes</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-code gr" aria-hidden="true"></i><span>元 の HTML/JS は<span class="hl-green">触らない</span></span></li>
+                    <li><i class="fa-solid fa-syringe gr" aria-hidden="true"></i><span>エッジ が スクリプト を<span class="tag green">注入</span></span></li>
+                    <li><i class="fa-solid fa-shield gr" aria-hidden="true"></i><span>本番 へ の<span class="hl-green">影響 最小</span></span></li>
+                    <li><i class="fa-solid fa-feather gr" aria-hidden="true"></i><span>導入 ハードル は<span class="tag green">低い</span></span></li>
+                </ul>
+                <div class="bubble v4">
+                    <span class="hw">
+                        <i class="fa-solid fa-thumbs-up fa-lg" style="color:var(--c10);"></i>
+                        リリース 済み の<br>
+                        サイト でも<br>
+                        <span class="hl-green">すぐ 追加</span>できる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 12: エッジが自動でスクリプト差込 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-network-wired fa-5x gold" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>エッジ が 自動 で スクリプト を 差し込む</h2>
+                <div class="ch">Edge Injects the Script</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-tower-broadcast g" aria-hidden="true"></i><span>Cloudflare エッジ が<span class="hl-gold">中継</span></span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles g" aria-hidden="true"></i><span>レスポンス を<span class="tag gold">書き換え</span></span></li>
+                    <li><i class="fa-solid fa-puzzle-piece g" aria-hidden="true"></i><span>WebMCP スクリプト を<span class="hl-gold">挿入</span></span></li>
+                    <li><i class="fa-solid fa-eye-slash g" aria-hidden="true"></i><span>ユーザー には<span class="tag amber">見えない</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label indigo"><i class="fa-solid fa-server"></i> 配信元</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label gold"><i class="fa-solid fa-cloud"></i> エッジ注入</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label indigo"><i class="fa-solid fa-globe"></i> ブラウザ</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== SECTION 5: 2つの機能 ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-toggle-on fa-lg"></i> 第5章：有効化 できる 2機能</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 13: Content Credentials とは -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-fingerprint fa-5x deep" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>Content Credentials とは</h2>
+                <div class="ch">Content Credentials</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-id-card d" aria-hidden="true"></i><span>コンテンツ に<span class="hl-indigo">来歴</span>を 付与</span></li>
+                    <li><i class="fa-solid fa-stamp d" aria-hidden="true"></i><span>どこ で 生まれた か<span class="tag indigo">記録</span></span></li>
+                    <li><i class="fa-solid fa-shield-halved d" aria-hidden="true"></i><span>偽物 と 本物 を<span class="hl-indigo">見分ける</span></span></li>
+                    <li><i class="fa-solid fa-lock d" aria-hidden="true"></i><span>改ざん を<span class="tag indigo">検知</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c8);"></i>
+                        コンテンツ に<br>
+                        <span class="hl-indigo">出生証明</span>を<br>
+                        つける よう な もの
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 14: 来歴チェック -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-check fa-5x orange" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>コンテンツ の 来歴 を チェック</h2>
+                <div class="ch">Provenance Check</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-magnifying-glass o" aria-hidden="true"></i><span>画像 や テキスト の<span class="hl-orange">出所</span>を 確認</span></li>
+                    <li><i class="fa-solid fa-circle-question o" aria-hidden="true"></i><span>AI生成 か<span class="tag orange">人間作成</span>か</span></li>
+                    <li><i class="fa-solid fa-circle-nodes o" aria-hidden="true"></i><span>エージェント が<span class="hl-orange">判断材料</span>に</span></li>
+                    <li><i class="fa-solid fa-scale-balanced o" aria-hidden="true"></i><span>信頼性 の<span class="tag gold">土台</span>に</span></li>
+                </ul>
+                <div class="bubble v5">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c12);"></i>
+                        「これ 誰 が<br>
+                        作った？」に<br>
+                        <span class="hl-orange">答える</span>仕組み
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 15: 既存MCPサーバーへの中継 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project fa-5x indigo" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>既存 MCP サーバー へ の 中継</h2>
+                <div class="ch">Relay to Existing MCP Servers</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-plug id" aria-hidden="true"></i><span>すでに ある MCPサーバー を</span></li>
+                    <li><i class="fa-solid fa-arrow-right-arrow-left id" aria-hidden="true"></i><span>ブラウザ 経由 で<span class="hl-indigo">橋渡し</span></span></li>
+                    <li><i class="fa-solid fa-recycle id" aria-hidden="true"></i><span>作り直し は<span class="tag indigo">不要</span></span></li>
+                    <li><i class="fa-solid fa-arrows-up-down id" aria-hidden="true"></i><span>ローカル と Web を<span class="hl-indigo">統合</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label indigo"><i class="fa-solid fa-globe"></i> ブラウザ</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label gold"><i class="fa-solid fa-cloud"></i> エッジ中継</span>
+                    <i class="fa-solid fa-arrow-right sep"></i>
+                    <span class="label indigo"><i class="fa-solid fa-server"></i> MCP鯖</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== SECTION 6: 位置づけと設計 ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-flag fa-lg"></i> 第6章：ベータ版 と これから の 設計</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 16: ベータ版の位置づけ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-flask fa-5x gold" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>ベータ版 と して の 位置づけ</h2>
+                <div class="ch">Beta - Early but Real</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-vial g" aria-hidden="true"></i><span>まだ<span class="hl-gold">実験段階</span></span></li>
+                    <li><i class="fa-solid fa-comments g" aria-hidden="true"></i><span>フィードバック を<span class="tag amber">募集中</span></span></li>
+                    <li><i class="fa-solid fa-tools g" aria-hidden="true"></i><span>仕様 は 変わる<span class="hl-orange">可能性</span></span></li>
+                    <li><i class="fa-solid fa-seedling g" aria-hidden="true"></i><span>でも<span class="tag gold">方向は固い</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c1);"></i>
+                        完成品 じゃ ない<br>
+                        けど<span class="hl-gold">触って</span><br>
+                        確かめる 価値 あり
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 17: エージェント前提のサイト設計 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-drafting-compass fa-5x deep" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>エージェント前提 の サイト設計</h2>
+                <div class="ch">Designing for Agents</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-group d" aria-hidden="true"></i><span>人 だけ でなく<span class="hl-indigo">AI</span>にも 優しく</span></li>
+                    <li><i class="fa-solid fa-route d" aria-hidden="true"></i><span>「どう 操作 する か」を<span class="tag indigo">設計</span></span></li>
+                    <li><i class="fa-solid fa-map d" aria-hidden="true"></i><span>ツール 公開 が<span class="hl-indigo">道しるべ</span></span></li>
+                    <li><i class="fa-solid fa-handshake d" aria-hidden="true"></i><span>両方 に いい<span class="tag gold">WIN-WIN</span></span></li>
+                </ul>
+                <div class="compare">
+                    <div class="side left">
+                        <span class="ttl"><i class="fa-solid fa-user"></i> 人 向け</span>
+                        見やすく<br>押しやすい UI
+                    </div>
+                    <div class="side right">
+                        <span class="ttl"><i class="fa-solid fa-robot"></i> AI 向け</span>
+                        ツール を<br>公開 する 仕組み
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 18: 使いどころ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-bullseye fa-5x orange" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>どこ で 生きる か</h2>
+                <div class="ch">Where It Shines</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cart-shopping o" aria-hidden="true"></i><span>EC で の<span class="hl-orange">注文・検索</span></span></li>
+                    <li><i class="fa-solid fa-calendar-check o" aria-hidden="true"></i><span>予約 システム の<span class="tag orange">自動化</span></span></li>
+                    <li><i class="fa-solid fa-chart-line o" aria-hidden="true"></i><span>データ 取得 を<span class="hl-orange">定型化</span></span></li>
+                    <li><i class="fa-solid fa-building-columns o" aria-hidden="true"></i><span>金融・業務 で の<span class="tag gold">確実性</span></span></li>
+                </ul>
+                <div class="bubble v5">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c12);"></i>
+                        確実 さ が 求められる<br>
+                        <span class="hl-orange">業務系</span>こそ<br>
+                        本領 発揮
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== SECTION 7: 今後とまとめ ====================== -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-rocket fa-lg"></i> 第7章：今後 の 展望 と まとめ</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- CARD 19: 今後の展望と課題 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-telescope fa-5x indigo" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>今後 の 展望 と 課題</h2>
+                <div class="ch">Outlook and Challenges</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-trend-up id" aria-hidden="true"></i><span>エージェント 利用 は<span class="hl-indigo">増える</span>一方</span></li>
+                    <li><i class="fa-solid fa-lock id" aria-hidden="true"></i><span>セキュリティ の<span class="tag indigo">枠組み</span>が 鍵</span></li>
+                    <li><i class="fa-solid fa-people-group id" aria-hidden="true"></i><span>標準化 へ の<span class="hl-indigo">合意</span>が必要</span></li>
+                    <li><i class="fa-solid fa-balance-scale id" aria-hidden="true"></i><span>便利さ と 安全 の<span class="tag gold">両立</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c8);"></i>
+                        技術 より<br>
+                        <span class="hl-indigo">運用ルール</span>が<br>
+                        これから の 山場
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 20: まとめとキーポイント -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-check fa-5x gold" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>まとめ と キーポイント</h2>
+                <div class="ch">Key Takeaways</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-check g" aria-hidden="true"></i><span>WebMCP ＝ <span class="hl-gold">MCP の ブラウザ版</span></span></li>
+                    <li><i class="fa-solid fa-check g" aria-hidden="true"></i><span>サイト が ツール を<span class="tag gold">公開</span></span></li>
+                    <li><i class="fa-solid fa-check g" aria-hidden="true"></i><span>Cloudflare なら<span class="hl-gold">コード変更ゼロ</span></span></li>
+                    <li><i class="fa-solid fa-check g" aria-hidden="true"></i><span>提供者 こそ が<span class="tag amber">押さえる</span>べき</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw">
+                        <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c1);"></i>
+                        これ から は<br>
+                        「サイト 側」が<br>
+                        <span class="hl-gold">主役</span>に なる
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 21: キーワードタグ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-tags fa-5x deep" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>キーワード タグ</h2>
+                <div class="ch">Key Terms</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag indigo">WebMCP</span></span></li>
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag gold">registerTool</span></span></li>
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag amber">Cloudflare エッジ</span></span></li>
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag orange">Content Credentials</span></span></li>
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag green">コード変更ゼロ</span></span></li>
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag red">MCP 中継</span></span></li>
+                    <li><i class="fa-solid fa-tag d" aria-hidden="true"></i><span><span class="tag indigo">エージェント前提</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw">
+                        <i class="fa-solid fa-fire fa-lg" style="color:var(--c8);"></i>
+                        この 言葉 だけ でも<br>
+                        <span class="hl-indigo">押さえておこう</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ====================== FOOTER ====================== -->
+    <div class="footer">
+        <p class="src"><i class="fa-solid fa-video"></i> 動画：<a href="https://www.youtube.com/watch?v=TocdnAuFSxM" target="_blank" rel="noopener">【これ便利】WebMCPとは？Cloudflareの新機能も解説！／ まさおAIじっくり解説ch</a></p>
+        <p class="url"><i class="fa-solid fa-link"></i> https://www.youtube.com/watch?v=TocdnAuFSxM</p>
+        <p class="refs"><i class="fa-solid fa-book"></i> 出典（参考）：<a href="https://blog.cloudflare.com/webmcp/" target="_blank" rel="noopener">Cloudflare Blog - WebMCP</a></p>
+        <p class="note">このインフォグラフィックは動画内容をもとに作成したまとめです ／ 2026.08.10</p>
+    </div>
+
+</div>
+</body>
+</html>

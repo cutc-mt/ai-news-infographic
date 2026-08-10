@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenAI Astra — 10の 未解決 問題 を 解く — Julian Goldie</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --c1:  #1B5E20;   /* ディープ フォレスト */
+            --c2:  #2E7D32;   /* フォレスト グリーン */
+            --c3:  #E8F5E9;   /* 薄緑 */
+            --c4:  #0D3B14;   /* 極深 緑 */
+            --c5:  #C9A227;   /* アンティーク ゴールド */
+            --c6:  #FFF8DC;   /* コーンシルク */
+            --c7:  #8D6E63;   /* ウッド ブラウン */
+            --c8:  #B71C1C;   /* 深紅（警告） */
+            --c9:  #FFEBEE;   /* 薄赤 */
+            --c10: #00695C;   /* ディープ ティール */
+            --c11: #D4AC0D;   /* 明 ゴールド */
+            --c12: #FFFDE7;   /* 極薄 黄 */
+            --c13: #F1F8E9;   /* 極薄 緑 */
+            --c14: #6D4C41;   /* ダーク ブラウン */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FAFAF5; font-family:'Kaisei Decol',sans-serif; color:#2b2b2b; line-height:1.75; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:60px 24px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 50%,var(--c2) 100%);
+            border-radius:32px;
+            box-shadow:8px 8px 32px rgba(27,94,32,.45);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(212,172,13,.28) 0%, transparent 60%);
+            animation:shimmer 8s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            bottom:0; left:0; right:0; height:60px;
+            background:linear-gradient(180deg, transparent, rgba(201,162,39,.30));
+        }
+        @keyframes shimmer { 0%,100%{transform:scale(1) rotate(0deg)} 50%{transform:scale(1.15) rotate(180deg)} }
+        .header i.main { color:#D4AC0D; font-size:96px; margin-bottom:18px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; display:block; }
+        .header h1 { color:#FFF8DC; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.4); margin-bottom:14px; position:relative; z-index:1; line-height:1.45; }
+        .header .sub { color:#D4AC0D; font-size:20px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .meta { color:#E8F5E9; font-size:14px; margin-top:14px; position:relative; z-index:1; }
+
+        /* セクション 区切り */
+        .section-divider {
+            display:flex; align-items:center; gap:14px;
+            margin:42px 0 28px; padding:0 10px;
+        }
+        .section-divider i { font-size:26px; color:var(--c5); }
+        .section-divider h3 {
+            font-size:22px; color:var(--c4); white-space:nowrap;
+            font-family:'Yomogi',cursive;
+        }
+        .section-divider .line {
+            flex:1; height:3px;
+            background:linear-gradient(90deg, var(--c2), transparent);
+            border-radius:2px;
+        }
+
+        /* カード レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(27,94,32,.15);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeInScale .6s ease-out;
+        }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(27,94,32,.25); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c2));
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .ic-green   { color:var(--c1); }
+        .ic-teal    { color:var(--c10); }
+        .ic-deep    { color:var(--c4); }
+        .ic-gold    { color:var(--c5); }
+        .ic-bright  { color:var(--c11); }
+        .ic-red     { color:var(--c8); }
+        .ic-brown   { color:var(--c14); }
+        .ic-forest  { color:var(--c2); }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.78;
+        }
+        ul.kl li i { margin-right:9px; min-width:18px; margin-top:4px; }
+        ul.kl li i.g { color:var(--c1); }
+        ul.kl li i.t { color:var(--c10); }
+        ul.kl li i.d { color:var(--c4); }
+        ul.kl li i.o { color:var(--c5); }
+        ul.kl li i.b { color:var(--c11); }
+        ul.kl li i.r { color:var(--c8); }
+        ul.kl li i.w { color:var(--c14); }
+        ul.kl li i.f { color:var(--c2); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3); color:var(--c4);
+            padding:2px 9px; border-radius:6px; margin:0 2px;
+            display:inline-block; font-weight:bold; font-size:14px;
+        }
+        .tag.gold   { background:var(--c6); color:var(--c5); }
+        .tag.bright { background:var(--c12); color:var(--c11); }
+        .tag.red    { background:var(--c9); color:var(--c8); }
+        .tag.teal   { background:#B2DFDB; color:var(--c10); }
+        .tag.brown  { background:#EFEBE9; color:var(--c14); }
+
+        /* ハイライト */
+        .hl      { background:linear-gradient(transparent 60%, var(--c3) 60%); font-weight:bold; }
+        .hl-gold { background:linear-gradient(transparent 60%, var(--c6) 60%); font-weight:bold; }
+        .hl-bright{ background:linear-gradient(transparent 60%, var(--c12) 60%); font-weight:bold; }
+        .hl-red   { background:linear-gradient(transparent 60%, var(--c9) 60%); font-weight:bold; }
+        .hl-teal  { background:linear-gradient(transparent 60%, #B2DFDB 60%); font-weight:bold; }
+        .hl-brown { background:linear-gradient(transparent 60%, #EFEBE9 60%); font-weight:bold; }
+
+        /* バッジ */
+        .badge {
+            display:inline-block; background:var(--c3); color:var(--c4);
+            padding:3px 10px; border-radius:14px; font-size:13px;
+            margin-bottom:10px; font-weight:bold;
+        }
+        .badge.gold   { background:var(--c6); color:var(--c5); }
+        .badge.bright { background:var(--c12); color:var(--c11); }
+        .badge.red    { background:var(--c9); color:var(--c8); }
+        .badge.teal   { background:#B2DFDB; color:var(--c10); }
+        .badge.brown  { background:#EFEBE9; color:var(--c14); }
+
+        /* 手書き風 吹き出し */
+        .bubble {
+            position:relative; background:#fff; border:3px solid var(--c1);
+            border-radius:18px; padding:12px 15px; margin:15px 5px;
+            font-family:'Yomogi',cursive; font-size:15px; line-height:1.65;
+            box-shadow:3px 3px 10px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+        }
+        .bubble::after {
+            content:''; position:absolute; bottom:-13px; left:24px;
+            border-width:12px 8px 0; border-style:solid;
+            border-color:var(--c1) transparent; width:0;
+        }
+        .bubble.top { transform:rotate(1deg); }
+        .bubble.top::after {
+            bottom:auto; top:-13px; border-width:0 8px 12px;
+            transform:rotate(-5deg);
+        }
+        .bubble.r::after { left:auto; right:24px; }
+        .bubble.gold { background:#FFF8DC; border-color:var(--c5); transform:rotate(1deg); }
+        .bubble.gold::after { border-color:var(--c5) transparent; }
+        .bubble.red { background:#FFEBEE; border-color:var(--c8); transform:rotate(-2deg); }
+        .bubble.red::after { border-color:var(--c8) transparent; }
+        .bubble.teal { background:#E0F2F1; border-color:var(--c10); transform:rotate(1deg); }
+        .bubble.teal::after { border-color:var(--c10) transparent; }
+        .bubble.bright { background:#FFFDE7; border-color:var(--c11); transform:rotate(-1deg); }
+        .bubble.bright::after { border-color:var(--c11) transparent; }
+        .bubble.brown { background:#EFEBE9; border-color:var(--c14); transform:rotate(1deg); }
+        .bubble.brown::after { border-color:var(--c14) transparent; }
+        .bubble b { color:var(--c4); }
+
+        /* コード プレビュー */
+        pre {
+            background:#0D3B14; color:#E8F5E9; padding:10px; border-radius:6px;
+            font-size:12px; margin-top:10px; overflow-x:auto;
+            font-family:monospace;
+        }
+        pre .cmd { color:#C9A227; }
+        pre .ok  { color:#A5D6A7; }
+        pre .hot { color:#FFD54F; }
+
+        /* フッター */
+        .footer {
+            text-align:center; margin-top:50px; padding:40px 24px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c2));
+            border-radius:24px; color:#fff;
+            box-shadow:6px 6px 24px rgba(27,94,32,.32);
+        }
+        .footer a { color:#D4AC0D; text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .ch { font-size:18px; margin-bottom:10px; }
+        .footer .url { font-size:14px; opacity:.9; margin-top:6px; word-break:break-all; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px) { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; min-width:auto; max-width:none; }
+            .header h1 { font-size:30px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-brain main" aria-hidden="true"></i>
+        <h1>OpenAI Astra が<br>10 の 未解決 問題 を 解いた</h1>
+        <div class="sub">数十年 の 数学 難問 を<br>ついに 打ち破った 機械</div>
+        <div class="meta">🎬 Julian Goldie Agency &nbsp;|&nbsp; 2026.08.10</div>
+    </div>
+
+    <!-- ===== セクション1: Astra とは 何か ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
+        <h3>序章: Astra とは 何か</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1: Astra の 概要 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-brain fa-5x ic-deep" style="animation:fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+                <h2>Astra って<br>何者 な のか</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-lightbulb"></i> 新世代 AI</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-info d"></i><span>OpenAI が 開発 する <span class="hl-gold">次世代 モデル</span></span></li>
+                    <li><i class="fa-solid fa-flask d"></i><span>まだ <span class="tag gold">内部 版</span> が 存在</span></li>
+                    <li><i class="fa-solid fa-shield-halved d"></i><span>簡単 な 会話 では <span class="hl">ない</span></span></li>
+                    <li><i class="fa-solid fa-rocket d"></i><span>公開 前 から <span class="hl-gold">大 規模</span> な 成果</span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-brain" style="color:var(--c5);"></i>
+                    ただ の チャット ボット じゃ <b>ない</b>。<br>
+                    ここ が 大きな 違い 🧠
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: 従来 モデル と の 違い -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-code-compare fa-5x ic-gold" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>GPT 等 と の<br>決定的 な 違い</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-scale-balanced"></i> 比較</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comments o"></i><span>GPT は <span class="hl-gold">短い 会話</span> 向け</span></li>
+                    <li><i class="fa-solid fa-hourglass-half o"></i><span>Astra は <span class="tag gold">長時間</span> の タスク</span></li>
+                    <li><i class="fa-solid fa-users o"></i><span>単独 から <span class="hl">協調 型</span> へ</span></li>
+                    <li><i class="fa-solid fa-layer-group o"></i><span>深さ の 次元 が <span class="hl-gold">違う</span></span></li>
+                </ul>
+                <div class="bubble bright r">
+                    <i class="fa-solid fa-code-compare" style="color:var(--c11);"></i>
+                    速さ より <b>深さ</b>。<br>
+                    そこ が 根本的 な 転換 ⚖️
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: アーキテクチャ の 根本的 変化 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-cubes fa-5x ic-forest" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>設計 思想 が<br>根 から 変わった</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-drafting-compass"></i> 設計 軸</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-right g"></i><span>会話 から <span class="hl">自律 処理</span> へ</span></li>
+                    <li><i class="fa-solid fa-diagram-project g"></i><span>網 の 目 の よう な <span class="tag">構造</span></span></li>
+                    <li><i class="fa-solid fa-puzzle-piece g"></i><span>複数 の 部品 が <span class="hl">連携</span></span></li>
+                    <li><i class="fa-solid fa-recycle g"></i><span>止まらず に <span class="hl">回る</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-cubes" style="color:var(--c1);"></i>
+                    中身 の <b>骨組み</b> が 違う。<br>
+                    だから 働き方 も 変わる 🧩
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション2: 数十年 未解決 問題 を 解決 ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+        <h3>本編: 解けない と 言われた 問題 を</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード4: 数十年 の 数学 難問 を 解決 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-square-root-variable fa-5x ic-gold" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>数十年 の<br>数学 難問 を 制した</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-medal"></i> 快挙</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-calculator o"></i><span>長年 <span class="hl-gold">解けなかった</span> 問題</span></li>
+                    <li><i class="fa-solid fa-list-ol o"></i><span>実に <span class="tag gold">10 問</span> を 正解</span></li>
+                    <li><i class="fa-solid fa-infinity o"></i><span>人間 でも <span class="hl-gold">手 が 届かない</span></span></li>
+                    <li><i class="fa-solid fa-fire o"></i><span>業界 に <span class="hl-gold">衝撃</span></span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-square-root-variable" style="color:var(--c5);"></i>
+                    何十年 も 残っていた <b>壁</b> が<br>
+                    ついに 崩れた 🏆
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: 人間 の 専門家 でも 解けなかった -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-graduate fa-5x ic-teal" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>専門家 でも<br>お手上げ だっ た 領域</h2>
+            </div>
+            <div class="body">
+                <span class="badge teal"><i class="fa-solid fa-magnifying-glass"></i> 人間 の 限界</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-chalkboard t"></i><span>トップ 学者 も <span class="hl-teal">手詰まり</span></span></li>
+                    <li><i class="fa-solid fa-pen-ruler t"></i><span>黒板 や <span class="tag teal">紙</span> では 限界</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left t"></i><span>何十年 も <span class="hl-teal">放置</span> さ れた</span></li>
+                    <li><i class="fa-solid fa-circle-question t"></i><span>解法 すら <span class="hl-teal">見えない</span></span></li>
+                </ul>
+                <div class="bubble teal">
+                    <i class="fa-solid fa-user-graduate" style="color:var(--c10);"></i>
+                    天才 でも <b>解けない</b>。<br>
+                    そこ を 機械 が 抜いた 🎓
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: テキスト 生成 から 自律 ネットワーク へ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-network-wired fa-5x ic-deep" style="animation:fa-flip 3.4s infinite;" aria-hidden="true"></i>
+                <h2>文 を 書く だけ<br>じゃ なくなった</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-arrows-turn-right"></i> パラダイム シフト</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-keyboard d"></i><span>従来 は <span class="hl">文 を 出力</span> する のみ</span></li>
+                    <li><i class="fa-solid fa-diagram-next d"></i><span>今 は <span class="tag">網</span> のように 考える</span></li>
+                    <li><i class="fa-solid fa-microchip d"></i><span>自律 で <span class="hl">判断</span> を 重ねる</span></li>
+                    <li><i class="fa-solid fa-route d"></i><span>自分 で <span class="hl">道</span> を 探す</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-network-wired" style="color:var(--c4);"></i>
+                    文 を 作る から <b>問題 を 解く</b> へ。<br>
+                    これ が 新しい 姿 🕸️
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション3: 長時間 実行 型 の タスク ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-hourglass-half" aria-hidden="true"></i>
+        <h3>深編: 数日 〜 数週間 動き 続ける</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード7: 長時間 実行 型 タスク -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-hourglass-start fa-5x ic-gold" style="animation:fa-shake 2.8s infinite;" aria-hidden="true"></i>
+                <h2>数日 〜 数週間<br>動き 続ける</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-clock"></i> 長時間 実行</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-calendar-week o"></i><span>数日 〜 <span class="hl-gold">数週間</span> の 作業</span></li>
+                    <li><i class="fa-solid fa-bolt o"></i><span>途中 で <span class="tag gold">止まらない</span></span></li>
+                    <li><i class="fa-solid fa-mug-hot o"></i><span>人間 の 休憩 は <span class="hl-gold">不要</span></span></li>
+                    <li><i class="fa-solid fa-flag-checkered o"></i><span>最後 まで <span class="hl-gold">走り切る</span></span></li>
+                </ul>
+                <div class="bubble gold r">
+                    <i class="fa-solid fa-hourglass-start" style="color:var(--c5);"></i>
+                    寝ない、休まない。<br>
+                    ただ <b>解き 続ける</b> ⏳
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: 協調 型 自律 エージェント ネットワーク -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows fa-5x ic-forest" style="animation:fa-beat-fade 3.2s infinite;" aria-hidden="true"></i>
+                <h2>複数 の エージェント<br>が 助け 合う</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-handshake"></i> 協調 型</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-group g"></i><span>複数 の <span class="hl">分担</span></span></li>
+                    <li><i class="fa-solid fa-comments g"></i><span>お互い に <span class="tag">相談</span></span></li>
+                    <li><i class="fa-solid fa-link g"></i><span>情報 を <span class="hl">繋ぐ</span></span></li>
+                    <li><i class="fa-solid fa-puzzle-piece g"></i><span>役割 を <span class="hl">組み立てる</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-people-arrows" style="color:var(--c2);"></i>
+                    一人 じゃ ない。<br>
+                    <b>チーム</b> で 動く の だ 🤝
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: 自律 推論 の 新 パラダイム -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-lightbulb fa-5x ic-bright" style="animation:fa-flip 2.6s infinite;" aria-hidden="true"></i>
+                <h2>自ら 考える<br>新しい 推論</h2>
+            </div>
+            <div class="body">
+                <span class="badge bright"><i class="fa-solid fa-brain"></i> 自律 推論</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-thought-bubble b"></i><span>自発 的 に <span class="hl-bright">考える</span></span></li>
+                    <li><i class="fa-solid fa-shuffle b"></i><span>複数 の <span class="tag bright">仮説</span> を 試す</span></li>
+                    <li><i class="fa-solid fa-filter b"></i><span>自分 で <span class="hl-bright">取捨 選択</span></span></li>
+                    <li><i class="fa-solid fa-graduation-cap b"></i><span>結果 から <span class="hl-bright">学ぶ</span></span></li>
+                </ul>
+                <div class="bubble bright">
+                    <i class="fa-solid fa-lightbulb" style="color:var(--c11);"></i>
+                    聞かれ て 答える から<br>
+                    自ら <b>気づく</b> へ 💡
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション4: ビジネス と ワークフロー へ の 影響 ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-briefcase" aria-hidden="true"></i>
+        <h3>活用編: 仕事 の 仕方 が 変わる</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード10: ビジネス 自動化 へ の 影響 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-robot fa-5x ic-teal" style="animation:fa-bounce 3s infinite;" aria-hidden="true"></i>
+                <h2>仕事 の<br>自動化 が 加速</h2>
+            </div>
+            <div class="body">
+                <span class="badge teal"><i class="fa-solid fa-industry"></i> ビジネス 影響</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gears t"></i><span>複雑 な <span class="hl-teal">工程</span> も 自動</span></li>
+                    <li><i class="fa-solid fa-coins t"></i><span>コスト が <span class="tag teal">下がる</span></span></li>
+                    <li><i class="fa-solid fa-chart-line t"></i><span>精度 が <span class="hl-teal">上がる</span></span></li>
+                    <li><i class="fa-solid fa-building t"></i><span>企業 の <span class="hl-teal">体質</span> が 変わる</span></li>
+                </ul>
+                <div class="bubble teal">
+                    <i class="fa-solid fa-robot" style="color:var(--c10);"></i>
+                    単純 作業 じゃ ない。<br>
+                    <b>高度 な 判断</b> まで 🤖
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: ワークフロー 最適化 の 未来 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project fa-5x ic-deep" style="animation:fa-flip 3.4s infinite;" aria-hidden="true"></i>
+                <h2>仕事 の 流れ を<br>最適 化 する</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-sliders"></i> 最適 化</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-route d"></i><span>無駄 な <span class="hl">手順</span> を 削る</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles d"></i><span>自動 で <span class="tag">整える</span></span></li>
+                    <li><i class="fa-solid fa-stopwatch d"></i><span>所要 時間 が <span class="hl">短縮</span></span></li>
+                    <li><i class="fa-solid fa-arrows-rotate d"></i><span>継続 的 に <span class="hl">改善</span></span></li>
+                </ul>
+                <div class="bubble r">
+                    <i class="fa-solid fa-diagram-project" style="color:var(--c4);"></i>
+                    流れ そのもの を <b>作り直す</b>。<br>
+                    そこ が 強み 📊
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: エキスパート ワークフロー へ の 統合 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-toolbox fa-5x ic-gold" style="animation:fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+                <h2>プロ の 仕事 に<br>組み 込める</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-plug"></i> 統合</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-screwdriver-wrench o"></i><span>専門家 の <span class="hl-gold">道具</span> に</span></li>
+                    <li><i class="fa-solid fa-laptop-code o"></i><span>既存 の <span class="tag gold">環境</span> に 接続</span></li>
+                    <li><i class="fa-solid fa-handshake-angle o"></i><span>人間 と <span class="hl-gold">協力</span></span></li>
+                    <li><i class="fa-solid fa-cubes-stacked o"></i><span>段階 的 に <span class="hl-gold">導入</span></span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-toolbox" style="color:var(--c5);"></i>
+                    取って 代わる じゃ ない。<br>
+                    <b>一緒 に 働く</b> の だ 🧰
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション5: AI の 役割 変化 と 業界 へ の 波及 ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-arrows-turn-right" aria-hidden="true"></i>
+        <h3>転換編: チャット から 問題 解決 者 へ</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード13: AI の 役割 変化 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x ic-forest" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>話し相手 から<br>解決 者 へ</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-masks-theater"></i> 役割 変化</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comment-dots f"></i><span>かつて は <span class="hl">会話 相手</span></span></li>
+                    <li><i class="fa-solid fa-wrench f"></i><span>今 は <span class="tag">作業員</span></span></li>
+                    <li><i class="fa-solid fa-crown f"></i><span>判断 を <span class="hl">預ける</span> 時代</span></li>
+                    <li><i class="fa-solid fa-hand-holding f"></i><span>任せる ことが <span class="hl">増える</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-comments" style="color:var(--c2);"></i>
+                    雑談 から <b>実務</b> へ。<br>
+                    役割 が まるで 違う 💬
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: 業界 へ の 波及 効果 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-wave-square fa-5x ic-bright" style="animation:fa-beat-fade 3.2s infinite;" aria-hidden="true"></i>
+                <h2>業界 全体 に<br>波 が 広がる</h2>
+            </div>
+            <div class="body">
+                <span class="badge bright"><i class="fa-solid fa-tower-broadcast"></i> 波及 効果</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-flask-vial b"></i><span>研究 分野 が <span class="hl-bright">加速</span></span></li>
+                    <li><i class="fa-solid fa-money-bill-trend-up b"></i><span>金融 も <span class="tag bright">恩恵</span></span></li>
+                    <li><i class="fa-solid fa-stethoscope b"></i><span>医療 にも <span class="hl-bright">応用</span></span></li>
+                    <li><i class="fa-solid fa-globe b"></i><span>世界 規模 で <span class="hl-bright">変化</span></span></li>
+                </ul>
+                <div class="bubble bright">
+                    <i class="fa-solid fa-wave-square" style="color:var(--c11);"></i>
+                    一つの 会社 の 話 じゃ ない。<br>
+                    <b>業界 全体</b> が 動く 🌊
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: 競争 の 激化 と 注意 点 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-5x ic-red" style="animation:fa-shake 2.4s infinite;" aria-hidden="true"></i>
+                <h2>置いていかれない<br>ため の 注意</h2>
+            </div>
+            <div class="body">
+                <span class="badge red"><i class="fa-solid fa-circle-exclamation"></i> 注意 点</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gauge-high r"></i><span>変化 の <span class="hl-red">速度</span> が 速い</span></li>
+                    <li><i class="fa-solid fa-chess r"></i><span>先手 が <span class="tag red">勝つ</span></span></li>
+                    <li><i class="fa-solid fa-book r"></i><span>知識 の <span class="hl-red">陳腐化</span></span></li>
+                    <li><i class="fa-solid fa-handshake-simple r"></i><span>使い方 を <span class="hl-red">覚える</span></span></li>
+                </ul>
+                <div class="bubble red r">
+                    <i class="fa-solid fa-triangle-exclamation" style="color:var(--c8);"></i>
+                    放って おく と <b>差</b> が 開く。<br>
+                    油断 は 禁物 ⚠️
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション6: 公式 リリース 前 の 準備 と 未来 ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+        <h3>未来編: 公開 前 に 何 を するべき か</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード16: 公式 リリース 前 の 準備 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag fa-5x ic-gold" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>公開 前 から<br>準備 を 始める</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-flag-checkered"></i> 準備 期</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-list-check o"></i><span>課題 を <span class="hl-gold">洗い出す</span></span></li>
+                    <li><i class="fa-solid fa-database o"></i><span>データ を <span class="tag gold">整える</span></span></li>
+                    <li><i class="fa-solid fa-users-gear o"></i><span>人材 を <span class="hl-gold">育てる</span></span></li>
+                    <li><i class="fa-solid fa-map o"></i><span>導入 の <span class="hl-gold">道筋</span></span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-flag" style="color:var(--c5);"></i>
+                    公開 を 待つ な。<br>
+                    <b>今</b> から 動く べし 🚩
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: 今後 の 展望 と 予測 -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-chart-line fa-5x ic-teal" style="animation:fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+                <h2>これから の<br>展開 と 予測</h2>
+            </div>
+            <div class="body">
+                <span class="badge teal"><i class="fa-solid fa-magnifying-glass-chart"></i> 展望</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-trend-up t"></i><span>能力 は <span class="hl-teal">伸び 続ける</span></span></li>
+                    <li><i class="fa-solid fa-people-group t"></i><span>更多人 が <span class="tag teal">使う</span></span></li>
+                    <li><i class="fa-solid fa-shield t"></i><span>安全性 の <span class="hl-teal">議論</span> も</span></li>
+                    <li><i class="fa-solid fa-seedling t"></i><span>新 産業 が <span class="hl-teal">芽吹く</span></span></li>
+                </ul>
+                <div class="bubble teal r">
+                    <i class="fa-solid fa-chart-line" style="color:var(--c10);"></i>
+                    まだ 始まった ばかり。<br>
+                    <b>数年 後</b> が 本番 📈
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: まとめ と アクション -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-check fa-5x ic-deep" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>ここ から<br>何 を する か</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-circle-check"></i> アクション</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-book-open d"></i><span>まず は <span class="hl">情報 を 集める</span></span></li>
+                    <li><i class="fa-solid fa-pen-to-square d"></i><span>自社 の <span class="tag">課題</span> を 書く</span></li>
+                    <li><i class="fa-solid fa-hand-point-right d"></i><span>小さく <span class="hl">試す</span></span></li>
+                    <li><i class="fa-solid fa-arrows-rotate d"></i><span>結果 で <span class="hl">改良</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-clipboard-check" style="color:var(--c4);"></i>
+                    読む だけ じゃ 進まない。<br>
+                    <b>一歩</b> が 大事 ✅
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== セクション7: 補足 と キーワード ===== -->
+    <div class="section-divider">
+        <i class="fa-solid fa-tags" aria-hidden="true"></i>
+        <h3>参考編: 覚えて おく べき 言葉</h3>
+        <div class="line"></div>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード19: 関連 キーワード タグ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-tags fa-5x ic-gold" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>押さえて おきたい<br>キーワード</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold"><i class="fa-solid fa-bookmark"></i> 用語 集</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hashtag o"></i><span><span class="tag gold">Astra</span> — 新世代 モデル</span></li>
+                    <li><i class="fa-solid fa-hashtag o"></i><span><span class="tag bright">自律 エージェント</span> — 自ら 動く</span></li>
+                    <li><i class="fa-solid fa-hashtag o"></i><span><span class="tag">長時間 実行</span> — 数日 〜 数週</span></li>
+                    <li><i class="fa-solid fa-hashtag o"></i><span><span class="tag gold">未解決 問題</span> — 数十年 の 壁</span></li>
+                    <li><i class="fa-solid fa-hashtag o"></i><span><span class="tag bright">協調 型</span> — チーム で 動く</span></li>
+                </ul>
+                <div class="bubble gold r">
+                    <i class="fa-solid fa-tags" style="color:var(--c5);"></i>
+                    これら の 言葉 が<br>
+                    これから <b>頻出</b> する 🏷️
+                </div>
+            </div>
+        </div>
+
+        <!-- カード20: 重要 な メッセージ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-fire fa-5x ic-red" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>一番 伝えたい<br>こと</h2>
+            </div>
+            <div class="body">
+                <span class="badge red"><i class="fa-solid fa-bullhorn"></i> 核心</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-star r"></i><span>数学 は <span class="hl-red">入口</span> に 過ぎない</span></li>
+                    <li><i class="fa-solid fa-arrows-turn-right r"></i><span>本当 は <span class="tag red">設計</span> が 主役</span></li>
+                    <li><i class="fa-solid fa-eye r"></i><span>この <span class="hl-red">転換</span> を 見逃すな</span></li>
+                    <li><i class="fa-solid fa-handshake-angle r"></i><span>早い 者 が <span class="hl-red">勝つ</span></span></li>
+                </ul>
+                <div class="bubble red">
+                    <i class="fa-solid fa-fire" style="color:var(--c8);"></i>
+                    10 問 は <b>結果</b> で あって<br>
+                    本質 は その <b>仕組み</b> 🔥
+                </div>
+            </div>
+        </div>
+
+        <!-- カード21: 公開 前 の 位置づけ -->
+        <div class="card">
+            <div class="icon-box">
+                <i class="fa-solid fa-eye-slash fa-5x ic-forest" style="animation:fa-flip 3.4s infinite;" aria-hidden="true"></i>
+                <h2>まだ 内部 版<br>という 現実</h2>
+            </div>
+            <div class="body">
+                <span class="badge"><i class="fa-solid fa-lock"></i> 未 公開</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-vault g"></i><span>今 は <span class="hl">内部 のみ</span></span></li>
+                    <li><i class="fa-solid fa-hourglass-half g"></i><span>公式 公開 は <span class="tag">これから</span></span></li>
+                    <li><i class="fa-solid fa-flask g"></i><span>研究 段階 の <span class="hl">成果</span></span></li>
+                    <li><i class="fa-solid fa-bell g"></i><span>発表 を <span class="hl">待つ</span> 状態</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-eye-slash" style="color:var(--c2);"></i>
+                    一般 には まだ <b>見えない</b>。<br>
+                    だから こそ 準備 が 効く 🔒
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div class="ch">🎬 動画 元: <a href="https://www.youtube.com/watch?v=N3YspgYL_JY" target="_blank" rel="noopener">Julian Goldie Agency</a></div>
+        <div class="url">📤 出典: <a href="https://www.youtube.com/watch?v=N3YspgYL_JY" target="_blank" rel="noopener">https://www.youtube.com/watch?v=N3YspgYL_JY</a></div>
+        <div class="url" style="margin-top:14px; font-family:'Yomogi',cursive; font-size:16px;">
+            この インフォグラフィック は 動画 内容 を もと に 作成 しました ✨
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

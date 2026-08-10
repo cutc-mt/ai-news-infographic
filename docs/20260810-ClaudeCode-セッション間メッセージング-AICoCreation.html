@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code｜セッション間メッセージングでAIを連携</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：Deep Petrol × Terracotta × Sage（ウォーム・アーシー） */
+            --c1: #0E5C5C;   /* Deep Petrol - メイン深緑青 */
+            --c2: #C75B39;   /* Terracotta - アクセント朱 */
+            --c3: #DCEEE6;   /* 薄ペトロール - 背景 */
+            --c4: #06343A;   /* 深海緑青 - 最濃 */
+            --c5: #3F8E8E;   /* ミディアムペトロール - 中間 */
+            --c6: #F4EEDD;   /* ウォームクリーム */
+            --c7: #6B8E5A;   /* Sage - セージグリーン */
+            --c8: #A7C4A0;   /* 薄セージ */
+            --c9: #B84A2E;   /* バーントシェンナ - 警告 */
+            --c10: #D89B3C;  /* アンバー - セカンド */
+            --c11: #F8E6C8;  /* 薄アンバー */
+            --c12: #E0B05A;  /* ライトアンバー */
+            --tint-c1: #C8E1DC;
+            --tint-c2: #F8DCCB;
+            --tint-c7: #E2EDDA;
+            --tint-c9: #F7D9CC;
+            --tint-c10: #FAEACB;
+            --ink-petrol: #06343A;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#EEF4EE; font-family:'Kaisei Decol',sans-serif; color:#2a2a2a; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:55px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 45%,var(--c5) 75%,var(--c7) 110%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(6,52,58,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(220,238,230,.22) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c11); font-size:96px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.30); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.35); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c8); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c11); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(14,92,92,.13);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(14,92,92,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c10));
+        }
+        .card.terra::before { background:linear-gradient(90deg,var(--c2),var(--c9),var(--c1)); }
+        .card.sage::before { background:linear-gradient(90deg,var(--c7),var(--c8),var(--c1)); }
+        .card.amber::before { background:linear-gradient(90deg,var(--c10),var(--c12),var(--c2)); }
+        .card.warn::before { background:linear-gradient(90deg,var(--c9),var(--c2),var(--c10)); }
+        .card.deep::before { background:linear-gradient(90deg,var(--c4),var(--c1),var(--c5)); }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.terra { color:var(--c2); }
+        .icon-box i.sage { color:var(--c7); }
+        .icon-box i.amber { color:var(--c10); }
+        .icon-box i.deep { color:var(--c4); }
+        .icon-box i.light { color:var(--c5); }
+        .icon-box i.gold { color:var(--c12); }
+        .icon-box i.red { color:var(--c9); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#8aa097; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.terra { color:var(--c2); }
+        ul.kl li i.sage { color:var(--c7); }
+        ul.kl li i.amber { color:var(--c10); }
+        ul.kl li i.deep { color:var(--c4); }
+        ul.kl li i.light { color:var(--c5); }
+        ul.kl li i.gold { color:var(--c12); }
+        ul.kl li i.red { color:var(--c9); }
+
+        /* タグ */
+        .tag {
+            background:var(--c3);
+            color:var(--ink-petrol);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.terra { background:var(--tint-c2); color:var(--c2); }
+        .tag.amber { background:var(--tint-c10); color:var(--c10); }
+        .tag.sage { background:var(--tint-c7); color:var(--c7); }
+        .tag.red { background:var(--tint-c9); color:var(--c9); }
+        .tag.gold { background:var(--c11); color:#8a6420; }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--c3) 60%); }
+        .hl-terra { color:var(--c2); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c2) 60%); }
+        .hl-sage { color:var(--c7); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c7) 60%); }
+        .hl-amber { color:#8a6420; font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c10) 60%); }
+        .hl-red { color:var(--c9); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c9) 60%); }
+        .hl-deep { color:var(--c4); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-c1) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:var(--tint-c2);
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:var(--tint-c7);
+            border-color:var(--c7);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c7) transparent; }
+        .bubble.v3 {
+            background:var(--tint-c10);
+            border-color:var(--c10);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c10) transparent; }
+        .bubble.v4 {
+            background:var(--tint-c1);
+            border-color:var(--c5);
+            transform:rotate(-1deg);
+        }
+        .bubble.v4::after { border-color:var(--c5) transparent; }
+        .bubble.v5 {
+            background:var(--tint-c9);
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v5::after { border-color:var(--c9) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#333; }
+        .hw i { color:var(--c10); }
+
+        /* コードプレビュー */
+        pre.code {
+            background:var(--c4);
+            color:var(--c3);
+            padding:12px 14px;
+            border-radius:8px;
+            font-size:13px;
+            font-family:'Courier New',monospace;
+            margin-top:12px;
+            overflow-x:auto;
+            line-height:1.6;
+            border-left:4px solid var(--c2);
+        }
+        pre.code .k { color:#7FD4C7; }
+        pre.code .s { color:var(--c12); }
+        pre.code .c { color:#A7C4A0; }
+        pre.code .f { color:var(--c10); }
+
+        /* 比較ボックス */
+        .vs-box { display:flex; gap:8px; margin:12px 0; flex-wrap:wrap; }
+        .vs-side {
+            flex:1;
+            min-width:120px;
+            padding:10px;
+            border-radius:12px;
+            font-size:13.5px;
+            line-height:1.5;
+        }
+        .vs-side.main { background:var(--tint-c1); border:2px solid var(--c1); }
+        .vs-side.terra { background:var(--tint-c2); border:2px solid var(--c2); }
+        .vs-side.sage { background:var(--tint-c7); border:2px solid var(--c7); }
+        .vs-side.amber { background:var(--tint-c10); border:2px solid var(--c10); }
+        .vs-side h4 { font-size:14px; margin-bottom:6px; }
+        .vs-side.main h4 { color:var(--c1); }
+        .vs-side.terra h4 { color:var(--c2); }
+        .vs-side.sage h4 { color:var(--c7); }
+        .vs-side.amber h4 { color:#8a6420; }
+
+        /* フロー棒 */
+        .flow-bar {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:12px 0;
+            padding:10px 12px;
+            background:linear-gradient(90deg,var(--c3) 0%,var(--tint-c7) 100%);
+            border-radius:10px;
+            flex-wrap:wrap;
+        }
+        .flow-bar .label { color:var(--c1); font-weight:bold; font-size:14px; }
+        .flow-bar .label.terra { color:var(--c2); }
+        .flow-bar .label.amber { color:#8a6420; }
+        .flow-bar .sep { color:var(--c10); font-size:20px; }
+
+        /* ステップ番号 */
+        .step {
+            display:inline-block;
+            background:var(--c1);
+            color:#fff;
+            width:28px; height:28px;
+            line-height:28px;
+            text-align:center;
+            border-radius:50%;
+            font-weight:bold;
+            font-size:14px;
+            margin-right:8px;
+        }
+        .step.terra { background:var(--c2); }
+        .step.amber { background:var(--c10); }
+        .step.sage { background:var(--c7); }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:45px 0 30px;
+            position:relative;
+        }
+        .section-break h2 {
+            display:inline-block;
+            background:linear-gradient(135deg,var(--c1),var(--c5));
+            color:#fff;
+            padding:10px 32px;
+            border-radius:30px;
+            font-size:20px;
+            box-shadow:3px 3px 12px rgba(14,92,92,.20);
+        }
+        .section-break.terra h2 { background:linear-gradient(135deg,var(--c2),var(--c9)); }
+        .section-break.sage h2 { background:linear-gradient(135deg,var(--c7),var(--c8)); }
+        .section-break.amber h2 { background:linear-gradient(135deg,var(--c10),var(--c12)); }
+        .section-break.deep h2 { background:linear-gradient(135deg,var(--c4),var(--c1)); }
+
+        /* フェードイン */
+        @keyframes fadeInScale {
+            from { opacity:0; transform:scale(.96); }
+            to { opacity:1; transform:scale(1); }
+        }
+        .fade-in { animation:fadeInScale .8s ease both; }
+
+        /* フッター */
+        .footer {
+            margin-top:55px;
+            padding:35px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c7));
+            border-radius:25px;
+            text-align:center;
+            color:#fff;
+            box-shadow:6px 6px 25px rgba(6,52,58,.25);
+        }
+        .footer a { color:var(--c12); text-decoration:none; border-bottom:2px dotted var(--c12); }
+        .footer a:hover { color:#fff; border-bottom-style:solid; }
+        .footer .src { margin-top:12px; font-size:15px; line-height:1.8; }
+        .footer .url { font-size:14px; color:var(--c8); word-break:break-all; margin-top:6px; }
+        .footer .note { font-size:13px; color:var(--c8); margin-top:10px; font-family:'Yomogi',cursive; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px) { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; min-width:auto; }
+            .header h1 { font-size:28px; }
+            .header i.main { font-size:72px; }
+            .vs-box { flex-direction:column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-network-wired main" aria-hidden="true"></i>
+        <h1>Claude Code｜セッション同士が<br>直接、話せるようになった</h1>
+        <div class="sub">独立したAIたちが、最小限のメッセージで連携する。新しい組織型の働き方</div>
+        <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月10日 ／ チャンネル：AI共創イノベーション</div>
+    </div>
+
+    <!-- セクション1：セッション間メッセージングとは -->
+    <div class="section-break">
+        <h2><i class="fa-solid fa-circle-info fa-lg"></i> 第1章：そもそも何ができるように？</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1：セッション間メッセージングとは -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>セッション間 メッセージング とは</h2>
+                <div class="ch">Cross-session Messaging</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-paper-plane"></i><span>独立した複数のセッションが、<span class="hl">直接</span>メッセージを送り合える</span></li>
+                    <li><i class="fa-solid fa-comment-dots"></i><span>会話の履歴<span class="tag red">全部</span>は渡さない</span></li>
+                    <li><i class="fa-solid fa-bolt"></i><span>必要な<span class="hl">シグナルとデータ</span>だけ連携</span></li>
+                    <li><i class="fa-solid fa-user-graduate"></i><span>各AIの<span class="hl">専門性</span>を保ったまま協力</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c5);"></i>
+                    履歴の共有ではなく、<br>
+                    必要な時だけ<span class="hl">ぽん</span>と渡す。<br>
+                    <span class="tag">効率的</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2：従来との決定的な違い -->
+        <div class="card terra fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrows-left-right fa-5x terra" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>従来 との 違い</h2>
+                <div class="ch">What's Different</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-book terra"></i><span>これまでは、文脈を<span class="hl-terra">全部</span>渡すしかなかった</span></li>
+                    <li><i class="fa-solid fa-circle-xmark terra"></i><span>トークンを<span class="hl-terra">大量消費</span>してしまう</span></li>
+                    <li><i class="fa-solid fa-envelope terra"></i><span>今は、<span class="hl-terra">必要なメッセージ</span>だけ届く</span></li>
+                    <li><i class="fa-solid fa-feather terra"></i><span>だから<span class="tag terra">軽く</span>、<span class="tag terra">速い</span></span></li>
+                </ul>
+                <div class="bubble v1 r">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                    履歴の山ごと渡すのは、<br>
+                    もう<span class="hl-terra">古い</span>やり方。<br>
+                    <span class="tag terra">最小限で</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3：独立性を保つ設計 -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved fa-5x sage" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>独立性 を 保つ 設計</h2>
+                <div class="ch">Each Mind Stays Its Own</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-brain sage"></i><span>各セッションは<span class="hl-sage">自分の文脈</span>を持つ</span></li>
+                    <li><i class="fa-solid fa-user-secret sage"></i><span>他人の会話に<span class="hl-sage">混ざらない</span></span></li>
+                    <li><i class="fa-solid fa-handshake sage"></i><span>連携は<span class="tag sage">連絡</span>だけ</span></li>
+                    <li><i class="fa-solid fa-lock sage"></i><span>専門領域を<span class="hl-sage">守り抜く</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-people-group fa-lg" style="color:var(--c7);"></i>
+                    プロフェッショナルが、<br>
+                    各自の<span class="hl-sage">得意分野</span>で助け合う。<br>
+                    <span class="tag sage">専門性</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード4：ネットワーク型のつながり -->
+        <div class="card fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-share-nodes fa-5x light" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>ネットワーク型 の つながり</h2>
+                <div class="ch">Network, Not Hierarchy</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-nodes"></i><span>セッション同士が<span class="hl">横につながる</span></span></li>
+                    <li><i class="fa-solid fa-arrows-up-down-left-right"></i><span>上下ではなく<span class="hl">対等</span>な関係</span></li>
+                    <li><i class="fa-solid fa-wifi"></i><span>どこからでも<span class="tag">連絡</span>可能</span></li>
+                    <li><i class="fa-solid fa-diagram-project"></i><span>組織の<span class="hl">形</span>が変わる</span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label"><i class="fa-solid fa-user-tie"></i> CEO（人間）</span>
+                    <i class="fa-solid fa-arrows-left-right-to-line sep"></i>
+                    <span class="label amber"><i class="fa-solid fa-users"></i> 各専門家AI</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション2：Subagent・Agent Teamsとの違い -->
+    <div class="section-break terra">
+        <h2><i class="fa-solid fa-scale-balanced fa-lg"></i> 第2章：他の手法と何が違う？</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード5：Subagentとは -->
+        <div class="card amber fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-roof fa-5x amber" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>Subagent とは</h2>
+                <div class="ch">Temporary Parent-Child</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user amber"></i><span>親AIが<span class="hl-amber">子AI</span>を立ち上げる</span></li>
+                    <li><i class="fa-solid fa-arrows-up-to-line amber"></i><span><span class="hl-amber">縦型</span>の構造</span></li>
+                    <li><i class="fa-solid fa-clock amber"></i><span>一時的な<span class="tag amber">親子関係</span></span></li>
+                    <li><i class="fa-solid fa-circle-down amber"></i><span>指示は<span class="hl-amber">上から下</span>へ</span></li>
+                </ul>
+                <div class="bubble v3 r">
+                    <i class="fa-solid fa-circle-info fa-lg" style="color:var(--c10);"></i>
+                    使い捨ての<span class="hl-amber">助手</span>。<br>
+                    終わったら<span class="hl-amber">さよなら</span>。<br>
+                    <span class="tag amber">一時的</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6：Agent Teamsとは -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-users-gear fa-5x sage" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>Agent Teams とは</h2>
+                <div class="ch">AI-Led Squad</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-crown sage"></i><span>AI自身が<span class="hl-sage">リーダー</span>になる</span></li>
+                    <li><i class="fa-solid fa-shuffle sage"></i><span>自律的に<span class="hl-sage">分担</span>を決める</span></li>
+                    <li><i class="fa-solid fa-mug-hot sage"></i><span>人間は<span class="tag sage">お任せ</span>するだけ</span></li>
+                    <li><i class="fa-solid fa-robot sage"></i><span>AI主体の<span class="hl-sage">チーム運営</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-circle-info fa-lg" style="color:var(--c7);"></i>
+                    AIに<span class="hl-sage">丸投げ</span>。<br>
+                    でも、見えないところで<span class="hl-sage">相談</span>が増える。<br>
+                    <span class="tag sage">自動型</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7：セッション間メッセージングの位置づけ -->
+        <div class="card deep fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-building fa-5x deep" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>メッセージング の 位置づけ</h2>
+                <div class="ch">Human-Led Organization</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-tie deep"></i><span>人間が<span class="hl-deep">CEO/PM</span>として指揮</span></li>
+                    <li><i class="fa-solid fa-infinity deep"></i><span>独立した<span class="hl-deep">長寿命</span>セッション同士</span></li>
+                    <li><i class="fa-solid fa-network-wired deep"></i><span><span class="tag">ネットワーク型</span>で横つなぎ</span></li>
+                    <li><i class="fa-solid fa-eye deep"></i><span>人間が<span class="hl-deep">全体</span>を見渡せる</span></li>
+                </ul>
+                <div class="vs-box">
+                    <div class="vs-side amber">
+                        <h4><i class="fa-solid fa-people-arrows"></i> Subagent</h4>
+                        縦型・一時的
+                    </div>
+                    <div class="vs-side sage">
+                        <h4><i class="fa-solid fa-users-gear"></i> Teams</h4>
+                        AI主体・お任せ
+                    </div>
+                    <div class="vs-side main">
+                        <h4><i class="fa-solid fa-network-wired"></i> 本手法</h4>
+                        人間主導・組織型
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8：人間がハブになる強み -->
+        <div class="card terra fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-handshake-angle fa-5x terra" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>人間 が ハブ に なる</h2>
+                <div class="ch">Human as the Hub</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-tower-broadcast terra"></i><span>人間が<span class="hl-terra">中央</span>で連絡を調整</span></li>
+                    <li><i class="fa-solid fa-eye terra"></i><span>リアルタイムで<span class="hl-terra">監視</span>できる</span></li>
+                    <li><i class="fa-solid fa-hand terra"></i><span>いつでも<span class="tag terra">介入</span>可能</span></li>
+                    <li><i class="fa-solid fa-compass terra"></i><span>方針を<span class="hl-terra">自分</span>で握る</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                    AIだけで進むと、<br>
+                    <span class="hl-terra">余計な相談</span>が増える。<br>
+                    人間が<span class="tag terra">止める</span>役
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション3：高い制御性 -->
+    <div class="section-break sage">
+        <h2><i class="fa-solid fa-sliders fa-lg"></i> 第3章：人間がリーダーを務める意義</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード9：AIだけのチームの問題 -->
+        <div class="card warn fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-5x red" style="animation:fa-flip 3.5s infinite;" aria-hidden="true"></i>
+                <h2>AIだけ の チーム の 課題</h2>
+                <div class="ch">When AI Talks Too Much</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comments red"></i><span>不要な<span class="hl-red">相談</span>が次々発生</span></li>
+                    <li><i class="fa-solid fa-bell red"></i><span>過剰な<span class="hl-red">報告</span>で埋もれる</span></li>
+                    <li><i class="fa-solid fa-eye-slash red"></i><span>人間には<span class="tag red">見えない</span>進行</span></li>
+                    <li><i class="fa-solid fa-clock red"></i><span>ムダな<span class="hl-red">時間</span>が膨らむ</span></li>
+                </ul>
+                <div class="bubble v5 r">
+                    <i class="fa-solid fa-face-tired fa-lg" style="color:var(--c9);"></i>
+                    AI同士が<span class="hl-red">しゃべりすぎ</span>て、<br>
+                    本筋が見えなくなる。<br>
+                    <span class="tag red">要注意</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10：人間がいることの価値 -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-check fa-5x sage" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>人間 が いる 価値</h2>
+                <div class="ch">The Value of a Human Leader</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-filter sage"></i><span>必要な相談だけ<span class="hl-sage">通す</span></span></li>
+                    <li><i class="fa-solid fa-scissors sage"></i><span>余計な報告を<span class="hl-sage">切る</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass sage"></i><span>流れを<span class="tag sage">常に把握</span></span></li>
+                    <li><i class="fa-solid fa-anchor sage"></i><span>判断の<span class="hl-sage">最終決定</span>は人間</span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-heart fa-lg" style="color:var(--c7);"></i>
+                    人間が<span class="hl-sage">交通整理</span>すると、<br>
+                    チームが<span class="hl-sage">速く</span>走る。<br>
+                    <span class="tag sage">制御性</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11：リアルタイム監視 -->
+        <div class="card deep fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-tower-control fa-5x deep" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>リアルタイム の 監視</h2>
+                <div class="ch">Watch and Step In, Anytime</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-chart-line deep"></i><span>各セッションの<span class="hl-deep">状態</span>が見える</span></li>
+                    <li><i class="fa-solid fa-stop deep"></i><span>おかしければ<span class="hl-deep">止められる</span></span></li>
+                    <li><i class="fa-solid fa-rotate deep"></i><span>軌道修正も<span class="tag">即座</span></span></li>
+                    <li><i class="fa-solid fa-shield-halved deep"></i><span><span class="hl-deep">安全性</span>が段違い</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c5);"></i>
+                    丸投げじゃない。<br>
+                    <span class="hl-deep">見守りながら</span>進める。<br>
+                    <span class="tag">安心感</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション4：OpenAI Codexとの比較 -->
+    <div class="section-break amber">
+        <h2><i class="fa-solid fa-code-compare fa-lg"></i> 第4章：Codexとのアプローチ比較</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード12：OpenAI Codexの強み -->
+        <div class="card amber fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-robot fa-5x amber" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>OpenAI Codex の 強み</h2>
+                <div class="ch">Automated by Design</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-layer-group amber"></i><span>複数の<span class="hl-amber">Thread</span>を扱う</span></li>
+                    <li><i class="fa-solid fa-code-branch amber"></i><span><span class="hl-amber">Worktrees</span>で並行作業</span></li>
+                    <li><i class="fa-solid fa-users amber"></i><span><span class="tag amber">Subagents</span>による自動化</span></li>
+                    <li><i class="fa-solid fa-gauge-high amber"></i><span><span class="hl-amber">自動化</span>に特化</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c10);"></i>
+                    機械に<span class="hl-amber">任せ切る</span>。<br>
+                    速さと効率が<span class="hl-amber">売り</span>。<br>
+                    <span class="tag amber">自動化</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13：Claude Codeの強み -->
+        <div class="card deep fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-laptop-code fa-5x deep" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>Claude Code の 強み</h2>
+                <div class="ch">Human-Centric by Nature</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-terminal deep"></i><span><span class="hl-deep">ターミナル</span>で直感的に</span></li>
+                    <li><i class="fa-solid fa-desktop deep"></i><span><span class="hl-deep">デスクトップアプリ</span>で運営</span></li>
+                    <li><i class="fa-solid fa-hand-holding-hand deep"></i><span>人間が<span class="tag">中心</span>にいる設計</span></li>
+                    <li><i class="fa-solid fa-heart deep"></i><span><span class="hl-deep">人間中心</span>のアプローチ</span></li>
+                </ul>
+                <div class="bubble v4 r">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c5);"></i>
+                    機械より<span class="hl-deep">人間</span>が主役。<br>
+                    直感で<span class="hl-deep">動かせる</span>。<br>
+                    <span class="tag">人間中心</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14：比較まとめ -->
+        <div class="card terra fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-5x terra" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>両者 の 比較 まとめ</h2>
+                <div class="ch">Different Strengths</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-bolt terra"></i><span>Codexは<span class="hl-terra">自動化</span>で勝負</span></li>
+                    <li><i class="fa-solid fa-user terra"></i><span>Claude Codeは<span class="hl-terra">人間の指揮</span>で勝負</span></li>
+                    <li><i class="fa-solid fa-circle-question terra"></i><span>どちらが<span class="tag terra">正解</span>ではない</span></li>
+                    <li><i class="fa-solid fa-route terra"></i><span><span class="hl-terra">目的</span>で選ぶ時代</span></li>
+                </ul>
+                <div class="vs-box">
+                    <div class="vs-side amber">
+                        <h4><i class="fa-solid fa-robot"></i> Codex</h4>
+                        自動化・効率重視
+                    </div>
+                    <div class="vs-side main">
+                        <h4><i class="fa-solid fa-laptop-code"></i> Claude Code</h4>
+                        人間指揮・制御重視
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション5：3層構造 -->
+    <div class="section-break">
+        <h2><i class="fa-solid fa-layer-group fa-lg"></i> 第5章：3層構造で連携を組み立てる</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード15：Layer1 長期記憶 -->
+        <div class="card amber fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-database fa-5x amber" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>Layer 1：長期記憶</h2>
+                <div class="ch">Shared Files as Memory</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-lines amber"></i><span><span class="hl-amber">RULES.md</span>で基本ルールを共有</span></li>
+                    <li><i class="fa-solid fa-clipboard-list amber"></i><span><span class="hl-amber">STATUS.md</span>で進捗を一元管理</span></li>
+                    <li><i class="fa-solid fa-gavel amber"></i><span><span class="hl-amber">DECISIONS.md</span>で決定事項を記録</span></li>
+                    <li><i class="fa-solid fa-book-bookmark amber"></i><span>全員が<span class="tag amber">同じ記憶</span>を持つ</span></li>
+                </ul>
+                <pre class="code"><span class="c"># 共有ファイルの例</span>
+<span class="f">RULES.md</span>     <span class="c"># ルール</span>
+<span class="f">STATUS.md</span>    <span class="c"># 進捗</span>
+<span class="f">DECISIONS.md</span> <span class="c"># 決定履歴</span></pre>
+            </div>
+        </div>
+
+        <!-- カード16：Layer2 各専門家の頭脳 -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-brain fa-5x sage" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>Layer 2：専門家 の 頭脳</h2>
+                <div class="ch">Independent Expert Sessions</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-lightbulb sage"></i><span><span class="hl-sage">Planner</span>（企画・計画）</span></li>
+                    <li><i class="fa-solid fa-hammer sage"></i><span><span class="hl-sage">Worker</span>（実装・作業）</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass sage"></i><span><span class="hl-sage">Reviewer</span>（監査・確認）</span></li>
+                    <li><i class="fa-solid fa-user-gear sage"></i><span>それぞれ<span class="tag sage">独立</span>したセッション</span></li>
+                </ul>
+                <div class="bubble v2 r">
+                    <i class="fa-solid fa-people-group fa-lg" style="color:var(--c7);"></i>
+                    役割ごとに、<br>
+                    <span class="hl-sage">別々の頭脳</span>を用意。<br>
+                    <span class="tag sage">分業</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17：Layer3 リアルタイム通信 -->
+        <div class="card terra fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-tower-broadcast fa-5x terra" style="animation:fa-flip 3.5s infinite;" aria-hidden="true"></i>
+                <h2>Layer 3：リアルタイム 通信</h2>
+                <div class="ch">SendMessage Lines</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-paper-plane terra"></i><span><span class="hl-terra">SendMessage</span>で直接連絡</span></li>
+                    <li><i class="fa-solid fa-bolt terra"></i><span>必要な瞬間に<span class="hl-terra">即、届く</span></span></li>
+                    <li><i class="fa-solid fa-comments terra"></i><span>双方向の<span class="tag terra">連絡ライン</span></span></li>
+                    <li><i class="fa-solid fa-plug-circle-bolt terra"></i><span>3層が<span class="hl-terra">組み合わさる</span></span></li>
+                </ul>
+                <div class="flow-bar">
+                    <span class="label amber"><i class="fa-solid fa-database"></i> 記憶</span>
+                    <i class="fa-solid fa-arrow-right-long sep"></i>
+                    <span class="label"><i class="fa-solid fa-brain"></i> 頭脳</span>
+                    <i class="fa-solid fa-arrow-right-long sep"></i>
+                    <span class="label terra"><i class="fa-solid fa-broadcast-tower"></i> 通信</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18：3層が合わさった強み -->
+        <div class="card deep fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-cubes-stacked fa-5x deep" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>3層 が 重なる 強み</h2>
+                <div class="ch">The Whole Is Greater</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-database deep"></i><span>記憶が<span class="hl-deep">共有</span>される</span></li>
+                    <li><i class="fa-solid fa-brain deep"></i><span>頭脳が<span class="hl-deep">専門別</span>に動く</span></li>
+                    <li><i class="fa-solid fa-tower-broadcast deep"></i><span>通信が<span class="hl-deep">瞬時</span>に届く</span></li>
+                    <li><i class="fa-solid fa-star deep"></i><span>小さな組織が<span class="tag">大きな成果</span></span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c5);"></i>
+                    一人ひとりは小さくても、<br>
+                    <span class="hl-deep">3層</span>で巨大な力に。<br>
+                    <span class="tag">相乗効果</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション6：初心者向けの実践例 -->
+    <div class="section-break terra">
+        <h2><i class="fa-solid fa-seedling fa-lg"></i> 第6章：初心者向けの2セッション連携</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード19：開発向けペア -->
+        <div class="card deep fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-code-branch fa-5x deep" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>開発 向け ペア</h2>
+                <div class="ch">Worker + Reviewer</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hammer deep"></i><span><span class="hl-deep">Worker</span>が実装を担当</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass deep"></i><span><span class="hl-deep">Reviewer</span>が監査・確認</span></li>
+                    <li><i class="fa-solid fa-comments deep"></i><span>成果物を<span class="tag">メッセージ</span>で回す</span></li>
+                    <li><i class="fa-solid fa-shield-halved deep"></i><span>品質が<span class="hl-deep">自動で</span>上がる</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--c5);"></i>
+                    作る人と、<br>
+                    <span class="hl-deep">確認する人</span>を分ける。<br>
+                    <span class="tag">二重チェック</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード20：ビジネス企画向けペア -->
+        <div class="card amber fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-lightbulb fa-5x amber" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>企画 向け ペア</h2>
+                <div class="ch">Planner + Critic</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-pen-ruler amber"></i><span><span class="hl-amber">Planner</span>が企画を作る</span></li>
+                    <li><i class="fa-solid fa-comment-dots amber"></i><span><span class="hl-amber">Critic</span>が批判的に検証</span></li>
+                    <li><i class="fa-solid fa-arrows-left-right amber"></i><span>意見を<span class="tag amber">ぶつけ合う</span></span></li>
+                    <li><i class="fa-solid fa-arrow-up amber"></i><span>アイデアが<span class="hl-amber">鍛えられる</span></span></li>
+                </ul>
+                <div class="bubble v3 r">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c10);"></i>
+                    賛成と反対を、<br>
+                    <span class="hl-amber">別々に</span>投げる。<br>
+                    <span class="tag amber">深掘り</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード21：意思決定向けペア -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-unbalanced fa-5x sage" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>意思決定 向け ペア</h2>
+                <div class="ch">Pro vs Con Analysis</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-thumbs-up sage"></i><span><span class="hl-sage">賛成派</span>の分析役</span></li>
+                    <li><i class="fa-solid fa-thumbs-down sage"></i><span><span class="hl-sage">反対派</span>の分析役</span></li>
+                    <li><i class="fa-solid fa-scale-balanced sage"></i><span>両面から<span class="tag sage">比較</span></span></li>
+                    <li><i class="fa-solid fa-circle-check sage"></i><span>人間が<span class="hl-sage">最終判断</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-people-group fa-lg" style="color:var(--c7);"></i>
+                    賛否を<span class="hl-sage">両方</span>出して、<br>
+                    人間が<span class="hl-sage">決める</span>。<br>
+                    <span class="tag sage">安全な判断</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード22：まず2つから始める -->
+        <div class="card terra fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-shoe-prints fa-5x terra" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>まず 2つ から 始める</h2>
+                <div class="ch">Start Small, Grow Slowly</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 terra"></i><span>最初は<span class="hl-terra">2セッション</span>だけ</span></li>
+                    <li><i class="fa-solid fa-message terra"></i><span>メッセージの<span class="hl-terra">送受信</span>に慣れる</span></li>
+                    <li><i class="fa-solid fa-plus terra"></i><span>慣れたら<span class="tag terra">追加</span>していく</span></li>
+                    <li><i class="fa-solid fa-flag-checkered terra"></i><span>小さく<span class="hl-terra">確実に</span>育てる</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-heart fa-lg" style="color:var(--c2);"></i>
+                    いきなり全部は<span class="hl-terra">無理</span>。<br>
+                    まずは<span class="hl-terra">2人</span>で練習。<br>
+                    <span class="tag terra">第一歩</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション7：実践のコツ -->
+    <div class="section-break amber">
+        <h2><i class="fa-solid fa-wand-magic-sparkles fa-lg"></i> 第7章：うまく回すためのコツ</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード23：役割を明確に -->
+        <div class="card amber fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-id-card fa-5x amber" style="animation:fa-flip 4s infinite;" aria-hidden="true"></i>
+                <h2>役割 を 明確 に</h2>
+                <div class="ch">Clear Roles, Less Confusion</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-tag amber"></i><span>各セッションに<span class="hl-amber">役割</span>を持たせる</span></li>
+                    <li><i class="fa-solid fa-list-check amber"></i><span>担当を<span class="hl-amber">重複させない</span></span></li>
+                    <li><i class="fa-solid fa-circle-question amber"></i><span>「誰が何を」を<span class="tag amber">明確化</span></span></li>
+                    <li><i class="fa-solid fa-bullseye amber"></i><span>役割が<span class="hl-amber">ぶれない</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c10);"></i>
+                    役割が<span class="hl-amber">曖昧</span>だと、<br>
+                    メッセージが<span class="hl-amber">迷子</span>になる。<br>
+                    <span class="tag amber">明確に</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード24：共有ファイルを活用 -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-folder-open fa-5x sage" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>共有ファイル を 活用</h2>
+                <div class="ch">One Source of Truth</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-circle-check sage"></i><span>進捗は<span class="hl-sage">STATUS.md</span>へ</span></li>
+                    <li><i class="fa-solid fa-gavel sage"></i><span>決定は<span class="hl-sage">DECISIONS.md</span>へ</span></li>
+                    <li><i class="fa-solid fa-rotate sage"></i><span>常に<span class="tag sage">最新</span>を保つ</span></li>
+                    <li><i class="fa-solid fa-eye sage"></i><span>誰でも<span class="hl-sage">同じ情報</span>を見る</span></li>
+                </ul>
+                <div class="bubble v2 r">
+                    <i class="fa-solid fa-circle-info fa-lg" style="color:var(--c7);"></i>
+                    メッセージだけだと<span class="hl-sage">消える</span>。<br>
+                    ファイルに<span class="hl-sage">残す</span>のが大事。<br>
+                    <span class="tag sage">記録</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション8：未来の働き方 -->
+    <div class="section-break deep">
+        <h2><i class="fa-solid fa-rocket fa-lg"></i> 第8章：これが未来の働き方</h2>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード25：一人CEOの時代 -->
+        <div class="card deep fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-tie fa-5x deep" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>一人 CEO の 時代</h2>
+                <div class="ch">Be the CEO of Your AI Team</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-crown deep"></i><span>あなたが<span class="hl-deep">社長</span>になる</span></li>
+                    <li><i class="fa-solid fa-users deep"></i><span>AIたちが<span class="hl-deep">社員</span></span></li>
+                    <li><i class="fa-solid fa-briefcase deep"></i><span>役割を<span class="tag">振って</span>動かす</span></li>
+                    <li><i class="fa-solid fa-chart-line deep"></i><span>小さな会社が<span class="hl-deep">一人で</span></span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-rocket fa-lg" style="color:var(--c5);"></i>
+                    一人でも<span class="hl-deep">組織</span>を持てる。<br>
+                    それがメッセージングの<span class="hl-deep">力</span>。<br>
+                    <span class="tag">新時代</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード26：AIを部下として使う -->
+        <div class="card terra fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows fa-5x terra" style="animation:fa-flip 3.5s infinite;" aria-hidden="true"></i>
+                <h2>AI を 部下 として</h2>
+                <div class="ch">Direct, Don't Dictate</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-bullhorn terra"></i><span>指示は<span class="hl-terra">明確</span>に</span></li>
+                    <li><i class="fa-solid fa-ear-listen terra"></i><span>報告は<span class="hl-terra">適切</span>な頻度で</span></li>
+                    <li><i class="fa-solid fa-handshake terra"></i><span>セッション間で<span class="tag terra">連携</span></span></li>
+                    <li><i class="fa-solid fa-star terra"></i><span>人間が<span class="hl-terra">采配</span>を振る</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--c2);"></i>
+                    AIは<span class="hl-terra">優秀な部下</span>。<br>
+                    でも<span class="hl-terra">放置</span>は禁物。<br>
+                    <span class="tag terra">指揮</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード27：最大の強みは制御性 -->
+        <div class="card sage fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield fa-5x sage" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>最大 の 強み は 制御性</h2>
+                <div class="ch">Control Is the Superpower</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hand-back-fist sage"></i><span><span class="hl-sage">人間の手</span>で止められる</span></li>
+                    <li><i class="fa-solid fa-eye sage"></i><span>常に<span class="hl-sage">全体</span>が見える</span></li>
+                    <li><i class="fa-solid fa-compass sage"></i><span>方向を<span class="tag sage">変えられる</span></span></li>
+                    <li><i class="fa-solid fa-medal sage"></i><span>これが<span class="hl-sage">最大</span>の武器</span></li>
+                </ul>
+                <div class="bubble v2 r">
+                    <i class="fa-solid fa-heart fa-lg" style="color:var(--c7);"></i>
+                    速さより<span class="hl-sage">確かさ</span>。<br>
+                    人間がいる<span class="hl-sage">強み</span>。<br>
+                    <span class="tag sage">安心感</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード28（最終）：まとめ -->
+        <div class="card amber fade-in">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag-checkered fa-5x amber" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>ここまで の まとめ</h2>
+                <div class="ch">The Big Picture</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comments amber"></i><span>独立AIが<span class="hl-amber">直接、連携</span></span></li>
+                    <li><i class="fa-solid fa-user amber"></i><span><span class="hl-amber">人間主導</span>の組織型</span></li>
+                    <li><i class="fa-solid fa-layer-group amber"></i><span>記憶・頭脳・通信の<span class="tag amber">3層</span></span></li>
+                    <li><i class="fa-solid fa-seedling amber"></i><span>まずは<span class="hl-amber">2つ</span>から</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-rocket fa-lg" style="color:var(--c10);"></i>
+                    AIを<span class="hl-amber">組織</span>として動かす。<br>
+                    それが<span class="hl-amber">新しい働き方</span>。<br>
+                    <span class="tag amber">未来形</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <h2 style="font-size:22px; margin-bottom:12px;"><i class="fa-solid fa-clapperboard"></i> 出典・動画情報</h2>
+        <div style="font-size:16px;">
+            🎬 動画: <a href="https://www.youtube.com/watch?v=_7dWMJQvXBk" target="_blank" rel="noopener">AI共創イノベーション ／ Claude Codeのセッション間のやり取りが直接可能に！「セッション間メッセージング」の使い方と価値を解説！</a>
+        </div>
+        <div class="url">
+            <i class="fa-solid fa-link"></i> https://www.youtube.com/watch?v=_7dWMJQvXBk
+        </div>
+        <div class="src">
+            <i class="fa-regular fa-calendar"></i> 2026年8月10日 ／ チャンネル：AI共創イノベーション
+        </div>
+        <div class="note">
+            このインフォグラフィックは、動画内容をもとに作成しました
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

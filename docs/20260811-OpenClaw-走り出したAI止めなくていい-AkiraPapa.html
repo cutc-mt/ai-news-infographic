@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw｜走り出したAI、止めなくていい</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：パイントレイル × タンジェリン（常緑の森＝走り続ける勢い、小道のオレンジ＝ひと言の追加） */
+            --c1: #14532D;   /* Green 900  - 深い常緑 */
+            --c2: #EA580C;   /* Orange 600 - 小道のオレンジ */
+            --c3: #DCFCE7;   /* Green 100  - 薄い緑 */
+            --c4: #052E16;   /* Green 950  - さらに深い森 */
+            --c5: #16A34A;   /* Green 600  - 鮮やか緑 */
+            --c6: #FB923C;   /* Orange 400 - 明るいオレンジ */
+            --c7: #F0FDF4;   /* Green 50   - ごく薄い緑 */
+            --c8: #C2410C;   /* Orange 700 - 深いオレンジ */
+            --c9: #FBBF24;   /* Amber 400  - 黄金の差し色 */
+            --c10: #15803D;  /* Green 700  - 中間の緑 */
+            --c11: #FED7AA;  /* Orange 200 - 桃色オレンジ */
+            --c12: #D9F99D;  /* Lime 200   - 新葉の黄緑 */
+            --c13: #B91C1C;  /* Red 700    - 警告・止める */
+            --c14: #0D9488;  /* Teal 600   - 並走の青緑 */
+            --c15: #99F6E4;  /* Teal 200   - 薄い青緑 */
+            --ink-green: #052E16;
+            --ink-orange: #7C2D12;
+            --ink-teal: #134E4A;
+            --tint-green: #DCFCE7;
+            --tint-orange: #FFEDD5;
+            --tint-lime: #ECFCCB;
+            --tint-teal: #CCFBF1;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F7FBF6; font-family:'Kaisei Decol',sans-serif; color:#052E16; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:58px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c1) 40%,var(--c10) 72%,var(--c5) 110%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(5,46,22,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(251,191,36,.22) 0%, transparent 60%);
+            animation:pulse 6s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        .header i.main { color:var(--c9); font-size:100px; margin-bottom:15px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; text-shadow:0 4px 18px rgba(0,0,0,.30); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.32); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c11); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c9); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(20,83,45,.13);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(234,88,12,.20); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c6));
+        }
+        .card.pine::before { background:linear-gradient(90deg,var(--c4),var(--c1),var(--c10)); }
+        .card.trail::before { background:linear-gradient(90deg,var(--c2),var(--c8),var(--c6)); }
+        .card.leaf::before { background:linear-gradient(90deg,var(--c10),var(--c5),var(--c12)); }
+        .card.gold::before { background:linear-gradient(90deg,var(--c9),var(--c2),var(--c1)); }
+        .card.warn::before { background:linear-gradient(90deg,var(--c13),var(--c2),var(--c9)); }
+        .card.run::before { background:linear-gradient(90deg,var(--c14),var(--c5),var(--c10)); }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:58px; }
+        .icon-box i.trail { color:var(--c2); }
+        .icon-box i.leaf { color:var(--c5); }
+        .icon-box i.gold { color:var(--c9); }
+        .icon-box i.deep { color:var(--c4); }
+        .icon-box i.run { color:var(--c14); }
+        .icon-box i.red { color:var(--c13); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#4B5563; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.t { color:var(--c2); }
+        ul.kl li i.l { color:var(--c5); }
+        ul.kl li i.g { color:var(--c9); }
+        ul.kl li i.r { color:var(--c14); }
+        ul.kl li i.x { color:var(--c13); }
+        ul.kl li i.d { color:var(--c4); }
+
+        /* タグ */
+        .tag {
+            background:var(--tint-green);
+            color:var(--ink-green);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.trail { background:var(--tint-orange); color:var(--ink-orange); }
+        .tag.leaf { background:var(--tint-lime); color:#3F6212; }
+        .tag.teal { background:var(--tint-teal); color:var(--ink-teal); }
+        .tag.gold { background:#FEF3C7; color:var(--ink-orange); }
+        .tag.warn { background:#FECACA; color:#7F1D1D; }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-green) 60%); }
+        .hl-trail { color:var(--ink-orange); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-orange) 60%); }
+        .hl-leaf { color:#3F6212; font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-lime) 60%); }
+        .hl-gold { color:var(--ink-orange); font-weight:bold; background:linear-gradient(transparent 60%, #FEF3C7 60%); }
+        .hl-warn { color:#7F1D1D; font-weight:bold; background:linear-gradient(transparent 60%, #FECACA 60%); }
+        .hl-run { color:var(--ink-teal); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-teal) 60%); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:20px;
+            padding:12px 16px;
+            margin:14px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            box-shadow:3px 3px 12px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 9px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.r::after { left:auto; right:22px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 9px 12px; }
+        .bubble.v1 {
+            background:var(--tint-orange);
+            border-color:var(--c2);
+            transform:rotate(1deg);
+        }
+        .bubble.v1::after { border-color:var(--c2) transparent; }
+        .bubble.v2 {
+            background:var(--tint-green);
+            border-color:var(--c5);
+            transform:rotate(-2deg);
+        }
+        .bubble.v2::after { border-color:var(--c5) transparent; }
+        .bubble.v3 {
+            background:#FEF3C7;
+            border-color:var(--c9);
+            transform:rotate(1deg);
+        }
+        .bubble.v3::after { border-color:var(--c9) transparent; }
+        .bubble.vg {
+            background:var(--tint-lime);
+            border-color:var(--c5);
+            transform:rotate(-1deg);
+        }
+        .bubble.vg::after { border-color:var(--c5) transparent; }
+        .bubble.vt {
+            background:var(--tint-teal);
+            border-color:var(--c14);
+            transform:rotate(1deg);
+        }
+        .bubble.vt::after { border-color:var(--c14) transparent; }
+        .bubble.vw {
+            background:#FEE2E2;
+            border-color:var(--c13);
+            transform:rotate(-2deg);
+        }
+        .bubble.vw::after { border-color:var(--c13) transparent; }
+        .hw { font-family:'Yomogi',cursive; line-height:1.6; color:#052E16; }
+        .hw i { color:var(--c1); }
+        .hw i.t { color:var(--c2); }
+        .hw i.g { color:var(--c9); }
+        .hw i.x { color:var(--c13); }
+        .hw i.r { color:var(--c14); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--c4);
+            color:var(--c3);
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'Courier New',monospace;
+            line-height:1.5;
+        }
+        pre .cmd { color:var(--c9); font-weight:bold; }
+        pre .info { color:var(--c6); }
+        pre .ok { color:#6EE7B7; }
+        pre .warn { color:#FCD34D; }
+        pre .err { color:#FCA5A5; }
+
+        /* 比較ボックス */
+        .compare-box {
+            display:flex;
+            gap:10px;
+            margin:12px 5px;
+        }
+        .compare-box .col {
+            flex:1;
+            padding:12px 8px;
+            border-radius:10px;
+            text-align:center;
+            font-size:13px;
+            font-family:'Yomogi',cursive;
+        }
+        .compare-box .col.stop { background:#FEE2E2; color:#7F1D1D; }
+        .compare-box .col.run { background:var(--tint-lime); color:#3F6212; }
+        .compare-box .col.teal { background:var(--tint-teal); color:var(--ink-teal); }
+        .compare-box .col i { font-size:26px; margin-bottom:4px; display:block; }
+        .compare-box .col .big { font-size:17px; font-weight:bold; display:block; margin-top:6px; line-height:1.4; }
+
+        /* タイムライン */
+        .timeline {
+            margin:12px 5px;
+            padding:12px;
+            background:var(--c7);
+            border-radius:10px;
+        }
+        .timeline .t-row {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:8px 0;
+            font-size:13px;
+            font-family:'Yomogi',cursive;
+        }
+        .timeline .t-bar {
+            flex:1;
+            height:16px;
+            border-radius:8px;
+            background:var(--c3);
+            position:relative;
+            overflow:hidden;
+        }
+        .timeline .t-bar .fill {
+            position:absolute;
+            top:0; left:0; height:100%;
+            border-radius:8px;
+        }
+        .timeline .t-bar .fill.t { background:var(--c2); }
+        .timeline .t-bar .fill.l { background:var(--c5); }
+        .timeline .t-bar .fill.r { background:var(--c14); }
+        .timeline .t-label { min-width:72px; color:var(--c4); font-weight:bold; }
+        .timeline .t-time { min-width:48px; text-align:right; color:var(--c8); font-weight:bold; font-family:'Courier New',monospace; }
+
+        /* ステップ番号 */
+        .step-num {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:24px; height:24px;
+            background:var(--c1);
+            color:#fff;
+            border-radius:50%;
+            font-size:13px;
+            font-weight:bold;
+            margin-right:8px;
+            flex-shrink:0;
+        }
+        .step-num.t { background:var(--c2); }
+        .step-num.l { background:var(--c5); }
+        .step-num.g { background:var(--c9); color:var(--c4); }
+        .step-num.r { background:var(--c14); }
+        .step-num.x { background:var(--c13); }
+
+        /* ショートカット風 */
+        .kbd {
+            display:inline-block;
+            background:#fff;
+            border:2px solid var(--c4);
+            border-bottom-width:4px;
+            border-radius:6px;
+            padding:2px 8px;
+            font-family:'Courier New',monospace;
+            font-size:13px;
+            font-weight:bold;
+            color:var(--c4);
+            margin:2px;
+        }
+
+        /* チャット模擬 */
+        .chat-mock {
+            background:var(--c7);
+            border-radius:12px;
+            padding:12px;
+            margin:12px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:14px;
+        }
+        .chat-mock .msg {
+            background:#fff;
+            border-radius:14px 14px 14px 4px;
+            padding:8px 12px;
+            margin:6px 0;
+            display:inline-block;
+            max-width:88%;
+            box-shadow:1px 1px 4px rgba(0,0,0,.06);
+        }
+        .chat-mock .msg.ai {
+            background:var(--tint-orange);
+            border-radius:14px 14px 4px 14px;
+        }
+        .chat-mock .msg .who { font-size:11px; color:#6B7280; margin-bottom:2px; }
+        .chat-mock .msg .badge {
+            background:var(--c2);
+            color:#fff;
+            padding:1px 7px;
+            border-radius:4px;
+            font-family:'Courier New',monospace;
+            font-weight:bold;
+            font-size:12px;
+        }
+
+        /* 状態ピル */
+        .status-pills {
+            display:flex;
+            flex-direction:column;
+            gap:6px;
+            margin:10px 0;
+        }
+        .status-pill {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            padding:7px 12px;
+            border-radius:30px;
+            font-size:14px;
+            font-weight:bold;
+        }
+        .status-pill.stop { background:#FEE2E2; color:#7F1D1D; }
+        .status-pill.run { background:var(--tint-lime); color:#3F6212; }
+        .status-pill i { font-size:16px; }
+
+        /* セクション区切り */
+        .section-break {
+            text-align:center;
+            margin:40px 0 30px;
+            padding:15px;
+            background:linear-gradient(90deg,transparent,var(--tint-green),var(--tint-orange),transparent);
+            border-radius:12px;
+        }
+        .section-break span {
+            font-family:'Yomogi',cursive;
+            font-size:18px;
+            color:var(--c4);
+            display:inline-flex;
+            align-items:center;
+            gap:10px;
+        }
+        .section-break i { color:var(--c1); }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:60px;
+            padding:30px 20px;
+            background:linear-gradient(135deg,var(--c4),var(--c1),var(--c2));
+            border-radius:25px;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(5,46,22,.25);
+        }
+        .footer a { color:var(--c9); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .url { font-size:14px; color:var(--c9); word-break:break-all; }
+        .footer i { color:var(--c9); }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .header h1 { font-size:28px; }
+            .compare-box { flex-direction:column; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <i class="fa-solid fa-person-running fa-6x main" aria-hidden="true"></i>
+        <h1>OpenClaw｜走り出した AI、<br>止めなくて いい</h1>
+        <p class="sub">違うのは 走り出した あとの ひと言 だけ</p>
+        <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月11日 ／ あきらパパの AI 活用 学習 部屋</p>
+    </div>
+
+    <!-- ============ セクション1: はじまり ＝ 同じAI、同じ依頼 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-flag-checkered"></i> はじまり： 同じ AI、 同じ 依頼、 違うのは ひとこと だけ</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード1: 同じAI、同じ依頼 -->
+        <div class="card pine">
+            <div class="icon-box">
+                <i class="fa-solid fa-equals deep fa-5x" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>同じ AI、<br>同じ 依頼</h2>
+                <p class="ch">スタート は ぜんぶ おなじ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-robot d"></i><span>つかう <span class="tag">AI</span> は 同じ</span></li>
+                    <li><i class="fa-solid fa-file-lines d"></i><span>頼む <span class="tag">内容</span> も 同じ</span></li>
+                    <li><i class="fa-solid fa-circle-question d"></i><span>ちがうのは <span class="hl">あとの ひと言</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-lightbulb l"></i> はじまり は<br><span class="hl">ぜんぶ 一緒</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: 走り出した後のひとことがすべて -->
+        <div class="card trail">
+            <div class="icon-box">
+                <i class="fa-solid fa-comment-dots trail fa-5x" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>走り出した あとの<br>ひとことが すべて</h2>
+                <p class="ch">そこで 道が 分かれる</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hand t"></i><span><span class="hl-trail">止めて</span> 言い直す</span></li>
+                    <li><i class="fa-solid fa-forward t"></i><span><span class="hl-leaf">走らせたまま</span> 足す</span></li>
+                    <li><i class="fa-solid fa-route t"></i><span>この <span class="tag trail">ひと言</span> で 道が 決まる</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-hand-pointer t"></i> ひと言 が<br>すべての <span class="hl-trail">分かれ道</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: 二つの道をならべて -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-signs-post gold fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>道は<br>2つ に 分かれる</h2>
+                <p class="ch">あなたは どっちを えらぶ？</p>
+            </div>
+            <div class="body">
+                <div class="compare-box">
+                    <div class="col stop">
+                        <i class="fa-solid fa-hand"></i>
+                        止める
+                        <span class="big">やり直し</span>
+                    </div>
+                    <div class="col run">
+                        <i class="fa-solid fa-person-running"></i>
+                        走らせる
+                        <span class="big">足すだけ</span>
+                    </div>
+                </div>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-compass g"></i> ぜんぶ <span class="hl-gold">同じ</span> なのに<br>結果が かわる。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション2: 止める道 ＝ どうなるか ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-hand"></i> 道A： 止めて 言い直すと、 何が おきる？</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード4: 止めると作業が打ち切られる -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-octagon-xmark red fa-5x" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>止めると 今の 作業が<br>そこで 打ち切られる</h2>
+                <p class="ch">すこし 進んだ 分が きえる</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-stop x"></i><span>動いて いた <span class="tag warn">作業</span> が 止まる</span></li>
+                    <li><i class="fa-solid fa-trash-can x"></i><span>進んだ <span class="hl-warn">分</span> が なくなる</span></li>
+                    <li><i class="fa-solid fa-arrow-rotate-left x"></i><span>もどって <span class="tag warn">やり直し</span></span></li>
+                </ul>
+                <div class="bubble vw">
+                    <span class="hw"><i class="fa-solid fa-triangle-exclamation x"></i> 止める =<br><span class="hl-warn">そこで 終わり</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: もう一度初めから説明し直し -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-rotate-left red fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>もう 1度 初めから<br>説明を し直す</h2>
+                <p class="ch">時間が もどって くる</p>
+            </div>
+            <div class="body">
+                <div class="timeline">
+                    <div class="t-row">
+                        <span class="t-label">説明 1回め</span>
+                        <span class="t-bar"><span class="fill t" style="width:50%"></span></span>
+                        <span class="t-time">x1</span>
+                    </div>
+                    <div class="t-row">
+                        <span class="t-label">説明 2回め</span>
+                        <span class="t-bar"><span class="fill t" style="width:100%"></span></span>
+                        <span class="t-time">x2</span>
+                    </div>
+                </div>
+                <div class="bubble vw">
+                    <span class="hw"><i class="fa-solid fa-stopwatch x"></i> 初めから<br><span class="hl-warn">もう 1回</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: 止める道のまとめ -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-face-frown red fa-5x" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>止める 道 の<br>お値段</h2>
+                <p class="ch">コスト が 2倍 に</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clock x"></i><span>時間が <span class="hl-warn">2倍</span> かかる</span></li>
+                    <li><i class="fa-solid fa-comment x"></i><span>説明も <span class="tag warn">2回</span></span></li>
+                    <li><i class="fa-solid fa-face-tired x"></i><span>あなたの <span class="hl-warn">手間</span> も 増える</span></li>
+                </ul>
+                <div class="bubble vw">
+                    <span class="hw"><i class="fa-solid fa-coins x"></i> 止める と<br>ぜんぶ <span class="hl-warn">やり直し</span>。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション3: 走らせる道 ＝ OpenClawの標準 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-person-running"></i> 道B： 走らせたまま、 ひと言 だけ たす</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード7: 走らせたまま方針を一言送るだけ -->
+        <div class="card leaf">
+            <div class="icon-box">
+                <i class="fa-solid fa-paper-plane leaf fa-5x" style="animation:fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+                <h2>走らせたまま<br>方針を ひと言 送る</h2>
+                <p class="ch">止めない、 ただ 足す</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-play l"></i><span>AIは <span class="hl-leaf">走り続ける</span></span></li>
+                    <li><i class="fa-solid fa-message l"></i><span>あなたは <span class="tag leaf">ひと言</span> だけ</span></li>
+                    <li><i class="fa-solid fa-plus l"></i><span>方針を <span class="hl-leaf">足す</span> だけ</span></li>
+                </ul>
+                <div class="bubble vg">
+                    <span class="hw"><i class="fa-solid fa-bolt l"></i> 止めない。<br>ただ <span class="hl-leaf">足す</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: OpenClawは最初から標準 -->
+        <div class="card run">
+            <div class="icon-box">
+                <i class="fa-solid fa-gears run fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>OpenClaw は 最初から<br>この 動きが 標準</h2>
+                <p class="ch">設定を 変える ひつよう なし</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-check r"></i><span>最初から <span class="hl-run">標準</span> で こう 動く</span></li>
+                    <li><i class="fa-solid fa-sliders r"></i><span><span class="tag teal">設定</span> は いじらない</span></li>
+                    <li><i class="fa-solid fa-circle-check r"></i><span>その ままで <span class="hl-run">大丈夫</span></span></li>
+                </ul>
+                <div class="bubble vt">
+                    <span class="hw"><i class="fa-solid fa-star r"></i> なにも しなくて<br><span class="hl-run">いい</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: 設定は変えなくていい -->
+        <div class="card run">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved run fa-5x" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>設定 を 変える<br>ひつよう は ない</h2>
+                <p class="ch">どうさ の ままで OK</p>
+            </div>
+            <div class="body">
+                <div class="status-pills">
+                    <div class="status-pill run"><i class="fa-solid fa-circle-check"></i> 標準の まま で どうさ</div>
+                    <div class="status-pill run"><i class="fa-solid fa-circle-check"></i> なにも かえない</div>
+                    <div class="status-pill run"><i class="fa-solid fa-circle-check"></i> すぐ つかえる</div>
+                </div>
+                <div class="bubble vt">
+                    <span class="hw"><i class="fa-solid fa-thumbs-up r"></i> かんたん に<br><span class="hl-run">はじめられる</span>。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション4: 届くタイミング ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-clock"></i> ひと言 は いつ 届く？： 今の 道具 が 止まった あと</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード10: 届くのは今動いている道具が止まった後 -->
+        <div class="card trail">
+            <div class="icon-box">
+                <i class="fa-solid fa-toolbox trail fa-5x" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>届くのは 今の 道具が<br>止まった あと</h2>
+                <p class="ch">すぐ じゃない、 つぎの きっかけ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-screwdriver-wrench t"></i><span>いま 動いて いる <span class="tag trail">道具</span></span></li>
+                    <li><i class="fa-solid fa-circle-pause t"></i><span>その 道具 が <span class="hl-trail">止まる</span></span></li>
+                    <li><i class="fa-solid fa-bell t"></i><span>その あと <span class="tag trail">ひと言</span> が 届く</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-hourglass-half t"></i> いまの が おわって<br>その <span class="hl-trail">つぎ</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: 今の作業はきちんと終わらせて -->
+        <div class="card leaf">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag-checkered leaf fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>今の 作業は<br>きちんと 終わらせる</h2>
+                <p class="ch">途中で きらない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-check l"></i><span>いま の <span class="hl-leaf">作業</span> は 最後まで</span></li>
+                    <li><i class="fa-solid fa-clipboard-check l"></i><span>きちんと <span class="tag leaf">完了</span></span></li>
+                    <li><i class="fa-solid fa-forward-step l"></i><span>つぎの <span class="hl-leaf">判断</span> から きりかえ</span></li>
+                </ul>
+                <div class="bubble vg">
+                    <span class="hw"><i class="fa-solid fa-handshake l"></i> 最後まで<br><span class="hl-leaf">やる</span> のが まめ な ところ。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: 次の判断からあなたの一言が反映 -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrow-turn-right gold fa-5x" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>次の 判断から<br>ひと言が 反映</h2>
+                <p class="ch">きりかえ は つぎの つぎ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><span class="step-num l">1</span><span>いま の <span class="hl-leaf">作業</span> を おわる</span></li>
+                    <li><span class="step-num t">2</span><span>あなた の <span class="tag trail">ひと言</span> を とりこむ</span></li>
+                    <li><span class="step-num g">3</span><span>つぎ の <span class="hl-gold">判断</span> から かわる</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-lightbulb g"></i> ひと言 は<br><span class="hl-gold">すぐ つぎ</span> から。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション5: きょうの初回成功 ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-bullseye"></i> きょうの 初回 成功： 1つ。 止めずに 送って みよう</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード13: 今日の初回成功は1つ -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-1 gold fa-5x" style="animation:fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+                <h2>きょうの 初回 成功<br>は 1つ で いい</h2>
+                <p class="ch">まず 1回 ためす</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-bullseye g"></i><span>ねらい は <span class="hl-gold">1つ</span></span></li>
+                    <li><i class="fa-solid fa-seedling g"></i><span>小さな <span class="tag gold">一歩</span> で OK</span></li>
+                    <li><i class="fa-solid fa-fire g"></i><span>1回 できれば <span class="hl-gold">成功</span></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-star g"></i> きょう は<br>これ <span class="hl-gold">1つ</span> だけ。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: 止めずに「小さい修正でお願いします」 -->
+        <div class="card trail">
+            <div class="icon-box">
+                <i class="fa-solid fa-comment-medical trail fa-5x" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>気づいたら 止めずに<br>「小さい 修正で」</h2>
+                <p class="ch">この ひと言 を 送る</p>
+            </div>
+            <div class="body">
+                <div class="chat-mock">
+                    <div class="msg">
+                        <div class="who">あなた</div>
+                        <span class="badge">送信</span> そこは <span class="hl-trail">小さい 修正</span> で おねがい します
+                    </div>
+                </div>
+                <div class="bubble v1">
+                    <span class="hw"><i class="fa-solid fa-paper-plane t"></i> これ だけ 送って<br><span class="hl-trail">待つ</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: ためしかた 3ステップ -->
+        <div class="card pine">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-check deep fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>ためしかた<br>3ステップ</h2>
+                <p class="ch">気 → 送る → 待つ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><span class="step-num">1</span><span>作業中 に <span class="hl">気づく</span></span></li>
+                    <li><span class="step-num t">2</span><span>止めずに <span class="tag trail">ひと言</span> を 送る</span></li>
+                    <li><span class="step-num g">3</span><span>終わる まで <span class="hl-gold">待つ</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-flag-checkered l"></i> この 3つ で<br><span class="hl">完了</span>。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション6: 注意点 ＝ ここだけ ちがう ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-triangle-exclamation"></i> 注意点： 本当に 止めたい 時 と、 受け取れない 時</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード16: 本当に打ち切りたい時は割り込み -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-bolt-lightning red fa-5x" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>本当に 打ち切りたい 時は<br>割り込み に きりかえ</h2>
+                <p class="ch">止めたい だけ 止める</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hand-fist x"></i><span>どうしても <span class="hl-warn">止めたい</span> 時</span></li>
+                    <li><i class="fa-solid fa-bolt x"></i><span><span class="tag warn">割り込み</span> に きりかえる</span></li>
+                    <li><i class="fa-solid fa-circle-stop x"></i><span>その 時 だけ <span class="hl-warn">即 停止</span></span></li>
+                </ul>
+                <div class="bubble vw">
+                    <span class="hw"><i class="fa-solid fa-circle-info x"></i> 緊急 の とき だけ<br><span class="hl-warn">割り込み</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: 要約中やレビュー中は終わってから -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-ol red fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>要約中 ・ レビュー中 は<br>おわって から 反映</h2>
+                <p class="ch">同じ 順番 では 受け取れない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-align-left x"></i><span><span class="tag warn">要約中</span> は 受け取れない</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass x"></i><span><span class="tag warn">レビュー中</span> も 同じ</span></li>
+                    <li><i class="fa-solid fa-flag-checkered x"></i><span>おわって から <span class="hl-warn">反映</span></span></li>
+                </ul>
+                <div class="bubble vw">
+                    <span class="hw"><i class="fa-solid fa-clock x"></i> この 2つ は<br>おわり <span class="hl-warn">まち</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: いつ届くか まとめ表 -->
+        <div class="card run">
+            <div class="icon-box">
+                <i class="fa-solid fa-table-list run fa-5x" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>いつ 届くか<br>まとめ</h2>
+                <p class="ch">状態 に よって かわる</p>
+            </div>
+            <div class="body">
+                <div class="timeline">
+                    <div class="t-row">
+                        <span class="t-label">通常 作業</span>
+                        <span class="t-bar"><span class="fill l" style="width:40%"></span></span>
+                        <span class="t-time">道具の つぎ</span>
+                    </div>
+                    <div class="t-row">
+                        <span class="t-label">要約 中</span>
+                        <span class="t-bar"><span class="fill r" style="width:80%"></span></span>
+                        <span class="t-time">おわり まち</span>
+                    </div>
+                    <div class="t-row">
+                        <span class="t-label">レビュー 中</span>
+                        <span class="t-bar"><span class="fill r" style="width:80%"></span></span>
+                        <span class="t-time">おわり まち</span>
+                    </div>
+                    <div class="t-row">
+                        <span class="t-label">割り込み</span>
+                        <span class="t-bar"><span class="fill t" style="width:20%"></span></span>
+                        <span class="t-time">即時</span>
+                    </div>
+                </div>
+                <div class="bubble vt">
+                    <span class="hw"><i class="fa-solid fa-table r"></i> 状態 で<br><span class="hl-run">届く 速さ</span> が かわる。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============ セクション7: あなたはどっち？＋まとめ ============ -->
+    <div class="section-break">
+        <span><i class="fa-solid fa-people-arrows"></i> あなたは どっち？ 止めて 言い直すか、 走らせたまま 足すか</span>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード19: あなたはどっち？ -->
+        <div class="card gold">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows gold fa-5x" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>あなたは<br>どっち？</h2>
+                <p class="ch">えらぶのは あなた</p>
+            </div>
+            <div class="body">
+                <div class="compare-box">
+                    <div class="col stop">
+                        <i class="fa-solid fa-hand"></i>
+                        止めて 言い直す
+                        <span class="big">やり直し x2</span>
+                    </div>
+                    <div class="col run">
+                        <i class="fa-solid fa-forward"></i>
+                        走らせたまま 足す
+                        <span class="big">ひと言 だけ</span>
+                    </div>
+                </div>
+                <div class="bubble v3">
+                    <span class="hw"><i class="fa-solid fa-lightbulb g"></i> どっちも あり。<br>ばあい で <span class="hl-gold">えらぼう</span>。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード20: きょうのまとめ 3行 -->
+        <div class="card pine">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-list deep fa-5x" style="animation:fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+                <h2>きょうの まとめ<br>3行 で</h2>
+                <p class="ch">おぼえる こと</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><span class="step-num l">1</span><span>走り出した ら <span class="hl-leaf">止めない</span></span></li>
+                    <li><span class="step-num t">2</span><span>ひと言 だけ <span class="tag trail">足す</span></span></li>
+                    <li><span class="step-num g">3</span><span>終わる のを <span class="hl-gold">待つ</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <span class="hw"><i class="fa-solid fa-bookmark l"></i> これだけ。<br>あとは <span class="hl">OpenClaw</span> が やる。</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード21: 毎日AI活用 -->
+        <div class="card run">
+            <div class="icon-box">
+                <i class="fa-solid fa-envelope-open-text run fa-5x" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>毎日 AI 活用 を<br>1つ ずつ おとどけ</h2>
+                <p class="ch">あきらパパの 1日 1ネタ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-calendar-day r"></i><span>毎日 <span class="tag teal">1つ</span> の ワザ</span></li>
+                    <li><i class="fa-solid fa-fire r"></i><span>すぐ つかえる <span class="hl-run">小さな 一歩</span></span></li>
+                    <li><i class="fa-solid fa-heart r"></i><span><a href="https://www.youtube.com/@akirapapa-akirapapa" target="_blank" style="color:inherit;text-decoration:none;">あきらパパ</a> の チャンネル</span></li>
+                </ul>
+                <div class="bubble vt">
+                    <span class="hw"><i class="fa-solid fa-bell r"></i> フォロー で<br>毎日 <span class="hl-run">1つ</span> ふえる。</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <p class="src">🎬 動画: <a href="https://www.youtube.com/watch?v=tpiqIRAfeZ8" target="_blank">あきらパパ「OpenClaw｜走り出したAI、止めなくていい」</a></p>
+        <p class="url"><i class="fa-solid fa-link"></i> https://www.youtube.com/watch?v=tpiqIRAfeZ8</p>
+        <p class="src" style="margin-top:10px;"><i class="fa-solid fa-calendar"></i> 2026年8月11日 ／ インフォグラフィック化作成</p>
+    </div>
+
+</div>
+</body>
+</html>

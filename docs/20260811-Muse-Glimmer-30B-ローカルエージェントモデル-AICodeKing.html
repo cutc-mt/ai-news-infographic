@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Muse Glimmer 30B — ローカルで動く エージェント特化 モデル — AI Code King</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：ネオンアメジスト × エレクトリックシアン */
+            --c1: #7C3AED;   /* アメジスト 600 - メイン紫 */
+            --c2: #4C1D95;   /* ディープアメジスト */
+            --c3: #2E1065;   /* 最暗バイオレット */
+            --c4: #06B6D4;   /* エレクトリックシアン 500 */
+            --c5: #22D3EE;   /* シアン 400 */
+            --c6: #CFFAFE;   /* 薄シアン */
+            --c7: #A78BFA;   /* ラベンダー 400 */
+            --c8: #EDE9FE;   /* 極薄バイオレット */
+            --c9: #F0ABFC;   /* ネオンピンク */
+            --c10: #F472B6;  /* ホットピンク */
+            --c11: #FACC15;  /* サンライトイエロー */
+            --c12: #FEF3C7;  /* 薄クリーム */
+            --c13: #10B981;  /* セーフ緑 */
+            --c14: #EF4444;  /* 警告赤 */
+            --c15: #1F2937;  /* インク黒 */
+            --c16: #F8FAFC;  /* スノー白 */
+            --c17: #FB923C;  /* コーラルオレンジ */
+            --c18: #8B5CF6;  /* ミッドパープル */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#FAF5FF; font-family:'Kaisei Decol',sans-serif; color:#2b2b2b; line-height:1.75; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:60px 24px;
+            background:linear-gradient(135deg,var(--c3) 0%,var(--c2) 40%,var(--c1) 70%,var(--c4) 110%);
+            border-radius:32px;
+            box-shadow:8px 8px 32px rgba(76,29,149,.4);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(34,211,238,.28) 0%, transparent 60%);
+            animation:pulse 7s infinite;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+        .header i.main { color:#fff; font-size:96px; margin-bottom:18px; animation:fa-beat-fade 3s infinite; position:relative; z-index:1; display:block; text-shadow:0 4px 18px rgba(0,0,0,.35); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:2px 2px 8px rgba(0,0,0,.35); margin-bottom:14px; position:relative; z-index:1; line-height:1.45; }
+        .header .sub { color:var(--c6); font-size:20px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .meta { color:var(--c12); font-size:14px; margin-top:14px; position:relative; z-index:1; }
+        .header .badge-row { margin-top:18px; position:relative; z-index:1; }
+        .header .badge-row .h-tag {
+            display:inline-block;
+            background:rgba(255,255,255,.18);
+            color:#fff;
+            padding:5px 14px;
+            border-radius:20px;
+            font-size:13px;
+            margin:4px;
+            border:1px solid rgba(255,255,255,.3);
+            font-family:'Yomogi',cursive;
+        }
+
+        /* セクション区切り */
+        .section-divider {
+            display:flex; align-items:center; gap:14px;
+            margin:42px 0 28px; padding:0 10px;
+        }
+        .section-divider i { font-size:26px; color:var(--c4); }
+        .section-divider h3 {
+            font-size:22px; color:var(--c2); white-space:nowrap;
+            font-family:'Yomogi',cursive;
+        }
+        .section-divider .line {
+            flex:1; height:3px;
+            background:linear-gradient(90deg, var(--c7), transparent);
+            border-radius:2px;
+        }
+
+        /* カードレイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(76,29,149,.14);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeInScale .6s ease-out;
+        }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(76,29,149,.24); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c4),var(--c9));
+        }
+        .num-badge {
+            position:absolute;
+            top:14px; right:16px;
+            background:linear-gradient(135deg,var(--c1),var(--c4));
+            color:#fff;
+            width:34px; height:34px;
+            border-radius:50%;
+            display:flex; align-items:center; justify-content:center;
+            font-weight:bold; font-size:14px;
+            box-shadow:2px 2px 8px rgba(0,0,0,.18);
+        }
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:58px; }
+        .icon-box h2 { font-size:20px; color:var(--c2); margin-top:10px; line-height:1.4; font-weight:bold; }
+        .ic-purple { color:var(--c1); }
+        .ic-cyan { color:var(--c4); }
+        .ic-deep { color:var(--c2); }
+        .ic-lav { color:var(--c7); }
+        .ic-pink { color:var(--c10); }
+        .ic-neon { color:var(--c9); }
+        .ic-yellow { color:var(--c11); }
+        .ic-coral { color:var(--c17); }
+        .ic-green { color:var(--c13); }
+        .ic-red { color:var(--c14); }
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.78;
+        }
+        ul.kl li i { margin-right:9px; min-width:18px; margin-top:4px; }
+        ul.kl li i.e { color:var(--c1); }
+        ul.kl li i.t { color:var(--c4); }
+        ul.kl li i.p { color:var(--c10); }
+        ul.kl li i.y { color:var(--c11); }
+        ul.kl li i.r { color:var(--c14); }
+        ul.kl li i.g { color:var(--c13); }
+        ul.kl li i.c { color:var(--c17); }
+
+        .tag {
+            display:inline-block;
+            background:var(--c8);
+            color:var(--c2);
+            padding:3px 9px;
+            border-radius:6px;
+            font-weight:bold;
+            font-size:13px;
+            margin:2px 3px;
+            border:1px solid var(--c7);
+        }
+        .tag-cyan { background:var(--c6); color:var(--c3); border-color:var(--c4); }
+        .tag-pink { background:#FCE7F3; color:#9D174D; border-color:var(--c10); }
+        .tag-yellow { background:var(--c12); color:#92400E; border-color:var(--c11); }
+        .tag-green { background:#D1FAE5; color:#065F46; border-color:var(--c13); }
+
+        /* 手書き吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:18px;
+            padding:11px 15px;
+            margin:15px 5px;
+            font-family:'Yomogi',cursive;
+            font-size:15px;
+            line-height:1.6;
+            box-shadow:3px 3px 10px rgba(124,58,237,.15);
+            transform:rotate(-1deg);
+            color:#333;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px; left:20px;
+            border-width:12px 8px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            width:0;
+        }
+        .bubble.right::after { left:auto; right:20px; }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 8px 12px; }
+        .bubble.v1 { background:#FFFBEA; border-color:var(--c11); transform:rotate(1deg); }
+        .bubble.v1::after { border-color:var(--c11) transparent; }
+        .bubble.v2 { background:#FFE4E6; border-color:var(--c10); transform:rotate(-2deg); }
+        .bubble.v2::after { border-color:var(--c10) transparent; }
+        .bubble.v3 { background:var(--c6); border-color:var(--c4); transform:rotate(1.5deg); }
+        .bubble.v3::after { border-color:var(--c4) transparent; }
+        .bubble.v4 { background:#D1FAE5; border-color:var(--c13); transform:rotate(-1.5deg); }
+        .bubble.v4::after { border-color:var(--c13) transparent; }
+
+        pre {
+            background:#1F2937;
+            color:#E0E7FF;
+            padding:12px;
+            border-radius:8px;
+            font-size:12px;
+            font-family:'Courier New',monospace;
+            margin-top:10px;
+            overflow-x:auto;
+            line-height:1.6;
+        }
+        pre .k { color:#F472B6; }
+        pre .s { color:#FACC15; }
+        pre .c { color:#6B7280; }
+
+        .spec-grid {
+            display:grid;
+            grid-template-columns:1fr 1fr;
+            gap:8px;
+            margin:12px 0;
+        }
+        .spec-grid .item {
+            background:var(--c8);
+            padding:8px 10px;
+            border-radius:8px;
+            text-align:center;
+            font-size:13px;
+            border:1px solid var(--c7);
+        }
+        .spec-grid .item b { display:block; color:var(--c2); font-size:16px; }
+        .spec-grid .item span { color:#666; }
+
+        .footer {
+            margin-top:50px;
+            padding:30px 24px;
+            background:linear-gradient(135deg,var(--c3),var(--c2));
+            border-radius:24px;
+            text-align:center;
+            color:#fff;
+            box-shadow:6px 6px 24px rgba(76,29,149,.3);
+        }
+        .footer a { color:var(--c5); text-decoration:none; }
+        .footer a:hover { text-decoration:underline; }
+        .footer .row { margin:8px 0; font-size:14px; }
+        .footer .row i { margin-right:6px; color:var(--c5); }
+        .footer .row.title { font-size:18px; font-family:'Yomogi',cursive; margin-bottom:14px; }
+
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; max-width:none; }
+            .spec-grid { grid-template-columns:1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-wand-magic-sparkles main" aria-hidden="true"></i>
+        <h1>Muse Glimmer 30B<br>ローカルで動く エージェント特化 モデル</h1>
+        <div class="sub">Metaの新オープンモデルは、ずっと動く AI のために作られた</div>
+        <div class="meta">📅 2026年8月11日 ｜ 🎙️ AI Code King</div>
+        <div class="badge-row">
+            <span class="h-tag"><i class="fa-solid fa-microchip"></i> 30B Dense</span>
+            <span class="h-tag"><i class="fa-solid fa-screwdriver-wrench"></i> ツール呼び出し</span>
+            <span class="h-tag"><i class="fa-solid fa-image"></i> マルチモーダル</span>
+            <span class="h-tag"><i class="fa-solid fa-scale-balanced"></i> MIT ライセンス</span>
+            <span class="h-tag"><i class="fa-solid fa-house-laptop"></i> ローカル実行</span>
+        </div>
+    </div>
+
+    <!-- セクション1: Muse Glimmerとは -->
+    <div class="section-divider">
+        <i class="fa-solid fa-rocket"></i>
+        <h3>Muse Glimmer ってなに？</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード1 -->
+        <div class="card">
+            <div class="num-badge">1</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-rocket fa-bounce ic-purple" style="animation:fa-bounce 2s infinite;"></i>
+                <h2>Meta 発表の 新モデル</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-info e"></i><span>名前は <span class="tag">Muse Glimmer</span>、30B（300億パラメータ）の オープン AI モデル</span></li>
+                    <li><i class="fa-solid fa-bullseye t"></i><span>狙いは「<span class="tag tag-cyan">ローカル エージェント</span>」を 動かす こと</span></li>
+                    <li><i class="fa-solid fa-house-laptop e"></i><span>クラウド無しで、自分の PC で AI を 24時間 動かしたい人 向け</span></li>
+                    <li><i class="fa-solid fa-code-branch t"></i><span>オープン重視。誰でも ダウンロードして 使える</span></li>
+                </ul>
+                <div class="bubble v3 top">
+                    <i class="fa-solid fa-lightbulb" style="color:var(--c4);"></i>
+                    ひとことで言うと<br>
+                    <b>「手元の PC で じぶん専用 AI を」</b><br>
+                    を 実現するための モデル です
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2 -->
+        <div class="card">
+            <div class="num-badge">2</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-bullseye fa-flip ic-cyan" style="animation:fa-flip 3s infinite;"></i>
+                <h2>エージェント用途 に 特化</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gears e"></i><span>単なる 会話 AI ではなく、<span class="tag">ツール を 婦ぶ</span> ことに こだわった 設計</span></li>
+                    <li><i class="fa-solid fa-infinity t"></i><span>ずっと 動き続ける <span class="tag tag-cyan">常時起動</span> ワークフロー 向け</span></li>
+                    <li><i class="fa-solid fa-diagram-project e"></i><span>複数ステップを つなぐ タスク で 本領を 発揮</span></li>
+                    <li><i class="fa-solid fa-shield-halved t"></i><span>失敗 しても 立ち直る、<span class="tag">障害 回復</span> が 強い</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-comment-dots" style="color:var(--c1);"></i>
+                    普通の チャット なら 他のモデルで OK。<br>
+                    <b>「動き続ける AI」</b>を作りたい人に ピッタリ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3 -->
+        <div class="card">
+            <div class="num-badge">3</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-layer-group fa-beat-fade ic-deep" style="animation:fa-beat-fade 2s infinite;"></i>
+                <h2>Dense 30B という 形</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cubes e"></i><span>アーキテクチャは <span class="tag">Dense（密）</span>型</span></li>
+                    <li><i class="fa-solid fa-circle-xmark t"></i><span><span class="tag tag-pink">MoE</span>（専門家 mixture）では ない</span></li>
+                    <li><i class="fa-solid fa-microchip e"></i><span>パラメータ を すべて 毎回 使うので、安定した 出力</span></li>
+                    <li><i class="fa-solid fa-scale-balanced t"></i><span>代わりに <span class="tag tag-yellow">メモリ 要件</span> は 高め</span></li>
+                </ul>
+                <div class="spec-grid">
+                    <div class="item"><b>30B</b><span>Dense 参数</span></div>
+                    <div class="item"><b>Dense</b><span>非 MoE</span></div>
+                </div>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-circle-question" style="color:var(--c11);"></i>
+                    MoE より 重い けど、<br>
+                    <b>挙動 が 読みやすい</b> のが Dense の 魅力
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション2: ツール呼び出しと安定性 -->
+    <div class="section-divider">
+        <i class="fa-solid fa-screwdriver-wrench"></i>
+        <h3>ツール呼び出し ＆ 安定性</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード4 -->
+        <div class="card">
+            <div class="num-badge">4</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-screwdriver-wrench fa-bounce ic-purple" style="animation:fa-bounce 2s infinite;"></i>
+                <h2>ツール呼び出し が とにかく 正確</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-wrench e"></i><span>API を 叩く、検索する、ファイル を 読む — こうした <span class="tag">ツール 呼び</span> が 安定</span></li>
+                    <li><i class="fa-solid fa-circle-check g"></i><span>指示 した 通り に 動く 確率 が 高い</span></li>
+                    <li><i class="fa-solid fa-link t"></i><span>パラメータ の 渡し間違い が 少ない</span></li>
+                    <li><i class="fa-solid fa-bolt e"></i><span>エージェント の <span class="tag tag-cyan">信頼性</span> に 直結する 強み</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-thumbs-up" style="color:var(--c13);"></i>
+                    エージェント で 一番 困る のは<br>
+                    <b>「ツール を 間違えて 呼ぶ」</b>こと。<br>
+                    そこが しっかり してる のが 最大の 売り
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5 -->
+        <div class="card">
+            <div class="num-badge">5</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project fa-flip ic-cyan" style="animation:fa-flip 3s infinite;"></i>
+                <h2>複数ステップ の タスク に 強い</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-list-ol e"></i><span>「調べて → まとめて → 書いて」の ような <span class="tag">連続 タスク</span></span></li>
+                    <li><i class="fa-solid fa-route t"></i><span>道筋 を 保ちながら 進める のが 得意</span></li>
+                    <li><i class="fa-solid fa-arrows-turn-to-dots e"></i><span>途中で やり直し が 必要 でも 対応</span></li>
+                    <li><i class="fa-solid fa-flag-checkered t"></i><span>最後まで 着地 させる 力 が 評価 されてる</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-flag" style="color:var(--c1);"></i>
+                    一発 の 回答 より、<br>
+                    <b>長い 旅路 を 伴う タスク</b> 向き
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6 -->
+        <div class="card">
+            <div class="num-badge">6</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved fa-beat-fade ic-green" style="animation:fa-beat-fade 2s infinite;"></i>
+                <h2>失敗から 立ち直る 力</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-triangle-exclamation y"></i><span>エラー が 出ても <span class="tag tag-yellow">パニック しない</span></span></li>
+                    <li><i class="fa-solid fa-rotate-right g"></i><span>別の 方法 を 試して 回復 できる</span></li>
+                    <li><i class="fa-solid fa-fire-flame-curved r"></i><span>ずっと 動かす AI で <span class="tag tag-pink">耐久力</span> は 命</span></li>
+                    <li><i class="fa-solid fa-heart-pulse e"></i><span>長時間 運用 での 安定性 が 高い</span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-circle-exclamation" style="color:var(--c10);"></i>
+                    常に 動き続ける AI にとって<br>
+                    <b>「落ちない」</b> のは 正義。<br>
+                    その 点 で 安心 できる モデル
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション3: マルチモーダル -->
+    <div class="section-divider">
+        <i class="fa-solid fa-image"></i>
+        <h3>目 と 耳 を 持つ AI</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード7 -->
+        <div class="card">
+            <div class="num-badge">7</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-image fa-bounce ic-pink" style="animation:fa-bounce 2s infinite;"></i>
+                <h2>マルチモーダル に 対応</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-eye e"></i><span>テキスト だけで なく <span class="tag tag-pink">画像</span> も 入力 可能</span></li>
+                    <li><i class="fa-solid fa-camera t"></i><span>スクショ、図、写真 を 読み取れる</span></li>
+                    <li><i class="fa-solid fa-palette e"></i><span>デザイン や 図解 の 理解 も こなす</span></li>
+                    <li><i class="fa-solid fa-layer-group t"></i><span>エージェント が <span class="tag">視覚</span> を 使える のが 大きい</span></li>
+                </ul>
+                <div class="bubble v2 top">
+                    <i class="fa-solid fa-image" style="color:var(--c10);"></i>
+                    「画面 を 見て 操作」みたいな<br>
+                    <b>視覚 を 要する タスク</b> も 視野 に入る
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8 -->
+        <div class="card">
+            <div class="num-badge">8</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-brain fa-flip ic-purple" style="animation:fa-flip 3s infinite;"></i>
+                <h2>専用 パーセプション エンコーダー</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-microchip e"></i><span>画像処理 用 の <span class="tag">知覚 モジュール</span> を 内蔵</span></li>
+                    <li><i class="fa-solid fa-gear t"></i><span>本 体 とは 別 に、画像 を 読む 部品 が ある</span></li>
+                    <li><i class="fa-solid fa-bolt-lightning e"></i><span>その 分、認識 の <span class="tag tag-cyan">精度</span> が 上がる</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece t"></i><span>構造 が 丁寧 に 作られて いる 印象</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-puzzle-piece" style="color:var(--c4);"></i>
+                    画像 は 画像 用 パーツ で 処理。<br>
+                    <b>役割 を 分ける</b> のが 今風 の 作り
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9 -->
+        <div class="card">
+            <div class="num-badge">9</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-arrows-left-right fa-beat-fade ic-cyan" style="animation:fa-beat-fade 2s infinite;"></i>
+                <h2>テキスト ＋ 画像 の 組み合わせ</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-image e"></i><span>画像 を 見ながら 説明 する、といった ことが できる</span></li>
+                    <li><i class="fa-solid fa-arrows-rotate t"></i><span>「ここ を 直して」と 指示 + スクショ、の 運用 に向く</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles e"></i><span>エージェント が <span class="tag">視覚 情報</span> を 活用 できる</span></li>
+                    <li><i class="fa-solid fa-people-arrows t"></i><span>人間 との やり取り が ずっと 自然 に</span></li>
+                </ul>
+                <div class="bubble v4 right">
+                    <i class="fa-solid fa-handshake" style="color:var(--c13);"></i>
+                    目 で 見せて、口 で 伝える。<br>
+                    <b>人間 らしい 連携</b> が ローカルで できる
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション4: ローカル実行 -->
+    <div class="section-divider">
+        <i class="fa-solid fa-house-laptop"></i>
+        <h3>自分の PC で 動かす</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード10 -->
+        <div class="card">
+            <div class="num-badge">10</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-house-laptop fa-bounce ic-deep" style="animation:fa-bounce 2s infinite;"></i>
+                <h2>48GB Mac なら フル実行</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-memory e"></i><span><span class="tag">48GB RAM</span> の Mac が ひとつの 目安</span></li>
+                    <li><i class="fa-solid fa-compress t"></i><span><span class="tag tag-cyan">4-bit 量子化</span> すれば フル コンテキスト で 動く</span></li>
+                    <li><i class="fa-solid fa-apple-whole e"></i><span>Apple Silicon の 統合 メモリ が 有利</span></li>
+                    <li><i class="fa-solid fa-gauge-high t"></i><span>クラウド 通信 なし で 実用的 な 速度</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-apple" style="color:var(--c1);"></i>
+                    Mシリーズ Mac × 大容量 メモリ なら<br>
+                    <b>自分 の マシン だけで 完結</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11 -->
+        <div class="card">
+            <div class="num-badge">11</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-triangle-exclamation fa-flip ic-red" style="animation:fa-flip 3s infinite;"></i>
+                <h2>メモリ 要件 は 高め</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-microchip r"></i><span>Dense 30B なので <span class="tag tag-pink">全 パラメータ を 読む</span></span></li>
+                    <li><i class="fa-solid fa-laptop y"></i><span><span class="tag tag-yellow">16GB / 24GB</span> の 機械 では 厳しい</span></li>
+                    <li><i class="fa-solid fa-gauge r"></i><span>厳しい 量化 で 無理 すると 遅く なる</span></li>
+                    <li><i class="fa-solid fa-circle-exclamation y"></i><span>ハードウェア の 選択 が 大事</span></li>
+                </ul>
+                <div class="bubble v2 top">
+                    <i class="fa-solid fa-triangle-exclamation" style="color:var(--c10);"></i>
+                    Dense の 強み は メモリ 代价。<br>
+                    <b>スペック 次第</b> で 使い勝手 が 変わる
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12 -->
+        <div class="card">
+            <div class="num-badge">12</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-gauge-high fa-beat-fade ic-yellow" style="animation:fa-beat-fade 2s infinite;"></i>
+                <h2>4-bit 量子化 で バランス</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-compress y"></i><span>4-bit に つぶせば <span class="tag tag-yellow">メモリ 節約</span></span></li>
+                    <li><i class="fa-solid fa-scale-balanced e"></i><span>精度 落ち は ある ものの、実用範囲 内</span></li>
+                    <li><i class="fa-solid fa-bolt t"></i><span>速度 と 品質 の <span class="tag tag-cyan">折り合い</span> を 付けやすい</span></li>
+                    <li><i class="fa-solid fa-sliders e"></i><span>用途 に 合わせ て 量化 レベル を 選ぶ</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-sliders" style="color:var(--c11);"></i>
+                    フル精度 じゃなくても、<br>
+                    <b>エージェント 用途 なら 十分</b> な こと が 多い
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション5: エコシステムとライセンス -->
+    <div class="section-divider">
+        <i class="fa-solid fa-link"></i>
+        <h3>相性 の良い ツール ＆ ライセンス</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード13 -->
+        <div class="card">
+            <div class="num-badge">13</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-plug fa-bounce ic-purple" style="animation:fa-bounce 2s infinite;"></i>
+                <h2>エージェント ツール と 相性 良し</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-terminal e"></i><span><span class="tag">Hermes Agent</span>、OpenCode で すぐ 繋がる</span></li>
+                    <li><i class="fa-solid fa-laptop-code t"></i><span><span class="tag tag-cyan">LM Studio</span> から 手軽に 試せる</span></li>
+                    <li><i class="fa-solid fa-network-wired e"></i><span>ローカル エンドポイント を 立てて 運用 しやすい</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece t"></i><span>既存 の エージェント 基盤 に 組み込み やすい</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-link" style="color:var(--c1);"></i>
+                    専用 インフラ は 不要。<br>
+                    <b>普段 使ってる ツール</b> に そのまま 接続
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14 -->
+        <div class="card">
+            <div class="num-badge">14</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-flip ic-cyan" style="animation:fa-flip 3s infinite;"></i>
+                <h2>MIT ライセンス で 緩い</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-scroll e"></i><span>採用 は <span class="tag">MIT</span>。使い勝手 が とても 良い</span></li>
+                    <li><i class="fa-solid fa-circle-minus t"></i><span>Meta 従来 の <span class="tag tag-pink">Llama 系</span> ライセンス より 制限 が 少ない</span></li>
+                    <li><i class="fa-solid fa-building e"></i><span>商用 利用 の ハードル が 低い</span></li>
+                    <li><i class="fa-solid fa-code-pull-request t"></i><span>派生 や 改変 も 自由 度 高く</span></li>
+                </ul>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-scale-balanced" style="color:var(--c4);"></i>
+                    Llama ライセンス の 縛り が 気 に なる 場合、<br>
+                    <b>MIT は 大きな 利点</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15 -->
+        <div class="card">
+            <div class="num-badge">15</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-infinity fa-beat-fade ic-deep" style="animation:fa-beat-fade 2s infinite;"></i>
+                <h2>常時起動 ワークフロー 向き</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clock e"></i><span>24時間 動かしっぱなし の <span class="tag">常駐 AI</span></span></li>
+                    <li><i class="fa-solid fa-calendar-week t"></i><span>日々 の定型 業務 を 任せる 運用 に 適する</span></li>
+                    <li><i class="fa-solid fa-server e"></i><span>ローカル なので <span class="tag tag-cyan">通信 料</span> が ゼロ</span></li>
+                    <li><i class="fa-solid fa-lock t"></i><span>データ が 外 に 出ない のも 強み</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-infinity" style="color:var(--c13);"></i>
+                    「置いて おく だけで 動く」<br>
+                    <b>部署 の AI</b> みたいな 使い方 に 最適
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- セクション6: 注意点とまとめ -->
+    <div class="section-divider">
+        <i class="fa-solid fa-chart-line"></i>
+        <h3>ここだけは 押さえよう</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード16 -->
+        <div class="card">
+            <div class="num-badge">16</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-chart-line fa-bounce ic-coral" style="animation:fa-bounce 2s infinite;"></i>
+                <h2>一般 ベンチマーク は 控えめ</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-ranking-star c"></i><span>汎用 ベンチマーク の スコア は <span class="tag tag-pink">高く ない</span></span></li>
+                    <li><i class="fa-solid fa-medal r"></i><span>トップ モデル とは 競合 しない 作り</span></li>
+                    <li><i class="fa-solid fa-bullseye y"></i><span>狙い は <span class="tag tag-yellow">実運用</span> で あって ベンチ ではない</span></li>
+                    <li><i class="fa-solid fa-circle-info e"></i><span>用途 に 合えば 非常に 実用的</span></li>
+                </ul>
+                <div class="bubble v1 top">
+                    <i class="fa-solid fa-circle-info" style="color:var(--c11);"></i>
+                    ベンチ 数字 で 選ぶ モデル じゃ ない。<br>
+                    <b>動かし続ける</b> ため の モデル です
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17 -->
+        <div class="card">
+            <div class="num-badge">17</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-user-check fa-flip ic-green" style="animation:fa-flip 3s infinite;"></i>
+                <h2>こんな 人 に おすすめ</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-house-laptop g"></i><span>ローカル で <span class="tag tag-green">常駐 AI</span> を 作りたい人</span></li>
+                    <li><i class="fa-solid fa-tools e"></i><span>ツール 呼び出し を 大切 に したい 開発者</span></li>
+                    <li><i class="fa-solid fa-lock t"></i><span>データ を 外部 に 出したく ない 人</span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench e"></i><span>Hermes / OpenCode / LM Studio ユーザー</span></li>
+                </ul>
+                <div class="bubble v4 right">
+                    <i class="fa-solid fa-thumbs-up" style="color:var(--c13);"></i>
+                    十分 な メモリ を 持つ マシン が ある人 なら、<br>
+                    <b>ぜひ 試す 価値 あり</b>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18 -->
+        <div class="card">
+            <div class="num-badge">18</div>
+            <div class="icon-box">
+                <i class="fa-solid fa-trophy fa-beat-fade ic-yellow" style="animation:fa-beat-fade 2s infinite;"></i>
+                <h2>総評：ローカル エージェント の 強力 な 選択肢</h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-star e"></i><span>ベンチ 最強 ではない が、<span class="tag">実用 性</span> で 光る</span></li>
+                    <li><i class="fa-solid fa-shield-halved g"></i><span>ツール 呼び出し と 障害 回復 の 安心感</span></li>
+                    <li><i class="fa-solid fa-eye t"></i><span>マルチモーダル で <span class="tag tag-cyan">応用 範囲</span> が 広い</span></li>
+                    <li><i class="fa-solid fa-scale-balanced e"></i><span>MIT ライセンス で <span class="tag tag-green">導入 ハードル 低</span></span></li>
+                    <li><i class="fa-solid fa-heart t"></i><span>ローカル で AI を 動かす なら 注目 の 一手</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-trophy" style="color:var(--c1);"></i>
+                    話題 の 数字 より<br>
+                    <b>毎日 の 運用 で 頼れる</b> モデル。<br>
+                    それが Muse Glimmer の 立ち位置 です
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div class="row title"><i class="fa-solid fa-circle-info"></i> ソース ＆ 参照</div>
+        <div class="row">
+            🎬 動画: <a href="https://youtu.be/gkioCWxOJZY" target="_blank" rel="noopener">AI Code King — Muse Glimmer 30B (Local Testing & Review): REALLY GOOD for LOCAL USAGE!</a>
+        </div>
+        <div class="row">
+            📺 チャンネル: <a href="https://www.youtube.com/@AiCodeKing" target="_blank" rel="noopener">AI Code King</a>
+        </div>
+        <div class="row">
+            🌐 公開場所: <a href="https://cutc-mt.github.io/ai-news-infographic/" target="_blank" rel="noopener">cutc-mt.github.io/ai-news-infographic</a>
+        </div>
+        <div class="row" style="margin-top:16px; font-size:12px; opacity:.8;">
+            📅 2026年8月11日 ｜ このインフォグラフィックは動画内容を元に作成した 要約 です
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

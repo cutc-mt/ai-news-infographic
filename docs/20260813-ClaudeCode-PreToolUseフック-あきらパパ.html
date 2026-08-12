@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Claude Code｜危ないコマンド、もう目視で止めなくていい</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：Sentinel Gate（歩哨の門）
+               夜の門に立つ歩哨が、通行をいちいち確認するイメージ。
+               実行「前」に止める、という制御の層を表現。
+               スレート夜色 × 琥珀の灯火 × 若草の安全、の組み合わせ。 */
+            --c1: #1E40AF;   /* Blue 800   - 監視塔の深い青 */
+            --c2: #B45309;   /* Amber 700  - 警戒灯の琥珀 */
+            --c3: #1E293B;   /* Slate 800  - 夜の門 */
+            --c4: #0F172A;   /* Slate 950  - 最も深い夜 */
+            --c5: #DC2626;   /* Red 600    - 停止の赤 */
+            --c6: #F59E0B;   /* Amber 500  - 警告の橙 */
+            --c7: #16A34A;   /* Green 600  - 安全の緑 */
+            --c8: #FBBF24;   /* Amber 400  - 明るい灯火 */
+            --c9: #4ADE80;   /* Green 400  - 若草 */
+            --c10: #3B82F6;  /* Blue 500   - 明るい青 */
+            --c11: #EF4444;  /* Red 500    - 鮮やか赤 */
+            --c12: #64748B;  /* Slate 500  - 中間の灰 */
+            --c13: #2563EB;  /* Blue 600   - 中間の青 */
+            --c14: #D97706;  /* Amber 600  - 深い琥珀 */
+            --c15: #15803D;  /* Green 700  - 深い若草 */
+            --c16: #DBEAFE;  /* Blue 100   - 薄青 背景 */
+            --c17: #1E3A8A;  /* Blue 900   - 深藍 */
+            --c18: #F8FAFC;  /* Slate 50   - ごく薄 */
+            /* インク・ティント */
+            --ink-blue: #1E3A8A;
+            --ink-amber: #78350F;
+            --ink-green: #14532D;
+            --ink-rose: #9F1239;
+            --ink-slate: #0F172A;
+            --tint-blue: #DBEAFE;
+            --tint-amber: #FEF3C7;
+            --tint-green: #D1FAE5;
+            --tint-rose: #FFE4E6;
+            --tint-slate: #F1F5F9;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F5F7FB; font-family:'Kaisei Decol',sans-serif; color:#0F172A; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:62px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c17) 35%,var(--c1) 65%,var(--c13) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(30,64,175,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(251,191,36,.20) 0%, transparent 55%);
+            animation:pulse 6s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:repeating-linear-gradient(90deg, transparent 0, transparent 48px, rgba(251,191,36,.05) 48px, rgba(251,191,36,.05) 49px);
+            pointer-events:none;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        @keyframes drift { 0%{transform:translateX(0)} 50%{transform:translateX(14px)} 100%{transform:translateX(0)} }
+        @keyframes fadeScale { 0%{opacity:0; transform:translateY(20px) scale(.96)} 100%{opacity:1; transform:translateY(0) scale(1)} }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .header i.main { color:var(--c8); font-size:108px; margin-bottom:15px; animation:fa-beat-fade 3s infinite, drift 8s ease-in-out infinite; position:relative; z-index:1; text-shadow:0 0 30px rgba(251,191,36,.6), 0 4px 18px rgba(0,0,0,.32); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:0 0 14px rgba(59,130,246,.5), 2px 2px 8px rgba(0,0,0,.34); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c16); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c8); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(30,64,175,.13);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeScale .7s ease both;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(37,99,235,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c10),var(--c13));
+        }
+        .card.gate::before  { background:linear-gradient(90deg,var(--c4),var(--c1),var(--c10)); }
+        .card.amber::before { background:linear-gradient(90deg,var(--c2),var(--c6),var(--c8)); }
+        .card.warn::before  { background:linear-gradient(90deg,var(--c5),var(--c11),var(--c2)); }
+        .card.safe::before  { background:linear-gradient(90deg,var(--c7),var(--c9),var(--c15)); }
+        .card.night::before { background:linear-gradient(90deg,var(--c4),var(--c3),var(--c12)); }
+        .card.lamp::before  { background:linear-gradient(90deg,var(--c14),var(--c8),var(--c6)); }
+        .card.red::before   { background:linear-gradient(90deg,var(--c5),var(--c11),var(--c14)); }
+        .card.blue::before  { background:linear-gradient(90deg,var(--c13),var(--c10),var(--c1)); }
+
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:60px; }
+        .icon-box i.gate  { color:var(--c4); }
+        .icon-box i.amber { color:var(--c6); }
+        .icon-box i.warn  { color:var(--c5); }
+        .icon-box i.safe  { color:var(--c7); }
+        .icon-box i.night { color:var(--c3); }
+        .icon-box i.lamp  { color:var(--c8); }
+        .icon-box i.red   { color:var(--c11); }
+        .icon-box i.blue  { color:var(--c10); }
+        .icon-box i.green { color:var(--c9); }
+        .icon-box i.gold  { color:var(--c8); }
+        .icon-box i.slate { color:var(--c12); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#475569; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.gate  { color:var(--c4); }
+        ul.kl li i.amber { color:var(--c6); }
+        ul.kl li i.warn  { color:var(--c5); }
+        ul.kl li i.safe  { color:var(--c7); }
+        ul.kl li i.night { color:var(--c3); }
+        ul.kl li i.lamp  { color:var(--c8); }
+        ul.kl li i.red   { color:var(--c11); }
+        ul.kl li i.blue  { color:var(--c10); }
+        ul.kl li i.green { color:var(--c9); }
+        ul.kl li i.gold  { color:var(--c8); }
+        ul.kl li i.slate { color:var(--c12); }
+
+        /* タグ */
+        .tag {
+            background:var(--tint-blue);
+            color:var(--ink-blue);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.amber { background:var(--tint-amber); color:var(--ink-amber); }
+        .tag.rose  { background:var(--tint-rose);  color:var(--ink-rose); }
+        .tag.green { background:var(--tint-green); color:var(--ink-green); }
+        .tag.slate { background:var(--tint-slate); color:var(--ink-slate); }
+        .tag.warn  { background:#FEE2E2; color:#7F1D1D; }
+
+        /* ハイライト */
+        .hl { color:var(--c1); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-blue) 60%); }
+        .hl-amber { color:var(--ink-amber); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-amber) 60%); }
+        .hl-rose { color:var(--ink-rose); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-rose) 60%); }
+        .hl-green { color:var(--ink-green); font-weight:bold; background:linear-gradient(transparent 60%, var(--tint-green) 60%); }
+
+        /* 手書き風吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:18px;
+            padding:10px 14px;
+            margin:14px 6px 6px;
+            font-family:'Yomogi',cursive;
+            box-shadow:3px 3px 10px rgba(0,0,0,.10);
+            transform:rotate(-1deg);
+            font-size:15px;
+            line-height:1.6;
+            color:#334155;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 8px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.right::after { left:auto; right:22px; transform:rotate(15deg); }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 8px 12px; transform:rotate(-5deg); }
+        .bubble.v1 { background:var(--tint-amber); border-color:var(--c6); transform:rotate(1deg); }
+        .bubble.v1::after { border-color:var(--c6) transparent; }
+        .bubble.v2 { background:var(--tint-rose); border-color:var(--c5); transform:rotate(-2deg); }
+        .bubble.v2::after { border-color:var(--c5) transparent; }
+        .bubble.v3 { background:var(--tint-blue); border-color:var(--c13); transform:rotate(1.5deg); }
+        .bubble.v3::after { border-color:var(--c13) transparent; }
+        .bubble.v4 { background:var(--tint-green); border-color:var(--c7); transform:rotate(-1.5deg); }
+        .bubble.v4::after { border-color:var(--c7) transparent; }
+        .bubble i { color:var(--c6); margin-right:6px; }
+
+        /* コードプレビュー */
+        pre.code {
+            background:var(--c4);
+            color:#E2E8F0;
+            padding:12px 14px;
+            border-radius:10px;
+            font-size:13px;
+            font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+            margin-top:12px;
+            overflow-x:auto;
+            border-left:4px solid var(--c8);
+            line-height:1.6;
+        }
+        pre.code .c-key { color:var(--c9); }
+        pre.code .c-str { color:var(--c8); }
+        pre.code .c-com { color:var(--c12); }
+        pre.code .c-fn  { color:var(--c10); }
+        pre.code .c-err { color:#FCA5A5; }
+        pre.code .c-ok  { color:#86EFAC; }
+        pre.code .c-warn{ color:#FCD34D; }
+
+        /* 設定ファイル モック */
+        .file-mock {
+            background:#0B1220;
+            border:2px solid var(--c13);
+            border-radius:10px;
+            padding:12px;
+            margin:12px 5px;
+            font-family:'SFMono-Regular',Consolas,monospace;
+            font-size:12.5px;
+            line-height:1.6;
+            color:#DBEAFE;
+        }
+        .file-mock .fname {
+            color:var(--c8);
+            font-size:11.5px;
+            border-bottom:1px dashed var(--c12);
+            padding-bottom:5px;
+            margin-bottom:7px;
+            display:flex;
+            align-items:center;
+            gap:6px;
+        }
+        .file-mock .k { color:var(--c8); }
+        .file-mock .s { color:var(--c9); }
+        .file-mock .c { color:var(--c10); font-style:italic; }
+        .file-mock .p { color:#FDBA74; }
+
+        /* コマンド プレビュー */
+        .cmd {
+            background:var(--c4);
+            color:#E2E8F0;
+            padding:10px 12px;
+            border-radius:8px;
+            font-size:12.5px;
+            margin-top:10px;
+            overflow-x:auto;
+            font-family:'SFMono-Regular',Consolas,monospace;
+            line-height:1.5;
+            border-left:4px solid var(--c5);
+        }
+        .cmd .err { color:#FCA5A5; }
+        .cmd .ok  { color:#86EFAC; }
+        .cmd .warn{ color:#FCD34D; }
+        .cmd .info{ color:var(--c10); }
+
+        /* 比較ボックス */
+        .vs-box {
+            display:flex;
+            gap:8px;
+            margin:10px 5px;
+        }
+        .vs-box .col {
+            flex:1;
+            padding:10px;
+            border-radius:10px;
+            text-align:center;
+            font-size:13px;
+        }
+        .vs-box .col.bad  { background:var(--tint-rose); color:var(--ink-rose); }
+        .vs-box .col.good { background:var(--tint-green); color:var(--ink-green); }
+        .vs-box .col.warn { background:var(--tint-amber); color:var(--ink-amber); }
+        .vs-box .col i { font-size:24px; margin-bottom:4px; display:block; }
+
+        /* ステップ番号 */
+        .step-num {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            width:24px; height:24px;
+            background:var(--c1);
+            color:#fff;
+            border-radius:50%;
+            font-size:13px;
+            font-weight:bold;
+            margin-right:8px;
+            flex-shrink:0;
+        }
+        .step-num.a { background:var(--c6); }
+        .step-num.r { background:var(--c5); }
+        .step-num.g { background:var(--c7); }
+
+        /* タイムライン */
+        .timeline {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:6px;
+            margin:16px 6px;
+            flex-wrap:wrap;
+        }
+        .timeline .step {
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            min-width:64px;
+        }
+        .timeline .step i {
+            font-size:26px;
+            margin-bottom:4px;
+        }
+        .timeline .step span {
+            font-size:11px;
+            color:#475569;
+            text-align:center;
+            font-family:'Yomogi',cursive;
+        }
+        .timeline .arrow { color:var(--c10); font-size:18px; }
+
+        /* セクション区切り */
+        .section-title {
+            flex-basis:100%;
+            text-align:center;
+            margin:30px 0 10px;
+            padding:14px;
+            background:linear-gradient(90deg,transparent,var(--tint-blue),transparent);
+            color:var(--ink-blue);
+            font-size:22px;
+            font-weight:bold;
+            border-radius:12px;
+        }
+        .section-title i { color:var(--c10); margin-right:8px; }
+
+        /* チェックリスト */
+        .check-mock {
+            background:var(--tint-slate);
+            border-radius:10px;
+            padding:10px 12px;
+            margin:10px 5px;
+            font-size:13px;
+        }
+        .check-mock .item {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            margin:6px 0;
+            font-family:'Yomogi',cursive;
+            color:var(--c4);
+        }
+        .check-mock .item i { font-size:14px; }
+        .check-mock .item .ok { color:var(--c7); }
+        .check-mock .item .ng { color:var(--c5); }
+
+        /* 警告バッジ */
+        .warn-badge {
+            display:inline-flex;
+            align-items:center;
+            gap:6px;
+            background:var(--c5);
+            color:#fff;
+            padding:4px 12px;
+            border-radius:20px;
+            font-size:13px;
+            font-weight:bold;
+            margin:4px 2px;
+            animation:blink 2s infinite;
+        }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:50px;
+            padding:30px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c17) 50%,var(--c1) 100%);
+            color:#fff;
+            border-radius:24px;
+            box-shadow:6px 6px 22px rgba(30,64,175,.25);
+        }
+        .footer a { color:var(--c8); text-decoration:none; font-weight:bold; border-bottom:2px dotted var(--c8); padding-bottom:1px; }
+        .footer a:hover { color:var(--c6); border-bottom-color:var(--c6); }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .meta { font-size:13px; color:var(--c16); font-family:'Yomogi',cursive; margin-top:10px; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px)  { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; min-width:auto; max-width:none; }
+            .header h1 { font-size:28px; }
+            .header i.main { font-size:80px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-shield-halved main" aria-hidden="true"></i>
+        <h1>Claude Code｜危ないコマンド、<br>もう目視で止めなくていい</h1>
+        <div class="sub">実行「前」にはさむ、もう一つの防線。PreToolUseフックのはなし</div>
+        <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月13日 ／ あきらパパ</div>
+    </div>
+
+    <div class="layout">
+
+        <!-- ============ セクション1: 問題提起 ============ -->
+        <div class="section-title"><i class="fa-solid fa-triangle-exclamation"></i>目視で止める、という怖さ</div>
+
+        <!-- カード1: 本番データを消すコマンド -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-database fa-5x warn" style="animation:fa-shake 2.5s infinite;" aria-hidden="true"></i>
+                <h2>本番のデータを<br>消すコマンド</h2>
+                <p class="ch">一番こわいやつ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-bomb warn"></i><span>AI が <span class="hl-rose">DROP DATABASE</span> を提案した</span></li>
+                    <li><i class="fa-solid fa-trash-can warn"></i><span><span class="tag warn">rm -rf</span> で、大事な場所を消そうとする</span></li>
+                    <li><i class="fa-solid fa-server red"></i><span>本番環境だと、<span class="hl-rose">戻せない</span></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    止められなかったら、<span class="tag warn">取り返しがつかない</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: 手作業のやり方 -->
+        <div class="card amber">
+            <div class="icon-box">
+                <i class="fa-solid fa-eye fa-5x amber" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>いままでの止め方：<br>目で見て止める</h2>
+                <p class="ch">人間が、毎回チェックする</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-book-open amber"></i><span>AI の提案を、<span class="hl-amber">毎回 読む</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass amber"></i><span>危ないところが ないか、探す</span></li>
+                    <li><i class="fa-solid fa-hand gold"></i><span>あぶなければ、<span class="tag amber">手で止める</span></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-circle-info"></i>
+                    やることは、シンプル。でも……
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: 忙しいほど見落とす -->
+        <div class="card red">
+            <div class="icon-box">
+                <i class="fa-solid fa-eye-low-vision fa-5x red" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>忙しいほど、<br>見のがしやすい</h2>
+                <p class="ch">目視の、いちばんの弱点</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-business-time warn"></i><span>レビューが<span class="hl-rose">いそがしい</span>時ほど、注意が散る</span></li>
+                    <li><i class="fa-solid fa-brain warn"></i><span>同じ作業のくりかえしで、目が<strong>慣れる</strong></span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation warn"></i><span>「たぶん大丈夫」で、<span class="tag warn">通してしまう</span></span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    人間の<span class="tag warn">注意力</span>に、全部かけるのは あぶない
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セクション2: 解決策の登場 ============ -->
+        <div class="section-title"><i class="fa-solid fa-shield-halved"></i>もう一つの防線：実行「前」に止める</div>
+
+        <!-- カード4: Claude Codeなら自動で止められる -->
+        <div class="card safe">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved fa-5x safe" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>Claude Code なら、<br>自動で止められる</h2>
+                <p class="ch">人間の目の前に出る「前」に</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gears safe"></i><span>コマンドが走る<span class="hl-green">前</span>に、チェックを入れる</span></li>
+                    <li><i class="fa-solid fa-robot green"></i><span>機械が、毎回 同じ基準で<span class="tag green">判定</span></span></li>
+                    <li><i class="fa-solid fa-bed green"></i><span>人間は、ふだん<strong>休んでいて</strong>よい</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-circle-check"></i>
+                    「目で追う」から「<span class="tag green">門番</span>を置く」へ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: PreToolUseフックとは -->
+        <div class="card gate">
+            <div class="icon-box">
+                <i class="fa-solid fa-door-closed fa-5x gate" style="animation:fa-bounce 3s infinite;" aria-hidden="true"></i>
+                <h2>その名は<br>PreToolUseフック</h2>
+                <p class="ch">実行の「前」にはさむ、監督の層</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-right-to-bracket night"></i><span>ツールが動く<strong>直前</strong>に、割り込む</span></li>
+                    <li><i class="fa-solid fa-shield-halved gate"></i><span>そこで、<span class="hl">通すか・止めるか</span>を決める</span></li>
+                    <li><i class="fa-solid fa-layer-group blue"></i><span>AI の上に、もう一段<span class="tag">監督の層</span>を重ねる</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-circle-info"></i>
+                    「門」を一つ、増やすだけ。でも、それが効く
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セクション3: 仕組みの中身 ============ -->
+        <div class="section-title"><i class="fa-solid fa-gears"></i>仕組み：どうやって止めるのか</div>
+
+        <!-- カード6: バッシュコマンドの前にスクリプト -->
+        <div class="card blue">
+            <div class="icon-box">
+                <i class="fa-solid fa-terminal fa-5x blue" style="animation:fa-beat 2.5s infinite;" aria-hidden="true"></i>
+                <h2>Bashコマンドの<br>実行前に、スクリプトが走る</h2>
+                <p class="ch">門番が、毎回 先に立つ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-flag blue"></i><span>コマンドが動く<span class="hl">前</span>に、スクリプトを起動</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass-chart blue"></i><span>中身を、じっくり<span class="tag">確認</span></span></li>
+                    <li><i class="fa-solid fa-clock night"></i><span>判定は一瞬。人間は、その間<strong>知らなくてよい</strong></span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    コマンドが「走る前」だから、<span class="tag">手遅れ</span>にならない
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7: denyでキャンセル -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-hand fa-5x warn" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>あぶなかったら、<br>「deny」で止める</h2>
+                <p class="ch">拒否（ディナイ）で、実行をキャンセル</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-xmark warn"></i><span>危険な命令なら、<span class="hl-rose">deny</span> を返す</span></li>
+                    <li><i class="fa-solid fa-ban warn"></i><span>コマンドは、ここで<span class="tag warn">止まる</span></span></li>
+                    <li><i class="fa-solid fa-circle-question red"></i><span>理由も 一緒に 伝えられる</span></li>
+                </ul>
+                <div class="vs-box">
+                    <div class="col bad"><i class="fa-solid fa-database"></i>DROP TABLE<br>→ deny</div>
+                    <div class="col good"><i class="fa-solid fa-list"></i>ls -la<br>→ pass</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: hooksセクション + matcher -->
+        <div class="card lamp">
+            <div class="icon-box">
+                <i class="fa-solid fa-sliders fa-5x lamp" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>設定は、hooks の中に<br>matcher を書く</h2>
+                <p class="ch">門番の「担当」を、決める</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-code gold"></i><span>設定ファイルの <span class="hl-amber">hooks</span> セクションに書く</span></li>
+                    <li><i class="fa-solid fa-bullseye amber"></i><span><span class="tag amber">matcher</span> で、監視する対象を指定</span></li>
+                    <li><i class="fa-solid fa-terminal gold"></i><span>Bash なら、matcher を <span class="tag amber">bash</span> に</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    「どのツールを、見張るか」を、ここで決める
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: rm や DROP DATABASE を理由付きで -->
+        <div class="card red">
+            <div class="icon-box">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x red" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>rm や DROP DATABASE を、<br>見つけたら止める</h2>
+                <p class="ch">止めるだけじゃなく、理由も返す</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-text-height warn"></i><span>コマンドの文字を、<span class="hl-rose">なめて</span>探す</span></li>
+                    <li><i class="fa-solid fa-ban warn"></i><span><span class="tag warn">rm</span> や <span class="tag warn">DROP DATABASE</span> を見つけたら停止</span></li>
+                    <li><i class="fa-solid fa-comment-dots warn"></i><span>なぜ止めたか、<strong>理由</strong>をそえる</span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-circle-info"></i>
+                    理由があると、あとで<strong>なおしやすい</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10: 設定のコードプレビュー -->
+        <div class="card gate">
+            <div class="icon-box">
+                <i class="fa-solid fa-file-code fa-5x gate" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>設定ファイルの<br>イメージ</h2>
+                <p class="ch">だいたい、こんなかんじ</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-folder-tree night"></i><span>hooks の中に、matcher を入れる</span></li>
+                    <li><i class="fa-solid fa-code blue"></i><span>止める条件は、スクリプトで書く</span></li>
+                </ul>
+                <div class="file-mock">
+                    <div class="fname"><i class="fa-solid fa-gear"></i> settings.json （イメージ）</div>
+                    <span class="c">// 実行前フックの設定</span><br>
+                    <span class="k">"hooks"</span>: {<br>
+                    &nbsp;&nbsp;<span class="k">"PreToolUse"</span>: [{<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"matcher"</span>: <span class="s">"bash"</span>,<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;<span class="k">"command"</span>: <span class="s">"./guard.sh"</span><br>
+                    &nbsp;&nbsp;}]<br>
+                    }
+                </div>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    詳細は公式ドキュメントで。これは<strong>概念図</strong>だよ
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セクション4: 実践ステップ ============ -->
+        <div class="section-title"><i class="fa-solid fa-shoe-prints"></i>実際にやってみる：小さく、少しずつ</div>
+
+        <!-- カード11: まず rm -rf を止める -->
+        <div class="card safe">
+            <div class="icon-box">
+                <i class="fa-solid fa-seedling fa-5x safe" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>まずは rm -rf を、<br>止めるだけ</h2>
+                <p class="ch">いちばん小さな、はじめの一歩</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-dot green"></i><span>ルールは、<span class="hl-green">1つ</span>だけでよい</span></li>
+                    <li><i class="fa-solid fa-trash-can green"></i><span><span class="tag warn">rm -rf</span> を見つけたら、止める</span></li>
+                    <li><i class="fa-solid fa-thumbs-up safe"></i><span>これだけで、<strong>一番こわい事故</strong>を防げる</span></li>
+                </ul>
+                <div class="bubble v4 right">
+                    <i class="fa-solid fa-circle-check"></i>
+                    最初は、これだけで十分！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: 段階的にルールを増やす -->
+        <div class="card lamp">
+            <div class="icon-box">
+                <i class="fa-solid fa-stairs fa-5x lamp" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>慣れてきたら、<br>ルールを増やす</h2>
+                <p class="ch">少しずつ、広げていく</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-1 amber"></i><span><span class="step-num g" style="background:var(--c7)">1</span>まず <span class="tag warn">rm -rf</span></span></li>
+                    <li><i class="fa-solid fa-circle-2 gold"></i><span><span class="step-num a" style="background:var(--c6)">2</span>つぎに <span class="tag warn">DROP DATABASE</span></span></li>
+                    <li><i class="fa-solid fa-circle-3 amber"></i><span><span class="step-num" style="background:var(--c1)">3</span>本番環境への操作、など</span></li>
+                    <li><i class="fa-solid fa-infinity gold"></i><span>様子を見ながら、<strong>足していく</strong></span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    いっぺんに<span class="tag amber">詰め込まない</span>。これが、長続きのコツ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13: 流れのタイムライン -->
+        <div class="card blue">
+            <div class="icon-box">
+                <i class="fa-solid fa-route fa-5x blue" style="animation:fa-flip 5s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>導入の、流れ</h2>
+                <p class="ch">小さく、ためして、広げる</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-play blue"></i><span>小さなフックを、<span class="hl">1つ</span>入れる</span></li>
+                    <li><i class="fa-solid fa-vial blue"></i><span>本番じゃない場所で、<strong>ためす</strong></span></li>
+                    <li><i class="fa-solid fa-plus night"></i><span>大丈夫なら、ルールを<span class="tag">追加</span></span></li>
+                </ul>
+                <div class="timeline">
+                    <div class="step"><i class="fa-solid fa-seedling" style="color:var(--c7)"></i><span>1つ<br>入れる</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-vial-circle-check" style="color:var(--c10)"></i><span>ためす</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-plus" style="color:var(--c8)"></i><span>ルール<br>追加</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-repeat" style="color:var(--c7)"></i><span>くりかえす</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セクション5: 注意点 ============ -->
+        <div class="section-title"><i class="fa-solid fa-triangle-exclamation"></i>ただし、万能じゃない。ここを知っておく</div>
+
+        <!-- カード14: 万能ではない -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-exclamation fa-5x warn" style="animation:fa-shake 3s infinite;" aria-hidden="true"></i>
+                <h2>万能じゃない。<br>過信は禁物</h2>
+                <p class="ch">フックは、あくまで「一つの層」</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-shield-halved warn"></i><span>止めてくれる<span class="hl-rose">可能性が上がる</span>だけで、完全じゃない</span></li>
+                    <li><i class="fa-solid fa-pen-ruler warn"></i><span>止める条件は、<strong>自分で書く</strong>必要がある</span></li>
+                    <li><i class="fa-solid fa-eye warn"></i><span>だから、人間の目も<strong>まだ要る</strong></span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    「これさえ入れれば安心」では、ないんだ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: タイムアウト時の挙動 -->
+        <div class="card amber">
+            <div class="icon-box">
+                <i class="fa-solid fa-clock fa-5x amber" style="animation:fa-shake 2.5s infinite;" aria-hidden="true"></i>
+                <h2>タイムアウトしたら、<br>いつもの権限へ</h2>
+                <p class="ch">門番が間に合わなかった時の話</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hourglass-end amber"></i><span>コマンド型フックが<span class="hl-amber">時間切れ</span>になることも</span></li>
+                    <li><i class="fa-solid fa-arrow-right gold"></i><span>その時は、<span class="tag amber">通常の権限フロー</span>に進む</span></li>
+                    <li><i class="fa-solid fa-circle-question amber"></i><span>つまり、いつもの「許可を聞く」に戻る</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-circle-info"></i>
+                    門番が<span class="tag amber">黙る</span>と、元のやり方が 続くだけ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード16: 権限設定とセット -->
+        <div class="card gate">
+            <div class="icon-box">
+                <i class="fa-solid fa-link fa-5x gate" style="animation:fa-beat 2.5s infinite;" aria-hidden="true"></i>
+                <h2>権限の設定と、<br>セットで使う</h2>
+                <p class="ch">フックだけでは、足りない</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-shield night"></i><span>もとからある<span class="hl">権限設定</span>が、土台</span></li>
+                    <li><i class="fa-solid fa-handshake gate"></i><span>その上に、フックを<strong>重ねて</strong>使う</span></li>
+                    <li><i class="fa-solid fa-layer-group blue"></i><span>二つで、初めて<span class="tag">厚い防線</span>になる</span></li>
+                </ul>
+                <div class="check-mock">
+                    <div class="item"><i class="fa-solid fa-circle-check ok"></i> 権限の設定（もと）</div>
+                    <div class="item"><i class="fa-solid fa-plus"></i> PreToolUseフック（上）</div>
+                    <div class="item"><i class="fa-solid fa-equals"></i> = 二重の防線</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============ セクション6: まとめ ============ -->
+        <div class="section-title"><i class="fa-solid fa-flag-checkered"></i>おさらい：今日、覚えて帰ること</div>
+
+        <!-- カード17: PreToolUseで理由を返す -->
+        <div class="card safe">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-check fa-5x safe" style="animation:fa-beat 2s infinite;" aria-hidden="true"></i>
+                <h2>実行前フックは、<br>PreToolUse で</h2>
+                <p class="ch">止める時は、理由も 一緒に</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-door-closed green"></i><span>実行「前」に割り込むのが <span class="hl-green">PreToolUse</span></span></li>
+                    <li><i class="fa-solid fa-hand safe"></i><span>止める時は、<span class="tag green">deny</span> を返す</span></li>
+                    <li><i class="fa-solid fa-comment-dots green"></i><span>理由をそえると、<strong>なおしやすい</strong></span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-circle-check"></i>
+                    名前と、返し方。これだけは、おさえておこう
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: 最初は危険な言葉1つから -->
+        <div class="card lamp">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag fa-5x lamp" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>まずは、あぶない言葉を<br>1つ登録するところから</h2>
+                <p class="ch">AI を、監督する層として</p>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 gold"></i><span>あぶない言葉を、<span class="hl-amber">1つ</span>だけ登録</span></li>
+                    <li><i class="fa-solid fa-arrow-up-right-dots amber"></i><span>動かしながら、ルールを<strong>増やす</strong></span></li>
+                    <li><i class="fa-solid fa-user-tie gold"></i><span>AI の上に、<span class="tag amber">監督の層</span>を、ひとつ</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    1個でいい。今日、<span class="tag amber">1つ</span>、入れてみよう
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div class="src">🎬 動画：<a href="https://www.youtube.com/watch?v=A-bMkgBfZFQ" target="_blank" rel="noopener">あきらパパ「Claude Code｜危ないコマンド、もう目視で止めなくていい」</a></div>
+        <div class="src">🛡️ テーマ：PreToolUseフックで、実行前に危険コマンドを自動停止</div>
+        <div class="meta">カラーテーマ：Sentinel Gate（歩哨の門）— 夜のスレート × 監視塔の青 × 琥珀の灯火 × 若草の安全</div>
+    </div>
+
+</div>
+</body>
+</html>

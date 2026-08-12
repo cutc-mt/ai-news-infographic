@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw｜進捗確認、もう何度も見に行かなくていい</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：Aurora Watch（極光の監視）
+               夜空に浮かぶオーロラのように、状態が変わった瞬間だけ光って知らせる監視機能を表現。
+               既存の「ネオン・クローム（シアン×ピンク）」「Cloud Summit（インディゴ×空色）」
+               「ティール×コーラル」「ネイビー×ゴールド」とは完全に別系統。 */
+            --c1: #059669;   /* Emerald 600  - 基本のオーロラグリーン */
+            --c2: #0E7490;   /* Cyan 700     - 氷の深いシアン */
+            --c3: #4F46E5;   /* Indigo 500   - 北の夜の藍 */
+            --c4: #0F172A;   /* Slate 950    - 一番深い夜空 */
+            --c5: #10B981;   /* Emerald 500  - 明るいオーロラ */
+            --c6: #06B6D4;   /* Cyan 500     - 明るい氷 */
+            --c7: #22D3EE;   /* Cyan 400     - 薄氷の光 */
+            --c8: #34D399;   /* Emerald 400  - 若草の光 */
+            --c9: #FBBF24;   /* Amber 400    - 星の金 */
+            --c10: #A78BFA;  /* Violet 400   - 北極光の紫 */
+            --c11: #F472B6;  /* Pink 400     - 薄明の色 */
+            --c12: #67E8F9;  /* Cyan 300     - 明るい水色 */
+            --c13: #DC2626;  /* Red 600      - 注意喚起 */
+            --c14: #F59E0B;  /* Amber 500    - 警告の橙 */
+            --c15: #FACC15;  /* Yellow 400   - 警告の黄 */
+            --c16: #ECFDF5;  /* Emerald 50   - ごく薄い緑 */
+            --c17: #ECFEFF;  /* Cyan 50      - ごく薄い氷 */
+            --c18: #1E293B;  /* Slate 800    - カード深色 */
+            /* 派生インク・ティント */
+            --ink-emerald: #064E3B;
+            --ink-cyan: #0C4A6E;
+            --ink-indigo: #312E81;
+            --ink-amber: #78350F;
+            --ink-violet: #5B21B6;
+            --ink-rose: #9F1239;
+            --tint-emerald: #D1FAE5;
+            --tint-cyan: #CFFAFE;
+            --tint-indigo: #E0E7FF;
+            --tint-amber: #FEF3C7;
+            --tint-violet: #EDE9FE;
+            --tint-rose: #FFE4E6;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F0FBF6; font-family:'Kaisei Decol',sans-serif; color:#0F172A; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:62px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,#064E3B 30%,var(--c1) 60%,var(--c6) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(5,150,105,.30);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(52,211,153,.30) 0%, transparent 55%);
+            animation:pulse 6s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:repeating-linear-gradient(90deg, transparent 0, transparent 44px, rgba(103,232,249,.04) 44px, rgba(103,232,249,.04) 45px);
+            pointer-events:none;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        @keyframes drift { 0%{transform:translateX(0)} 50%{transform:translateX(14px)} 100%{transform:translateX(0)} }
+        @keyframes fadeScale { 0%{opacity:0; transform:translateY(20px) scale(.96)} 100%{opacity:1; transform:translateY(0) scale(1)} }
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        .header i.main { color:var(--c7); font-size:108px; margin-bottom:15px; animation:fa-beat-fade 3s infinite, drift 8s ease-in-out infinite; position:relative; z-index:1; text-shadow:0 0 30px rgba(34,211,238,.6), 0 4px 18px rgba(0,0,0,.32); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:0 0 14px rgba(16,185,129,.5), 2px 2px 8px rgba(0,0,0,.34); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c16); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c12); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(5,150,105,.13);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeScale .7s ease both;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(6,182,212,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c8));
+        }
+        .card.aurora::before { background:linear-gradient(90deg,var(--c1),var(--c5),var(--c8)); }
+        .card.ice::before    { background:linear-gradient(90deg,var(--c2),var(--c6),var(--c7)); }
+        .card.night::before  { background:linear-gradient(90deg,var(--c4),var(--c3),var(--c10)); }
+        .card.star::before   { background:linear-gradient(90deg,var(--c9),var(--c14),var(--c15)); }
+        .card.dawn::before   { background:linear-gradient(90deg,var(--c10),var(--c11),var(--c9)); }
+        .card.warn::before   { background:linear-gradient(90deg,var(--c13),var(--c14),var(--c15)); }
+        .card.ok::before     { background:linear-gradient(90deg,var(--c8),var(--c5),var(--c1)); }
+        .card.violet::before { background:linear-gradient(90deg,var(--c10),var(--c3),var(--c7)); }
+        .card.cyan::before   { background:linear-gradient(90deg,var(--c6),var(--c7),var(--c12)); }
+
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color:var(--c1); font-size:60px; }
+        .icon-box i.ice    { color:var(--c2); }
+        .icon-box i.cyan   { color:var(--c6); }
+        .icon-box i.light  { color:var(--c7); }
+        .icon-box i.night  { color:var(--c4); }
+        .icon-box i.indigo { color:var(--c3); }
+        .icon-box i.star   { color:var(--c9); }
+        .icon-box i.amber  { color:var(--c14); }
+        .icon-box i.gold   { color:var(--c15); }
+        .icon-box i.violet { color:var(--c10); }
+        .icon-box i.dawn   { color:var(--c11); }
+        .icon-box i.red    { color:var(--c13); }
+        .icon-box i.emerald{ color:var(--c5); }
+        .icon-box i.fresh  { color:var(--c8); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#475569; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.ice    { color:var(--c2); }
+        ul.kl li i.cyan   { color:var(--c6); }
+        ul.kl li i.light  { color:var(--c7); }
+        ul.kl li i.night  { color:var(--c4); }
+        ul.kl li i.indigo { color:var(--c3); }
+        ul.kl li i.star   { color:var(--c9); }
+        ul.kl li i.amber  { color:var(--c14); }
+        ul.kl li i.gold   { color:var(--c15); }
+        ul.kl li i.violet { color:var(--c10); }
+        ul.kl li i.dawn   { color:var(--c11); }
+        ul.kl li i.red    { color:var(--c13); }
+        ul.kl li i.fresh  { color:var(--c8); }
+
+        /* タグ */
+        .tag {
+            background:var(--tint-emerald);
+            color:var(--ink-emerald);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.ice    { background:var(--tint-cyan);   color:var(--ink-cyan); }
+        .tag.indigo { background:var(--tint-indigo); color:var(--ink-indigo); }
+        .tag.amber  { background:var(--tint-amber);  color:var(--ink-amber); }
+        .tag.violet { background:var(--tint-violet); color:var(--ink-violet); }
+        .tag.rose   { background:var(--tint-rose);   color:var(--ink-rose); }
+        .tag.warn   { background:#FEE2E2; color:#7F1D1D; }
+
+        /* 手書き風吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:18px;
+            padding:10px 14px;
+            margin:14px 6px 6px;
+            font-family:'Yomogi',cursive;
+            box-shadow:3px 3px 10px rgba(0,0,0,.10);
+            transform:rotate(-1deg);
+            font-size:15px;
+            line-height:1.6;
+            color:#334155;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 8px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.right::after { left:auto; right:22px; transform:rotate(15deg); }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 8px 12px; transform:rotate(-5deg); }
+        .bubble.v1 { background:#FEF9C3; border-color:var(--c9); transform:rotate(1deg); }
+        .bubble.v1::after { border-color:var(--c9) transparent; }
+        .bubble.v2 { background:#FFE4E6; border-color:var(--c11); transform:rotate(-2deg); }
+        .bubble.v2::after { border-color:var(--c11) transparent; }
+        .bubble.v3 { background:var(--c17); border-color:var(--c2); transform:rotate(1.5deg); }
+        .bubble.v3::after { border-color:var(--c2) transparent; }
+        .bubble.v4 { background:var(--tint-violet); border-color:var(--c10); transform:rotate(-1.5deg); }
+        .bubble.v4::after { border-color:var(--c10) transparent; }
+        .bubble i { color:var(--c9); margin-right:6px; }
+
+        /* コードプレビュー */
+        pre.code {
+            background:#0F172A;
+            color:#E2E8F0;
+            padding:12px 14px;
+            border-radius:10px;
+            font-size:13px;
+            font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+            margin-top:12px;
+            overflow-x:auto;
+            border-left:4px solid var(--c5);
+            line-height:1.6;
+        }
+        pre.code .c-key { color:#67E8F9; }
+        pre.code .c-str { color:#FBBF24; }
+        pre.code .c-com { color:#64748B; }
+        pre.code .c-fn  { color:#34D399; }
+
+        /* 比較表 */
+        .vs-table {
+            width:100%;
+            border-collapse:collapse;
+            margin-top:12px;
+            font-size:14px;
+        }
+        .vs-table th, .vs-table td {
+            padding:8px 10px;
+            text-align:center;
+            border:1px solid #E2E8F0;
+        }
+        .vs-table th { background:var(--c16); color:var(--c4); font-weight:bold; }
+        .vs-table td.bad  { background:#FEF2F2; color:#991B1B; }
+        .vs-table td.good { background:#ECFDF5; color:var(--c1); font-weight:bold; }
+
+        /* タイムライン */
+        .timeline {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:6px;
+            margin:16px 6px;
+            flex-wrap:wrap;
+        }
+        .timeline .step {
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            min-width:64px;
+        }
+        .timeline .step i {
+            font-size:26px;
+            margin-bottom:4px;
+        }
+        .timeline .step span {
+            font-size:11px;
+            color:#475569;
+            text-align:center;
+            font-family:'Yomogi',cursive;
+        }
+        .timeline .arrow { color:var(--c6); font-size:18px; }
+
+        /* ステップ番号 */
+        .step-num {
+            display:inline-block;
+            width:30px; height:30px;
+            line-height:30px;
+            text-align:center;
+            border-radius:50%;
+            background:var(--c1);
+            color:#fff;
+            font-weight:bold;
+            font-size:14px;
+            margin-right:8px;
+        }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:50px;
+            padding:30px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,#064E3B 50%,var(--c1) 100%);
+            color:#fff;
+            border-radius:24px;
+            box-shadow:6px 6px 22px rgba(5,150,105,.25);
+        }
+        .footer a { color:var(--c12); text-decoration:none; font-weight:bold; border-bottom:2px dotted var(--c12); padding-bottom:1px; }
+        .footer a:hover { color:var(--c7); border-bottom-color:var(--c7); }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .meta { font-size:13px; color:var(--c16); font-family:'Yomogi',cursive; margin-top:10px; }
+
+        /* セクション区切り */
+        .section-title {
+            grid-column:1/-1;
+            text-align:center;
+            margin:30px 0 10px;
+            padding:14px;
+            background:linear-gradient(90deg,transparent,var(--c16),transparent);
+            color:var(--ink-emerald);
+            font-size:22px;
+            font-weight:bold;
+            border-radius:12px;
+        }
+        .section-title i { color:var(--c5); margin-right:8px; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px)  { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; min-width:auto; max-width:none; }
+            .header h1 { font-size:28px; }
+            .header i.main { font-size:80px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-eye main" aria-hidden="true"></i>
+        <h1>OpenClaw｜進捗の確認、もう何度も見に行かなくていい</h1>
+        <div class="sub">「変わったら教えて」のひとことで、確認が自動に変わる</div>
+        <div class="date">2026年8月13日 ／ チャンネル：あきらパパ</div>
+    </div>
+
+    <div class="layout">
+
+        <!-- セクション1：問題提起 -->
+        <div class="section-title"><i class="fa-solid fa-circle-exclamation"></i>同じ待ち時間でも、差が出る</div>
+
+        <!-- カード1 -->
+        <div class="card aurora">
+            <div class="icon-box">
+                <i class="fa-solid fa-eye fa-5x emerald" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>終わったか、何度も見に行く</h2>
+                <div class="ch">手動で確認する、いつものやり方</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clock ice"></i><span>タスクを投げて<span class="tag ice">待つ</span>あいだ、気になって仕方ない</span></li>
+                    <li><i class="fa-solid fa-arrows-rotate cyan"></i><span>画面を開いては閉じて、また開いて…を繰り返す</span></li>
+                    <li><i class="fa-solid fa-hand-paper light"></i><span>作業が<span class="tag amber">手止まり</span>、何度も起こる</span></li>
+                    <li><i class="fa-solid fa-face-tired amber"></i><span>「まだかな」が、じわじわ効いてくる</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    待つ時間は同じでも、こっちの<span class="tag amber">負担</span>がでかい！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2 -->
+        <div class="card ice">
+            <div class="icon-box">
+                <i class="fa-solid fa-bell fa-5x ice" style="animation:fa-beat 2s infinite;" aria-hidden="true"></i>
+                <h2>変わった瞬間に、向こうから教えてくれる</h2>
+                <div class="ch">もう一方のやり方：通知が来る</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comment-dots cyan"></i><span>頼んでおけば、あとは<span class="tag ice">放っておける</span></span></li>
+                    <li><i class="fa-solid fa-bell-on light"></i><span>状態が変わった瞬間に、通知が届く</span></li>
+                    <li><i class="fa-solid fa-check fresh"></i><span>来た時だけ、確認すればよい</span></li>
+                    <li><i class="fa-solid fa-face-smile emerald"></i><span>そのあいだ、別の作業に集中できる</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    同じ時間を待っても、<span class="tag">心の消費</span>がぜんぜん違う
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3 -->
+        <div class="card night">
+            <div class="icon-box">
+                <i class="fa-solid fa-scale-balanced fa-5x indigo" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>違いは「確認するのが自分か、AIか」だけ</h2>
+                <div class="ch">本質は、誰が見に行くか</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user night"></i><span>自分で見に行く＝<span class="tag indigo">手動確認</span></span></li>
+                    <li><i class="fa-solid fa-robot indigo"></i><span>AI に見に行かせる＝<span class="tag">自動監視</span></span></li>
+                    <li><i class="fa-solid fa-equals violet"></i><span>待つ時間も、最終的な結果も、同じ</span></li>
+                    <li><i class="fa-solid fa-arrow-right-arrow-left star"></i><span>ちがうのは<span class="tag amber">手間</span>と、集中の途切れ方だけ</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    「見に行く係」を、AI に任せられるかどうか。それだけの話
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション2：OpenClawの監視機能 -->
+        <div class="section-title"><i class="fa-solid fa-tower-broadcast"></i>OpenClaw の監視機能とは</div>
+
+        <!-- カード4 -->
+        <div class="card aurora">
+            <div class="icon-box">
+                <i class="fa-solid fa-tower-broadcast fa-5x emerald" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>条件が変わった時だけ、動く仕組み</h2>
+                <div class="ch">監視＝ずっと動き続ける、ではない</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-pause fresh"></i><span>ふだんは<span class="tag">静かに待機</span>している</span></li>
+                    <li><i class="fa-solid fa-radar emerald"></i><span>決まった条件を、定期的に見張る</span></li>
+                    <li><i class="fa-solid fa-bolt light"></i><span>変化があった瞬間だけ、動き出す</span></li>
+                    <li><i class="fa-solid fa-feather fresh"></i><span>だから、余分な負荷がかからない</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-circle-info"></i>
+                    「見張り番」を AI に立ててもらう、というイメージ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5 -->
+        <div class="card cyan">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x cyan" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>チャットで頼むだけ。設定はいらない</h2>
+                <div class="ch">使い方は、とてもシンプル</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-keyboard cyan"></i><span>特別な画面や、複雑な設定は<span class="tag ice">不要</span></span></li>
+                    <li><i class="fa-solid fa-comment light"></i><span>ふつうにチャットで、「変わったら教えて」と頼む</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles fresh"></i><span>その一言で、監視が<span class="tag">始動</span>する</span></li>
+                    <li><i class="fa-solid fa-thumbs-up emerald"></i><span>難しいことは、向こうがやってくれる</span></li>
+                </ul>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    監視したいものを、<span class="tag ice">言葉で伝える</span>だけ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6 -->
+        <div class="card ice">
+            <div class="icon-box">
+                <i class="fa-solid fa-stopwatch fa-5x ice" style="animation:fa-shake 3s infinite;" aria-hidden="true"></i>
+                <h2>30秒ごとに、状態を見に行く</h2>
+                <div class="ch">監視の周期は、決まっている</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clock-rotate-left cyan"></i><span>頼むと、<span class="tag ice">30秒</span>おきに確認を繰り返す</span></li>
+                    <li><i class="fa-solid fa-repeat light"></i><span>人間が「そろそろ見よう」と思うより、規則正しい</span></li>
+                    <li><i class="fa-solid fa-eye-low-vision fresh"></i><span>見に行くのは、一瞬。結果だけを覚えて戻る</span></li>
+                    <li><i class="fa-solid fa-gauge-high emerald"></i><span>これより速くはできない（最短＝30秒）</span></li>
+                </ul>
+                <div class="timeline">
+                    <div class="step"><i class="fa-solid fa-eye" style="color:var(--c2)"></i><span>0秒<br>確認</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-hourglass-half" style="color:var(--c6)"></i><span>30秒<br>待機</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-eye" style="color:var(--c2)"></i><span>30秒<br>再確認</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-repeat" style="color:var(--c5)"></i><span>これを<br>繰り返す</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7 -->
+        <div class="card aurora">
+            <div class="icon-box">
+                <i class="fa-solid fa-code-compare fa-5x emerald" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>前回と違った時だけ、通知が飛ぶ</h2>
+                <div class="ch">変化を検知する、仕組みの中身</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-memory fresh"></i><span>前回の状態を、こっそり<span class="tag">覚えている</span></span></li>
+                    <li><i class="fa-solid fa-not-equal emerald"></i><span>今回と見比べて、<span class="tag ice">違い</span>があるかを判定</span></li>
+                    <li><i class="fa-solid fa-bell light"></i><span>変わっていれば、ここで通知が飛ぶ</span></li>
+                    <li><i class="fa-solid fa-volume-xmark fresh"></i><span>変わってなければ、静かに次へ。迷惑なし</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-circle-info"></i>
+                    つねに「最新」と「前回」を、にらみ合っている
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション3：得られる効果 -->
+        <div class="section-title"><i class="fa-solid fa-arrow-trend-up"></i>これで、何が変わるか</div>
+
+        <!-- カード8 -->
+        <div class="card ok">
+            <div class="icon-box">
+                <i class="fa-solid fa-0 fa-5x fresh" style="animation:fa-beat 2s infinite;" aria-hidden="true"></i>
+                <h2>確認で手を止める回数が、ゼロに</h2>
+                <div class="ch">一番の効果は「途切れない集中」</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-ban fresh"></i><span>「見に行く」ために、作業を止めることが<span class="tag">なくなる</span></span></li>
+                    <li><i class="fa-solid fa-headphones emerald"></i><span>ずっと、目の前の作業に集中していられる</span></li>
+                    <li><i class="fa-solid fa-arrow-up-from-bracket light"></i><span>来た通知にだけ反応すればいい</span></li>
+                    <li><i class="fa-solid fa-mug-hot fresh"></i><span>そのほうが、かえって早く終わる</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    監視を任せると、自分は<span class="tag">「作る側」</span>にいられる
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9：比較表 -->
+        <div class="card violet">
+            <div class="icon-box">
+                <i class="fa-solid fa-table-columns fa-5x violet" style="animation:fa-flip 5s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>手動確認 vs 自動監視</h2>
+                <div class="ch">同じ待ち時間、ちがう体験</div>
+            </div>
+            <div class="body">
+                <table class="vs-table">
+                    <thead>
+                        <tr><th>項目</th><th>手動で確認</th><th>自動で監視</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>見に行く人</td><td class="bad">自分</td><td class="good">AI</td></tr>
+                        <tr><td>確認の回数</td><td class="bad">何度も</td><td class="good">必要な時だけ</td></tr>
+                        <tr><td>作業の途切れ</td><td class="bad">よく起きる</td><td class="good">ほぼゼロ</td></tr>
+                        <tr><td>反応の早さ</td><td class="bad">気づき次第</td><td class="good">変わった瞬間</td></tr>
+                        <tr><td>心の負担</td><td class="bad">大きい</td><td class="good">ほぼない</td></tr>
+                    </tbody>
+                </table>
+                <div class="bubble v4 right">
+                    <i class="fa-solid fa-chart-line"></i>
+                    ちがいは「誰が見に行くか」に集約される
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10 -->
+        <div class="card star">
+            <div class="icon-box">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x star" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>何を監視できるか</h2>
+                <div class="ch">対象は、わりと自由</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-lines amber"></i><span>ファイルの中身が、変わったかどうか</span></li>
+                    <li><i class="fa-solid fa-globe gold"></i><span>Web ページの表示が、更新されたか</span></li>
+                    <li><i class="fa-solid fa-server star"></i><span>コマンドの結果が、前回と違うか</span></li>
+                    <li><i class="fa-solid fa-list-check amber"></i><span>要は「状態」を返せるものなら、なんでも</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    監視したい<span class="tag amber">状態</span>を、言葉で伝えるだけで OK
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11：コードプレビュー -->
+        <div class="card aurora">
+            <div class="icon-box">
+                <i class="fa-solid fa-terminal fa-5x emerald" style="animation:fa-shake 3s infinite;" aria-hidden="true"></i>
+                <h2>頼み方のイメージ</h2>
+                <div class="ch">チャットで、こんなふうに伝える</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comment-dots emerald"></i><span>対象を、ひとつ決める</span></li>
+                    <li><i class="fa-solid fa-arrow-right-arrow-left fresh"></i><span>「変わったら教えて」と、添える</span></li>
+                    <li><i class="fa-solid fa-bell light"></i><span>あとは、通知を待つだけ</span></li>
+                </ul>
+                <pre class="code"><span class="c-com">// チャット欄に入れる、ひとこと</span>
+<span class="c-str">「build.log の最終行が変わったら、教えて」</span>
+
+<span class="c-com">// OpenClaw 側の動き（概要）</span>
+<span class="c-key">watch</span>({
+  <span class="c-fn">target</span>: <span class="c-str">"build.log"</span>,
+  <span class="c-fn">interval</span>: <span class="c-str">"30s"</span>,   <span class="c-com">// 最短は30秒</span>
+  <span class="c-fn">notify</span>: <span class="c-str">"on-change"</span> <span class="c-com">// 変化時のみ</span>
+})</pre>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    監視が動くには、事前の<span class="tag ice">有効化</span>が必要（後述）
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション4：今日の1歩 -->
+        <div class="section-title"><i class="fa-solid fa-shoe-prints"></i>今日の1歩：まず、1つ頼んでみる</div>
+
+        <!-- カード12 -->
+        <div class="card ok">
+            <div class="icon-box">
+                <i class="fa-solid fa-shoe-prints fa-5x fresh" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>状態を1つ決めて、「変わったら教えて」</h2>
+                <div class="ch">小さく始めるのが、コツ</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 fresh"></i><span>監視したい<span class="tag">状態</span>を、1つだけ選ぶ</span></li>
+                    <li><i class="fa-solid fa-2 emerald"></i><span>チャットで、「変わったら教えて」と頼む</span></li>
+                    <li><i class="fa-solid fa-3 light"></i><span>あとは、自分の作業に戻る</span></li>
+                    <li><i class="fa-solid fa-flag-checkered fresh"></i><span>通知が来たら、初めて確認する</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    今日は、たった<span class="tag">1つ</span>で十分。まず体験する
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13 -->
+        <div class="card cyan">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-check fa-5x cyan" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>最初の1ネタ、候補まとめ</h2>
+                <div class="ch">何を監視しようか、迷ったら</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-export light"></i><span>ビルドや処理の<span class="tag ice">完了</span>を待つ</span></li>
+                    <li><i class="fa-solid fa-clock cyan"></i><span>時間のかかるコマンドの、終わりを知りたい</span></li>
+                    <li><i class="fa-solid fa-globe fresh"></i><span>ページの更新を、取り逃したくない</span></li>
+                    <li><i class="fa-solid fa-folder-open emerald"></i><span>フォルダに、新しいファイルが増えたか</span></li>
+                </ul>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-circle-info"></i>
+                    どれも「自分で見に行く」を、AI に置き換えられる
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション5：注意点 -->
+        <div class="section-title"><i class="fa-solid fa-triangle-exclamation"></i>ここだけ、押さえておきたい注意点</div>
+
+        <!-- カード14 -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-gear fa-5x amber" style="animation:fa-spin 6s infinite linear;" aria-hidden="true"></i>
+                <h2>設定で「有効」にして、初めて使える</h2>
+                <div class="ch">最初は、オフになっている</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-toggle-off red"></i><span>標準では、監視は<span class="tag warn">無効</span></span></li>
+                    <li><i class="fa-solid fa-toggle-on amber"></i><span>使うには、設定から有効に切り替える</span></li>
+                    <li><i class="fa-solid fa-circle-info gold"></i><span>有効にする前は、頼んでも動かない</span></li>
+                    <li><i class="fa-solid fa-key amber"></i><span>つまり、意図して<span class="tag amber">開けた時だけ</span>動く</span></li>
+                </ul>
+                <div class="bubble v2">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    いきなり動き出すわけじゃない。まずは<span class="tag warn">自分で ON に</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15 -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-user-shield fa-5x red" style="animation:fa-shake 2s infinite;" aria-hidden="true"></i>
+                <h2>有効にすると、権限は「エージェント」のまま</h2>
+                <div class="ch">公式も、ここを警告している</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-id-badge red"></i><span>監視で動くコマンドは、<span class="tag warn">エージェントの権限</span>で走る</span></li>
+                    <li><i class="fa-solid fa-shield-halved amber"></i><span>つまり、エージェントに許した範囲が、そのまま適用される</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation gold"></i><span>権限を広げすぎると、監視もその分、強くなる</span></li>
+                    <li><i class="fa-solid fa-bullhorn amber"></i><span>公式ドキュメントで、この点に<span class="tag warn">注意喚起</span>がある</span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    便利さと引き換えに、<span class="tag warn">権限</span>が見えない所で動く。要はそこ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード16 -->
+        <div class="card star">
+            <div class="icon-box">
+                <i class="fa-solid fa-gauge-high fa-5x gold" style="animation:fa-beat 2s infinite;" aria-hidden="true"></i>
+                <h2>最短の間隔は、30秒</h2>
+                <div class="ch">それより速くは、ならない</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-stopwatch-20 gold"></i><span>監視の周期は、<span class="tag amber">30秒</span>が下限</span></li>
+                    <li><i class="fa-solid fa-hourglass-half amber"></i><span>これより細かくは、見に行けない</span></li>
+                    <li><i class="fa-solid fa-circle-info star"></i><span>速すぎる変化は、取りこぼす可能性がある</span></li>
+                    <li><i class="fa-solid fa-scale-unbalanced gold"></i><span>負荷と速さの、バランスをとった値</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-circle-info"></i>
+                    「即時」じゃない。最大で<span class="tag amber">30秒</span>の、ズレが出る
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション6：まとめ -->
+        <div class="section-title"><i class="fa-solid fa-flag"></i>まとめ：見に行く係を、AI に任せる</div>
+
+        <!-- カード17 -->
+        <div class="card ok">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows fa-5x fresh" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>役割を、ひとつずつ分ける</h2>
+                <div class="ch">人間と AI の、自然な分業</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user fresh"></i><span>人間：作業する。通知が来たら、確認する</span></li>
+                    <li><i class="fa-solid fa-robot emerald"></i><span>AI：30秒ごとに見に行き、変化を伝える</span></li>
+                    <li><i class="fa-solid fa-handshake light"></i><span>おたがい、<span class="tag">得意なこと</span>だけやる</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up fresh"></i><span>結果、全体の作業が、スムーズに進む</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    「見張り」を AI に渡す。それだけで、自分は<span class="tag">前に進める</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18 -->
+        <div class="card violet">
+            <div class="icon-box">
+                <i class="fa-solid fa-clipboard-check fa-5x violet" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>この機能の、3行まとめ</h2>
+                <div class="ch">ざっくり、これだけ</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comment-dots violet"></i><span><span class="step-num">1</span>チャットで「変わったら教えて」と頼む</span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left indigo"></i><span><span class="step-num" style="background:var(--c3)">2</span>30秒ごとに確認し、変化時だけ通知する</span></li>
+                    <li><i class="fa-solid fa-toggle-on star"></i><span><span class="step-num" style="background:var(--c14)">3</span>事前の設定で有効に。権限周りは要確認</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-circle-check"></i>
+                    これだけ、おさえておけば、とりあえず使える！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード19 -->
+        <div class="card night">
+            <div class="icon-box">
+                <i class="fa-solid fa-seedling fa-5x fresh" style="animation:fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+                <h2>今日のねらい：1つ、試してみる</h2>
+                <div class="ch">知っているだけでは、変わらない</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-dot fresh"></i><span>監視したい状態を、1つだけ決める</span></li>
+                    <li><i class="fa-solid fa-comments emerald"></i><span>「変わったら教えて」と、頼んでみる</span></li>
+                    <li><i class="fa-solid fa-mug-hot light"></i><span>そのあいだ、お茶でも淹れて待つ</span></li>
+                    <li><i class="fa-solid fa-star fresh"></i><span>通知が来た時の、あの軽さを味わう</span></li>
+                </ul>
+                <div class="bubble v4 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    一度体験すると、「手動で見る」に、<span class="tag">戻れなく</span>なるかも
+                </div>
+            </div>
+        </div>
+
+        <!-- カード20 -->
+        <div class="card aurora">
+            <div class="icon-box">
+                <i class="fa-solid fa-circle-info fa-5x emerald" style="animation:fa-flip 5s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>覚えておきたい、3つのポイント</h2>
+                <div class="ch">便利さと、引き換えにすること</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-toggle-on emerald"></i><span>監視は、設定で<span class="tag">有効</span>にして初めて動く</span></li>
+                    <li><i class="fa-solid fa-user-shield red"></i><span>動くコマンドは、エージェントの<span class="tag warn">権限</span>のまま</span></li>
+                    <li><i class="fa-solid fa-stopwatch fresh"></i><span>確認の周期は、最短でも<span class="tag ice">30秒</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    この3つを知っておけば、あとは安心して任せられる
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div class="src">🎬 動画：<a href="https://www.youtube.com/watch?v=BPRKUVYL_Nc" target="_blank" rel="noopener">あきらパパ「進捗確認、もう何度も見に行かなくていい」</a></div>
+        <div class="src">🛠️ テーマ：OpenClaw の進捗監視機能（条件変化の通知）</div>
+        <div class="meta">カラーテーマ：Aurora Watch（極光の監視）— 夜空 × オーロラグリーン × 氷のシアン × 星の金</div>
+    </div>
+
+</div>
+</body>
+</html>

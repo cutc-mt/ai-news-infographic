@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GKE × NetApp Flex Unified — ひとつの Pool で File と Block — Google Cloud Tech</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ: "Deep Storage × Aurora × Ember"
+               NetApp の信頼感ある深い青緑（ストレージの深淵）×
+               Aurora の鮮やかなミント（クラウドの革新）×
+               Ember オレンジ（ONTAP の技術的熱量）
+               Google ブランド青、既存のバイオ ティール・ルビー・ゴールド系を
+               すべて回避した ストレージ特有の重厚と革新の配色 */
+            --s1: #0B3A4A;   /* ディープアビス（最深 ストレージ青） */
+            --s2: #14637A;   /* ミッドアビス */
+            --s3: #1E8AA8;   /* ブライトアビス */
+            --s4: #052430;   /* アビス ブラック */
+            --s5: #4FB3C9;   /* ライトアビス */
+            --s6: #C8E8F0;   /* ペールアビス */
+            --s7: #EAF6F9;   /* 極薄アビス */
+
+            --a1: #0F8C6E;   /* ディープアーバン（安定した緑） */
+            --a2: #1DB98F;   /* アーバン ミント */
+            --a3: #5FD9B5;   /* ブライトミント */
+            --a4: #065544;   /* フォレストミント */
+            --a5: #E0F7F0;   /* ペールミント */
+            --a6: #F2FBF8;   /* 極薄ミント */
+
+            --e1: #B5530C;   /* ダークエンバー */
+            --e2: #E8761E;   /* エンバー オレンジ */
+            --e3: #FFB55A;   /* ブライトエンバー */
+            --e4: #7A3706;   /* 最深エンバー */
+            --e5: #FDEED9;   /* ペールエンバー */
+
+            --sl1: #1A2530;  /* スレート */
+            --sl2: #4A5560;  /* ミッドスレート */
+            --sl3: #0E151B;  /* ナイトスレート */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background:#F3F8FA;
+            font-family:'Kaisei Decol',sans-serif;
+            color:var(--sl1);
+            line-height:1.78;
+        }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ===== ヘッダー ===== */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:70px 24px;
+            background:linear-gradient(135deg,var(--s4) 0%,var(--s1) 40%,var(--a4) 100%);
+            border-radius:32px;
+            box-shadow:8px 8px 32px rgba(11,58,74,.42);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(232,118,30,.28) 0%, transparent 55%);
+            animation:pulse 7s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            bottom:-30%; right:-20%;
+            width:80%; height:80%;
+            background:radial-gradient(circle, rgba(29,185,143,.32) 0%, transparent 60%);
+            animation:pulse 9s infinite 1s;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+        .header i.main {
+            color:var(--e3);
+            font-size:108px;
+            margin-bottom:18px;
+            animation:fa-beat-fade 3s infinite;
+            position:relative; z-index:1; display:block;
+            text-shadow:0 0 30px rgba(255,181,90,.5);
+        }
+        .header h1 {
+            color:#fff; font-size:40px;
+            text-shadow:2px 2px 8px rgba(0,0,0,.4);
+            margin-bottom:14px; position:relative; z-index:1;
+            line-height:1.42;
+        }
+        .header .sub {
+            color:var(--s6); font-size:21px;
+            font-family:'Yomogi',cursive;
+            position:relative; z-index:1;
+        }
+        .header .meta {
+            color:var(--e5); font-size:14px;
+            margin-top:16px; position:relative; z-index:1;
+        }
+        .header .badges { margin-top:18px; position:relative; z-index:1; }
+        .h-badge {
+            display:inline-block; padding:5px 14px; margin:4px;
+            background:rgba(255,255,255,.14); color:var(--s6);
+            border:1px solid rgba(255,255,255,.32);
+            border-radius:16px; font-size:13px; font-weight:bold;
+        }
+
+        /* ===== セクション区切り ===== */
+        .section-divider {
+            display:flex; align-items:center; gap:14px;
+            margin:48px 0 28px; padding:0 10px;
+        }
+        .section-divider i { font-size:28px; }
+        .section-divider h3 {
+            font-size:23px; white-space:nowrap;
+            font-family:'Yomogi',cursive;
+        }
+        .section-divider .line {
+            flex:1; height:3px; border-radius:2px;
+        }
+        .sd-abyss i { color:var(--s3); }
+        .sd-abyss h3 { color:var(--s1); }
+        .sd-abyss .line { background:linear-gradient(90deg, var(--s5), transparent); }
+        .sd-mint i { color:var(--a2); }
+        .sd-mint h3 { color:var(--a4); }
+        .sd-mint .line { background:linear-gradient(90deg, var(--a3), transparent); }
+        .sd-ember i { color:var(--e2); }
+        .sd-ember h3 { color:var(--e4); }
+        .sd-ember .line { background:linear-gradient(90deg, var(--e2), transparent); }
+
+        /* ===== カードレイアウト ===== */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(11,58,74,.14);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeInScale .6s ease-out;
+        }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(11,58,74,.24); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+        }
+        .card.c-abyss::before { background:linear-gradient(90deg,var(--s2),var(--s3),var(--s5)); }
+        .card.c-mint::before { background:linear-gradient(90deg,var(--a1),var(--a2),var(--a3)); }
+        .card.c-ember::before { background:linear-gradient(90deg,var(--e1),var(--e2),var(--e3)); }
+        .card.c-mix::before { background:linear-gradient(90deg,var(--s2),var(--a2),var(--e2)); }
+
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:74px; }
+        .icon-box h2 { font-size:20px; margin-top:10px; line-height:1.4; }
+        .icon-box.h-abyss h2 { color:var(--s1); }
+        .icon-box.h-mint h2 { color:var(--a4); }
+        .icon-box.h-ember h2 { color:var(--e4); }
+        .icon-box.h-slate h2 { color:var(--sl1); }
+
+        .ic-s1 { color:var(--s1); }
+        .ic-s2 { color:var(--s2); }
+        .ic-s3 { color:var(--s3); }
+        .ic-s5 { color:var(--s5); }
+        .ic-a1 { color:var(--a1); }
+        .ic-a2 { color:var(--a2); }
+        .ic-a4 { color:var(--a4); }
+        .ic-a3 { color:var(--a3); }
+        .ic-e1 { color:var(--e1); }
+        .ic-e2 { color:var(--e2); }
+        .ic-e4 { color:var(--e4); }
+        .ic-slate { color:var(--sl1); }
+        .ic-slate2 { color:var(--sl2); }
+
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.78;
+        }
+        ul.kl li i { margin-right:9px; min-width:18px; margin-top:4px; }
+        ul.kl li i.ab { color:var(--s2); }
+        ul.kl li i.abd { color:var(--s1); }
+        ul.kl li i.abb { color:var(--s5); }
+        ul.kl li i.mt { color:var(--a1); }
+        ul.kl li i.mtb { color:var(--a2); }
+        ul.kl li i.mtd { color:var(--a4); }
+        ul.kl li i.em { color:var(--e1); }
+        ul.kl li i.emb { color:var(--e2); }
+        ul.kl li i.sl { color:var(--sl1); }
+
+        /* タグ */
+        .tag {
+            background:var(--s6); color:var(--s1);
+            padding:2px 9px; border-radius:6px; margin:0 2px;
+            display:inline-block; font-weight:bold; font-size:14px;
+        }
+        .tag.pale { background:var(--s7); color:var(--s2); }
+        .tag.mint { background:var(--a5); color:var(--a4); }
+        .tag.mint-pale { background:var(--a6); color:var(--a1); }
+        .tag.ember { background:var(--e5); color:var(--e1); }
+        .tag.ember-bright { background:#FFEAC9; color:var(--e4); }
+
+        /* ハイライト */
+        .hl-a { background:linear-gradient(transparent 60%, var(--s6) 60%); font-weight:bold; }
+        .hl-ap { background:linear-gradient(transparent 60%, var(--s7) 60%); font-weight:bold; }
+        .hl-m { background:linear-gradient(transparent 60%, var(--a5) 60%); font-weight:bold; }
+        .hl-mp { background:linear-gradient(transparent 60%, var(--a6) 60%); font-weight:bold; }
+        .hl-e { background:linear-gradient(transparent 60%, var(--e5) 60%); font-weight:bold; }
+
+        /* バッジ */
+        .badge {
+            display:inline-block; background:var(--s6); color:var(--s1);
+            padding:3px 10px; border-radius:14px; font-size:13px;
+            margin-bottom:10px; font-weight:bold;
+        }
+        .badge.pale { background:var(--s7); color:var(--s2); }
+        .badge.mint { background:var(--a5); color:var(--a4); }
+        .badge.mint-pale { background:var(--a6); color:var(--a1); }
+        .badge.ember { background:var(--e5); color:var(--e1); }
+
+        /* 手書き風吹き出し (Yomogi) */
+        .bubble {
+            position:relative; background:#fff; border:3px solid var(--s2);
+            border-radius:18px; padding:12px 15px; margin:15px 5px;
+            font-family:'Yomogi',cursive; font-size:15px; line-height:1.65;
+            box-shadow:3px 3px 10px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+        }
+        .bubble::after {
+            content:''; position:absolute; bottom:-13px; left:24px;
+            border-width:12px 8px 0; border-style:solid;
+            border-color:var(--s2) transparent; width:0;
+        }
+        .bubble.top { transform:rotate(1deg); }
+        .bubble.top::after {
+            bottom:auto; top:-13px; border-width:0 8px 12px;
+            transform:rotate(-5deg);
+        }
+        .bubble.r::after { left:auto; right:24px; }
+        .bubble.pale { background:var(--s7); border-color:var(--s5); transform:rotate(1deg); }
+        .bubble.pale::after { border-color:var(--s5) transparent; }
+        .bubble.mint { background:var(--a6); border-color:var(--a2); transform:rotate(-2deg); }
+        .bubble.mint::after { border-color:var(--a2) transparent; }
+        .bubble.ember { background:#FFF6EB; border-color:var(--e1); transform:rotate(1deg); }
+        .bubble.ember::after { border-color:var(--e1) transparent; }
+        .bubble b { color:var(--s1); }
+        .bubble.mint b { color:var(--a4); }
+        .bubble.ember b { color:var(--e4); }
+
+        /* ステップ */
+        .step-row {
+            display:flex; align-items:center; gap:8px;
+            margin:8px 0; padding:8px 10px;
+            background:var(--s7); border-radius:10px;
+            border-left:3px solid var(--s5);
+        }
+        .step-row.mint { background:var(--a6); border-left:3px solid var(--a3); }
+        .step-row.ember { background:#FFF6EB; border-left:3px solid var(--e2); }
+        .step-num {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:26px; height:26px; min-width:26px;
+            background:var(--s2); color:#fff;
+            border-radius:50%; font-weight:bold; font-size:13px;
+        }
+        .step-num.mint { background:var(--a2); }
+        .step-num.ember { background:var(--e1); }
+        .step-text { font-size:14px; color:var(--s1); }
+        .step-row.mint .step-text { color:var(--a4); }
+        .step-row.ember .step-text { color:var(--e4); }
+
+        /* コードプレビュー */
+        pre {
+            background:var(--s4); color:var(--s6); padding:10px; border-radius:6px;
+            font-size:12px; margin-top:10px; overflow-x:auto;
+            font-family:'SFMono-Regular',Consolas,monospace;
+            border-left:4px solid var(--e2);
+            line-height:1.6;
+        }
+        pre .cmd { color:var(--e3); }
+        pre .ok { color:var(--a3); }
+        pre .hot { color:#FFD663; }
+        pre .cmt { color:var(--s5); }
+
+        /* 数値ハイライト */
+        .stat-box { text-align:center; margin:10px 0; }
+        .stat-num {
+            font-size:46px; font-weight:bold;
+            display:block; line-height:1.1;
+        }
+        .stat-num.a { color:var(--s1); }
+        .stat-num.m { color:var(--a4); }
+        .stat-num.e { color:var(--e4); }
+        .stat-label {
+            font-size:13px; color:var(--sl2); margin-top:4px;
+            display:block;
+        }
+
+        /* 対比カード */
+        .vs-box {
+            display:flex; gap:12px; margin:12px 0;
+            background:var(--s7); border-radius:12px; padding:10px;
+            align-items:center;
+        }
+        .vs-side {
+            flex:1; text-align:center;
+            padding:10px 6px; border-radius:10px;
+        }
+        .vs-side.left { background:#fff; border:2px solid var(--s3); }
+        .vs-side.right { background:#fff; border:2px solid var(--a2); }
+        .vs-side i { font-size:30px; display:block; margin-bottom:6px; }
+        .vs-side.left i { color:var(--s2); }
+        .vs-side.right i { color:var(--a2); }
+        .vs-side b { display:block; font-size:14px; }
+        .vs-side.left b { color:var(--s1); }
+        .vs-side.right b { color:var(--a4); }
+        .vs-side small { font-size:12px; color:var(--sl2); }
+        .vs-mid {
+            font-size:20px; font-weight:bold;
+            color:var(--e2); min-width:32px;
+        }
+
+        /* フッター */
+        .footer {
+            text-align:center; margin-top:50px; padding:40px 24px;
+            background:linear-gradient(135deg,var(--s4),var(--s1),var(--a4));
+            border-radius:24px; color:#fff;
+            box-shadow:6px 6px 24px rgba(11,58,74,.32);
+        }
+        .footer a { color:var(--e3); text-decoration:underline; }
+        .footer a:hover { color:#fff; }
+        .footer .ch { font-size:18px; margin-bottom:10px; }
+        .footer .url { font-size:14px; opacity:.9; margin-top:6px; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px) { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; min-width:auto; max-width:none; }
+            .header h1 { font-size:28px; }
+            .section-divider h3 { font-size:18px; white-space:normal; }
+            .vs-box { flex-direction:column; }
+            .vs-mid { transform:rotate(90deg); }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ===== ヘッダー ===== -->
+    <div class="header">
+        <i class="fa-solid fa-database main" aria-hidden="true"></i>
+        <h1>GKE × NetApp Flex Unified — ひとつの Pool で File も Block も</h1>
+        <div class="sub">ステートフル ワークロードを、Google ネイティブな 高性能ストレージへ</div>
+        <div class="meta">🎬 Google Cloud Tech &nbsp;|&nbsp; 📅 2026-08-13 公開</div>
+        <div class="badges">
+            <span class="h-badge"><i class="fa-solid fa-dharmachakra"></i> GKE</span>
+            <span class="h-badge"><i class="fa-solid fa-cubes-stacked"></i> ONTAP 技术</span>
+            <span class="h-badge"><i class="fa-solid fa-bolt"></i> Trident CSI</span>
+            <span class="h-badge"><i class="fa-solid fa-layer-group"></i> File &amp; Block 統合</span>
+        </div>
+    </div>
+
+    <!-- ========== セクション1: テーマ ========== -->
+    <div class="section-divider sd-abyss">
+        <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+        <h3>テーマ — GKE で ステートフル を 強化する</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード1: 動画の テーマ -->
+        <div class="card c-abyss">
+            <div class="icon-box h-abyss">
+                <i class="fa-solid fa-handshake-angle fa-5x ic-s3" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>GKE 上で <b>ステートフル</b> を 強化</h2>
+            </div>
+            <div class="body">
+                <span class="badge">動画の 中心</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-dharmachakra ab" aria-hidden="true"></i><span>コンテナ基盤 <b>GKE</b> が 主役</span></li>
+                    <li><i class="fa-solid fa-database abd" aria-hidden="true"></i><span>ステートフル アプリの <span class="hl-a">永続ストレージ</span></span></li>
+                    <li><i class="fa-solid fa-cubes-stacked abb" aria-hidden="true"></i><span>NetApp の <span class="tag pale">ONTAP 技术</span> を 活用</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up sl" aria-hidden="true"></i><span>性能と <b>運用性</b> の 両立 を 図る</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--s2);" aria-hidden="true"></i>
+                    コンテナで 状態を 持つ アプリを
+                    どう <b>支えるか</b>。それが 今日の テーマ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: GCNV Flex Unified -->
+        <div class="card c-mint">
+            <div class="icon-box h-mint">
+                <i class="fa-solid fa-cubes-stacked fa-5x ic-a2" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2><b>GCNV Flex Unified</b> とは</h2>
+            </div>
+            <div class="body">
+                <span class="badge mint">Google ネイティブ サービス</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cloud mt" aria-hidden="true"></i><span>Google Cloud NetApp Volumes の 一形態</span></li>
+                    <li><i class="fa-solid fa-microchip mtd" aria-hidden="true"></i><span>内部で <b>ONTAP 技术</b> を 活用</span></li>
+                    <li><i class="fa-solid fa-handshake mtb" aria-hidden="true"></i><span>IAM や 課金へ <span class="tag mint-pale">シームレス 統合</span></span></li>
+                    <li><i class="fa-solid fa-rocket mtb" aria-hidden="true"></i><span>他の Google サービスと <b>自然に 連携</b></span></li>
+                </ul>
+                <div class="bubble mint">
+                    <i class="fa-solid fa-puzzle-piece fa-lg" style="color:var(--a2);" aria-hidden="true"></i>
+                    NetApp の 技术 が
+                    Google 生态系に <b>溶けこんだ</b> 形！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: Block & File の 統合 -->
+        <div class="card c-mix">
+            <div class="icon-box h-slate">
+                <i class="fa-solid fa-layer-group fa-5x ic-slate" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>ブロック と ファイル を <b>単一 Pool</b> で</h2>
+            </div>
+            <div class="body">
+                <span class="badge ember">最大の 特徴</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cube em" aria-hidden="true"></i><span>ブロック ワークロード を <b>サポート</b></span></li>
+                    <li><i class="fa-solid fa-folder-open mt" aria-hidden="true"></i><span>ファイル ワークロード も <span class="hl-m">同じ Pool</span></span></li>
+                    <li><i class="fa-solid fa-coins emb" aria-hidden="true"></i><span>容量 を <span class="tag ember">ひとまとめ</span> で 管理</span></li>
+                    <li><i class="fa-solid fa-circle-nodes sl" aria-hidden="true"></i><span>複数 の アクセス方式 を <b>一本化</b></span></li>
+                </ul>
+                <div class="vs-box">
+                    <div class="vs-side left">
+                        <i class="fa-solid fa-cube" aria-hidden="true"></i>
+                        <b>Block</b>
+                        <small>iSCSI / RWO</small>
+                    </div>
+                    <div class="vs-mid">＋</div>
+                    <div class="vs-side right">
+                        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                        <b>File</b>
+                        <small>NFS / RWX</small>
+                    </div>
+                </div>
+                <div class="bubble ember">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--e1);" aria-hidden="true"></i>
+                    分かれていた 2つの 方式が、
+                    <b>同じ Pool</b> で 動く のが 鍵！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション2: Trident CSI ========== -->
+    <div class="section-divider sd-mint">
+        <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+        <h3>Trident CSI — 橋渡し の プロビジョナー</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード4: Trident の 役割 -->
+        <div class="card c-mint">
+            <div class="icon-box h-mint">
+                <i class="fa-solid fa-bolt fa-5x ic-a2" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2><b>Trident</b> が CSI を どう 拡張するか</h2>
+            </div>
+            <div class="body">
+                <span class="badge mint-pale">プロビジョナー</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-plug mt" aria-hidden="true"></i><span>CSI 機能 を <b>ベース</b> に 動作</span></li>
+                    <li><i class="fa-solid fa-arrows-up-down mtd" aria-hidden="true"></i><span>標準 を <span class="hl-m">上回る 拡張</span> を 追加</span></li>
+                    <li><i class="fa-solid fa-brain mtb" aria-hidden="true"></i><span><span class="tag mint">インテリジェント</span> な AutoGrow 等</span></li>
+                    <li><i class="fa-solid fa-gauge-high mtb" aria-hidden="true"></i><span>容量 不足を <b>自動で 検知</b></span></li>
+                </ul>
+                <div class="bubble mint">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color:var(--a2);" aria-hidden="true"></i>
+                    ただの CSI じゃない。
+                    <b>賢く 育つ</b> プロビジョナー なんだ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: Windows & Linux 対応 -->
+        <div class="card c-mint">
+            <div class="icon-box h-mint">
+                <i class="fa-solid fa-display fa-5x ic-a4" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>Windows と Linux の <b>両対応</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge mint">全アクセスモード</span>
+                <ul class="kl">
+                    <li><i class="fa-brands fa-windows mt" aria-hidden="true"></i><span>Windows ワークロード も <b>対応</b></span></li>
+                    <li><i class="fa-brands fa-linux mtd" aria-hidden="true"></i><span>Linux ワークロード も <span class="hl-m">当然 対応</span></span></li>
+                    <li><i class="fa-solid fa-cube mtb" aria-hidden="true"></i><span>ファイル と ブロック の <b>両方</b></span></li>
+                    <li><i class="fa-solid fa-check-double mtb" aria-hidden="true"></i><span>Kubernetes の <span class="tag mint-pale">全アクセスモード</span></span></li>
+                </ul>
+                <div class="bubble pale">
+                    <i class="fa-solid fa-people-arrows fa-lg" style="color:var(--s5);" aria-hidden="true"></i>
+                    OS を 選ばない。
+                    どんな ワークロードも <b>幅広く 支える</b>！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: 無料・OSS -->
+        <div class="card c-ember">
+            <div class="icon-box h-ember">
+                <i class="fa-brands fa-github fa-5x ic-e2" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2><b>無料</b> ・ オープンソース</h2>
+            </div>
+            <div class="body">
+                <span class="badge ember">導入 ハードル 低下</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gift em" aria-hidden="true"></i><span>ライセンス費用は <b>無料</b></span></li>
+                    <li><i class="fa-solid fa-code-branch em" aria-hidden="true"></i><span>ソースコード が <span class="hl-e">公開済み</span></span></li>
+                    <li><i class="fa-brands fa-github emb" aria-hidden="true"></i><span>GitHub で <span class="tag ember">誰でも 参照</span></span></li>
+                    <li><i class="fa-solid fa-heart emb" aria-hidden="true"></i><span>コミュニティ 主導で <b>成長</b></span></li>
+                </ul>
+                <div class="bubble ember">
+                    <i class="fa-solid fa-thumbs-up fa-lg" style="color:var(--e1);" aria-hidden="true"></i>
+                    コスト の 障壁 なし。
+                    まずは <b>試して みよう</b> という 態勢！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション3: デモ前半 (Cluster〜Backend) ========== -->
+    <div class="section-divider sd-abyss">
+        <i class="fa-solid fa-terminal" aria-hidden="true"></i>
+        <h3>デモ前半 — クラスタ から バックエンド まで</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード7: GKE クラスタ 準備 -->
+        <div class="card c-abyss">
+            <div class="icon-box h-abyss">
+                <i class="fa-solid fa-server fa-5x ic-s3" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>Step 1 — GKE クラスタ を <b>準備</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge">前提 の セットアップ</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-location-dot ab" aria-hidden="true"></i><span>リージョン: <b>US Central1-a</b></span></li>
+                    <li><i class="fa-solid fa-circle-nodes abd" aria-hidden="true"></i><span><span class="hl-a">Zonal</span> な 3 ノード 構成</span></li>
+                    <li><i class="fa-solid fa-tag abb" aria-hidden="true"></i><span>クラスタ名: <span class="tag pale">flex-unified-cluster1</span></span></li>
+                    <li><i class="fa-solid fa-key abb" aria-hidden="true"></i><span><b>Workload Identity</b> を 有効化</span></li>
+                </ul>
+                <div class="bubble pale">
+                    <i class="fa-solid fa-circle-info fa-lg" style="color:var(--s5);" aria-hidden="true"></i>
+                    Workload Identity が ある から、
+                    後の <b>認証 が 楽に</b> なる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: ストレージプール 作成 -->
+        <div class="card c-abyss">
+            <div class="icon-box h-abyss">
+                <i class="fa-solid fa-cubes fa-5x ic-s2" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>Step 2 — ストレージプール を <b>作成</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge pale">プール の 設定</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gauge-high ab" aria-hidden="true"></i><span>サービスレベル: <span class="hl-a">Flex Unified</span></span></li>
+                    <li><i class="fa-solid fa-location-dot abd" aria-hidden="true"></i><span>配置: <b>Zonal</b> 指定</span></li>
+                    <li><i class="fa-solid fa-database abb" aria-hidden="true"></i><span>容量: <span class="tag pale">1024</span></span></li>
+                    <li><i class="fa-solid fa-layer-group abb" aria-hidden="true"></i><span>この Pool に <b>全部の も</b></span></li>
+                </ul>
+                <div class="stat-box">
+                    <span class="stat-num a">1024</span>
+                    <span class="stat-label">初期 容量 (GiB)</span>
+                </div>
+                <div class="bubble">
+                    <i class="fa-solid fa-boxes-stacked fa-lg" style="color:var(--s2);" aria-hidden="true"></i>
+                    この Pool が、
+                    File も Block も <b>受け皿</b> に なる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: Trident インストール -->
+        <div class="card c-mint">
+            <div class="icon-box h-mint">
+                <i class="fa-solid fa-download fa-5x ic-a2" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>Step 3 — <b>Trident</b> を Helm で 導入</h2>
+            </div>
+            <div class="body">
+                <span class="badge mint">インストール</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-helmet-safety mt" aria-hidden="true"></i><span>パッケージ管理 は <b>Helm</b></span></li>
+                    <li><i class="fa-solid fa-cloud mtd" aria-hidden="true"></i><span>認証 は <span class="hl-m">Cloud Identity</span> を 使用</span></li>
+                    <li><i class="fa-solid fa-cube mtb" aria-hidden="true"></i><span><span class="tag mint-pale">trident</span> namespace に 配備</span></li>
+                    <li><i class="fa-solid fa-bolt mtb" aria-hidden="true"></i><span>CSI オペレーター が <b>常駐</b></span></li>
+                </ul>
+<pre><span class="cmt"># Helm で Trident を 導入</span>
+<span class="cmd">helm install</span> trident \
+  trident-operator/trident-operator \
+  -n <span class="ok">trident</span></pre>
+                <div class="bubble mint">
+                    <i class="fa-solid fa-rocket fa-lg" style="color:var(--a2);" aria-hidden="true"></i>
+                    Cloud Identity の おかげで
+                    秘密鍵 なし で <b>スッキリ 導入</b>！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション4: デモ中盤 (Backend〜PVC) ========== -->
+    <div class="section-divider sd-ember">
+        <i class="fa-solid fa-diagram-project" aria-hidden="true"></i>
+        <h3>デモ中盤 — バックエンド から PVC まで</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード10: バックエンド 設定 -->
+        <div class="card c-ember">
+            <div class="icon-box h-ember">
+                <i class="fa-solid fa-gears fa-5x ic-e2" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>Step 4 — バックエンド を <b>2つ 作成</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge ember">認証情報 不要</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cube em" aria-hidden="true"></i><span>ブロック用 バックエンド を <b>1つ</b></span></li>
+                    <li><i class="fa-solid fa-folder-open em" aria-hidden="true"></i><span>NAS 用 バックエンド を <b>1つ</b></span></li>
+                    <li><i class="fa-solid fa-coins emb" aria-hidden="true"></i><span>どちらも <span class="hl-e">同じ Pool</span> を 参照</span></li>
+                    <li><i class="fa-solid fa-key emb" aria-hidden="true"></i><span>Cloud Identity で <span class="tag ember">秘密鍵 なし</span></span></li>
+                </ul>
+                <div class="step-row ember">
+                    <span class="step-num ember">1</span>
+                    <span class="step-text">SAN バックエンド (Block 用)</span>
+                </div>
+                <div class="step-row mint">
+                    <span class="step-num mint">2</span>
+                    <span class="step-text">NAS バックエンド (File 用)</span>
+                </div>
+                <div class="bubble ember">
+                    <i class="fa-solid fa-unlock-keyhole fa-lg" style="color:var(--e1);" aria-hidden="true"></i>
+                    認証 を 都度 渡さず、
+                    Identity が <b>よしなに</b> してくれる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: ストレージクラス -->
+        <div class="card c-ember">
+            <div class="icon-box h-ember">
+                <i class="fa-solid fa-sliders fa-5x ic-e4" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>Step 5 — StorageClass を <b>作成</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge ember">Kubernetes リソース</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-folder-open em" aria-hidden="true"></i><span>NAS 用 クラス を <b>1つ</b></span></li>
+                    <li><i class="fa-solid fa-cube emb" aria-hidden="true"></i><span>SAN 用 クラス を <b>1つ</b></span></li>
+                    <li><i class="fa-solid fa-truck-field emb" aria-hidden="true"></i><span>SAN は <span class="hl-e">GCNV SAN ドライバー</span></span></li>
+                    <li><i class="fa-solid fa-link emb" aria-hidden="true"></i><span>各 バックエンド に <span class="tag ember">紐付き</span></span></li>
+                </ul>
+<pre><span class="cmt"># StorageClass の ドライバー 指定</span>
+provisioner: <span class="hot">csi.gcnv.com</span>
+<span class="cmd">driver:</span> <span class="ok">gcnv-san</span></pre>
+                <div class="bubble ember">
+                    <i class="fa-solid fa-screwdriver-wrench fa-lg" style="color:var(--e1);" aria-hidden="true"></i>
+                    StorageClass が、
+                    PVC と <b>Pool</b> を 結ぶ 橋 に なる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: PVC 作成 -->
+        <div class="card c-abyss">
+            <div class="icon-box h-abyss">
+                <i class="fa-solid fa-file-circle-plus fa-5x ic-s3" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>Step 6 — PVC を <b>2種</b> 作成</h2>
+            </div>
+            <div class="body">
+                <span class="badge">Persistent Volume Claim</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-cube ab" aria-hidden="true"></i><span>iSCSI 用: <span class="hl-a">RWO</span> モード</span></li>
+                    <li><i class="fa-solid fa-folder-open abd" aria-hidden="true"></i><span>NFS 用: <span class="hl-a">RWX</span> モード</span></li>
+                    <li><i class="fa-solid fa-arrows-split-up-and-left abb" aria-hidden="true"></i><span>用途で <b>アクセス方式 を 使い分け</b></span></li>
+                    <li><i class="fa-solid fa-bolt abb" aria-hidden="true"></i><span>Class が 自動で <span class="tag pale">ボリューム を 生成</span></span></li>
+                </ul>
+                <div class="vs-box">
+                    <div class="vs-side left">
+                        <i class="fa-solid fa-cube" aria-hidden="true"></i>
+                        <b>RWO</b>
+                        <small>iSCSI / ReadWriteOnce</small>
+                    </div>
+                    <div class="vs-mid">vs</div>
+                    <div class="vs-side right">
+                        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                        <b>RWX</b>
+                        <small>NFS / ReadWriteMany</small>
+                    </div>
+                </div>
+                <div class="bubble">
+                    <i class="fa-solid fa-circle-question fa-lg" style="color:var(--s2);" aria-hidden="true"></i>
+                    RWO と RWX を、
+                    <b>同じ Pool</b> から 同時に 出せる のが ミソ！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション5: デモ後半 (Deploy〜Snapshot) ========== -->
+    <div class="section-divider sd-mint">
+        <i class="fa-solid fa-rocket" aria-hidden="true"></i>
+        <h3>デモ後半 — Pod から スナップショット まで</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード13: Pod デプロイ -->
+        <div class="card c-mint">
+            <div class="icon-box h-mint">
+                <i class="fa-solid fa-cube fa-5x ic-a2" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>Step 7 — busybox Pod を <b>2つ 配備</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge mint-pale">動作 確認</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-box mt" aria-hidden="true"></i><span>軽量 イメージ <span class="hl-m">busybox</span> を 使用</span></li>
+                    <li><i class="fa-solid fa-clone mtd" aria-hidden="true"></i><span>Pod を <b>2つ</b> 用意</span></li>
+                    <li><i class="fa-solid fa-cube mtb" aria-hidden="true"></i><span>片方は <span class="tag mint-pale">iSCSI</span> を マウント</span></li>
+                    <li><i class="fa-solid fa-folder-open mtb" aria-hidden="true"></i><span>もう片方は <b>NFS</b> を マウント</span></li>
+                </ul>
+                <div class="bubble mint">
+                    <i class="fa-solid fa-flask-vial fa-lg" style="color:var(--a2);" aria-hidden="true"></i>
+                    小さな Pod で、
+                    <b>両方式</b> の 動き を 確かめる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: マウント確認 -->
+        <div class="card c-mint">
+            <div class="icon-box h-mint">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x ic-a4" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>Step 8 — Pod に exec で <b>確認</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge mint">検証</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-terminal mt" aria-hidden="true"></i><span>Pod の 中に <b>直接 exec</b></span></li>
+                    <li><i class="fa-solid fa-hard-drive mtd" aria-hidden="true"></i><span>ボリューム の <span class="hl-m">正しい パス</span></span></li>
+                    <li><i class="fa-solid fa-ruler mtb" aria-hidden="true"></i><span>サイズ が <b>要求 どおり</b></span></li>
+                    <li><i class="fa-solid fa-circle-check mtb" aria-hidden="true"></i><span>両 Pod で <span class="tag mint-pale">マウント 成功</span></span></li>
+                </ul>
+<pre><span class="cmd">kubectl exec -it</span> busybox -- \
+  <span class="ok">df -h</span> /mnt/data</pre>
+                <div class="bubble pale">
+                    <i class="fa-solid fa-thumbs-up fa-lg" style="color:var(--s5);" aria-hidden="true"></i>
+                    実際に 中を のぞいて、
+                    <b>想定 どおり</b> か を 確かめる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: スナップショット -->
+        <div class="card c-ember">
+            <div class="icon-box h-ember">
+                <i class="fa-solid fa-camera-retro fa-5x ic-e2" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>Step 9 — <b>スナップショット</b> を 取得</h2>
+            </div>
+            <div class="body">
+                <span class="badge ember">VolumeSnapshot</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-camera em" aria-hidden="true"></i><span>事前に <b>SnapshotClass</b> を 作成</span></li>
+                    <li><i class="fa-solid fa-folder-open em" aria-hidden="true"></i><span>NAS ボリューム を <span class="hl-e">撮影</span></span></li>
+                    <li><i class="fa-solid fa-cube emb" aria-hidden="true"></i><span>iSCSI ボリューム も <span class="tag ember">同様</span></span></li>
+                    <li><i class="fa-solid fa-clock-rotate-left emb" aria-hidden="true"></i><span>両方 の <b>時点保存</b> に 成功</span></li>
+                </ul>
+                <div class="bubble ember">
+                    <i class="fa-solid fa-camera fa-lg" style="color:var(--e1);" aria-hidden="true"></i>
+                    File も Block も、
+                    どちらも <b>スナップショット 可能</b>！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション6: 応用 & まとめ ========== -->
+    <div class="section-divider sd-ember">
+        <i class="fa-solid fa-star" aria-hidden="true"></i>
+        <h3>応用機能 と まとめ</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード16: 追加機能 -->
+        <div class="card c-ember">
+            <div class="icon-box h-ember">
+                <i class="fa-solid fa-wand-magic-sparkles fa-5x ic-e4" style="animation:fa-flip 3.4s infinite;" aria-hidden="true"></i>
+                <h2>Step 10 — <b>応用</b> 機能 も 充実</h2>
+            </div>
+            <div class="body">
+                <span class="badge ember">ここから 広がる</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-arrow-right-from-bracket em" aria-hidden="true"></i><span>Snapshot から <b>新 PVC を 生成</b></span></li>
+                    <li><i class="fa-solid fa-clone emb" aria-hidden="true"></i><span>既存 PVC から <span class="hl-e">クローン</span></span></li>
+                    <li><i class="fa-solid fa-file-import emb" aria-hidden="true"></i><span>新規 ボリューム の <span class="tag ember">インポート</span></span></li>
+                    <li><i class="fa-solid fa-toolbox emb" aria-hidden="true"></i><span>運用 の <b>選択肢</b> が 豊富</span></li>
+                </ul>
+                <div class="step-row ember">
+                    <span class="step-num ember"><i class="fa-solid fa-camera"></i></span>
+                    <span class="step-text">Snapshot → <b>復元</b></span>
+                </div>
+                <div class="step-row mint">
+                    <span class="step-num mint"><i class="fa-solid fa-clone"></i></span>
+                    <span class="step-text">PVC → <b>クローン</b></span>
+                </div>
+                <div class="step-row">
+                    <span class="step-num"><i class="fa-solid fa-file-import"></i></span>
+                    <span class="step-text">外部 → <b>インポート</b></span>
+                </div>
+                <div class="bubble ember">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--e1);" aria-hidden="true"></i>
+                    単なる 接続 じゃ ない。
+                    <b>運用 まで 見えている</b> のが 強み！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: iSCSI vs NFS まとめ -->
+        <div class="card c-mix">
+            <div class="icon-box h-slate">
+                <i class="fa-solid fa-arrows-left-right fa-5x ic-slate" style="animation:fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+                <h2>iSCSI と NFS の <b>使い分け</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge pale">判断 の 基準</span>
+                <div class="vs-box">
+                    <div class="vs-side left">
+                        <i class="fa-solid fa-cube" aria-hidden="true"></i>
+                        <b>iSCSI</b>
+                        <small>ブロック / RWO<br>1ノード 専有</small>
+                    </div>
+                    <div class="vs-mid">⇄</div>
+                    <div class="vs-side right">
+                        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                        <b>NFS</b>
+                        <small>ファイル / RWX<br>複数ノード 共有</small>
+                    </div>
+                </div>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 ab" aria-hidden="true"></i><span>RWO なら <span class="tag pale">iSCSI</span> を 選ぶ</span></li>
+                    <li><i class="fa-solid fa-2 mt" aria-hidden="true"></i><span>RWX なら <span class="tag mint-pale">NFS</span> を 選ぶ</span></li>
+                    <li><i class="fa-solid fa-circle-nodes sl" aria-hidden="true"></i><span>どちらも <b>同じ Pool</b> から</span></li>
+                </ul>
+                <div class="bubble pale">
+                    <i class="fa-solid fa-compass fa-lg" style="color:var(--s5);" aria-hidden="true"></i>
+                    アクセス方式 で 道具 を 選ぶ。
+                    それが <b>Flex Unified の 便利さ</b>！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: 前提条件 & 総括 -->
+        <div class="card c-abyss">
+            <div class="icon-box h-abyss">
+                <i class="fa-solid fa-flag-checkered fa-5x ic-s3" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>注意点 と <b>総括</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge">事前の 準備</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-triangle-exclamation ab" aria-hidden="true"></i><span>GKE に <b>iSCSI ツール は 無い</b></span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench abd" aria-hidden="true"></i><span>事前の <span class="hl-a">インストール が 必須</span></span></li>
+                    <li><i class="fa-solid fa-list-check abb" aria-hidden="true"></i><span>DaemonSet 等 で <b>組み込み を 用意</b></span></li>
+                    <li><i class="fa-solid fa-shield-halved abb" aria-hidden="true"></i><span>Workload Identity の <span class="tag pale">有効化</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--s2);" aria-hidden="true"></i>
+                    File も Block も、ひとつの Pool で。
+                    <b>NetApp × Google</b> の 強力な 組み合わせ！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== フッター ===== -->
+    <div class="footer">
+        <div class="ch">🎬 動画: <a href="https://www.youtube.com/watch?v=JaPBRoHBE4E" target="_blank" rel="noopener">Google Cloud Tech — High-Performance File &amp; Block Storage on GKE with Flex Unified</a></div>
+        <div class="url"><i class="fa-solid fa-link"></i> https://www.youtube.com/watch?v=JaPBRoHBE4E</div>
+        <div class="url" style="margin-top:12px;"><i class="fa-solid fa-dharmachakra"></i> GKE &nbsp;|&nbsp; <i class="fa-solid fa-cubes-stacked"></i> NetApp ONTAP &nbsp;|&nbsp; <i class="fa-solid fa-bolt"></i> Trident CSI &nbsp;|&nbsp; <i class="fa-solid fa-cube"></i> iSCSI &nbsp;|&nbsp; <i class="fa-solid fa-folder-open"></i> NFS &nbsp;|&nbsp; <i class="fa-solid fa-cloud"></i> Google Cloud NetApp Volumes</div>
+    </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recursion × Google Cloud — ペタバイトのデータで 創薬を 工業化 | Google Cloud Tech</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ: "Bio Teal × Ruby × Gold"
+               生命の深いティール（細胞・深海のデータ）×
+               ルビーレッド（革新・治療への情熱）×
+               ゴールド（成果・価値）
+               Chai Discovery の紫系、GoogleCloud 青緑黄系をすべて回避。
+               バイオ × クラウドスケールの 重厚感と希望を表現。 */
+            --t1: #0A4A55;   /* ディープティール（生命の深海） */
+            --t2: #13707F;   /* ミッドティール */
+            --t3: #1FA2B5;   /* ブライトティール */
+            --t4: #063138;   /* アビスティール（最深） */
+            --t5: #5CC4D2;   /* ライトティール */
+            --t6: #C2EAF1;   /* ペールティール */
+            --t7: #EAF7FA;   /* 極薄ティール */
+
+            --r1: #8C1A2E;   /* ルビーレッド（革新の情熱） */
+            --r2: #B82842;   /* ブライトルビー */
+            --r3: #5C0E1C;   /* ディープルビー */
+            --r4: #FBE0E5;   /* ペールルビー */
+
+            --g1: #B07A0E;   /* ダークゴールド（成果） */
+            --g2: #E8A82E;   /* ブライトゴールド */
+            --g3: #FCF0CF;   /* ペールゴールド */
+            --g4: #6B4A08;   /* 最深ゴールド */
+
+            --sl1: #1A2530;  /* スレート */
+            --sl2: #4A5560;  /* ミッドスレート */
+            --sl3: #0E151B;  /* ナイトスレート */
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background:#F4FAFB;
+            font-family:'Kaisei Decol',sans-serif;
+            color:var(--sl1);
+            line-height:1.78;
+        }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ===== ヘッダー ===== */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:70px 24px;
+            background:linear-gradient(135deg,var(--t4) 0%,var(--t1) 40%,var(--r3) 100%);
+            border-radius:32px;
+            box-shadow:8px 8px 32px rgba(6,49,56,.42);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(232,168,46,.28) 0%, transparent 55%);
+            animation:pulse 7s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            bottom:-30%; right:-20%;
+            width:80%; height:80%;
+            background:radial-gradient(circle, rgba(92,196,210,.30) 0%, transparent 60%);
+            animation:pulse 9s infinite 1s;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+        .header i.main {
+            color:var(--g2);
+            font-size:108px;
+            margin-bottom:18px;
+            animation:fa-beat-fade 3s infinite;
+            position:relative; z-index:1; display:block;
+            text-shadow:0 0 30px rgba(232,168,46,.5);
+        }
+        .header h1 {
+            color:#fff; font-size:40px;
+            text-shadow:2px 2px 8px rgba(0,0,0,.4);
+            margin-bottom:14px; position:relative; z-index:1;
+            line-height:1.42;
+        }
+        .header .sub {
+            color:var(--t6); font-size:21px;
+            font-family:'Yomogi',cursive;
+            position:relative; z-index:1;
+        }
+        .header .meta {
+            color:var(--g3); font-size:14px;
+            margin-top:16px; position:relative; z-index:1;
+        }
+        .header .badges { margin-top:18px; position:relative; z-index:1; }
+        .h-badge {
+            display:inline-block; padding:5px 14px; margin:4px;
+            background:rgba(255,255,255,.14); color:#EAF7FA;
+            border:1px solid rgba(255,255,255,.32);
+            border-radius:16px; font-size:13px; font-weight:bold;
+        }
+
+        /* ===== セクション区切り ===== */
+        .section-divider {
+            display:flex; align-items:center; gap:14px;
+            margin:48px 0 28px; padding:0 10px;
+        }
+        .section-divider i { font-size:28px; }
+        .section-divider h3 {
+            font-size:23px; white-space:nowrap;
+            font-family:'Yomogi',cursive;
+        }
+        .section-divider .line {
+            flex:1; height:3px; border-radius:2px;
+        }
+        .sd-teal i { color:var(--t3); }
+        .sd-teal h3 { color:var(--t1); }
+        .sd-teal .line { background:linear-gradient(90deg, var(--t5), transparent); }
+        .sd-ruby i { color:var(--r2); }
+        .sd-ruby h3 { color:var(--r3); }
+        .sd-ruby .line { background:linear-gradient(90deg, var(--r2), transparent); }
+        .sd-gold i { color:var(--g2); }
+        .sd-gold h3 { color:var(--g4); }
+        .sd-gold .line { background:linear-gradient(90deg, var(--g2), transparent); }
+
+        /* ===== カードレイアウト ===== */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(10,74,85,.14);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeInScale .6s ease-out;
+        }
+        @keyframes fadeInScale { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(10,74,85,.24); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+        }
+        .card.c-teal::before { background:linear-gradient(90deg,var(--t2),var(--t3),var(--t5)); }
+        .card.c-ruby::before { background:linear-gradient(90deg,var(--r3),var(--r2)); }
+        .card.c-gold::before { background:linear-gradient(90deg,var(--g1),var(--g2)); }
+        .card.c-mix::before { background:linear-gradient(90deg,var(--t2),var(--r2),var(--g2)); }
+
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:74px; }
+        .icon-box h2 { font-size:20px; margin-top:10px; line-height:1.4; }
+        .icon-box.h-teal h2 { color:var(--t1); }
+        .icon-box.h-ruby h2 { color:var(--r3); }
+        .icon-box.h-gold h2 { color:var(--g4); }
+        .icon-box.h-slate h2 { color:var(--sl1); }
+
+        .ic-t1 { color:var(--t1); }
+        .ic-t2 { color:var(--t2); }
+        .ic-t3 { color:var(--t3); }
+        .ic-t4 { color:var(--t4); }
+        .ic-t5 { color:var(--t5); }
+        .ic-r1 { color:var(--r1); }
+        .ic-r2 { color:var(--r2); }
+        .ic-r3 { color:var(--r3); }
+        .ic-g1 { color:var(--g1); }
+        .ic-g2 { color:var(--g2); }
+        .ic-g4 { color:var(--g4); }
+        .ic-slate { color:var(--sl1); }
+        .ic-slate2 { color:var(--sl2); }
+
+        .body { padding:5px 8px 15px; }
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.78;
+        }
+        ul.kl li i { margin-right:9px; min-width:18px; margin-top:4px; }
+        ul.kl li i.t { color:var(--t2); }
+        ul.kl li i.td { color:var(--t1); }
+        ul.kl li i.tb { color:var(--t5); }
+        ul.kl li i.r { color:var(--r1); }
+        ul.kl li i.rb { color:var(--r2); }
+        ul.kl li i.rd { color:var(--r3); }
+        ul.kl li i.g { color:var(--g1); }
+        ul.kl li i.gb { color:var(--g2); }
+        ul.kl li i.sl { color:var(--sl1); }
+
+        /* タグ */
+        .tag {
+            background:var(--t6); color:var(--t1);
+            padding:2px 9px; border-radius:6px; margin:0 2px;
+            display:inline-block; font-weight:bold; font-size:14px;
+        }
+        .tag.pale { background:var(--t7); color:var(--t2); }
+        .tag.ruby { background:var(--r4); color:var(--r3); }
+        .tag.gold { background:var(--g3); color:var(--g4); }
+        .tag.gold-bright { background:#FFEFA8; color:var(--g4); }
+
+        /* ハイライト */
+        .hl-t { background:linear-gradient(transparent 60%, var(--t6) 60%); font-weight:bold; }
+        .hl-tp { background:linear-gradient(transparent 60%, var(--t7) 60%); font-weight:bold; }
+        .hl-r { background:linear-gradient(transparent 60%, var(--r4) 60%); font-weight:bold; }
+        .hl-g { background:linear-gradient(transparent 60%, var(--g3) 60%); font-weight:bold; }
+
+        /* バッジ */
+        .badge {
+            display:inline-block; background:var(--t6); color:var(--t1);
+            padding:3px 10px; border-radius:14px; font-size:13px;
+            margin-bottom:10px; font-weight:bold;
+        }
+        .badge.pale { background:var(--t7); color:var(--t2); }
+        .badge.ruby { background:var(--r4); color:var(--r3); }
+        .badge.gold { background:var(--g3); color:var(--g4); }
+
+        /* 手書き風吹き出し (Yomogi) */
+        .bubble {
+            position:relative; background:#fff; border:3px solid var(--t2);
+            border-radius:18px; padding:12px 15px; margin:15px 5px;
+            font-family:'Yomogi',cursive; font-size:15px; line-height:1.65;
+            box-shadow:3px 3px 10px rgba(0,0,0,.08);
+            transform:rotate(-1deg);
+        }
+        .bubble::after {
+            content:''; position:absolute; bottom:-13px; left:24px;
+            border-width:12px 8px 0; border-style:solid;
+            border-color:var(--t2) transparent; width:0;
+        }
+        .bubble.top { transform:rotate(1deg); }
+        .bubble.top::after {
+            bottom:auto; top:-13px; border-width:0 8px 12px;
+            transform:rotate(-5deg);
+        }
+        .bubble.r::after { left:auto; right:24px; }
+        .bubble.pale { background:var(--t7); border-color:var(--t5); transform:rotate(1deg); }
+        .bubble.pale::after { border-color:var(--t5) transparent; }
+        .bubble.ruby { background:var(--r4); border-color:var(--r2); transform:rotate(-2deg); }
+        .bubble.ruby::after { border-color:var(--r2) transparent; }
+        .bubble.gold { background:#FFFBED; border-color:var(--g1); transform:rotate(1deg); }
+        .bubble.gold::after { border-color:var(--g1) transparent; }
+        .bubble b { color:var(--t1); }
+        .bubble.ruby b { color:var(--r3); }
+        .bubble.gold b { color:var(--g4); }
+
+        /* ステップ */
+        .step-row {
+            display:flex; align-items:center; gap:8px;
+            margin:8px 0; padding:8px 10px;
+            background:var(--t7); border-radius:10px;
+            border-left:3px solid var(--t5);
+        }
+        .step-row.ruby { background:var(--r4); border-left:3px solid var(--r2); }
+        .step-row.gold { background:#FFF8DD; border-left:3px solid var(--g2); }
+        .step-num {
+            display:inline-flex; align-items:center; justify-content:center;
+            width:26px; height:26px; min-width:26px;
+            background:var(--t2); color:#fff;
+            border-radius:50%; font-weight:bold; font-size:13px;
+        }
+        .step-num.ruby { background:var(--r2); }
+        .step-num.gold { background:var(--g1); }
+        .step-text { font-size:14px; color:var(--t1); }
+        .step-row.ruby .step-text { color:var(--r3); }
+        .step-row.gold .step-text { color:var(--g4); }
+
+        /* 数値ハイライト */
+        .stat-box { text-align:center; margin:10px 0; }
+        .stat-num {
+            font-size:46px; font-weight:bold;
+            display:block; line-height:1.1;
+        }
+        .stat-num.t { color:var(--t1); }
+        .stat-num.r { color:var(--r3); }
+        .stat-num.g { color:var(--g4); }
+        .stat-label {
+            font-size:13px; color:var(--sl2); margin-top:4px;
+            display:block;
+        }
+
+        /* フッター */
+        .footer {
+            text-align:center; margin-top:50px; padding:40px 24px;
+            background:linear-gradient(135deg,var(--t4),var(--t1),var(--r3));
+            border-radius:24px; color:#fff;
+            box-shadow:6px 6px 24px rgba(6,49,56,.32);
+        }
+        .footer a { color:var(--g3); text-decoration:underline; }
+        .footer a:hover { color:#fff; }
+        .footer .ch { font-size:18px; margin-bottom:10px; }
+        .footer .url { font-size:14px; opacity:.9; margin-top:6px; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px) { .card { min-width:380px; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; min-width:auto; max-width:none; }
+            .header h1 { font-size:28px; }
+            .section-divider h3 { font-size:18px; white-space:normal; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ===== ヘッダー ===== -->
+    <div class="header">
+        <i class="fa-solid fa-dna main" aria-hidden="true"></i>
+        <h1>Recursion × Google Cloud — ペタバイトの データで 創薬を 工業化</h1>
+        <div class="sub">「New Way Now」— 65 PB の 生命情報 を、治療への 突破口へ</div>
+        <div class="meta">🎬 Google Cloud Tech &nbsp;|&nbsp; 📅 2026-08-13 公開</div>
+        <div class="badges">
+            <span class="h-badge"><i class="fa-solid fa-flask-vial"></i> 創薬 AI</span>
+            <span class="h-badge"><i class="fa-solid fa-database"></i> 65 PB+</span>
+            <span class="h-badge"><i class="fa-solid fa-microscope"></i> 週 220 万 実験</span>
+            <span class="h-badge"><i class="fa-solid fa-gem"></i> Gemini</span>
+        </div>
+    </div>
+
+    <!-- ========== セクション1: テーマ ========== -->
+    <div class="section-divider sd-teal">
+        <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+        <h3>テーマ — 生命の データを、治療へ</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード1: 動画の テーマ -->
+        <div class="card c-teal">
+            <div class="icon-box h-teal">
+                <i class="fa-solid fa-handshake-angle fa-5x ic-t3" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>Recursion × Google Cloud の <b>提携</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge">動画の 中心</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-building-columns t" aria-hidden="true"></i><span>バイオテクノロジー企業 <b>Recursion</b> が 主役</span></li>
+                    <li><i class="fa-solid fa-cloud td" aria-hidden="true"></i><span><span class="hl-t">Google Cloud</span> を 基盤に 選択</span></li>
+                    <li><i class="fa-solid fa-diagram-project tb" aria-hidden="true"></i><span>創薬を <span class="tag pale">工業化</span> する ビジョン</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up sl" aria-hidden="true"></i><span>スピードと <b>成功率</b> の 両立 を 目指す</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--t2);" aria-hidden="true"></i>
+                    「実験を たくさん、速く、安く」。
+                    それが Recursion の <b>創薬の しかた</b>！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2: 登場人物 -->
+        <div class="card c-gold">
+            <div class="icon-box h-gold">
+                <i class="fa-solid fa-user-tie fa-5x ic-g2" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>登場人物 — <b>Maureen Makes</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge gold">語り手</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-id-badge g" aria-hidden="true"></i><span><b>VP of Engineering</b>, Recursion</span></li>
+                    <li><i class="fa-solid fa-microchip g" aria-hidden="true"></i><span>エンジニアリング を <span class="tag gold">統括</span></span></li>
+                    <li><i class="fa-solid fa-comments gb" aria-hidden="true"></i><span>プラットフォーム の <b>実情を 解説</b></span></li>
+                    <li><i class="fa-solid fa-quote-right gb" aria-hidden="true"></i><span>現場の <span class="hl-g">声</span> を 伝える 役回り</span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-microphone fa-lg" style="color:var(--g1);" aria-hidden="true"></i>
+                    現場の リーダーが 自ら 語る。
+                    <b>実感の こもった</b> 導入事例！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3: Recursion OS -->
+        <div class="card c-ruby">
+            <div class="icon-box h-ruby">
+                <i class="fa-solid fa-gears fa-5x ic-r2" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>創薬 AI プラットフォーム <b>Recursion OS</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge ruby">中核 プラットフォーム</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-brain r" aria-hidden="true"></i><span>創薬 と 開発を <b>一本化</b> する AI 基盤</span></li>
+                    <li><i class="fa-solid fa-image rb" aria-hidden="true"></i><span>数億の <span class="tag ruby">細胞画像</span> を 分析</span></li>
+                    <li><i class="fa-solid fa-network-wired rd" aria-hidden="true"></i><span>生物学的・化学的な <b>関係を マッピング</b></span></li>
+                    <li><i class="fa-solid fa-rocket rb" aria-hidden="true"></i><span>ターゲット発見 を <span class="hl-r">高速化</span></span></li>
+                </ul>
+                <div class="bubble ruby">
+                    <i class="fa-solid fa-dna fa-lg" style="color:var(--r2);" aria-hidden="true"></i>
+                    「生物学を 読み解く OS」。
+                    セルの 画像から <b>関係の 地図</b> を つくる！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション2: Challenge ========== -->
+    <div class="section-divider sd-ruby">
+        <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+        <h3>課題 — なぜ 従来の 創薬では ダメなのか</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード4: 従来の 創薬は 遅い・高い -->
+        <div class="card c-ruby">
+            <div class="icon-box h-ruby">
+                <i class="fa-solid fa-hourglass-half fa-5x ic-r2" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2>従来の 創薬は <b>遅く・高い</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge ruby">構造的 課題</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-clock r" aria-hidden="true"></i><span>ひとつの 薬に <span class="hl-r">長い 年月</span></span></li>
+                    <li><i class="fa-solid fa-sack-dollar rd" aria-hidden="true"></i><span>開発 コストは <b>莫大</b></span></li>
+                    <li><i class="fa-solid fa-bolt-lightning rb" aria-hidden="true"></i><span>効率が <span class="tag ruby">悪い</span> プロセス</span></li>
+                    <li><i class="fa-solid fa-face-frown rd" aria-hidden="true"></i><span>患者に 届くまで <b>時間が かかる</b></span></li>
+                </ul>
+                <div class="bubble ruby">
+                    <i class="fa-solid fa-triangle-exclamation fa-lg" style="color:var(--r2);" aria-hidden="true"></i>
+                    「速くて 安い」が 難しい。
+                    これが <b>業界の 古い 壁</b>！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5: 治療法の 数の 限界 -->
+        <div class="card c-ruby">
+            <div class="icon-box h-ruby">
+                <i class="fa-solid fa-ban fa-5x ic-r3" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>治療法の <b>数</b> が 制限される</h2>
+            </div>
+            <div class="body">
+                <span class="badge ruby">結果として</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-pills r" aria-hidden="true"></i><span>新しい 治療法が <b>増えにくい</b></span></li>
+                    <li><i class="fa-solid fa-people-arrows rd" aria-hidden="true"></i><span>患者の <span class="tag ruby">選択肢</span> が 限られる</span></li>
+                    <li><i class="fa-solid fa-circle-question rb" aria-hidden="true"></i><span>未対応の <b>病気</b> が 残る</span></li>
+                    <li><i class="fa-solid fa-chart-line rd" aria-hidden="true"></i><span>業界全体の <span class="hl-r">成長の 足枷</span></span></li>
+                </ul>
+                <div class="bubble ruby">
+                    <i class="fa-solid fa-heart-crack fa-lg" style="color:var(--r2);" aria-hidden="true"></i>
+                    方法が 少ないと、
+                    救える 命も <b>救えない</b>。
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6: 工業化への 意図 -->
+        <div class="card c-teal">
+            <div class="icon-box h-teal">
+                <i class="fa-solid fa-industry fa-5x ic-t3" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2>創薬を <b>工業化</b> したい</h2>
+            </div>
+            <div class="body">
+                <span class="badge">Recursion の 目標</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-gauge-high t" aria-hidden="true"></i><span><span class="hl-t">スピード</span> を 画期的に 向上</span></li>
+                    <li><i class="fa-solid fa-percent td" aria-hidden="true"></i><span><b>成功率</b> を 引き上げる</span></li>
+                    <li><i class="fa-solid fa-arrows-repeat tb" aria-hidden="true"></i><span>実験を <span class="tag pale">くりかえし</span> 量産</span></li>
+                    <li><i class="fa-solid fa-flag-checkered sl" aria-hidden="true"></i><span>「速く・安く・多く」を <b>同時に</b></span></li>
+                </ul>
+                <div class="step-row">
+                    <span class="step-num"><i class="fa-solid fa-1"></i></span>
+                    <span class="step-text">データを <b>集める</b></span>
+                </div>
+                <div class="step-row ruby">
+                    <span class="step-num ruby"><i class="fa-solid fa-2"></i></span>
+                    <span class="step-text">AIで <b>関係を 読む</b></span>
+                </div>
+                <div class="step-row gold">
+                    <span class="step-num gold"><i class="fa-solid fa-3"></i></span>
+                    <span class="step-text">候補を <b>速く 試す</b></span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション3: Solution — インフラ ========== -->
+    <div class="section-divider sd-teal">
+        <i class="fa-solid fa-server" aria-hidden="true"></i>
+        <h3>解決策 (1) — データ基盤 としての Google Cloud</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード7: Cloud Storage -->
+        <div class="card c-teal">
+            <div class="icon-box h-teal">
+                <i class="fa-solid fa-database fa-5x ic-t2" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2><b>Cloud Storage</b> — 65 PB の 金庫</h2>
+            </div>
+            <div class="body">
+                <span class="badge">データ 保存</span>
+                <div class="stat-box">
+                    <span class="stat-num t">65 PB+</span>
+                    <span class="stat-label">蓄積する 生命情報</span>
+                </div>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-shield-halved t" aria-hidden="true"></i><span>安全に、<b>大規模に</b> 保存</span></li>
+                    <li><i class="fa-solid fa-box-archive td" aria-hidden="true"></i><span>細胞画像や <span class="tag pale">実験ログ</span></span></li>
+                    <li><i class="fa-solid fa-link tb" aria-hidden="true"></i><span>下流の モデルへ <b>すぐ 渡せる</b></span></li>
+                    <li><i class="fa-solid fa-infinity tb" aria-hidden="true"></i><span>週 <span class="hl-t">220 万 実験</span> を 支える 土台</span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-vault fa-lg" style="color:var(--t2);" aria-hidden="true"></i>
+                    ペタバイト級でも 安心。
+                    <b>雲の 金庫</b> が 基盤！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード8: BigQuery -->
+        <div class="card c-teal">
+            <div class="icon-box h-teal">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x ic-t3" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2><b>BigQuery</b> — 巨大データの 分析</h2>
+            </div>
+            <div class="body">
+                <span class="badge pale">管理 と 分析</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-table t" aria-hidden="true"></i><span>大規模 データセットを <b>一元管理</b></span></li>
+                    <li><i class="fa-solid fa-bolt td" aria-hidden="true"></i><span>超高速の <span class="tag pale">クエリ</span> 処理</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece tb" aria-hidden="true"></i><span>分析と <b>モデリング</b> を 連携</span></li>
+                    <li><i class="fa-solid fa-comments tb" aria-hidden="true"></i><span>自然言語で <span class="hl-tp">データ探索</span> も（後述）</span></li>
+                </ul>
+                <div class="bubble pale">
+                    <i class="fa-solid fa-database fa-lg" style="color:var(--t5);" aria-hidden="true"></i>
+                    巨大な 海でも、
+                    <b>一瞬で 検索</b> できる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: Cloud TPU -->
+        <div class="card c-teal">
+            <div class="icon-box h-teal">
+                <i class="fa-solid fa-microchip fa-5x ic-t4" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2><b>Cloud TPU</b> — 数億の 画像を 推論</h2>
+            </div>
+            <div class="body">
+                <span class="badge">推論 エンジン</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-image t" aria-hidden="true"></i><span>数億の <b>細胞画像</b> を 処理</span></li>
+                    <li><i class="fa-solid fa-gauge-high td" aria-hidden="true"></i><span>高スループットの <span class="tag pale">推論</span></span></li>
+                    <li><i class="fa-solid fa-coins tb" aria-hidden="true"></i><span>コスト 効率 を <b>重視</b></span></li>
+                    <li><i class="fa-solid fa-arrow-down tb" aria-hidden="true"></i><span>推論コストを <span class="hl-t">最大 50% 削減</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-bolt fa-lg" style="color:var(--t2);" aria-hidden="true"></i>
+                    数億枚を 読むための 専用チップ。
+                    <b>安く 速く</b> が TPUの 強み！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション4: Solution — Looker & Gemini ========== -->
+    <div class="section-divider sd-gold">
+        <i class="fa-solid fa-gem" aria-hidden="true"></i>
+        <h3>解決策 (2) — データ民主化 と 生成 AI</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード10: Looker -->
+        <div class="card c-gold">
+            <div class="icon-box h-gold">
+                <i class="fa-solid fa-chart-pie fa-5x ic-g2" style="animation:fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+                <h2><b>Looker</b> — 非技術者にも 開かれた データ</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold">データ 民主化</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-group g" aria-hidden="true"></i><span>エンジニア <b>以外</b> にも アクセス</span></li>
+                    <li><i class="fa-solid fa-eye gb" aria-hidden="true"></i><span>見やすい <span class="tag gold">ダッシュボード</span></span></li>
+                    <li><i class="fa-solid fa-hand-pointer g" aria-hidden="true"></i><span>コード 不要で <b>参照</b></span></li>
+                    <li><i class="fa-solid fa-people-arrows gb" aria-hidden="true"></i><span>現場と データの <span class="hl-g">距離を 縮める</span></span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-door-open fa-lg" style="color:var(--g1);" aria-hidden="true"></i>
+                    データの 扉を <b>広く 開ける</b>。
+                    これが Looker の 役割！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: Gemini × BigQuery -->
+        <div class="card c-gold">
+            <div class="icon-box h-gold">
+                <i class="fa-solid fa-comments fa-5x ic-g2" style="animation:fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+                <h2><b>Gemini</b> × BigQuery — 自然言語で 探索</h2>
+            </div>
+            <div class="body">
+                <span class="badge gold">生成 AI の 活用 (1)</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-keyboard g" aria-hidden="true"></i><span>クエリ を <b>ことばで</b> 投げる</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles gb" aria-hidden="true"></i><span><span class="tag gold">マルチモーダル</span> な Gemini</span></li>
+                    <li><i class="fa-solid fa-lightbulb g" aria-hidden="true"></i><span>結果の <b>意味</b> を すぐ 把握</span></li>
+                    <li><i class="fa-solid fa-graduation-cap gb" aria-hidden="true"></i><span>専門家で なくても <span class="hl-g">分析できる</span></span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-comment-dots fa-lg" style="color:var(--g1);" aria-hidden="true"></i>
+                    「話すように データに 聞く」。
+                    <b> 分析の しかた</b> が 変わる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: Workspace & Enterprise -->
+        <div class="card c-gold">
+            <div class="icon-box h-gold">
+                <i class="fa-solid fa-robot fa-5x ic-g2" style="animation:fa-flip 3.2s infinite;" aria-hidden="true"></i>
+                <h2>Workspace with Gemini ／ <b>Enterprise</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge gold">生成 AI の 活用 (2)</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-lines g" aria-hidden="true"></i><span><b>Workspace</b> で 高品質 ドキュメント</span></li>
+                    <li><i class="fa-solid fa-screwdriver-wrench gb" aria-hidden="true"></i><span><b>Gemini Enterprise</b> で IT 業務</span></li>
+                    <li><i class="fa-solid fa-user-shield g" aria-hidden="true"></i><span>権限 発行を <span class="tag gold">AIエージェント</span> が 処理</span></li>
+                    <li><i class="fa-solid fa-bug gb" aria-hidden="true"></i><span>ユーザー の <b>デバッグ</b> にも 対応</span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color:var(--g1);" aria-hidden="true"></i>
+                    研究 だけじゃ ない。
+                    <b>社内の 事務作業</b> まで Geminiが！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション5: Results ========== -->
+    <div class="section-divider sd-ruby">
+        <i class="fa-solid fa-trophy" aria-hidden="true"></i>
+        <h3>成果 — 数字で 見る 突破</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード13: 週220万 実験 -->
+        <div class="card c-mix">
+            <div class="icon-box h-slate">
+                <i class="fa-solid fa-flask-vial fa-5x ic-slate" style="animation:fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+                <h2>週 最大 <b>220 万</b> 実験</h2>
+            </div>
+            <div class="body">
+                <span class="badge pale">スループット</span>
+                <div class="stat-box">
+                    <span class="stat-num t">220 万</span>
+                    <span class="stat-label">1 週間 あたりの 実験 数（最大）</span>
+                </div>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-repeat t" aria-hidden="true"></i><span>実験を <b>常時</b> くりかえし</span></li>
+                    <li><i class="fa-solid fa-database td" aria-hidden="true"></i><span>結果が <span class="tag pale">65 PB+</span> の データに</span></li>
+                    <li><i class="fa-solid fa-bolt-lightning tb" aria-hidden="true"></i><span>人力では <b>不可能</b> な 規模</span></li>
+                    <li><i class="fa-solid fa-arrow-trend-up sl" aria-hidden="true"></i><span>「速さ」の <span class="hl-t">源泉</span></span></li>
+                </ul>
+                <div class="bubble">
+                    <i class="fa-solid fa-fire fa-lg" style="color:var(--t2);" aria-hidden="true"></i>
+                    1 週間で 数百万。
+                    これが <b>工業化</b> の スケール！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14: RBM39 — 18ヶ月 -->
+        <div class="card c-ruby">
+            <div class="icon-box h-ruby">
+                <i class="fa-solid fa-vial-circle-check fa-5x ic-r2" style="animation:fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+                <h2><b>RBM39</b> — 18 ヶ月で 前臨床試験へ</h2>
+            </div>
+            <div class="body">
+                <span class="badge ruby">成果 プログラム</span>
+                <div class="stat-box">
+                    <span class="stat-num r">18 ヶ月</span>
+                    <span class="stat-label">ターゲット発見 → 前臨床試験</span>
+                </div>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-scissors r" aria-hidden="true"></i><span>業界 平均の <b>半分 以下</b></span></li>
+                    <li><i class="fa-solid fa-flag-checkered rd" aria-hidden="true"></i><span>見つけてから <span class="tag ruby">試験</span> まで 急加速</span></li>
+                    <li><i class="fa-solid fa-dna rb" aria-hidden="true"></i><span>Recursion OS の <b>実証例</b></span></li>
+                    <li><i class="fa-solid fa-hand-holding-medical rd" aria-hidden="true"></i><span>患者へ <span class="hl-r">近づく</span> 速度</span></li>
+                </ul>
+                <div class="bubble ruby">
+                    <i class="fa-solid fa-stopwatch fa-lg" style="color:var(--r2);" aria-hidden="true"></i>
+                    半分の 時間で 到達。
+                    <b>時間を 买った</b> ような 劇的さ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: 推論コスト 50% 削減 -->
+        <div class="card c-gold">
+            <div class="icon-box h-gold">
+                <i class="fa-solid fa-percent fa-5x ic-g2" style="animation:fa-flip 3s infinite;" aria-hidden="true"></i>
+                <h2>Cloud TPU で 推論コスト <b>50% 削減</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge gold">コスト 効率</span>
+                <div class="stat-box">
+                    <span class="stat-num g">−50%</span>
+                    <span class="stat-label">モデル推論の 価格（品質 を 維持）</span>
+                </div>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-check g" aria-hidden="true"></i><span>品質は <b>そのまま</b> 維持</span></li>
+                    <li><i class="fa-solid fa-microchip gb" aria-hidden="true"></i><span>TPU の <span class="tag gold">最適化</span> による もの</span></li>
+                    <li><i class="fa-solid fa-piggy-bank g" aria-hidden="true"></i><span>浮いた 分は <b>実験の 拡大</b> へ</span></li>
+                    <li><i class="fa-solid fa-scale-balanced gb" aria-hidden="true"></i><span>「安いのに 良い」を <span class="hl-g">両立</span></span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-hand-holding-dollar fa-lg" style="color:var(--g1);" aria-hidden="true"></i>
+                    「半額で 同じ 品質」。
+                    これこそ <b>工業化の 証拠</b>！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========== セクション6: まとめ ========== -->
+    <div class="section-divider sd-teal">
+        <i class="fa-solid fa-flag-checkered" aria-hidden="true"></i>
+        <h3>まとめ — 創薬の 「新しい しかた」</h3>
+        <div class="line"></div>
+    </div>
+    <div class="layout">
+
+        <!-- カード16: Key Quote — データ -->
+        <div class="card c-teal">
+            <div class="icon-box h-teal">
+                <i class="fa-solid fa-quote-left fa-5x ic-t3" style="animation:fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+                <h2>Key Quote — <b>データの 即応性</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge pale">Maureen Makes の 言葉</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-comment-dots t" aria-hidden="true"></i><span>「Google Cloud によって <b>データが いつでも モデルに</b>」</span></li>
+                    <li><i class="fa-solid fa-bolt td" aria-hidden="true"></i><span>データが <span class="tag pale">すぐ 使える</span> 状態</span></li>
+                    <li><i class="fa-solid fa-gauge-high tb" aria-hidden="true"></i><span>結果: <b>動きの 速さ</b> に 直結</span></li>
+                    <li><i class="fa-solid fa-link tb" aria-hidden="true"></i><span>保存 → 分析 → 推論 の <span class="hl-tp">一本道</span></span></li>
+                </ul>
+                <div class="bubble pale top">
+                    <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--t5);" aria-hidden="true"></i>
+                    データが <b>すぐ 届く</b> から、
+                    意思決定も <b>早く なる</b>！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: Key Quote — コスト削減 -->
+        <div class="card c-gold">
+            <div class="icon-box h-gold">
+                <i class="fa-solid fa-quote-right fa-5x ic-g2" style="animation:fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+                <h2>Key Quote — <b>品質 を 保ったまま 半額</b></h2>
+            </div>
+            <div class="body">
+                <span class="badge gold">Maureen Makes の 言葉</span>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-percent g" aria-hidden="true"></i><span>「価格を <b>50% 削減</b>、品質は <b>維持</b>」</span></li>
+                    <li><i class="fa-solid fa-microchip gb" aria-hidden="true"></i><span>Cloud TPU の <span class="tag gold">賜物</span></span></li>
+                    <li><i class="fa-solid fa-scale-balanced g" aria-hidden="true"></i><span>コスト と 品質 の <b>トレードオフを 撃破</b></span></li>
+                    <li><i class="fa-solid fa-arrows-up-down gb" aria-hidden="true"></i><span>浮いた 余裕は <span class="hl-g">実験の 増強</span> へ</span></li>
+                </ul>
+                <div class="bubble gold">
+                    <i class="fa-solid fa-medal fa-lg" style="color:var(--g1);" aria-hidden="true"></i>
+                    「安いのに 良い」。
+                    創薬の <b>常識を 覆す</b> 一言！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18: 総括 -->
+        <div class="card c-mix">
+            <div class="icon-box h-slate">
+                <i class="fa-solid fa-dna fa-5x ic-slate" style="animation:fa-flip 3.4s infinite;" aria-hidden="true"></i>
+                <h2>工業化された 創薬 — <b>新しい 道</b></h2>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-database t" aria-hidden="true"></i><span><span class="hl-t">65 PB+</span> の 生命データ を 駆動</span></li>
+                    <li><i class="fa-solid fa-flask-vial r" aria-hidden="true"></i><span>週 <b>220 万</b> 実験を <span class="tag ruby">定常</span> 化</span></li>
+                    <li><i class="fa-solid fa-clock g" aria-hidden="true"></i><span>18 ヶ月で <span class="hl-g">前臨床</span> に 到達</span></li>
+                    <li><i class="fa-solid fa-gem sl" aria-hidden="true"></i><span>Gemini × BigQuery × TPU の <b>連携</b></span></li>
+                </ul>
+                <div class="step-row">
+                    <span class="step-num"><i class="fa-solid fa-database"></i></span>
+                    <span class="step-text">データ → <b>Cloud Storage</b></span>
+                </div>
+                <div class="step-row ruby">
+                    <span class="step-num ruby"><i class="fa-solid fa-microchip"></i></span>
+                    <span class="step-text">推論 → <b>Cloud TPU</b></span>
+                </div>
+                <div class="step-row gold">
+                    <span class="step-num gold"><i class="fa-solid fa-gem"></i></span>
+                    <span class="step-text">探索 → <b>Gemini / BigQuery</b></span>
+                </div>
+                <div class="bubble">
+                    <i class="fa-solid fa-flag-checkered fa-lg" style="color:var(--t2);" aria-hidden="true"></i>
+                    「速く・安く・多く」。
+                    Recursion が 創薬に <b>新しい 道</b> を 切り開いた！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ===== フッター ===== -->
+    <div class="footer">
+        <div class="ch">🎬 動画: <a href="https://www.youtube.com/watch?v=2OedxU0hXXg" target="_blank" rel="noopener">Google Cloud Tech — New Way Now: Recursion processes petabytes of data into therapeutic breakthroughs with Google Cloud</a></div>
+        <div class="url"><i class="fa-solid fa-link"></i> https://www.youtube.com/watch?v=2OedxU0hXXg</div>
+        <div class="url" style="margin-top:12px;"><i class="fa-solid fa-cloud"></i> Google Cloud &nbsp;|&nbsp; Gemini &nbsp;|&nbsp; BigQuery &nbsp;|&nbsp; Cloud Storage &nbsp;|&nbsp; Looker Studio &nbsp;|&nbsp; Cloud TPU &nbsp;|&nbsp; Google Workspace</div>
+    </div>
+
+</div>
+</body>
+</html>

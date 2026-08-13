@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenClaw｜会議メモの整理を自動化</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：Midnight Lilac（真夜中のリラック）
+               Discord の Blurple を核に、深い紫と夜空のグラデーション。
+               会議の夜かたづけを、AI が淡い光で照らすイメージ。
+               既存の「Sunset Bay」「Aurora Watch」「ネオン・クローム」
+               「Cloud Summit」「ティール×コーラル」と完全に別系統。 */
+            --c1: #5865F2;   /* Discord Blurple      - 主役の青紫 */
+            --c2: #7C3AED;   /* Violet 600           - 深めの紫 */
+            --c3: #4338CA;   /* Indigo 700           - 重めの藍 */
+            --c4: #312E81;   /* Indigo 900           - 一番深い夜 */
+            --c5: #818CF8;   /* Indigo 400           - 明るい青紫 */
+            --c6: #A78BFA;   /* Violet 400           - 藤色 */
+            --c7: #C4B5FD;   /* Violet 300           - 薄藤 */
+            --c8: #6366F1;   /* Indigo 500           - つなぎ色 */
+            --c9: #DDD6FE;   /* Violet 200           - うす光 */
+            --c10: #5B21B6;  /* Violet 800           - 濃紫 */
+            --c11: #8B5CF6;  /* Violet 500           - 中間紫 */
+            --c12: #EDE9FE;  /* Violet 50            - 乳色 */
+            --c13: #EC4899;  /* Pink 500             - アクセント桃 */
+            --c14: #F472B6;  /* Pink 400             - 薄桃 */
+            --c15: #0EA5E9;  /* Sky 500              - 副アクセント青 */
+            --c16: #1E1B4B;  /* Indigo 950           - 暗台 */
+            /* 派生インク・ティント */
+            --ink-blurple: #3730A3;
+            --ink-violet:  #4C1D95;
+            --ink-indigo:  #312E81;
+            --ink-pink:    #9D174D;
+            --ink-sky:     #0C4A6E;
+            --tint-blurple: #E0E7FF;
+            --tint-violet:  #EDE9FE;
+            --tint-pink:    #FCE7F3;
+            --tint-sky:     #E0F2FE;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { background:#F5F3FF; font-family:'Kaisei Decol',sans-serif; color:#1E1B4B; line-height:1.7; }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:62px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c3) 25%,var(--c2) 55%,var(--c1) 80%,var(--c5) 100%);
+            border-radius:30px;
+            box-shadow:8px 8px 30px rgba(88,101,242,.32);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background:radial-gradient(circle, rgba(167,139,250,.36) 0%, transparent 55%);
+            animation:pulse 6s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            inset:0;
+            background:repeating-linear-gradient(90deg, transparent 0, transparent 44px, rgba(221,214,254,.06) 44px, rgba(221,214,254,.06) 45px);
+            pointer-events:none;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        @keyframes drift { 0%{transform:translateX(0)} 50%{transform:translateX(14px)} 100%{transform:translateX(0)} }
+        @keyframes fadeScale { 0%{opacity:0; transform:translateY(20px) scale(.96)} 100%{opacity:1; transform:translateY(0) scale(1)} }
+        .header i.main { color:var(--c9); font-size:108px; margin-bottom:15px; animation:fa-beat-fade 3s infinite, drift 8s ease-in-out infinite; position:relative; z-index:1; text-shadow:0 0 30px rgba(221,214,254,.6), 0 4px 18px rgba(0,0,0,.34); }
+        .header h1 { color:#fff; font-size:38px; text-shadow:0 0 14px rgba(124,58,237,.5), 2px 2px 8px rgba(0,0,0,.34); margin-bottom:12px; position:relative; z-index:1; line-height:1.4; }
+        .header .sub { color:var(--c9); font-size:19px; font-family:'Yomogi',cursive; position:relative; z-index:1; }
+        .header .date { color:var(--c7); font-size:14px; margin-top:12px; position:relative; z-index:1; }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow:5px 5px 18px rgba(88,101,242,.13);
+            position:relative;
+            overflow:hidden;
+            transition:transform .3s, box-shadow .3s;
+            animation:fadeScale .7s ease both;
+        }
+        .card:hover { transform:translateY(-6px); box-shadow:10px 10px 28px rgba(124,58,237,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+            background:linear-gradient(90deg,var(--c1),var(--c5),var(--c6));
+        }
+        .card.blurple::before { background:linear-gradient(90deg,var(--c3),var(--c1),var(--c5)); }
+        .card.violet::before  { background:linear-gradient(90deg,var(--c2),var(--c6),var(--c7)); }
+        .card.indigo::before  { background:linear-gradient(90deg,var(--c4),var(--c3),var(--c8)); }
+        .card.lilac::before   { background:linear-gradient(90deg,var(--c5),var(--c6),var(--c9)); }
+        .card.deep::before    { background:linear-gradient(90deg,var(--c10),var(--c2),var(--c11)); }
+        .card.dusk::before    { background:linear-gradient(90deg,var(--c16),var(--c3),var(--c8)); }
+        .card.dawn::before    { background:linear-gradient(90deg,var(--c6),var(--c7),var(--c9)); }
+        .card.pink::before    { background:linear-gradient(90deg,var(--c13),var(--c14),var(--c6)); }
+        .card.warn::before    { background:linear-gradient(90deg,var(--c13),var(--c2),var(--c10)); }
+        .card.ok::before      { background:linear-gradient(90deg,var(--c15),var(--c8),var(--c1)); }
+        .card.sky::before     { background:linear-gradient(90deg,var(--c15),var(--c1),var(--c5)); }
+        .card.rose::before    { background:linear-gradient(90deg,var(--c13),var(--c14),var(--c9)); }
+
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { font-size:60px; }
+        .icon-box i.blurple { color:var(--c1); }
+        .icon-box i.violet  { color:var(--c2); }
+        .icon-box i.indigo  { color:var(--c3); }
+        .icon-box i.deep    { color:var(--c4); }
+        .icon-box i.lilac   { color:var(--c5); }
+        .icon-box i.flower  { color:var(--c6); }
+        .icon-box i.pale    { color:var(--c7); }
+        .icon-box i.mid     { color:var(--c8); }
+        .icon-box i.glow    { color:var(--c9); }
+        .icon-box i.dark    { color:var(--c10); }
+        .icon-box i.grape   { color:var(--c11); }
+        .icon-box i.pink    { color:var(--c13); }
+        .icon-box i.rose    { color:var(--c14); }
+        .icon-box i.sky     { color:var(--c15); }
+        .icon-box h2 { font-size:20px; color:var(--c4); margin-top:10px; line-height:1.4; }
+        .icon-box .ch { font-size:13px; color:#475569; font-family:'Yomogi',cursive; margin-top:4px; }
+        .body { padding:5px 8px 15px; }
+
+        /* リスト */
+        ul.kl { margin:12px 0; padding:0; list-style:none; }
+        ul.kl li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            line-height:1.75;
+        }
+        ul.kl li i { margin-right:9px; color:var(--c1); min-width:18px; margin-top:4px; }
+        ul.kl li i.violet  { color:var(--c2); }
+        ul.kl li i.indigo  { color:var(--c3); }
+        ul.kl li i.deep    { color:var(--c4); }
+        ul.kl li i.lilac   { color:var(--c5); }
+        ul.kl li i.flower  { color:var(--c6); }
+        ul.kl li i.pale    { color:var(--c7); }
+        ul.kl li i.mid     { color:var(--c8); }
+        ul.kl li i.dark    { color:var(--c10); }
+        ul.kl li i.grape   { color:var(--c11); }
+        ul.kl li i.pink    { color:var(--c13); }
+        ul.kl li i.rose    { color:var(--c14); }
+        ul.kl li i.sky     { color:var(--c15); }
+
+        /* タグ */
+        .tag {
+            background:var(--tint-blurple);
+            color:var(--ink-blurple);
+            padding:2px 9px;
+            border-radius:6px;
+            margin:0 2px;
+            display:inline-block;
+            font-weight:bold;
+            font-size:14px;
+        }
+        .tag.violet { background:var(--tint-violet); color:var(--ink-violet); }
+        .tag.pink   { background:var(--tint-pink);   color:var(--ink-pink); }
+        .tag.sky    { background:var(--tint-sky);    color:var(--ink-sky); }
+        .tag.warn   { background:#FEE2E2; color:#7F1D1D; }
+        .tag.glow   { background:#FEF9C3; color:#5B21B6; }
+
+        /* 手書き風吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--c1);
+            border-radius:18px;
+            padding:10px 14px;
+            margin:14px 6px 6px;
+            font-family:'Yomogi',cursive;
+            box-shadow:3px 3px 10px rgba(0,0,0,.10);
+            transform:rotate(-1deg);
+            font-size:15px;
+            line-height:1.6;
+            color:#334155;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px;
+            left:22px;
+            border-width:12px 8px 0;
+            border-style:solid;
+            border-color:var(--c1) transparent;
+            display:block;
+            width:0;
+        }
+        .bubble.right::after { left:auto; right:22px; transform:rotate(15deg); }
+        .bubble.top::after { bottom:auto; top:-13px; border-width:0 8px 12px; transform:rotate(-5deg); }
+        .bubble.v1 { background:#FEF9C3; border-color:var(--c6); transform:rotate(1deg); }
+        .bubble.v1::after { border-color:var(--c6) transparent; }
+        .bubble.v2 { background:#FCE7F3; border-color:var(--c14); transform:rotate(-2deg); }
+        .bubble.v2::after { border-color:var(--c14) transparent; }
+        .bubble.v3 { background:var(--c12); border-color:var(--c2); transform:rotate(1.5deg); }
+        .bubble.v3::after { border-color:var(--c2) transparent; }
+        .bubble.v4 { background:var(--tint-sky); border-color:var(--c15); transform:rotate(-1.5deg); }
+        .bubble.v4::after { border-color:var(--c15) transparent; }
+        .bubble i { color:var(--c6); margin-right:6px; }
+
+        /* コードプレビュー */
+        pre.code {
+            background:#1E1B4B;
+            color:#E2E8F0;
+            padding:12px 14px;
+            border-radius:10px;
+            font-size:13px;
+            font-family:'SFMono-Regular',Consolas,'Liberation Mono',Menlo,monospace;
+            margin-top:12px;
+            overflow-x:auto;
+            border-left:4px solid var(--c6);
+            line-height:1.6;
+        }
+        pre.code .c-key { color:#C4B5FD; }
+        pre.code .c-str { color:#F472B6; }
+        pre.code .c-com { color:#94A3B8; }
+        pre.code .c-fn  { color:#818CF8; }
+
+        /* 比較表 */
+        .vs-table {
+            width:100%;
+            border-collapse:collapse;
+            margin-top:12px;
+            font-size:14px;
+        }
+        .vs-table th, .vs-table td {
+            padding:8px 10px;
+            text-align:center;
+            border:1px solid #E2E8F0;
+        }
+        .vs-table th { background:var(--tint-blurple); color:var(--c4); font-weight:bold; }
+        .vs-table td.bad  { background:#FEE2E2; color:#991B1B; }
+        .vs-table td.good { background:var(--c12); color:var(--c2); font-weight:bold; }
+
+        /* 3項目カード（決定・担当・期限） */
+        .tri-grid {
+            display:grid;
+            grid-template-columns:repeat(3,1fr);
+            gap:8px;
+            margin:14px 4px;
+        }
+        .tri-grid .item {
+            text-align:center;
+            padding:14px 6px;
+            border-radius:12px;
+            background:var(--c12);
+            border:2px solid var(--c7);
+        }
+        .tri-grid .item i { font-size:30px; color:var(--c2); display:block; margin-bottom:6px; }
+        .tri-grid .item span { font-size:12px; color:var(--c4); font-family:'Yomogi',cursive; display:block; }
+
+        /* タイムライン */
+        .timeline {
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:6px;
+            margin:16px 6px;
+            flex-wrap:wrap;
+        }
+        .timeline .step {
+            display:flex;
+            flex-direction:column;
+            align-items:center;
+            min-width:64px;
+        }
+        .timeline .step i { font-size:26px; margin-bottom:4px; }
+        .timeline .step span { font-size:11px; color:#475569; text-align:center; font-family:'Yomogi',cursive; }
+        .timeline .arrow { color:var(--c6); font-size:18px; }
+
+        /* ステップ番号 */
+        .step-num {
+            display:inline-block;
+            width:30px; height:30px;
+            line-height:30px;
+            text-align:center;
+            border-radius:50%;
+            background:var(--c1);
+            color:#fff;
+            font-weight:bold;
+            font-size:14px;
+            margin-right:8px;
+        }
+
+        /* フッター */
+        .footer {
+            text-align:center;
+            margin-top:50px;
+            padding:30px 20px;
+            background:linear-gradient(135deg,var(--c4) 0%,var(--c2) 50%,var(--c1) 100%);
+            color:#fff;
+            border-radius:24px;
+            box-shadow:6px 6px 22px rgba(124,58,237,.25);
+        }
+        .footer a { color:var(--c9); text-decoration:none; font-weight:bold; border-bottom:2px dotted var(--c9); padding-bottom:1px; }
+        .footer a:hover { color:var(--c7); border-bottom-color:var(--c7); }
+        .footer .src { font-size:15px; margin-bottom:8px; }
+        .footer .meta { font-size:13px; color:var(--c7); font-family:'Yomogi',cursive; margin-top:10px; }
+
+        /* セクション区切り */
+        .section-title {
+            grid-column:1/-1;
+            text-align:center;
+            margin:30px 0 10px;
+            padding:14px;
+            background:linear-gradient(90deg,transparent,var(--tint-blurple),transparent);
+            color:var(--ink-violet);
+            font-size:22px;
+            font-weight:bold;
+            border-radius:12px;
+        }
+        .section-title i { color:var(--c2); margin-right:8px; }
+
+        /* レスポンシブ */
+        @media (max-width:1600px) { .card { min-width:300px; } }
+        @media (max-width:1200px) { .card { min-width:340px; } }
+        @media (max-width:900px)  { .card { min-width:380px; } .tri-grid { grid-template-columns:1fr; } }
+        @media (max-width:768px) {
+            .layout { flex-direction:column; }
+            .card { width:100%; min-width:auto; max-width:none; }
+            .header h1 { font-size:28px; }
+            .header i.main { font-size:80px; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-clipboard-check main" aria-hidden="true"></i>
+        <h1>OpenClaw｜会議メモの整理を、自動化</h1>
+        <div class="sub">録画を開いて、読み返して、探す。その30分が、5分になる</div>
+        <div class="date">2026年8月13日 ／ チャンネル：あきらパパ</div>
+    </div>
+
+    <div class="layout">
+
+        <!-- セクション1：会議メモ整理の課題 -->
+        <div class="section-title"><i class="fa-solid fa-circle-exclamation"></i>会議が終わったあとの、本当のつらさ</div>
+
+        <!-- カード1 -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-hourglass-half fa-5x pink" style="animation:fa-shake 3s infinite;" aria-hidden="true"></i>
+                <h2>会議のあとに、やることが山積み</h2>
+                <div class="ch">録画を開いて、メモを読んで、探す</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-video rose"></i><span>録画を、もう一度最初から開く</span></li>
+                    <li><i class="fa-solid fa-book-open pink"></i><span>走り書きのメモを、読み返す</span></li>
+                    <li><i class="fa-solid fa-magnifying-glass rose"></i><span>担当者と期限を、探し出す</span></li>
+                    <li><i class="fa-solid fa-clock pink"></i><span>これが、<span class="tag warn">30分</span>かかる</span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    会議<span class="tag warn">本体</span>より、あとの整理が重い！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード2 -->
+        <div class="card violet">
+            <div class="icon-box">
+                <i class="fa-solid fa-box-archive fa-5x flower" style="animation:fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+                <h2>決めたこと、どこに行った？</h2>
+                <div class="ch">忙しいほど、埋もれてしまう</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-snowflake flower"></i><span>会議中は、みんな<span class="tag violet">納得</span>している</span></li>
+                    <li><i class="fa-solid fa-folder-tree flower"></i><span>でも記録は、散らばったまま</span></li>
+                    <li><i class="fa-solid fa-calendar-xmark violet"></i><span>期限も、誰の頭の中かにある</span></li>
+                    <li><i class="fa-solid fa-ghost flower"></i><span>1週間後には、<span class="tag violet">蒸発</span>している</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    決定事項は、<span class="tag violet">文字</span>に残らないと消える
+                </div>
+            </div>
+        </div>
+
+        <!-- カード3 -->
+        <div class="card indigo">
+            <div class="icon-box">
+                <i class="fa-solid fa-diagram-project fa-5x indigo" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>「誰が」「いつまでに」が見えない</h2>
+                <div class="ch">進捗が止まる、本当の理由</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-secret indigo"></i><span>担当者が、あいまいなまま</span></li>
+                    <li><i class="fa-solid fa-calendar-question deep"></i><span>期限も、「そのうち」で終わる</span></li>
+                    <li><i class="fa-solid fa-link-slash indigo"></i><span>決定と行動が、つながっていない</span></li>
+                    <li><i class="fa-solid fa-pause deep"></i><span>結果、<span class="tag">放置</span>されて動かない</span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-circle-info"></i>
+                    議事録の価値は、<span class="tag warn">次の行動</span>にあります
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション2：OpenClawという解決策 -->
+        <div class="section-title"><i class="fa-solid fa-wand-magic-sparkles"></i>OpenClaw が、その悩みを解く</div>
+
+        <!-- カード4 -->
+        <div class="card blurple">
+            <div class="icon-box">
+                <i class="fa-solid fa-comment-dots fa-5x blurple" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>チャットで、1文送るだけ</h2>
+                <div class="ch">設定画面も、特別な操作も不要</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-hashtag blurple"></i><span>Discord の<span class="tag">チャンネル</span>で話しかける</span></li>
+                    <li><i class="fa-solid fa-keyboard lilac"></i><span>「この議事メモを整理して」と送る</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles flower"></i><span>あとは、AI が勝手にまとめる</span></li>
+                    <li><i class="fa-solid fa-paper-plane pale"></i><span>結果が、同じ場所に届く</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    特別な<span class="tag violet">操作</span>はゼロ。話すだけ
+                </div>
+            </div>
+        </div>
+
+        <!-- カード5 -->
+        <div class="card dawn">
+            <div class="icon-box">
+                <i class="fa-solid fa-gauge-high fa-5x flower" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>30分の作業が、5分に</h2>
+                <div class="ch">時短の効果は、バカにできない</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-stopwatch flower"></i><span>手作業：<span class="tag violet">約30分</span></span></li>
+                    <li><i class="fa-solid fa-bolt pale"></i><span>OpenClaw：<span class="tag violet">約5分</span></span></li>
+                    <li><i class="fa-solid fa-arrows-down-to-line flower"></i><span>毎回、<span class="tag violet">25分</span>が戻ってくる</span></li>
+                    <li><i class="fa-solid fa-seedling pale"></i><span>その時間を、本業に使える</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    週に3回なら、月で<span class="tag glow">5時間</span>の節約
+                </div>
+            </div>
+        </div>
+
+        <!-- カード6 -->
+        <div class="card deep">
+            <div class="icon-box">
+                <i class="fa-solid fa-robot fa-5x grape" style="animation:fa-beat 2s infinite;" aria-hidden="true"></i>
+                <h2>OpenClaw とは、何者か</h2>
+                <div class="ch">Discord で動く、AI エージェント</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-message dark"></i><span>Discord から、話しかけられる AI</span></li>
+                    <li><i class="fa-solid fa-folder-open grape"></i><span>自分の<span class="tag violet">文脈</span>や<span class="tag violet">ファイル</span>を使う</span></li>
+                    <li><i class="fa-solid fa-user-gear dark"></i><span>自分の仕事に、寄せて動かせる</span></li>
+                    <li><i class="fa-solid fa-puzzle-piece grape"></i><span>エージェントとして、作業もできる</span></li>
+                </ul>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-circle-info"></i>
+                    ただの<span class="tag violet">チャット AI</span>じゃない。働く AI
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7 -->
+        <div class="card sky">
+            <div class="icon-box">
+                <i class="fa-solid fa-comments fa-5x sky" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>Discord 連携の、大きな利点</h2>
+                <div class="ch">なぜ Discord なのか</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-users sky"></i><span>チーム全員が、<span class="tag sky">同じ場</span>にいる</span></li>
+                    <li><i class="fa-solid fa-bell blurple"></i><span>結果が、そのまま<span class="tag sky">通知</span>として届く</span></li>
+                    <li><i class="fa-solid fa-mobile-screen sky"></i><span>スマホからも、どこでも動かせる</span></li>
+                    <li><i class="fa-solid fa-share-nodes lilac"></i><span>他のツールとの、橋渡しも得意</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    仕事の<span class="tag sky">流れ</span>を、変えずに AI を足せる
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション3：具体的な使い方 -->
+        <div class="section-title"><i class="fa-solid fa-list-check"></i>実際に、どう使うのか</div>
+
+        <!-- カード8 -->
+        <div class="card blurple">
+            <div class="icon-box">
+                <i class="fa-solid fa-terminal fa-5x blurple" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>1文で、指示を出す</h2>
+                <div class="ch">プロンプトの形</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-quote-left blurple"></i><span>「この議事メモから——」</span></li>
+                    <li><i class="fa-solid fa-layer-group lilac"></i><span>「決定事項、担当者、期限の——」</span></li>
+                    <li><i class="fa-solid fa-arrow-down flower"></i><span>「3つに分けて、整理して」</span></li>
+                </ul>
+                <pre class="code"><span class="c-com"># Discord で送る、たった1文</span>
+<span class="c-str">"この議事メモから、決定事項・</span>
+<span class="c-str"> 担当者・期限の3つに分けて</span>
+<span class="c-str"> 整理して"</span></pre>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <span class="tag violet">3つ</span>に分ける、がポイント
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9 -->
+        <div class="card dawn">
+            <div class="icon-box">
+                <i class="fa-solid fa-list-ol fa-5x flower" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>出力は、3つの箱に分かれる</h2>
+                <div class="ch">見やすい形で、戻ってくる</div>
+            </div>
+            <div class="body">
+                <div class="tri-grid">
+                    <div class="item">
+                        <i class="fa-solid fa-gavel"></i>
+                        <span>決定事項</span>
+                    </div>
+                    <div class="item">
+                        <i class="fa-solid fa-user-tag"></i>
+                        <span>担当者</span>
+                    </div>
+                    <div class="item">
+                        <i class="fa-solid fa-calendar-check"></i>
+                        <span>期限</span>
+                    </div>
+                </div>
+                <ul class="kl">
+                    <li><i class="fa-solid fa-circle-check flower"></i><span>バラバラだった情報が、<span class="tag violet">構造化</span>される</span></li>
+                    <li><i class="fa-solid fa-eye pale"></i><span>誰が見ても、すぐ分かる形</span></li>
+                </ul>
+                <div class="bubble v1">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span class="tag glow">3つの箱</span>に分かれるだけで、見やすさが違う
+                </div>
+            </div>
+        </div>
+
+        <!-- カード10 -->
+        <div class="card violet">
+            <div class="icon-box">
+                <i class="fa-solid fa-timeline fa-5x flower" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>議事録の流れが、こう変わる</h2>
+                <div class="ch">Before と After</div>
+            </div>
+            <div class="body">
+                <table class="vs-table">
+                    <tr><th>手順</th><th>手作業</th><th>OpenClaw</th></tr>
+                    <tr><td>録画を開く</td><td class="bad">必要</td><td class="good">不要</td></tr>
+                    <tr><td>メモを読む</td><td class="bad">全部</td><td class="good">不要</td></tr>
+                    <tr><td>3つに分類</td><td class="bad">自分で</td><td class="good">AI が</td></tr>
+                    <tr><td>所要時間</td><td class="bad">30分</td><td class="good">5分</td></tr>
+                </table>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-circle-info"></i>
+                    人間は<span class="tag violet">確認</span>だけ。あとは AI へ
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション4：ベストプラクティス -->
+        <div class="section-title"><i class="fa-solid fa-pen-fancy"></i>もっと上手に、使うために</div>
+
+        <!-- カード11 -->
+        <div class="card lilac">
+            <div class="icon-box">
+                <i class="fa-solid fa-pen-to-square fa-5x lilac" style="animation:fa-beat 2s infinite;" aria-hidden="true"></i>
+                <h2>良い議事録は、良い入力から</h2>
+                <div class="ch">AI が読みやすい、メモの書き方</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-heading lilac"></i><span>見出しを、日付と議題で立ける</span></li>
+                    <li><i class="fa-solid fa-bullseye flower"></i><span>「決定」「 ToDo 」と、<span class="tag violet">印</span>をつける</span></li>
+                    <li><i class="fa-solid fa-at pale"></i><span>担当者は、<span class="tag violet">@名前</span>で明示</span></li>
+                    <li><i class="fa-solid fa-flag flower"></i><span>期限は、<span class="tag violet">日付</span>で書く</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    入力が丁寧だと、出力も<span class="tag glow">丁寧</span>になる
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12 -->
+        <div class="card dawn">
+            <div class="icon-box">
+                <i class="fa-solid fa-brain fa-5x flower" style="animation:fa-pulse 3s infinite;" aria-hidden="true"></i>
+                <h2>AI エージェント、活用の3カ条</h2>
+                <div class="ch">壁にぶつからない、使い方</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-1 flower"></i><span><span class="tag violet">文脈</span>を、ちゃんと渡す</span></li>
+                    <li><i class="fa-solid fa-2 pale"></i><span>求める<span class="tag violet">形式</span>を、指定する</span></li>
+                    <li><i class="fa-solid fa-3 flower"></i><span>結果は、必ず<span class="tag violet">確認</span>する</span></li>
+                </ul>
+                <div class="timeline">
+                    <div class="step"><i class="fa-solid fa-file-lines" style="color:var(--c2);"></i><span>文脈</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-shapes" style="color:var(--c6);"></i><span>形式</span></div>
+                    <i class="fa-solid fa-arrow-right arrow"></i>
+                    <div class="step"><i class="fa-solid fa-circle-check" style="color:var(--c15);"></i><span>確認</span></div>
+                </div>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    この<span class="tag violet">3つ</span>を守ると、失敗が減る
+                </div>
+            </div>
+        </div>
+
+        <!-- カード13 -->
+        <div class="card indigo">
+            <div class="icon-box">
+                <i class="fa-solid fa-tags fa-5x indigo" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>出力を、もっと使いやすく</h2>
+                <div class="ch">プロンプトを、少し工夫する</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-table indigo"></i><span><span class="tag">表形式</span>で、出してと頼む</span></li>
+                    <li><i class="fa-solid fa-flag-checkered deep"></i><span>期限順に、<span class="tag">並び替え</span>てもらう</span></li>
+                    <li><i class="fa-solid fa-highlighter indigo"></i><span>重要度を、<span class="tag">色分け</span>してもらう</span></li>
+                    <li><i class="fa-solid fa-file-export deep"></i><span>Markdown で、出力もできる</span></li>
+                </ul>
+                <pre class="code"><span class="c-com"># 工夫したプロンプト例</span>
+<span class="c-str">"期限が近い順に並べて、</span>
+<span class="c-str"> 担当者ごとにグループ化、</span>
+<span class="c-str"> 表形式で出して"</span></pre>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    言葉を<span class="tag violet">変える</span>だけで、出力が変わる
+                </div>
+            </div>
+        </div>
+
+        <!-- カード14 -->
+        <div class="card rose">
+            <div class="icon-box">
+                <i class="fa-solid fa-shield-halved fa-5x rose" style="animation:fa-shake 3s infinite;" aria-hidden="true"></i>
+                <h2>機密情報は、丸投げしない</h2>
+                <div class="ch">AI 活用の、一番の注意点</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-user-secret rose"></i><span>顧客名や、金額は<span class="tag warn">伏せる</span></span></li>
+                    <li><i class="fa-solid fa-file-shield pink"></i><span>社外秘は、扱わせない</span></li>
+                    <li><i class="fa-solid fa-scissors rose"></i><span>必要な部分だけ、切り出す</span></li>
+                    <li><i class="fa-solid fa-lock pink"></i><span>扱う範囲を、<span class="tag warn">決めて</span>おく</span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    便利さと<span class="tag warn">安全</span>は、両立できる
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション5：安全性と確認 -->
+        <div class="section-title"><i class="fa-solid fa-clipboard-check"></i>AI の出力を、信じすぎない</div>
+
+        <!-- カード15 -->
+        <div class="card ok">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-arrows fa-5x sky" style="animation:fa-bounce 2s infinite;" aria-hidden="true"></i>
+                <h2>人に渡す前、必ず照らし合わせる</h2>
+                <div class="ch">人間の目が、最後の砦</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-file-circle-check sky"></i><span>原文と、出力を<span class="tag sky">見比べる</span></span></li>
+                    <li><i class="fa-solid fa-magnifying-glass-chart blurple"></i><span>担当者・期限が、正しいか</span></li>
+                    <li><i class="fa-solid fa-circle-question sky"></i><span>おかしな点は、AI に<span class="tag sky">聞き直す</span></span></li>
+                    <li><i class="fa-solid fa-handshake lilac"></i><span>確認してから、初めて人に渡す</span></li>
+                </ul>
+                <div class="bubble v4">
+                    <i class="fa-solid fa-circle-info"></i>
+                    AI は<span class="tag sky">下書き</span>係。最終判断は人間
+                </div>
+            </div>
+        </div>
+
+        <!-- カード16 -->
+        <div class="card violet">
+            <div class="icon-box">
+                <i class="fa-solid fa-magnifying-glass-chart fa-5x flower" style="animation:fa-flip 4s infinite ease-in-out;" aria-hidden="true"></i>
+                <h2>抜け漏れも、人間が見つける</h2>
+                <div class="ch">AI の盲点を、補う</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-eye flower"></i><span>AI が<span class="tag violet">読み飛ばした</span>決定事項</span></li>
+                    <li><i class="fa-solid fa-comment-dots pale"></i><span>文脈が足りない、判断のずれ</span></li>
+                    <li><i class="fa-solid fa-wand-magic-sparkles flower"></i><span>気づいたら、AI に<span class="tag violet">追加指示</span></span></li>
+                    <li><i class="fa-solid fa-arrows-rotate pale"></i><span>何度か往復して、完成させる</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span class="tag glow">対話</span>しながら、精度を上げていく
+                </div>
+            </div>
+        </div>
+
+        <!-- セクション6：次のアクション -->
+        <div class="section-title"><i class="fa-solid fa-flag-checkered"></i>明日の会議から、試そう</div>
+
+        <!-- カード17 -->
+        <div class="card blurple">
+            <div class="icon-box">
+                <i class="fa-solid fa-flag-checkered fa-5x blurple" style="animation:fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+                <h2>次の会議メモで、やってみる</h2>
+                <div class="ch">まずは、小さく始める</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><span class="step-num">1</span><span>会議のメモを、そのまま残す</span></li>
+                    <li><span class="step-num">2</span><span>OpenClaw に、<span class="tag">3つに分けて</span>と頼む</span></li>
+                    <li><span class="step-num">3</span><span>出力を、原文と<span class="tag">照らし合わせる</span></span></li>
+                    <li><span class="step-num">4</span><span>チームに、そのまま共有する</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-circle-info"></i>
+                    1回やってみると、<span class="tag violet">差</span>が分かる
+                </div>
+            </div>
+        </div>
+
+        <!-- カード18 -->
+        <div class="card rose">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart fa-5x rose" style="animation:fa-beat 1.8s infinite;" aria-hidden="true"></i>
+                <h2>AI を、監督する側へ</h2>
+                <div class="ch">あきらパパが、毎日届けます</div>
+            </div>
+            <div class="body">
+                <ul class="kl">
+                    <li><i class="fa-solid fa-chess-king rose"></i><span>AI に<span class="tag pink">使われる</span>のではなく</span></li>
+                    <li><i class="fa-solid fa-chess-queen pink"></i><span>AI を<span class="tag pink">使いこなす</span>側へ</span></li>
+                    <li><i class="fa-solid fa-newspaper rose"></i><span>毎日、AI 活用の<span class="tag pink">ヒント</span>を配信</span></li>
+                    <li><i class="fa-solid fa-user-plus pink"></i><span>あきらパパを、<span class="tag pink">フォロー</span></span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    小さな<span class="tag warn">自動化</span>が、やがて大きな差になる
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+        <div class="src">
+            🎬 動画: <a href="https://www.youtube.com/watch?v=z3DmSWoxnOk" target="_blank" style="color: inherit;">あきらパパ「OpenClawで会議メモの整理を自動化」</a>
+        </div>
+        <div class="meta">
+            30分の整理が、5分に。残った25分を、本業へ ／ 2026年8月13日
+        </div>
+    </div>
+
+</div>
+</body>
+</html>

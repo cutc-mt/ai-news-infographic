@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>保存するだけでHTML自動生成 — Claude CodeのHooks仕組み解説</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ui-color-1: #E06020; /* パンプキンオレンジ */
+  --ui-color-2: #A8720A; /* アンバーゴールド */
+  --ui-color-3: #FDEBD0; /* 薄いクリーム */
+  --ui-color-4: #3B2A1A; /* ダークブラウン */
+  --ui-color-5: #C0564A; /* テラコッタ */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: #FFF9F0;
+  font-family: 'Zen Kurenaido', sans-serif;
+  color: #333333;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 40px 20px 20px;
+  position: relative;
+}
+
+.header .mega-icon {
+  font-size: 7em;
+  color: var(--ui-color-1);
+  animation: fa-bounce 2.5s infinite;
+  display: block;
+  margin-bottom: 15px;
+}
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  color: #333333;
+  margin-bottom: 10px;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: #777777;
+  margin-bottom: 8px;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #777777;
+}
+
+.header-accent {
+  width: 120px;
+  height: 6px;
+  background: linear-gradient(to right, var(--ui-color-1), var(--ui-color-2));
+  border-radius: 3px;
+  margin: 15px auto 0;
+}
+
+/* セクションレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 8px 20px rgba(224, 96, 32, 0.2);
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  animation: fa-beat-fade 3s infinite;
+}
+
+.section-card:nth-child(odd) .mega-icon-container i.fa-5x { animation: fa-bounce 3s infinite; }
+.section-card:nth-child(3n) .mega-icon-container i.fa-5x { animation: fa-flip 4s infinite; }
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  color: #555555;
+  margin-top: 10px;
+}
+
+.card-content { padding: 0 10px 15px; }
+
+.card-content h3 {
+  font-size: 18px;
+  color: #333333;
+  margin: 12px 0 8px;
+  border-left: 4px solid var(--ui-color-2);
+  padding-left: 8px;
+}
+
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #333333;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 16px;
+  margin-top: 4px;
+}
+
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.timestamp-tag {
+  background-color: var(--ui-color-1);
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: bold;
+  display: inline-block;
+  margin-left: 5px;
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FFF9E3;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+
+.speech-bubble.variant-2 {
+  background: #FFEDD9;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* コードプレビュー */
+pre {
+  background: #3B2A1A;
+  color: #FDEBD0;
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 14px;
+  margin-top: 10px;
+  overflow-x: auto;
+  font-family: monospace;
+}
+
+code.inline {
+  background: #FDEBD0;
+  color: #3B2A1A;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* 矢印つなぎ */
+.flow-arrow {
+  text-align: center;
+  color: var(--ui-color-1);
+  font-size: 28px;
+  margin: 5px 0;
+}
+
+/* アニメーション */
+.fade-in-scale {
+  animation: fadeInScale 0.8s ease both;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.highlight-pulse {
+  animation: highlightPulse 2.5s infinite;
+  padding: 2px 6px;
+  border-radius: 5px;
+}
+
+@keyframes highlightPulse {
+  0%, 100% { background-color: transparent; }
+  50% { background-color: #FFD9B3; }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 30px 20px;
+  font-size: 14px;
+  color: #777777;
+  border-top: 3px dashed var(--ui-color-2);
+  margin-top: 30px;
+}
+
+.footer a { color: var(--ui-color-1); text-decoration: none; font-weight: bold; }
+.footer a:hover { text-decoration: underline; }
+.footer .published-url {
+  margin-top: 10px;
+  font-family: monospace;
+  background: var(--ui-color-3);
+  padding: 5px 15px;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+/* レスポンシブ */
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px) { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <i class="fa-solid fa-bolt mega-icon" aria-hidden="true"></i>
+    <h1>保存した瞬間にHTMLへ変換 — Claude Codeの「Hooks」が天才的だった</h1>
+    <p class="subtitle">Markdownを置くだけで読みやすいHTMLが同じフォルダに自動で生まれる仕組みを、導入から実演までまるごと解説</p>
+    <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月14日 ／ れん学長のAIツール実験室</p>
+    <div class="header-accent"></div>
+  </div>
+
+  <!-- 1行目: 問題と解決の全体像 -->
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-cells fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>あるあるの悩み</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-face-sad-tear fa-lg"></i> Markdownが読みにくい</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-lines"></i><span>AIが書き出す<span class="keyword-tag">Markdown</span>は、表や画像が入ると一気に読みにくくなる</span></li>
+          <li><i class="fa-solid fa-repeat"></i><span>毎回<span class="keyword-tag">「HTMLにして」</span>と頼み直す手間が発生</span></li>
+          <li><i class="fa-solid fa-clock"></i><span>頼むたびにAIを動かすので、時間もトークンもムダになる</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 元ネタはまつにぃさんの記事。れん学長が実際に試して検証したよ！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>解決の全体像</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-bolt fa-lg"></i> 保存した瞬間に変換</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-arrow-down"></i><span>Markdownを<span class="keyword-tag">保存</span>する</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>Hooksが勝手に<span class="keyword-tag">スクリプト</span>を発火</span></li>
+          <li><i class="fa-solid fa-file-code"></i><span>同じフォルダに読みやすい<span class="keyword-tag">HTML</span>が誕生</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-1);"></i> 「お願い」が一切不要。置くだけで完結するのが天才的なポイント！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sack-dollar fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>効果その①：費用ゼロ</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-coins fa-lg"></i> お金もトークンも使わない</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-python"></i><span>変換はローカルの<span class="keyword-tag">Python</span>だけで動く</span></li>
+          <li><i class="fa-solid fa-ban"></i><span>AI利用料は<span class="highlight-pulse">完全にゼロ</span></span></li>
+          <li><i class="fa-solid fa-fire-flame-curved"></i><span>トークン消費もゼロ。APIを叩かないから夜も安心</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-2);"></i> 標準ライブラリのみだから、環境を汚さないのも嬉しいね</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>効果その②：すぐ読める</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-table-list fa-lg"></i> 表も画像もきれいに</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-images"></i><span>画像が入っても<span class="keyword-tag">レイアウト崩れなし</span></span></li>
+          <li><i class="fa-solid fa-table"></i><span>表もHTMLなら縦横きれいに表示される</span></li>
+          <li><i class="fa-solid fa-folder-tree"></i><span>HTMLは<span class="keyword-tag">同じフォルダ</span>に隣合わせで保存</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> 保存したその場でブラウザ確認できるので、流れが止まらない！</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 2行目: Hooksの仕組み -->
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug-circle-bolt fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>Hooksとは何か</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-circle-info fa-lg"></i> Claude Codeの便利機能</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-anchor"></i><span>Claude Codeが持つ<span class="keyword-tag">イベント連動</span>の仕組み</span></li>
+          <li><i class="fa-solid fa-bell"></i><span>指定したタイミングで好きな処理を<span class="keyword-tag">自動発火</span></span></li>
+          <li><i class="fa-solid fa-diagram-project"></i><span>設定は <code class="inline">settings.json</code> に書くだけ</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-anchor fa-lg" style="color: var(--ui-color-2);"></i> 「Hook＝針鉤」のように、特定の動作に引っかけて処理を走らせるイメージだよ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>PostToolUse</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-arrow-right-arrow-left fa-lg"></i> ツール実行のあとに発火</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hammer"></i><span>AIがファイルを<span class="keyword-tag">Write</span>（保存）した直後をフック</span></li>
+          <li><i class="fa-solid fa-filter"></i><span>対象はMarkdownファイルだけに限定できる</span></li>
+          <li><i class="fa-solid fa-bolt"></i><span>保存 → 変換が<span class="highlight-pulse">一連の流れ</span>に</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten"><i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-2);"></i> PreToolUse や Stop など、別の発火タイミングもあり汎用性抜群！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>登録するのは1本だけ</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-code fa-lg"></i> 変換スクリプトの設定例</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1"></i><span>追加するPythonスクリプトは<span class="keyword-tag">たった1本</span></span></li>
+          <li><i class="fa-solid fa-gear"></i><span>Hookからその1本を呼ぶだけのシンプル設計</span></li>
+        </ul>
+        <pre>{
+  "hooks": {
+    "PostToolUse": [{
+      "matcher": "Write",
+      "hooks": [{ "command": "python md2html.py" }]
+    }]
+  }
+}</pre>
+        <div class="speech-bubble right">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i> ※イメージです。実際はAIが環境に合わせて書いてくれます</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-paste fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>導入は貼るだけ</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-copy fa-lg"></i> プロンプトをAIに渡すだけ</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-newspaper"></i><span>まつにぃさんの記事にある<span class="keyword-tag">プロンプト</span>をコピー</span></li>
+          <li><i class="fa-solid fa-terminal"></i><span>Claude Codeに貼り付けて実行するだけ</span></li>
+          <li><i class="fa-solid fa-user-graduate"></i><span>環境調査から動作チェックまで<span class="highlight-pulse">AIが自力で完結</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-5);"></i> 「自分でHookを組み立ててテストしてね」の一言でやってくれるのが衝撃だった！</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 3行目: 注意点と実演① -->
+  <div class="section-layout">
+
+    <!-- カード9 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>実行前の注意2つ</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-shield-halved fa-lg"></i> 事前に確認しよう</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag">Python</span>が動く環境を用意しておく（バージョン確認）</span></li>
+          <li><i class="fa-solid fa-folder-open"></i><span>Hookは<span class="keyword-tag">全プロジェクト</span>ではなく設定ファイルの範囲で効く点に注意</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i> まず小さいメモで試してから、本番のドキュメントに拡げるのがおすすめ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>実演①：AIが自ら導入</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-robot fa-lg"></i> Claude Codeの仕事 <span class="timestamp-tag">6:44〜</span></h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>環境を調査して<span class="keyword-tag">settings.json</span>の場所を特定</span></li>
+          <li><i class="fa-solid fa-pen-ruler"></i><span>変換スクリプトを自分で書く</span></li>
+          <li><i class="fa-solid fa-vial-circle-check"></i><span>Hookの登録から<span class="keyword-tag">動作テスト</span>まで通して確認</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-2);"></i> 人間は見守るだけ。設定ミスも自分で直していく様子がライブで見られるよ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scroll fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>生成された中身</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-magnifying-glass-chart fa-lg"></i> スクリプトと変換条件 <span class="timestamp-tag">9:40〜</span></h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube"></i><span>依存は<span class="keyword-tag">標準ライブラリのみ</span>で軽量</span></li>
+          <li><i class="fa-solid fa-filter-circle-xmark"></i><span>変換不要なファイルはスキップする設計</span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>条件の中身は次のカードで詳しく解説</span></li>
+        </ul>
+        <pre># 変換の流れ（イメージ）
+Markdownを読み込む
+  ↓ 条件を満たす？
+    Yes → HTMLを same folder へ書き出し
+    No  → 何もせず終了</pre>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-filter fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>賢い変換条件</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-brain fa-lg"></i> フォルダが散らからない</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-heading"></i><span><span class="keyword-tag">見出しがない</span>メモは変換しない</span></li>
+          <li><i class="fa-solid fa-ruler-horizontal"></i><span><span class="keyword-tag">800文字未満</span>の短いメモも変換しない</span></li>
+          <li><i class="fa-solid fa-broom"></i><span>中途半端な断片HTMLが<span class="highlight-pulse">量産されるのを防止</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> 「本気のドキュメント」だけHTML化する、じょうずなふるいかけだね！</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 4行目: 実演②③と応用 -->
+  <div class="section-layout">
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flask fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>実演②：発火テスト</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-play fa-lg"></i> 新しいセッションで確認 <span class="timestamp-tag">10:24〜</span></h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rotate"></i><span>セッションを新しくして<span class="keyword-tag">記憶ゼロ</span>の状態から開始</span></li>
+          <li><i class="fa-solid fa-file-circle-plus"></i><span>Markdownを保存すると……<span class="keyword-tag">Hookが発火！</span></span></li>
+          <li><i class="fa-solid fa-folder-open"></i><span>同じフォルダにHTMLが現れて成功を確認</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten"><i class="fa-solid fa-circle-check fa-lg" style="color: var(--ui-color-2);"></i> 一度設定すれば、あとは毎回ちゃんと動く。ここが本当に大事な確認！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-palette fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>実演③：配色変更</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-paintbrush fa-lg"></i> ブルー系へのチェンジ <span class="timestamp-tag">12:39〜</span></h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots"></i><span>AIに<span class="keyword-tag">「ビジネスブルーにして」</span>の一言</span></li>
+          <li><i class="fa-solid fa-arrows-rotate"></i><span>CSSを更新 → 保存するだけで<span class="keyword-tag">再変換</span></span></li>
+          <li><i class="fa-solid fa-user-tie"></i><span>仕事の資料っぽい見た目に早変わり</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> テンプレートを差し替えるだけで、好みのデザインに仕上げられるよ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-infinity fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>Hooksは汎用枠</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-rocket fa-lg"></i> 自動化はこれだけじゃない <span class="timestamp-tag">14:51〜</span></h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-image"></i><span>保存した画像の<span class="keyword-tag">自動リサイズ</span></span></li>
+          <li><i class="fa-solid fa-file-zipper"></i><span>フォルダ整理や<span class="keyword-tag">バックアップ</span>を発火時に実行</span></li>
+          <li><i class="fa-solid fa-bullhorn"></i><span>作業完了の<span class="keyword-tag">通知</span>を飛ばす使い方も</span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-1);"></i> Markdown→HTMLは入口。発火タイミング×自分の困りごとで無限に広がる！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>他のエージェントでも</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-brands fa-codiepie fa-lg"></i> CodexやCursorにも同じ型</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-brands fa-openai"></i><span><span class="keyword-tag">Codex</span>にも同じ仕組みがある</span></li>
+          <li><i class="fa-solid fa-cursor"></i><span><span class="keyword-tag">Cursor</span>でも同様に設定できる</span></li>
+          <li><i class="fa-solid fa-cubes-stacked"></i><span>考え方は<span class="highlight-pulse">イベントに処理を引っかける</span>だけ</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten"><i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-5);"></i> 使う道具が変わっても、この型を覚えておけば使い回せるよ</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 5行目: 導入の再現手順とまとめ -->
+  <div class="section-layout">
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>再現する手順</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-road fa-lg"></i> 3ステップで導入</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1"></i><span>記事のプロンプトをコピーしてClaude Codeに貼る</span></li>
+          <li><i class="fa-solid fa-2"></i><span>AIがHook設定・スクリプト・テストまで自力で完了</span></li>
+          <li><i class="fa-solid fa-3"></i><span>新しいセッションで保存 → HTMLが生まれるのを確認</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> Pythonの動く環境だけ事前にチェックしておけば、あとは任せっきりでOK！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>まとめ</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-key fa-lg"></i> この動画の核心</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt"></i><span><span class="keyword-tag">Hooks（PostToolUse）</span>に1本登録するだけで保存時にHTML化</span></li>
+          <li><i class="fa-solid fa-sack-dollar"></i><span>ローカルのPythonのみで<span class="keyword-tag">費用ゼロ・トークン消費ゼロ</span></span></li>
+          <li><i class="fa-solid fa-filter"></i><span>見出しなし・800文字未満は除外してフォルダを整理整頓</span></li>
+          <li><i class="fa-solid fa-palette"></i><span>配色変更もAIに一言。CodexやCursorにも応用できる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-2);"></i> 「保存するだけでいい」環境を作ると、AIとの作業がもっと気持ちよくなるよ！</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <div class="footer">
+    <p>🎬 動画: <a href="https://youtu.be/lvOEvLI-bAM" target="_blank">【コレ天才】保存するだけでHTML自動生成。Claude Codeの「Hooks」が天才的だったので仕組みごと解説（れん学長のAIツール実験室）</a></p>
+    <p>📝 元ネタ記事: まつにぃさん（<a href="https://x.com/yugen_matuni/status/2087131962922418410" target="_blank">@yugen_matuni</a>）の記事より</p>
+    <p class="published-url">🌐 このページのURL: https://cutc-mt.github.io/ai-news-infographic/docs/20260814-ClaudeCode-Hooks-れん学長.html</p>
+    <p style="margin-top:10px;"><i class="fa-regular fa-copyright"></i> 2026 れん学長のAIツール実験室 ／ インフォグラフィック生成: Hermes Agent</p>
+  </div>
+
+</div>
+</body>
+</html>

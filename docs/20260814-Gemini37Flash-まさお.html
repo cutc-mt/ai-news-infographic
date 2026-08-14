@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini 3.7 Flash｜コーディング・エージェント性能が大幅に向上</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* 独自テーマ：Emerald Hearth（エメラルドの暖炉）
+               ジェードグリーン × サフラン琥珀 × プラム × クリーム。
+               既存の Indigo/Sky、ネオン、ネイビー×ゴールド、
+               Sunset Harbor、Mocha Coral とは別系統。 */
+            --jade-900: #14532D;
+            --jade-700: #15803D;
+            --jade-500: #22C55E;
+            --jade-300: #86EFAC;
+            --jade-100: #DCFCE7;
+            --jade-50:  #F0FDF4;
+
+            --saf-800: #92400E;
+            --saf-600: #D97706;
+            --saf-400: #FBBF24;
+            --saf-200: #FDE68A;
+            --saf-50:  #FFFBEB;
+
+            --plum-800: #6B21A8;
+            --plum-600: #9333EA;
+            --plum-300: #D8B4FE;
+            --plum-100: #F3E8FF;
+
+            --slate-900: #1C1917;
+            --slate-700: #44403C;
+            --slate-300: #D6D3D1;
+            --ink: #292524;
+
+            --bg: #F5FBF6;
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: var(--bg);
+            font-family: 'Kaisei Decol', sans-serif;
+            color: var(--ink);
+            line-height: 1.75;
+        }
+        .container { max-width:2000px; margin:0 auto; padding:40px 20px; }
+
+        /* ヘッダー */
+        .header {
+            text-align:center;
+            margin-bottom:50px;
+            padding:60px 20px;
+            background: linear-gradient(135deg, var(--jade-900) 0%, var(--jade-700) 45%, var(--saf-600) 100%);
+            border-radius:30px;
+            box-shadow: 8px 8px 30px rgba(20,83,45,.32);
+            position:relative;
+            overflow:hidden;
+        }
+        .header::before {
+            content:'';
+            position:absolute;
+            top:-50%; left:-50%;
+            width:200%; height:200%;
+            background: radial-gradient(circle, rgba(251,191,36,.25) 0%, transparent 60%);
+            animation: pulse 6s infinite;
+        }
+        .header::after {
+            content:'';
+            position:absolute;
+            inset:0;
+            background: repeating-linear-gradient(90deg, transparent 0, transparent 48px, rgba(255,255,255,.04) 48px, rgba(255,255,255,.04) 49px);
+            pointer-events:none;
+        }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+        @keyframes drift { 0%{transform:translateX(0)} 50%{transform:translateX(14px)} 100%{transform:translateX(0)} }
+        @keyframes fadeScale { 0%{opacity:0; transform:translateY(20px) scale(.96)} 100%{opacity:1; transform:translateY(0) scale(1)} }
+
+        .header i.main {
+            color: var(--saf-400);
+            font-size:110px;
+            margin-bottom:15px;
+            animation: fa-beat-fade 3s infinite, drift 8s ease-in-out infinite;
+            position:relative; z-index:1;
+            text-shadow: 0 0 30px rgba(251,191,36,.6), 0 4px 18px rgba(0,0,0,.32);
+        }
+        .header h1 {
+            color:#fff;
+            font-size:38px;
+            text-shadow: 0 0 14px rgba(34,197,94,.5), 2px 2px 8px rgba(0,0,0,.34);
+            margin-bottom:12px;
+            position:relative; z-index:1;
+            line-height:1.4;
+        }
+        .header .sub {
+            color: var(--jade-100);
+            font-size:19px;
+            font-family: 'Yomogi', cursive;
+            position:relative; z-index:1;
+        }
+        .header .date {
+            color: var(--saf-200);
+            font-size:14px;
+            margin-top:12px;
+            position:relative; z-index:1;
+        }
+
+        /* レイアウト */
+        .layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+        .card {
+            flex:1;
+            min-width:280px;
+            max-width:450px;
+            background:#fff;
+            border-radius:20px;
+            padding:22px;
+            box-shadow: 5px 5px 18px rgba(20,83,45,.14);
+            position:relative;
+            overflow:hidden;
+            transition: transform .3s, box-shadow .3s;
+            animation: fadeScale .7s ease both;
+        }
+        .card:hover { transform: translateY(-6px); box-shadow:10px 10px 28px rgba(34,197,94,.22); }
+        .card::before {
+            content:'';
+            position:absolute;
+            top:0; left:0;
+            width:100%; height:6px;
+        }
+        .card.jade::before   { background: linear-gradient(90deg, var(--jade-900), var(--jade-500), var(--jade-300)); }
+        .card.saf::before    { background: linear-gradient(90deg, var(--saf-800), var(--saf-600), var(--saf-400)); }
+        .card.plum::before   { background: linear-gradient(90deg, var(--plum-800), var(--plum-600), var(--plum-300)); }
+        .card.warn::before   { background: linear-gradient(90deg, var(--saf-800), var(--saf-600), var(--saf-400)); }
+        .card.mix::before    { background: linear-gradient(90deg, var(--jade-700), var(--plum-600), var(--saf-400)); }
+
+        .icon-box { text-align:center; margin:18px 0 12px; }
+        .icon-box i { color: var(--jade-700); font-size:78px; }
+        .icon-box i.jade      { color: var(--jade-500); }
+        .icon-box i.jade-deep { color: var(--jade-900); }
+        .icon-box i.saf       { color: var(--saf-600); }
+        .icon-box i.saf-l     { color: var(--saf-400); }
+        .icon-box i.plum      { color: var(--plum-600); }
+        .icon-box i.plum-l    { color: var(--plum-300); }
+        .icon-box i.slate     { color: var(--slate-700); }
+
+        .card h2 {
+            color: var(--jade-900);
+            font-size:24px;
+            text-align:center;
+            margin-bottom:14px;
+        }
+        .card.saf h2  { color: var(--saf-800); }
+        .card.plum h2 { color: var(--plum-800); }
+        .card.warn h2 { color: var(--saf-800); }
+        .card.mix h2  { color: var(--jade-900); }
+
+        .card-content { padding:0 6px 8px; }
+
+        /* リスト */
+        ul.kw { margin:12px 0; padding:0; list-style:none; }
+        ul.kw li {
+            margin-bottom:10px;
+            display:flex;
+            align-items:flex-start;
+            font-size:15px;
+            color: var(--slate-900);
+        }
+        ul.kw li > i {
+            margin-right:9px;
+            color: var(--jade-700);
+            min-width:20px;
+            margin-top:4px;
+        }
+        .card.saf ul.kw li > i  { color: var(--saf-600); }
+        .card.plum ul.kw li > i { color: var(--plum-600); }
+
+        /* タグ */
+        .tag {
+            display:inline-block;
+            background: var(--jade-100);
+            color: var(--jade-900);
+            padding: 2px 9px;
+            border-radius:6px;
+            font-weight:bold;
+            font-size:14px;
+            margin: 2px 3px 2px 0;
+        }
+        .tag.saf  { background: var(--saf-50); color: var(--saf-800); }
+        .tag.plum { background: var(--plum-100); color: var(--plum-800); }
+        .tag.slate{ background: var(--slate-300); color: var(--slate-900); }
+
+        /* 吹き出し */
+        .bubble {
+            position:relative;
+            background:#fff;
+            border:3px solid var(--jade-700);
+            border-radius:18px;
+            padding:11px 15px;
+            margin:16px 4px 4px;
+            font-family: 'Yomogi', cursive;
+            font-size:15px;
+            color: var(--ink);
+            box-shadow: 3px 3px 10px rgba(0,0,0,.08);
+            transform: rotate(-1deg);
+            line-height:1.6;
+        }
+        .bubble::after {
+            content:'';
+            position:absolute;
+            bottom:-13px; left:24px;
+            border-width:12px 8px 0;
+            border-style:solid;
+            border-color: var(--jade-700) transparent;
+            width:0;
+        }
+        .bubble.right::after { left:auto; right:24px; transform: rotate(15deg); }
+        .bubble.top::after {
+            bottom:auto; top:-13px;
+            border-width: 0 8px 12px;
+            transform: rotate(-5deg);
+        }
+        .bubble.v1 { background: var(--saf-200); border-color: var(--saf-600); transform: rotate(1deg); }
+        .bubble.v1::after { border-color: var(--saf-600) transparent; }
+        .bubble.v2 { background: var(--plum-100); border-color: var(--plum-600); transform: rotate(-2deg); }
+        .bubble.v2::after { border-color: var(--plum-600) transparent; }
+        .bubble.v3 { background: var(--jade-100); border-color: var(--jade-500); transform: rotate(1.5deg); }
+        .bubble.v3::after { border-color: var(--jade-500) transparent; }
+        .bubble i { color: var(--jade-700); margin-right:6px; }
+        .bubble.v1 i { color: var(--saf-600); }
+        .bubble.v2 i { color: var(--plum-600); }
+
+        /* コードプレビュー */
+        pre.code {
+            background: var(--slate-900);
+            color: var(--jade-300);
+            padding:11px 14px;
+            border-radius:10px;
+            font-family: 'Courier New', monospace;
+            font-size:13px;
+            margin-top:12px;
+            overflow-x:auto;
+            line-height:1.6;
+            border-left:4px solid var(--saf-400);
+        }
+        pre.code .cmt { color: var(--slate-300); }
+        pre.code .hi  { color: var(--saf-400); }
+
+        /* チャンネル帯 */
+        .channel {
+            text-align:center;
+            margin: 18px auto 30px;
+            max-width: 700px;
+            padding: 14px 22px;
+            background: var(--jade-50);
+            border: 2px dashed var(--jade-500);
+            border-radius: 16px;
+            font-family: 'Yomogi', cursive;
+            color: var(--jade-900);
+            font-size: 17px;
+        }
+        .channel i { color: var(--saf-600); }
+
+        /* 中央強調 */
+        .center-banner {
+            text-align:center;
+            margin: 40px auto;
+            max-width: 900px;
+            padding: 22px 28px;
+            background: linear-gradient(135deg, var(--plum-100), var(--saf-50));
+            border-radius:20px;
+            border: 3px solid var(--plum-300);
+            box-shadow: 5px 5px 18px rgba(147,51,234,.15);
+        }
+        .center-banner h3 {
+            color: var(--plum-800);
+            font-size:26px;
+            margin-bottom:10px;
+        }
+        .center-banner p {
+            font-family: 'Yomogi', cursive;
+            font-size:18px;
+            color: var(--slate-900);
+        }
+
+        /* フッター */
+        .footer {
+            margin-top:50px;
+            padding:30px 20px;
+            text-align:center;
+            background: linear-gradient(135deg, var(--jade-900), var(--jade-700));
+            border-radius:24px;
+            color:#fff;
+            box-shadow: 6px 6px 20px rgba(20,83,45,.22);
+        }
+        .footer a {
+            color: var(--saf-400);
+            text-decoration:none;
+            font-weight:bold;
+            border-bottom: 2px dotted var(--saf-400);
+        }
+        .footer a:hover { color: var(--saf-200); }
+        .footer .meta { color: var(--jade-100); font-size:14px; margin-top:10px; }
+
+        /* レスポンシブ */
+        @media (max-width: 900px) {
+            .card { min-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- カード1: ヘッダー -->
+    <div class="header">
+        <i class="fa-solid fa-bolt main" aria-hidden="true"></i>
+        <h1>Gemini 3.7 Flash が登場！<br>コーディング・エージェント性能が 大幅に向上</h1>
+        <div class="sub">量産型の実用エージェントを 狙う一押し</div>
+        <div class="date"><i class="fa-regular fa-calendar"></i> 2026.08.14 ／ まさおAIじっくり解説ch</div>
+    </div>
+
+    <div class="channel">
+        <i class="fa-solid fa-circle-info fa-lg"></i>
+        まさおさんがじっくり解説する <strong>Gemini 3.7 Flash</strong>。
+        キーワードは ひとことで「コーディング・エージェント・長時間タスク・低コスト」。
+    </div>
+
+    <div class="layout">
+
+        <!-- カード2: 4つのキーワード -->
+        <div class="card jade">
+            <div class="icon-box">
+                <i class="fa-solid fa-tags jade-deep fa-bounce" style="animation-duration:3s;" aria-hidden="true"></i>
+            </div>
+            <h2>このモデルの 4つの キーワード</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-code"></i><span><strong>コーディング</strong> ／ 開発の用途で 強くなった</span></li>
+                    <li><i class="fa-solid fa-robot"></i><span><strong>エージェント</strong> ／ 自律的にタスクをこなす</span></li>
+                    <li><i class="fa-solid fa-hourglass-half"></i><span><strong>長時間タスク</strong> ／ じっくり動ける</span></li>
+                    <li><i class="fa-solid fa-coins"></i><span><strong>低コスト</strong> ／ お財布に やさしい</span></li>
+                </ul>
+                <span class="tag">コーディング</span>
+                <span class="tag">エージェント</span>
+                <span class="tag">低コスト</span>
+            </div>
+        </div>
+
+        <!-- カード3: ライバルたち -->
+        <div class="card plum">
+            <div class="icon-box">
+                <i class="fa-solid fa-people-group plum fa-flip" style="animation-duration:5s;" aria-hidden="true"></i>
+            </div>
+            <h2>比べる相手は このあたり</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-user-tie"></i><span><strong>Claude Sonnet</strong> ／ 実用エージェントの 強敵</span></li>
+                    <li><i class="fa-solid fa-server"></i><span><strong>GPT 5.6 Terra</strong> ／ OpenAI の最新の 一角</span></li>
+                    <li><i class="fa-solid fa-scale-balanced"></i><span>このクラスと ガチンコで比べられる</span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    同じくらいの値段で<br>
+                    どこまで戦えるか、が見どころ！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード4: 3.6 Flash からの進化 -->
+        <div class="card saf">
+            <div class="icon-box">
+                <i class="fa-solid fa-arrow-trend-up saf fa-beat-fade" aria-hidden="true"></i>
+            </div>
+            <h2>3.6 Flash から 大きく進化</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-coins"></i><span>コストは <strong>3.6 Flash と同じ</strong> まま</span></li>
+                    <li><i class="fa-solid fa-rocket"></i><span>開発系の ベンチマークが 大幅に伸びた</span></li>
+                    <li><i class="fa-solid fa-thumbs-up"></i><span>安いのに、実力は しっかりアップ</span></li>
+                </ul>
+                <span class="tag saf">コスト据え置き</span>
+                <span class="tag saf">性能アップ</span>
+            </div>
+        </div>
+
+        <!-- カード5: 開発系ベンチマーク -->
+        <div class="card jade">
+            <div class="icon-box">
+                <i class="fa-solid fa-chart-column jade fa-bounce" style="animation-duration:3.5s;" aria-hidden="true"></i>
+            </div>
+            <h2>開発系ベンチで 大きく跳ねた</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-bug"></i><span><strong>DeepSWE</strong> ／ 実際の修正タスクで 高得点</span></li>
+                    <li><i class="fa-solid fa-laptop-code"></i><span><strong>FrontierCode</strong> ／ 難しめのコード問題</span></li>
+                    <li><i class="fa-solid fa-globe"></i><span><strong>Web Development</strong> ／ ウェブ制作の 総合力</span></li>
+                </ul>
+                <pre class="code"><span class="cmt"># 3.6 → 3.7 で伸びた分野</span>
+<span class="hi">DeepSWE</span>        <span class="cmt">// ↑↑</span>
+<span class="hi">FrontierCode</span>   <span class="cmt">// ↑↑</span>
+<span class="hi">Web Development</span> <span class="cmt">// ↑↑</span></pre>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 中央強調 -->
+    <div class="center-banner">
+        <h3><i class="fa-solid fa-circle-question"></i> どんな立ち位置なの？</h3>
+        <p>トップクラスには一歩及ばない。でも「実用エージェントの主力」としては、とても良い場所にいる。</p>
+    </div>
+
+    <div class="layout">
+
+        <!-- カード6: 量産型ポジション -->
+        <div class="card saf">
+            <div class="icon-box">
+                <i class="fa-solid fa-industry saf-l fa-shake" style="animation-duration:4s;" aria-hidden="true"></i>
+            </div>
+            <h2>ねらいは 「量産型」ポジション</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-bullseye"></i><span>実用エージェントの <strong>主力モデル</strong> を狙う</span></li>
+                    <li><i class="fa-solid fa-box-open"></i><span>毎日ガンガン使う 用途に最適化</span></li>
+                    <li><i class="fa-solid fa-hand-holding-dollar"></i><span>コスパ重視で 回し続けられる</span></li>
+                </ul>
+                <div class="bubble v1 top">
+                    <i class="fa-solid fa-fire"></i>
+                    最強じゃなくていい、<br>
+                    「ほどよく強くて安い」が正解！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード7: トップクラスとの差 -->
+        <div class="card plum">
+            <div class="icon-box">
+                <i class="fa-solid fa-ranking-star plum fa-flip" style="animation-duration:6s;" aria-hidden="true"></i>
+            </div>
+            <h2>トップクラスには まだ及ばない</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-crown"></i><span><strong>Opus 5</strong> ／ 最強クラスの実力</span></li>
+                    <li><i class="fa-solid fa-gem"></i><span><strong>Sol</strong> ／ 同じくトップ티ア</span></li>
+                    <li><i class="fa-solid fa-star"></i><span><strong>Kimi K3</strong> ／ やっぱり一段上</span></li>
+                    <li><i class="fa-solid fa-circle-info"></i><span>これらには まだ一歩 譲る</span></li>
+                </ul>
+                <span class="tag plum">Opus 5</span>
+                <span class="tag plum">Sol</span>
+                <span class="tag plum">Kimi K3</span>
+            </div>
+        </div>
+
+        <!-- カード8: 中間ゾーンの価値 -->
+        <div class="card jade">
+            <div class="icon-box">
+                <i class="fa-solid fa-heart jade-deep fa-beat-fade" aria-hidden="true"></i>
+            </div>
+            <h2>中間ゾーンで ちょうどいい存在</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-scale-balanced"></i><span>最強ではないけれど、<strong>ちょうどいい強さ</strong></span></li>
+                    <li><i class="fa-solid fa-wallet"></i><span>値段を考えれば 非常に良い勝負</span></li>
+                    <li><i class="fa-solid fa-thumbs-up"></i><span>ふだん使いには 十分すぎる</span></li>
+                </ul>
+                <div class="bubble v3 right">
+                    <i class="fa-solid fa-face-smile"></i>
+                    中間ゾーンこそ、<br>
+                    毎日使うなら一番安定だよ。
+                </div>
+            </div>
+        </div>
+
+        <!-- カード9: デモ ウェブ制作・分析 -->
+        <div class="card saf">
+            <div class="icon-box">
+                <i class="fa-solid fa-window-maximize saf fa-bounce" style="animation-duration:3s;" aria-hidden="true"></i>
+            </div>
+            <h2>デモ① ウェブ制作 と分析</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-file-code"></i><span><strong>LP（ランディング）作成</strong> ／ 1枚ものをサクッと</span></li>
+                    <li><i class="fa-solid fa-newspaper"></i><span><strong>記事の分析</strong> ／ 長文を 読み解く</span></li>
+                    <li><i class="fa-brands fa-youtube"></i><span><strong>YouTube動画の分析</strong> ／ 内容を整理</span></li>
+                </ul>
+                <span class="tag saf">LP</span>
+                <span class="tag saf">記事分析</span>
+                <span class="tag saf">動画分析</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- カード10: デモ アプリ作成 -->
+        <div class="card jade">
+            <div class="icon-box">
+                <i class="fa-solid fa-table-columns jade fa-flip" style="animation-duration:5s;" aria-hidden="true"></i>
+            </div>
+            <h2>デモ② アプリを つくってみた</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-pen-to-square"></i><span><strong>Notion風エディタ</strong> ／ メモアプリ風</span></li>
+                    <li><i class="fa-solid fa-pen-ruler"></i><span><strong>Figma風 UI</strong> ／ デザインツール風</span></li>
+                    <li><i class="fa-solid fa-map-pin"></i><span><strong>ピンボード</strong> ／ 付箋を貼るような UI</span></li>
+                </ul>
+                <div class="bubble right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    エディタもデザインツールも、<br>
+                    ちゃんと動くものができる！
+                </div>
+            </div>
+        </div>
+
+        <!-- カード11: デモ 3Dゲーム -->
+        <div class="card plum">
+            <div class="icon-box">
+                <i class="fa-solid fa-gamepad plum fa-bounce" style="animation-duration:3.5s;" aria-hidden="true"></i>
+            </div>
+            <h2>デモ③ 3Dゲームも 高品質</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-hand-fist"></i><span><strong>3D格闘ゲーム</strong> ／ 立体の戦うアクション</span></li>
+                    <li><i class="fa-solid fa-crosshairs"></i><span><strong>3D FPS</strong> ／ 一人称のシューティング</span></li>
+                    <li><i class="fa-solid fa-medal"></i><span>クオリティは かなり高い部類</span></li>
+                </ul>
+                <div class="bubble v2 top">
+                    <i class="fa-solid fa-fire-flame-curved"></i>
+                    3Dがしっかり動くのは、<br>
+                    地力の証拠だね。
+                </div>
+            </div>
+        </div>
+
+        <!-- カード12: デモ クリエイティブ -->
+        <div class="card saf">
+            <div class="icon-box">
+                <i class="fa-solid fa-palette saf-l fa-shake" style="animation-duration:4s;" aria-hidden="true"></i>
+            </div>
+            <h2>デモ④ クリエイティブ系</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-chalkboard"></i><span><strong>スライド</strong> ／ プレゼン資料を生成</span></li>
+                    <li><i class="fa-solid fa-image"></i><span><strong>サムネ</strong> ／ 動画のサムネイル</span></li>
+                    <li><i class="fa-solid fa-bezier-curve"></i><span><strong>SVG素材</strong> ／ ベクターのイラスト</span></li>
+                    <li><i class="fa-solid fa-pen-fancy"></i><span><strong>文章生成</strong> ／ テキストもお手の物</span></li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- カード13: Artificial Analysis での位置 -->
+        <div class="card jade">
+            <div class="icon-box">
+                <i class="fa-solid fa-chart-line jade-deep fa-beat-fade" aria-hidden="true"></i>
+            </div>
+            <h2>Artificial Analysis での 位置</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-arrows-left-right"></i><span><strong>Terra</strong> と <strong>DeepSeek V4</strong> のあいだ</span></li>
+                    <li><i class="fa-solid fa-anchor"></i><span>立ち位置は <strong>やや Terra より</strong></span></li>
+                    <li><i class="fa-solid fa-circle-down"></i><span><strong>Grok 4.6</strong> よりは 落ちる</span></li>
+                </ul>
+                <div class="bubble v3">
+                    <i class="fa-solid fa-ruler"></i>
+                    上位のあいだに すっぽり。<br>
+                    悪くない、でも最強ではない。
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="layout">
+
+        <!-- カード14: コストの変化 -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-tags saf fa-flip" style="animation-duration:5s;" aria-hidden="true"></i>
+            </div>
+            <h2>コスト感の 変化</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-clock-rotate-left"></i><span>昔の Gemini は <strong>激安・最強</strong> だった</span></li>
+                    <li><i class="fa-solid fa-triangle-exclamation"></i><span>今は <strong>激安ではなくなった</strong></span></li>
+                    <li><i class="fa-solid fa-arrows-up-down"></i><span><strong>GLM</strong> などの中間あたりに 位置する</span></li>
+                </ul>
+                <div class="bubble v1 right">
+                    <i class="fa-solid fa-circle-exclamation"></i>
+                    「安かろう最強」は昔の話。<br>
+                    今は普通の相場に戻ったよ。
+                </div>
+            </div>
+        </div>
+
+        <!-- カード15: 1Mコンテキスト & マルチモーダル -->
+        <div class="card mix">
+            <div class="icon-box">
+                <i class="fa-solid fa-infinity jade fa-bounce" style="animation-duration:3s;" aria-hidden="true"></i>
+            </div>
+            <h2>1M窓 ＆ マルチモーダル</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-expand"></i><span><strong>1M のコンテキスト窓</strong> ／ とても長い文脈を読める</span></li>
+                    <li><i class="fa-solid fa-film"></i><span><strong>動画</strong> ／ 動いている映像も処理</span></li>
+                    <li><i class="fa-solid fa-microphone"></i><span><strong>音声</strong> ／ 聴覚の入力にも対応</span></li>
+                </ul>
+                <span class="tag">1M窓</span>
+                <span class="tag plum">動画</span>
+                <span class="tag saf">音声</span>
+            </div>
+        </div>
+
+        <!-- カード16: コンピューターユース -->
+        <div class="card warn">
+            <div class="icon-box">
+                <i class="fa-solid fa-desktop saf-l fa-shake" style="animation-duration:4s;" aria-hidden="true"></i>
+            </div>
+            <h2>コンピューターユースは いまひとつ</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-computer-mouse"></i><span>画面操作（マウス・キーボード）は <strong>あまり高くない</strong></span></li>
+                    <li><i class="fa-solid fa-arrow-down"></i><span><strong>Terra よりも低い</strong> レベル</span></li>
+                    <li><i class="fa-solid fa-circle-info"></i><span>この用途なら、ほかを選ぶ手も</span></li>
+                </ul>
+                <div class="bubble v1 top">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    画面をポチポチするのは、<br>
+                    まだ得意じゃないみたい。
+                </div>
+            </div>
+        </div>
+
+        <!-- カード17: HumanEval & Pro版への期待 -->
+        <div class="card plum">
+            <div class="icon-box">
+                <i class="fa-solid fa-seedling plum fa-beat-fade" aria-hidden="true"></i>
+            </div>
+            <h2>HumanEval は フラッシュ級。Pro版に期待</h2>
+            <div class="card-content">
+                <ul class="kw">
+                    <li><i class="fa-solid fa-code"></i><span><strong>HumanEval</strong> 等も <strong>フラッシュ程度</strong> の出来</span></li>
+                    <li><i class="fa-solid fa-star-half-stroke"></i><span>突出して高い、というわけではない</span></li>
+                    <li><i class="fa-solid fa-crown"></i><span>本体は <strong>Pro版</strong> の登場に 期待したい</span></li>
+                </ul>
+                <div class="bubble v2 right">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    Flashは「ほどよく」。<br>
+                    本領は Pro版に 賭けよう！
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- カード18: フッター -->
+    <div class="footer">
+        <p style="font-size:18px;">🎬 動画: <a href="https://youtu.be/SZZ2PXyqF48" target="_blank">まさおAIじっくり解説ch</a></p>
+        <p class="meta">
+            <i class="fa-brands fa-youtube"></i>
+            Gemini 3.7 Flashが登場！コーディング・エージェント性能が大幅向上 #Gemini #AI活用 #コーディング<br>
+            じっくり解説してくれる まさおさんをフォローしよう
+        </p>
+    </div>
+
+</div>
+</body>
+</html>

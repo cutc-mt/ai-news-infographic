@@ -80,6 +80,9 @@ def update_index_html(index_file_path, docs_folder):
   <li><a href="docs/graph/202603.html">2026年3月</a></li>
   <li><a href="docs/graph/202604.html">2026年4月</a></li>
   <li><a href="docs/graph/202605-wip.html">🔄 2026年5月（暫定版）</a></li>
+  <li><a href="docs/graph/202606.html">2026年6月</a></li>
+  <li><a href="docs/graph/202607.html">2026年7月</a></li>
+  <li><a href="docs/graph/202608-wip.html">🔄 2026年8月（暫定版）</a></li>
 </ul>
 """
         updated_index_content = updated_index_content.replace(

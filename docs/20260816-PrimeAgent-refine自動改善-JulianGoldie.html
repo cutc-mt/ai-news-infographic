@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>20260816 Prime Agentのrefine自動改善 | Julian Goldie</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ui-color-1: #3A6D8C;  /* スチールブルー */
+  --ui-color-2: #E9EFF3;  /* ライトグレー */
+  --ui-color-3: #26C0B8;  /* ターコイズ */
+  --ui-color-4: #17242E;  /* ディープネイビー */
+  --ui-color-5: #7FB3D5;  /* スカイブルー */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--ui-color-2);
+  color: var(--ui-color-4);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+.canvas {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  background: linear-gradient(135deg, var(--ui-color-1) 0%, var(--ui-color-4) 100%);
+  border-radius: 24px;
+  padding: 40px 30px;
+  text-align: center;
+  color: var(--ui-color-2);
+  margin-bottom: 30px;
+  box-shadow: 6px 6px 20px rgba(23,36,46,0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: -60px; right: -60px;
+  width: 220px; height: 220px;
+  border-radius: 50%;
+  background: rgba(38,192,184,0.25);
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -80px; left: -40px;
+  width: 260px; height: 260px;
+  border-radius: 50%;
+  background: rgba(127,179,213,0.22);
+}
+
+.header .mega-icon {
+  font-size: 7em;
+  color: var(--ui-color-3);
+  animation: fa-beat 2.5s infinite;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 4px 18px rgba(38,192,184,0.55);
+}
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  margin: 12px 0 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  opacity: 0.92;
+  position: relative;
+  z-index: 1;
+}
+
+.header .date {
+  font-size: 14px;
+  color: rgba(233,239,243,0.75);
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.header-tags { margin-top: 14px; position: relative; z-index: 1; }
+.header-tags .keyword-tag { margin: 0 4px; }
+
+/* セクション見出し */
+.section-divider {
+  text-align: center;
+  margin: 34px 0 18px;
+  color: var(--ui-color-1);
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.section-divider i { color: var(--ui-color-3); margin-right: 10px; }
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: #fff;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(23,36,46,0.12);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-3);
+  transition: transform 0.25s, box-shadow 0.25s, background-color 0.25s;
+}
+
+.section-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 8px 10px 24px rgba(58,109,140,0.24);
+  background-color: #fbfeff;
+}
+
+.section-card.steel-top { border-top-color: var(--ui-color-5); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.mega-icon-container i.mega {
+  font-size: 5em;
+  color: var(--ui-color-1);
+}
+
+.mega-icon-container i.teal { color: var(--ui-color-3); }
+.mega-icon-container i.sky { color: var(--ui-color-5); }
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  color: var(--ui-color-4);
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.card-no {
+  position: absolute;
+  top: 10px; right: 14px;
+  font-family: 'Yomogi', cursive;
+  font-size: 14px;
+  color: #8fa8b8;
+}
+
+.card-content { padding: 0 10px 15px; }
+
+.card-content h3 {
+  font-size: 18px;
+  color: var(--ui-color-4);
+  margin: 12px 0 6px;
+  border-left: 4px solid var(--ui-color-3);
+  padding-left: 8px;
+}
+
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-3);
+  min-width: 18px;
+  margin-top: 4px;
+}
+
+.keyword-list li i.steel { color: var(--ui-color-1); }
+
+.keyword-tag {
+  background: rgba(38,192,184,0.13);
+  color: #14867f;
+  padding: 2px 10px;
+  border-radius: 999px;
+  margin: 2px 3px 2px 0;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+  border: 1px solid rgba(38,192,184,0.45);
+}
+
+.keyword-tag.steel {
+  background: rgba(58,109,140,0.11);
+  color: #2c5570;
+  border-color: rgba(58,109,140,0.4);
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 18px 5px 8px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(23,36,46,0.12);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after { left: auto; right: 20px; }
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+}
+
+.speech-bubble.variant-1 {
+  background: #E6F8F7;
+  border-color: var(--ui-color-3);
+  transform: rotate(1deg);
+}
+.speech-bubble.variant-1::after { border-color: var(--ui-color-3) transparent; }
+
+.speech-bubble.variant-2 {
+  background: #EBF3FA;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+.speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--ui-color-4);
+  display: inline;
+}
+
+.speech-bubble i { color: var(--ui-color-1); margin-right: 4px; }
+.speech-bubble.variant-1 i { color: var(--ui-color-3); }
+.speech-bubble.variant-2 i { color: #4a86ad; }
+
+/* コード・画面プレビュー */
+pre {
+  background: var(--ui-color-4);
+  color: #dce8f0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+pre .c { color: var(--ui-color-3); }
+pre .a { color: #8fd3e8; }
+
+/* 矢印でつなぐ */
+.flow-arrow {
+  text-align: center;
+  color: var(--ui-color-3);
+  font-size: 22px;
+  margin: 4px 0;
+  animation: fa-bounce 2s infinite;
+}
+
+/* フェードイン */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.fade-in-scale.visible { opacity: 1; transform: scale(1) translateY(0); }
+
+/* フッター */
+.footer {
+  margin-top: 40px;
+  background: linear-gradient(135deg, var(--ui-color-1) 0%, var(--ui-color-4) 100%);
+  color: #d3dde5;
+  border-radius: 20px;
+  padding: 26px 20px;
+  text-align: center;
+  font-size: 14px;
+  line-height: 2;
+  box-shadow: 6px 6px 20px rgba(23,36,46,0.25);
+}
+.footer a { color: var(--ui-color-3); text-decoration: none; border-bottom: 1px dashed var(--ui-color-3); }
+.footer a:hover { color: #fff; }
+.footer .src-label { color: #fff; font-weight: bold; }
+
+/* レスポンシブ */
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px)  { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; align-items: center; }
+  .section-card { width: 100%; max-width: 100%; min-width: auto; }
+  .header h1 { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- ヘッダー -->
+  <div class="header fade-in-scale visible">
+    <i class="fa-solid fa-robot mega-icon" aria-hidden="true"></i>
+    <h1>Prime Agent の refine 自動改善</h1>
+    <p class="subtitle">手で直すのはもうおしまい。スラッシュコマンドひとつで、エージェントが自分を育てる</p>
+    <p class="date"><i class="fa-regular fa-calendar"></i> 2026年8月16日公開の動画より / Julian Goldie SEO</p>
+    <div class="header-tags">
+      <span class="keyword-tag">PrimeAgent</span>
+      <span class="keyword-tag steel">AutonomousAgents</span>
+      <span class="keyword-tag">AIAutomation</span>
+      <span class="keyword-tag steel">ArtificialIntelligence</span>
+    </div>
+  </div>
+
+  <!-- セクション1: エージェントをとりまく課題 -->
+  <div class="section-divider"><i class="fa-solid fa-triangle-exclamation"></i>エージェントをとりまく課題</div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate mega teal" style="animation: fa-spin 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>手動修正のいたちごっこ</h2>
+      </div>
+      <div class="card-content">
+        <h3>終わらない直しの往復</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-pen steel" aria-hidden="true"></i><span>ほとんどのAIエージェントは、人の手による<span class="keyword-tag">修正</span>が欠かせない</span></li>
+          <li><i class="fa-solid fa-comment-dots" aria-hidden="true"></i><span>出力 → 指摘 → 直す、を何度もくりかえす</span></li>
+          <li><i class="fa-solid fa-hourglass-half steel" aria-hidden="true"></i><span>直している時間がどんどんふえていく</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-tired"></i>「また直し?」ってなる日々から、そろそろ抜け出したい!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comments mega sky" style="animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>フィードバックループの問題</h2>
+      </div>
+      <div class="card-content">
+        <h3>絶え間ない往復があたりまえ</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-left-right steel" aria-hidden="true"></i><span><span class="keyword-tag steel">フィードバックの往復</span>が常態化している</span></li>
+          <li><i class="fa-solid fa-user" aria-hidden="true"></i><span>ループの中心に、いつも人間がいる</span></li>
+          <li><i class="fa-solid fa-ban steel" aria-hidden="true"></i><span>人が離れると、改善が止まってしまう</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-lock steel" aria-hidden="true"></i><span>結果: <span class="keyword-tag steel">自律できない</span>エージェントのまま</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-clock mega" style="animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>人間の介入コスト</h2>
+      </div>
+      <div class="card-content">
+        <h3>がんばるのはいつも人間</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass steel" aria-hidden="true"></i><span>どこが悪いかは、人が見つけて教える</span></li>
+          <li><i class="fa-solid fa-pen-to-square" aria-hidden="true"></i><span>プロンプトや設定の<span class="keyword-tag">微調整</span>も手作業</span></li>
+          <li><i class="fa-solid fa-battery-quarter steel" aria-hidden="true"></i><span>担当者の体力と時間を食べていく</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb"></i>本来の仕事そっちのけで、直しばかり…という声も</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#04</span>
+      <div class="card-content">
+        <div class="mega-icon-container">
+          <i class="fa-solid fa-door-open mega sky" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+          <h2>求められるのは「自分で直すAI」</h2>
+        </div>
+        <h3>課題が示す方向</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-compass steel" aria-hidden="true"></i><span>人が教えなくても、<span class="keyword-tag steel">自分で学ぶ</span>仕組み</span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span>失敗をむねに、次の改善につなげる</span></li>
+          <li><i class="fa-solid fa-rocket steel" aria-hidden="true"></i><span>ここで登場するのが Prime Agent</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-key"></i>課題の答えが、次のセクションにあります!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション2: Prime Agent と /refine の登場 -->
+  <div class="section-divider"><i class="fa-solid fa-wand-magic-sparkles"></i>Prime Agent と /refine の登場</div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot mega teal" style="animation: fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+        <h2>Prime Agent とは</h2>
+      </div>
+      <div class="card-content">
+        <h3>手作業の直しを変える存在</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info steel" aria-hidden="true"></i><span>Julian Goldie が紹介する<span class="keyword-tag">自律エージェント</span></span></li>
+          <li><i class="fa-solid fa-arrows-turn-right" aria-hidden="true"></i><span>人の修正ループを、自動の改善ループへ</span></li>
+          <li><i class="fa-solid fa-puzzle-piece steel" aria-hidden="true"></i><span>その鍵が <span class="keyword-tag">秘密兵器</span> のコマンド</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-star"></i>「直すのはAI、見るのはあなた」への転換点!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal mega sky" style="animation: fa-shake 2.8s infinite;" aria-hidden="true"></i>
+        <h2>/refine コマンドの登場</h2>
+      </div>
+      <div class="card-content">
+        <h3>スラッシュコマンドで起動</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-square-caret-right steel" aria-hidden="true"></i><span>打つのは <span class="keyword-tag steel">/refine</span> のみ</span></li>
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>たったひとつで改善の処理が走る</span></li>
+          <li><i class="fa-solid fa-keyboard steel" aria-hidden="true"></i><span>むずかしい設定はとくに不要</span></li>
+        </ul>
+        <pre><span class="c">// 使い方はこれだけ</span>
+$ <span class="a">/refine</span>
+→ 直近の成績を分析して
+→ 改善を <span class="a">自動で適用</span></pre>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart mega" style="animation: fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+        <h2>失敗と成功を分析</h2>
+      </div>
+      <div class="card-content">
+        <h3>直近の成績をふり返る</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-xmark steel" aria-hidden="true"></i><span>直近の<span class="keyword-tag">失敗</span>を手がかりにする</span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>直近の<span class="keyword-tag">成功</span>も同じく材料に</span></li>
+          <li><i class="fa-solid fa-scale-balanced steel" aria-hidden="true"></i><span>両方をならして、次の手を考える</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-smile"></i>失敗をかくすのではなく、学びの種に変える発想!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-unbalanced mega sky" style="animation: fa-flip 3.2s infinite;" aria-hidden="true"></i>
+        <h2>証拠ベースの改善</h2>
+      </div>
+      <div class="card-content">
+        <h3>かんがえすぎず、事実を見る</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-circle-check steel" aria-hidden="true"></i><span>分析の根拠は、<span class="keyword-tag steel">証拠</span>そのもの</span></li>
+          <li><i class="fa-solid fa-chart-column" aria-hidden="true"></i><span>結果の良し悪しを実績から判断</span></li>
+          <li><i class="fa-solid fa-circle-question steel" aria-hidden="true"></i><span>「かん」ではなく「記録」がものをいう</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database steel" aria-hidden="true"></i><span>証拠 → 分析 → <span class="keyword-tag steel">改善案</span> の流れ</span></li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション3: 自動適用の中身 -->
+  <div class="section-divider"><i class="fa-solid fa-gears"></i>自動適用の中身</div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scissors mega teal" style="animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>最小限の有用な編集</h2>
+      </div>
+      <div class="card-content">
+        <h3>ほどほどがいちばん効く</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-dot steel" aria-hidden="true"></i><span>あてはめるのは<span class="keyword-tag">最小限の編集</span>だけ</span></li>
+          <li><i class="fa-solid fa-filter" aria-hidden="true"></i><span>効果の見込める改动だけをえらぶ</span></li>
+          <li><i class="fa-solid fa-shield-halved steel" aria-hidden="true"></i><span>大きな変更で壊すリスクを避ける</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb"></i>一気に変えない、じょうずに育てる。それがコツ!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud-arrow-down mega sky" style="animation: fa-beat 2s infinite;" aria-hidden="true"></i>
+        <h2>自動適用の仕組み</h2>
+      </div>
+      <div class="card-content">
+        <h3>人がわたす役割はゼロに</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-slash steel" aria-hidden="true"></i><span>人間の介入のかわりに<span class="keyword-tag steel">自動で適用</span></span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>セットアップへ、軽く手を入れる</span></li>
+          <li><i class="fa-solid fa-rotate-right steel" aria-hidden="true"></i><span>適用後は、また次の実行へもどる</span></li>
+        </ul>
+        <pre><span class="c">// 適用のイメージ</span>
+/refine
+ 1. 成績を分析
+ 2. 編集点を決定
+ 3. <span class="a">セットアップへ自動反映</span></pre>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain mega" style="animation: fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+        <h2>メモリの保存</h2>
+      </div>
+      <div class="card-content">
+        <h3>学びを忘れない</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-floppy-disk steel" aria-hidden="true"></i><span>気づきを<span class="keyword-tag">新しいメモリ</span>として保存</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>次回の実行から、その知識を活用</span></li>
+          <li><i class="fa-solid fa-layer-group steel" aria-hidden="true"></i><span>経験が積み重なっていく設計</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-heart"></i>同じ失敗を、二度とくりかえさなくていい!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users-gear mega sky" style="animation: fa-flip 2.8s infinite;" aria-hidden="true"></i>
+        <h2>サブエージェントのスペック更新</h2>
+      </div>
+      <div class="card-content">
+        <h3>部下の育て方も自動で</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-gear steel" aria-hidden="true"></i><span>メモリ保存か、<span class="keyword-tag steel">サブエージェントのスペック更新</span>かを選択</span></li>
+          <li><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>担当ごとの設定を、成績にあわせ改訂</span></li>
+          <li><i class="fa-solid fa-sitemap steel" aria-hidden="true"></i><span>チーム全体の底上げにつながる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top right">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up"></i>親玉だけでなく、わきのエージェントも成長する!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション4: 自己改善ループの効果 -->
+  <div class="section-divider"><i class="fa-solid fa-arrow-trend-up"></i>自己改善ループの効果</div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-spin mega teal" style="animation: fa-spin 3.5s linear infinite;" aria-hidden="true"></i>
+        <h2>人が介入しないループ</h2>
+      </div>
+      <div class="card-content">
+        <h3>回りつづける改善</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-shield steel" aria-hidden="true"></i><span>ループの中に<span class="keyword-tag">人の手</span>が入らない</span></li>
+          <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>実行 → 分析 → 適用をぐるぐらまわす</span></li>
+          <li><i class="fa-solid fa-bed steel" aria-hidden="true"></i><span>見ていない間も、勝手にうまくなる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-mug-hot"></i>あなたが休んでいるあいだに、AIが自分磨き!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-nodes mega sky" style="animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>自己改善ループの全体像</h2>
+      </div>
+      <div class="card-content">
+        <h3>ひとつの円として見る</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-play steel" aria-hidden="true"></i><span>エージェントが<span class="keyword-tag steel">実行</span>する</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i><span>/refine が成績を<span class="keyword-tag steel">分析</span>する</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench steel" aria-hidden="true"></i><span>編集を<span class="keyword-tag steel">適用</span>して、保存・更新する</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-rotate-left"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-spin steel" aria-hidden="true"></i><span>ふたたび実行へ…の<span class="keyword-tag steel">無限ループ</span></span></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-compare mega" style="animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>他のエージェントとのちがい</h2>
+      </div>
+      <div class="card-content">
+        <h3>いま欠けている機能</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-slash steel" aria-hidden="true"></i><span>他の自律エージェントには、この<span class="keyword-tag">自己改善</span>がない</span></li>
+          <li><i class="fa-solid fa-hand-point-right" aria-hidden="true"></i><span>動くだけでなく、<span class="keyword-tag">育つ</span>ところが決定的</span></li>
+          <li><i class="fa-solid fa-ranking-star steel" aria-hidden="true"></i><span>使いつづけるほど差がひらく設計</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-key"></i>「動くAI」から「育つAI」への、ひとかたち!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gift mega sky" style="animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>導入のメリット</h2>
+      </div>
+      <div class="card-content">
+        <h3>あなたに返ってくるもの</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock steel" aria-hidden="true"></i><span>直しの時間を、<span class="keyword-tag steel">まるごと削減</span></span></li>
+          <li><i class="fa-solid fa-face-smile" aria-hidden="true"></i><span>品質が使うほど安定していく</span></li>
+          <li><i class="fa-solid fa-briefcase steel" aria-hidden="true"></i><span>人は本来の仕事や<span class="keyword-tag steel">判断</span>に集中できる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up"></i>エージェント運用のストレスが、ぐっと軽くなる!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション5: 導入とまとめ -->
+  <div class="section-divider"><i class="fa-solid fa-flag-checkered"></i>導入とまとめ</div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <span class="card-no">#17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sliders mega teal" style="animation: fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+        <h2>必要な設定と今後のかたち</h2>
+      </div>
+      <div class="card-content">
+        <h3>はじめるハードルは低い</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gear steel" aria-hidden="true"></i><span>必要なのは、最初の<span class="keyword-tag">セットアップ</span>だけ</span></li>
+          <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>あとは <span class="keyword-tag">/refine</span> を打つだけの単純さ</span></li>
+          <li><i class="fa-solid fa-road steel" aria-hidden="true"></i><span>自律エージェントの<span class="keyword-tag">標準</span>になっていく可能性</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb"></i>「AIを育てる」のが、あたりまえになる日も近いかも!</span>
+      </div>
+    </div>
+
+    <div class="section-card steel-top fade-in-scale">
+      <span class="card-no">#18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-award mega sky" style="animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>まとめ: 直すのはAIに任せる</h2>
+      </div>
+      <div class="card-content">
+        <h3>この動画の核心</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rotate steel" aria-hidden="true"></i><span>手動修正の往復は、<span class="keyword-tag steel">/refine</span> で置きかえられる</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i><span>失敗と成功を<span class="keyword-tag steel">証拠</span>として分析</span></li>
+          <li><i class="fa-solid fa-cloud-arrow-down steel" aria-hidden="true"></i><span>最小の編集を自動適用、メモリやスペックを更新</span></li>
+          <li><i class="fa-solid fa-infinity steel" aria-hidden="true"></i><span>自己改善ループこそ、いま足りない機能</span></li>
+        </ul>
+        <div>
+          <span class="keyword-tag">#PrimeAgent</span>
+          <span class="keyword-tag steel">#AutonomousAgents</span>
+          <span class="keyword-tag">#AIAutomation</span>
+          <span class="keyword-tag steel">#ArtificialIntelligence</span>
+        </div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-heart"></i>あなたの修正作業を、AIの成長の糧に変えよう!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <div class="footer fade-in-scale">
+    <p><span class="src-label">🎬 動画:</span>
+      <a href="https://youtu.be/QqDg2QMwSB8" target="_blank" rel="noopener">Julian Goldie SEO</a>
+       — Stop manually correcting your AI agents. Prime Agent has a secret weapon for auto-improvement.
+    </p>
+    <p><i class="fa-solid fa-link"></i> https://youtu.be/QqDg2QMwSB8 &nbsp;|&nbsp; <i class="fa-regular fa-calendar"></i> 2026-08-16</p>
+    <p style="opacity:0.7;">このインフォグラフィックは、上の動画の内容を日本語でまとめたものです。</p>
+  </div>
+
+</div>
+
+<script>
+// スクロールに合わせてカードをフェードイン
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('visible');
+      observer.unobserve(entry.target);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll('.fade-in-scale').forEach((el) => observer.observe(el));
+</script>
+</body>
+</html>

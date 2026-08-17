@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenClawで請求ミスを送信前に止める（あきらパパ）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+:root{
+  /* ==== 指定カラーテーマ ==== */
+  --wine:  #7B2D43; /* ワインレッド */
+  --blue:  #5C7A99; /* ダスティブルー */
+  --linen: #F9F4EF; /* リネン */
+  --ink:   #2A2A2A; /* インク */
+  --sage:  #9CAF88; /* セージ */
+  /* 役割別マッピング */
+  --ui-color-1: var(--blue);
+  --ui-color-2: var(--wine);
+  --ui-color-3: var(--linen);
+  --ui-color-4: var(--ink);
+  --ui-color-5: var(--sage);
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+body{
+  background-color: var(--linen);
+  background-image: radial-gradient(var(--sage) 1px, transparent 1px);
+  background-size: 26px 26px;
+  background-blend-mode: soft-light;
+  color: var(--ink);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  font-size:16px;
+  line-height:1.5;
+}
+
+.page{ max-width:2000px; margin:0 auto; padding:24px 20px 10px; }
+
+/* ==== ヘッダー ==== */
+header.main-header{
+  background:#fff;
+  border-radius:24px;
+  border:4px solid var(--wine);
+  box-shadow:6px 6px 18px rgba(42,42,42,.15);
+  padding:28px 30px 22px;
+  margin-bottom:26px;
+  text-align:center;
+  position:relative;
+}
+.main-header .fa-7x{ color:var(--wine); }
+.main-header h1{
+  font-size:36px; color:#333; font-weight:bold; margin:10px 0 6px;
+  font-family:'Kaisei Decol', serif;
+}
+.main-header .sub{ font-size:16px; color:var(--blue); margin-bottom:8px; }
+.main-header .date{ font-size:14px; color:#777; }
+.header-tags{ margin-top:12px; }
+.header-note{
+  position:absolute; top:14px; right:18px;
+  font-family:'Yomogi', cursive; font-size:14px; color:var(--wine);
+  transform:rotate(3deg);
+}
+
+/* ==== 4カラムレイアウト ==== */
+.section-layout{
+  display:flex; flex-wrap:wrap; gap:20px; justify-content:center; align-items:stretch;
+}
+
+/* ==== カード ==== */
+.section-card{
+  flex:1 1 calc(25% - 20px);
+  min-width:230px;
+  max-width:460px;
+  background-color:#fff;
+  border-radius:20px;
+  padding:15px;
+  box-shadow:5px 5px 15px rgba(0,0,0,.1);
+  border-top:6px solid var(--blue);
+  position:relative;
+  overflow:hidden;
+  transition: transform .3s ease, box-shadow .3s ease, background-color .3s ease;
+}
+.section-card:nth-child(even){ border-top-color:var(--wine); transform:rotate(.3deg); }
+.section-card:nth-child(3n){ border-top-color:var(--sage); }
+.section-card:hover{
+  transform:translateY(-6px) rotate(0deg);
+  box-shadow:8px 10px 24px rgba(123,45,67,.22);
+  background-color:#FFFDF9;
+}
+.section-card.card-wine{ border-top-color:var(--wine); }
+.section-card.card-sage{ border-top-color:var(--sage); }
+
+.step-number{
+  position:absolute; top:10px; left:12px;
+  width:34px; height:34px; line-height:34px; text-align:center;
+  background:var(--wine); color:#fff; border-radius:50%;
+  font-family:'Yomogi', cursive; font-size:16px; font-weight:bold;
+  box-shadow:2px 2px 6px rgba(0,0,0,.2);
+}
+
+.mega-icon-container{ text-align:center; margin:15px 0 5px; }
+.mega-icon-container h2{
+  font-size:24px; color:#555; font-weight:bold; margin-top:10px;
+  font-family:'Kaisei Decol', serif;
+}
+
+.card-content{ padding:0 10px 15px; }
+
+.keyword-list{ margin:15px 0; padding:0; list-style-type:none; }
+.keyword-list li{
+  margin-bottom:10px; display:flex; align-items:flex-start; font-size:16px; color:#333;
+}
+.keyword-list li i{
+  margin-right:8px; color:var(--ui-color-2); min-width:20px; margin-top:3px;
+}
+.keyword-list.blue-icons li i{ color:var(--blue); }
+.list-heading{ font-size:18px; color:#333; font-weight:bold; margin:12px 0 2px; }
+
+.keyword-tag{
+  background-color:var(--ui-color-3);
+  color:var(--ui-color-4);
+  padding:3px 8px; border-radius:5px; margin-right:5px;
+  display:inline-block; font-weight:bold; font-size:16px;
+  border:1px solid rgba(92,122,153,.4);
+}
+.tag-wine{ background:var(--wine); color:#fff; border:none; }
+.tag-blue{ background:var(--blue); color:#fff; border:none; }
+.tag-sage{ background:var(--sage); color:var(--ink); border:none; }
+
+/* ==== 手書き風吹き出し（3種） ==== */
+.speech-bubble{
+  position:relative; background:#fff;
+  border:3px solid var(--ui-color-1);
+  border-radius:20px; padding:10px 15px; margin:15px 5px;
+  font-family:'Yomogi', cursive;
+  box-shadow:3px 3px 10px rgba(0,0,0,.1);
+  transform:rotate(-1deg);
+}
+.speech-bubble::after{
+  content:''; position:absolute; bottom:-13px; left:20px;
+  border-width:12px 8px 0; border-style:solid;
+  border-color:var(--ui-color-1) transparent; display:block; width:0;
+}
+.speech-bubble.right::after{ left:auto; right:20px; transform:rotate(15deg); }
+.speech-bubble.top::after{
+  bottom:auto; top:-13px; border-width:0 8px 12px; transform:rotate(-5deg);
+}
+.speech-bubble.variant-1{
+  background:#FBF3E4; border-color:var(--ui-color-2); transform:rotate(1deg);
+}
+.speech-bubble.variant-1::after{ border-color:var(--ui-color-2) transparent; }
+.speech-bubble.variant-2{
+  background:#EDF2EA; border-color:var(--ui-color-5); transform:rotate(-2deg);
+}
+.speech-bubble.variant-2::after{ border-color:var(--ui-color-5) transparent; }
+
+.handwritten{
+  font-family:'Yomogi', cursive; font-size:15px; line-height:1.5; color:#333;
+  display:inline;
+}
+
+/* ==== コードプレビュー ==== */
+pre{
+  background:#f5f2ee; border:1px dashed var(--blue);
+  padding:10px; border-radius:8px; font-size:14px; margin-top:12px;
+  overflow-x:auto; font-family:"SF Mono","Consolas","Courier New",monospace;
+  color:var(--ink); line-height:1.6;
+}
+pre .ok{ color:#5b7a45; font-weight:bold; }
+pre .warn{ color:var(--wine); font-weight:bold; }
+
+.link-box{
+  display:block; margin:12px 4px 0; padding:10px 14px;
+  background:var(--linen); border:2px solid var(--wine); border-radius:12px;
+  color:var(--wine); font-weight:bold; text-decoration:none; text-align:center;
+  transition: background .3s;
+}
+.link-box:hover{ background:#fff; }
+.link-box i{ margin-right:6px; }
+
+.flow-hint{
+  text-align:center; margin-top:8px; color:var(--blue);
+  font-family:'Yomogi', cursive; font-size:14px;
+}
+.flow-hint i{ color:var(--wine); }
+
+/* ==== 出現アニメーション ==== */
+.fade-in-scale{
+  opacity:0; transform:translateY(22px) scale(.97);
+  transition:opacity .6s ease, transform .6s ease;
+}
+.fade-in-scale.visible{ opacity:1; transform:translateY(0) scale(1); }
+.section-card.fade-in-scale:nth-child(even).visible{ transform:rotate(.3deg); }
+
+@keyframes tagPop{
+  0%{ transform:scale(.7); }
+  60%{ transform:scale(1.1); }
+  100%{ transform:scale(1); }
+}
+.visible .keyword-tag{ animation:tagPop .5s ease both; }
+
+/* ==== フッター ==== */
+footer.site-footer{
+  margin:30px 0 20px; padding:22px 26px;
+  background:var(--ink); color:var(--linen);
+  border-radius:20px; box-shadow:5px 5px 15px rgba(0,0,0,.2);
+  font-size:14px; line-height:1.9;
+}
+footer.site-footer a{ color:#EBD9A8; text-decoration:underline; }
+footer.site-footer .footer-title{ font-size:16px; font-weight:bold; }
+footer.site-footer i{ margin-right:6px; color:var(--sage); }
+
+/* ==== レスポンシブ ==== */
+@media (max-width:1600px){ .section-card{ min-width:280px; } }
+@media (max-width:1200px){ .section-card{ min-width:320px; flex-basis:calc(33.3% - 20px);} }
+@media (max-width:900px){ .section-card{ min-width:380px; flex-basis:calc(50% - 20px);} }
+@media (max-width:768px){
+  .section-layout{ flex-direction:column; }
+  .section-card{ width:100%; min-width:auto; max-width:none; }
+  .main-header h1{ font-size:28px; }
+  .header-note{ position:static; display:block; margin-top:6px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= ヘッダー ================= -->
+  <header class="main-header">
+    <i class="fa-solid fa-file-circle-check fa-7x fa-beat" style="color:var(--wine); --fa-animation-duration:2.5s;" aria-hidden="true"></i>
+    <h1>OpenClawで 請求ミスを 送信前に止める</h1>
+    <p class="sub">Discordに話しかけるだけで動く、パーソナルAIの活用例</p>
+    <p class="date"><i class="fa-regular fa-calendar" aria-hidden="true"></i> 2026.8.17（月）／ あきらパパのショート動画（40秒）より</p>
+    <p class="header-note">送ってから気づく、その前に止める！</p>
+    <div class="header-tags">
+      <span class="keyword-tag tag-wine">#OpenClaw</span>
+      <span class="keyword-tag tag-blue">#AI</span>
+      <span class="keyword-tag tag-sage">#自動化</span>
+      <span class="keyword-tag">#請求書</span>
+      <span class="keyword-tag">#3点チェック</span>
+    </div>
+  </header>
+
+  <!-- ================= 18カード ================= -->
+  <div class="section-layout">
+
+    <!-- 1 -->
+    <div class="section-card fade-in-scale card-wine">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x fa-shake" style="color:var(--wine); --fa-animation-duration:2.8s;" aria-hidden="true"></i>
+        <h2>送信後に気づく、ミスの痛さ</h2>
+      </div>
+      <div class="card-content">
+        <p class="list-heading"><i class="fa-solid fa-circle-info fa-lg" style="color:var(--blue);" aria-hidden="true"></i> あるある、その前に</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-face-dizzy fa-lg" aria-hidden="true"></i><span>送った後で<span class="keyword-tag tag-wine">額がちがう</span>と気づく</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>訂正の連絡、再送、おわび…手間がふくらむ</span></li>
+          <li><i class="fa-solid fa-hand-holding-heart fa-lg" aria-hidden="true"></i><span>先方の信頼にも、小さなキズが残る</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg" style="color:var(--wine);"></i> 送ってから見つかるのが、いちばんこたえる…！</span>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass fa-5x fa-bounce" style="color:var(--blue); --fa-animation-duration:2.2s;" aria-hidden="true"></i>
+        <h2>ミスが起きる3つの典型</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-yen-sign fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-wine">額</span>桁の落とし、転記のまちがい</span></li>
+          <li><i class="fa-solid fa-address-book fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-blue">宛先</span>似た名前との送り分けミス</span></li>
+          <li><i class="fa-solid fa-calendar-days fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-sage">期限</span>支払い期限の日付ずれ</span></li>
+        </ul>
+        <p><i class="fa-solid fa-arrow-right fa-lg" style="color:var(--wine);" aria-hidden="true"></i> この3点を押さえるのが第一歩</p>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color:var(--wine);"></i> 3点さえ見れば、ミスの大半は防げる！</span>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x fa-beat-fade" style="color:var(--blue);" aria-hidden="true"></i>
+        <h2>OpenClawとは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>Discordの上で動く、個人向けのAI</span></li>
+          <li><i class="fa-solid fa-reply fa-lg" aria-hidden="true"></i><span>話しかけると、返事と行動で応える</span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>書類の<span class="keyword-tag">まちがい探し</span>にも使える</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color:var(--wine);"></i> 新しい道具というより、<span class="keyword-tag tag-wine">話せる相棒</span>に近いよ</span>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comments fa-5x fa-bounce" style="color:var(--wine); --fa-animation-duration:2.4s;" aria-hidden="true"></i>
+        <h2>Discordに話しかけるだけ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-mobile-screen fa-lg" aria-hidden="true"></i><span>特別な画面を、つくらなくてOK</span></li>
+          <li><i class="fa-solid fa-keyboard fa-lg" aria-hidden="true"></i><span>チャットに<span class="keyword-tag tag-blue">一言</span>書くだけ</span></li>
+          <li><i class="fa-solid fa-comment fa-lg" aria-hidden="true"></i><span>返事も、同じ場所に返ってくる</span></li>
+        </ul>
+        <pre># Discordでのやりとり（一例）
+あなた：今日の請求書、
+　　　　額・宛先・期限を見て
+OpenClaw：<span class="warn">宛先が古い表記です</span>
+　　　　額と期限は OK です</pre>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color:var(--blue);"></i> キーボードだけで、完結！</span>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="section-card fade-in-scale card-sage">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x fa-flip" style="color:var(--sage); --fa-animation-duration:3s;" aria-hidden="true"></i>
+        <h2>セルフ改善するAIとは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-seedling fa-lg" aria-hidden="true"></i><span>使うほど、自分のクセを学んでいく</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>直した指摘を、次に活かす</span></li>
+          <li><i class="fa-solid fa-user-gear fa-lg" aria-hidden="true"></i><span>使う人<strong>専用</strong>に育っていく</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color:var(--wine);"></i> 育てる楽しさもあるね</span>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="section-card fade-in-scale card-wine">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x fa-beat-fade" style="color:var(--wine);" aria-hidden="true"></i>
+        <h2>送る前に止める仕組み</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hand fa-lg" aria-hidden="true"></i><span>送信の直前に、AIが<span class="keyword-tag tag-wine">関所</span>になる</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>額・宛先・期限を、その場で照合</span></li>
+          <li><i class="fa-solid fa-circle-stop fa-lg" aria-hidden="true"></i><span>怪しい点があれば、送るのを止める</span></li>
+        </ul>
+        <pre>[check] 請求書_20260817.pdf
+  額   ..... <span class="ok">OK</span>（¥120,000）
+  宛先 ..... <span class="warn">要確認</span>（古い表記）
+  期限 ..... <span class="ok">OK</span>（8/31）
+  ↓ 送信を、一度止めます</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color:var(--sage);"></i> 送る前の10秒が、すべてを守る！</span>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="section-card fade-in-scale">
+      <span class="step-number">1</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-invoice fa-5x fa-bounce" style="color:var(--blue); --fa-animation-duration:2.6s;" aria-hidden="true"></i>
+        <h2>手順① 一枚を選ぶ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i><span>今日、送る<span class="keyword-tag tag-blue">請求書</span>を一枚だけ</span></li>
+          <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>完璧を狙わず、小さく始める</span></li>
+          <li><i class="fa-solid fa-box-open fa-lg" aria-hidden="true"></i><span>「まず一つ」が、続けるコツ</span></li>
+        </ul>
+        <div class="flow-hint"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> 次は、額のチェックへ</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color:var(--wine);"></i> 一枚だけなら、今日からでもできる！</span>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <div class="section-card fade-in-scale">
+      <span class="step-number">2</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-yen-sign fa-5x fa-beat-fade" style="color:var(--wine);" aria-hidden="true"></i>
+        <h2>手順② 額を確認</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass-dollar fa-lg" aria-hidden="true"></i><span>見積もりと、金額が合うか</span></li>
+          <li><i class="fa-solid fa-hashtag fa-lg" aria-hidden="true"></i><span>桁の落ち・入りも見る</span></li>
+          <li><i class="fa-solid fa-calculator fa-lg" aria-hidden="true"></i><span>合計の計算まちがいも、いっしょに</span></li>
+        </ul>
+        <div class="flow-hint"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> 次は、宛先のチェックへ</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-yen-sign fa-lg" style="color:var(--wine);"></i> 桁のミスが、金額の主な原因だよ</span>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <div class="section-card fade-in-scale">
+      <span class="step-number">3</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-address-card fa-5x fa-flip" style="color:var(--blue); --fa-animation-duration:3.2s;" aria-hidden="true"></i>
+        <h2>手順③ 宛先を確認</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i><span>会社名の正式な表記は合うか</span></li>
+          <li><i class="fa-solid fa-user-tag fa-lg" aria-hidden="true"></i><span>担当者の名前、役職の変更</span></li>
+          <li><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i><span>送り先のメールは、今も有効か</span></li>
+        </ul>
+        <div class="flow-hint"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> 次は、期限のチェックへ</div>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-address-book fa-lg" style="color:var(--blue);"></i> 似た名前の送り分けに、注意！</span>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="section-card fade-in-scale card-sage">
+      <span class="step-number">4</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-calendar-check fa-5x fa-bounce" style="color:var(--sage); --fa-animation-duration:2.4s;" aria-hidden="true"></i>
+        <h2>手順④ 期限を確認</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-calendar-day fa-lg" aria-hidden="true"></i><span>支払い期限の日付は正しいか</span></li>
+          <li><i class="fa-solid fa-sun fa-lg" aria-hidden="true"></i><span>曜日や祝日も、いっしょに見る</span></li>
+          <li><i class="fa-solid fa-pen fa-lg" aria-hidden="true"></i><span>表記のゆれ（8/31、8月31日）</span></li>
+        </ul>
+        <div class="flow-hint"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i> 3点そろったら、送信へ</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-calendar-check fa-lg" style="color:var(--sage);"></i> 日付は、写し間違いが多い場所</span>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-repeat fa-5x fa-flip" style="color:var(--blue); --fa-animation-duration:3.4s;" aria-hidden="true"></i>
+        <h2>3点チェックを習慣に</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-redo fa-lg" aria-hidden="true"></i><span>毎日、一枚から続けてみる</span></li>
+          <li><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i><span>続くほど、迷いが減っていく</span></li>
+          <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span>AIの側も、学んでいく</span></li>
+        </ul>
+        <p><span class="keyword-tag tag-blue">額</span><span class="keyword-tag tag-wine">宛先</span><span class="keyword-tag tag-sage">期限</span> を、毎回同じ順で</p>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-seedling fa-lg" style="color:var(--blue);"></i> 習慣になれば、怖くなくなる！</span>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="section-card fade-in-scale card-sage">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-thumbs-up fa-5x fa-bounce" style="color:var(--sage); --fa-animation-duration:2s;" aria-hidden="true"></i>
+        <h2>AIに任せる利点</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-battery-full fa-lg" aria-hidden="true"></i><span>疲れている日も、<span class="keyword-tag tag-sage">同じ精度</span></span></li>
+          <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>夜でも、すぐ返ってくる</span></li>
+          <li><i class="fa-solid fa-clipboard-check fa-lg" aria-hidden="true"></i><span>何を見たか、記録に残る</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color:var(--wine);"></i> 「見たつもり」を、なくせるんだ</span>
+      </div>
+    </div>
+
+    <!-- 13 -->
+    <div class="section-card fade-in-scale card-wine">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x fa-beat-fade" style="color:var(--wine);" aria-hidden="true"></i>
+        <h2>目視チェックとの違い</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">目視</span>疲れると、抜けが出る</span></li>
+          <li><i class="fa-solid fa-microchip fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-wine">AI</span>毎回、同じ手順で見る</span></li>
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>判断の記録が、あとから見返せる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color:var(--sage);"></i> 人の目は体調で変わる、AIは変わらない</span>
+      </div>
+    </div>
+
+    <!-- 14 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-door-open fa-5x fa-flip" style="color:var(--blue); --fa-animation-duration:3s;" aria-hidden="true"></i>
+        <h2>導入は、かんたん</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-comment fa-lg" aria-hidden="true"></i><span>Discordに、話しかけるだけ</span></li>
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span>専用の道具づくりは、不要</span></li>
+          <li><i class="fa-solid fa-feather fa-lg" aria-hidden="true"></i><span>負担が軽いので、続けやすい</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-door-open fa-lg" style="color:var(--blue);"></i> 試すだけなら、5分でOK！</span>
+      </div>
+    </div>
+
+    <!-- 15 -->
+    <div class="section-card fade-in-scale card-sage">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-trend-up fa-5x fa-bounce" style="color:var(--sage); --fa-animation-duration:2.6s;" aria-hidden="true"></i>
+        <h2>セルフ改善が効く時</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>前回の指摘を、覚えている</span></li>
+          <li><i class="fa-solid fa-bell fa-lg" aria-hidden="true"></i><span>次は先に、同じ点を見てくれる</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span>人ごとに、クセを学んでいく</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-arrow-trend-up fa-lg" style="color:var(--wine);"></i> 付き合いが長いほど、頼れる存在に</span>
+      </div>
+    </div>
+
+    <!-- 16 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x fa-flip" style="color:var(--blue); --fa-animation-duration:3.4s;" aria-hidden="true"></i>
+        <h2>ほかの業務への展開</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-file-signature fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-blue">見積もり</span>額・宛先・期限を照合</span></li>
+          <li><i class="fa-solid fa-cart-shopping fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-wine">発注</span>数量と単価のチェック</span></li>
+          <li><i class="fa-solid fa-truck fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-sage">納品書</span>日付と送り先の確認</span></li>
+        </ul>
+        <p><i class="fa-solid fa-arrow-right fa-lg" style="color:var(--wine);" aria-hidden="true"></i> 同じ「3点」の考えで、広がっていく</p>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-layer-group fa-lg" style="color:var(--sage);"></i> 請求書で練習して、ほかへ展開！</span>
+      </div>
+    </div>
+
+    <!-- 17 -->
+    <div class="section-card fade-in-scale card-wine">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-graduation-cap fa-5x fa-beat-fade" style="color:var(--wine);" aria-hidden="true"></i>
+        <h2>セミナー動画のご案内</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-video fa-lg" aria-hidden="true"></i><span>OpenClawの仕組みを、詳しく解説</span></li>
+          <li><i class="fa-solid fa-chalkboard-user fa-lg" aria-hidden="true"></i><span>導入の進め方も、学べます</span></li>
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>30分ほどで、見終わる内容</span></li>
+        </ul>
+        <a class="link-box" href="https://youtu.be/kSHnhjYE0-o" target="_blank" rel="noopener">
+          <i class="fa-solid fa-play fa-lg" aria-hidden="true"></i>セミナー動画を見る（youtu.be）
+        </a>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" style="color:var(--wine);"></i> まずは動画で、全体像をつかもう</span>
+      </div>
+    </div>
+
+    <!-- 18 -->
+    <div class="section-card fade-in-scale card-sage">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x fa-bounce" style="color:var(--ink); --fa-animation-duration:2.2s;" aria-hidden="true"></i>
+        <h2>まとめ：まず一枚から</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-invoice fa-lg" aria-hidden="true"></i><span>今日の請求書を、<span class="keyword-tag tag-wine">一枚だけ</span>選ぶ</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-blue">額</span><span class="keyword-tag">宛先</span><span class="keyword-tag tag-sage">期限</span>の3点を見る</span></li>
+          <li><i class="fa-solid fa-paper-plane fa-lg" aria-hidden="true"></i><span>送る前に、一度止めて確かめる</span></li>
+        </ul>
+        <p><i class="fa-solid fa-robot fa-lg" style="color:var(--blue);" aria-hidden="true"></i> OpenClawに、話しかけてみよう</p>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color:var(--wine);"></i> 今日の一枚から、始めてみよう！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer class="site-footer">
+    <p class="footer-title"><i class="fa-solid fa-film" aria-hidden="true"></i> 出典（動画）</p>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=IfiZNWQhdPk" target="_blank" rel="noopener">あきらパパのAI活用・学習部屋</a>（40秒のショート）</p>
+    <p>📺 タイトル: OpenClaw｜請求ミス、もう送信後に気づかない #OpenClaw #AI #自動化</p>
+    <p>🎓 セミナー動画: <a href="https://youtu.be/kSHnhjYE0-o" target="_blank" rel="noopener">https://youtu.be/kSHnhjYE0-o</a></p>
+    <p>🎬 動画URL: <a href="https://www.youtube.com/watch?v=IfiZNWQhdPk" target="_blank" rel="noopener">https://www.youtube.com/watch?v=IfiZNWQhdPk</a></p>
+    <p><i class="fa-regular fa-clock" aria-hidden="true"></i> 作成: 2026.08.17 ／ 動画の内容をもとに、一枚にまとめた非公式レポートです</p>
+  </footer>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('visible'); });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  cards.forEach(function (c) { io.observe(c); });
+});
+</script>
+</body>
+</html>

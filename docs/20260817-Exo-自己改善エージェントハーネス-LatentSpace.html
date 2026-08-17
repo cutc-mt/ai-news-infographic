@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exo 再帰的自己改善エージェントハーネス（Latent Space）</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ui-color-1: #26282C;  /* グラファイトブラック */
+  --ui-color-2: #A3E635;  /* エレクトリックライム */
+  --ui-color-3: #F4F6EC;  /* ミストホワイト */
+  --ui-color-4: #15161A;  /* ディープブラック */
+  --ui-color-5: #6E7480;  /* スチールグレー */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #EDEFE6;
+  color: #333333;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+.canvas { max-width: 2000px; margin: 0 auto; }
+
+/* ヘッダー */
+.header {
+  background: linear-gradient(135deg, var(--ui-color-4) 0%, var(--ui-color-1) 55%, #3A3D42 100%);
+  border-radius: 24px;
+  padding: 40px 30px;
+  text-align: center;
+  color: var(--ui-color-3);
+  margin-bottom: 30px;
+  box-shadow: 6px 6px 20px rgba(21,22,26,0.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: -70px; right: -50px;
+  width: 230px; height: 230px;
+  border-radius: 50%;
+  background: rgba(163,230,53,0.18);
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -90px; left: -50px;
+  width: 270px; height: 270px;
+  border-radius: 50%;
+  background: rgba(110,116,128,0.30);
+}
+
+.header .mega-icon {
+  font-size: 7em;
+  color: #C4F36B;
+  animation: fa-spin 10s linear infinite;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 4px 18px rgba(163,230,53,0.55);
+}
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  margin: 12px 0 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  opacity: 0.94;
+  position: relative;
+  z-index: 1;
+}
+
+.header .date {
+  font-size: 14px;
+  color: rgba(244,246,236,0.8);
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.header-tags { margin-top: 14px; position: relative; z-index: 1; }
+.header-tags .keyword-tag { margin: 0 4px; }
+
+/* セクション見出し */
+.section-divider {
+  text-align: center;
+  margin: 34px 0 18px;
+  color: var(--ui-color-4);
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.section-divider i { color: #7FB32A; margin-right: 10px; }
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  align-items: stretch;
+}
+
+/* カード */
+.section-card {
+  flex: 1 1 23%;
+  min-width: 240px;
+  max-width: 460px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(21,22,26,0.16);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-2);
+  display: flex;
+  flex-direction: column;
+}
+
+.section-card.accent { border-top-color: var(--ui-color-5); }
+.section-card.deep { border-top-color: var(--ui-color-1); }
+
+.section-card:hover {
+  background-color: #F7FAEE;
+  box-shadow: 8px 8px 22px rgba(127,179,42,0.30);
+  transition: all 0.3s ease;
+}
+
+.card-num {
+  position: absolute;
+  top: 10px; right: 14px;
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  color: #7FB32A;
+  font-weight: bold;
+}
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 22px;
+  color: #555555;
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.card-content { padding: 0 10px 10px; flex: 1; }
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-5);
+  min-width: 18px;
+  margin-top: 4px;
+}
+
+.keyword-list li i.lime { color: #7FB32A; }
+.keyword-list li i.steel { color: var(--ui-color-1); }
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin: 0 3px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 14.5px;
+}
+
+.keyword-tag.lime {
+  background-color: #E8F7C9;
+  color: #4E7A0E;
+}
+
+.keyword-tag.dark {
+  background-color: var(--ui-color-4);
+  color: #C4F36B;
+}
+
+.keyword-tag.steel {
+  background-color: #E1E3E8;
+  color: #3D4148;
+}
+
+/* 手書き風吹き出し（標準） */
+.speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 14px;
+  margin: 15px 5px 8px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(21,22,26,0.14);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+}
+
+.speech-bubble.top {
+  transform: rotate(1deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+}
+
+/* 吹き出しバリエーション1（ライム） */
+.speech-bubble.variant-1 {
+  background: var(--ui-color-3);
+  border-color: #7FB32A;
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: #7FB32A transparent;
+}
+
+/* 吹き出しバリエーション2（スチール） */
+.speech-bubble.variant-2 {
+  background: #E9EBEF;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333333;
+  display: block;
+}
+
+/* コードプレビュー */
+pre {
+  background: var(--ui-color-4);
+  color: #D7F59A;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-top: 10px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  border-left: 4px solid #7FB32A;
+}
+
+code.inline {
+  background: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+}
+
+/* フロー矢印 */
+.flow-arrow {
+  text-align: center;
+  color: #7FB32A;
+  font-size: 20px;
+  margin: 4px 0;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  animation: fadeInScale 0.7s ease both;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9) translateY(15px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* フッター */
+.footer {
+  margin-top: 34px;
+  background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1) 60%, #3A3D42);
+  color: var(--ui-color-3);
+  border-radius: 20px;
+  padding: 22px 26px;
+  text-align: center;
+  font-size: 15px;
+  box-shadow: 5px 5px 15px rgba(21,22,26,0.35);
+}
+
+.footer a { color: #C4F36B; font-weight: bold; }
+.footer .source-line { margin-bottom: 6px; }
+.footer .hashtag { font-size: 13px; opacity: 0.85; margin-top: 8px; }
+
+/* レスポンシブ */
+@media (max-width: 1600px) { .section-card { flex: 1 1 30%; min-width: 290px; } }
+@media (max-width: 1200px) { .section-card { flex: 1 1 45%; min-width: 320px; } }
+@media (max-width: 900px) { .section-card { flex: 1 1 100%; min-width: auto; max-width: 520px; margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <i class="fa-solid fa-infinity mega-icon" aria-hidden="true"></i>
+    <h1>Exo — 自分のコードとログを見られるハーネス</h1>
+    <p class="subtitle">再帰的な自分の改善を目指す エージェントハーネスの 設計思想を たどる技術講演</p>
+    <p class="date"><i class="fa-regular fa-calendar" aria-hidden="true"></i> 2026.08.17 &nbsp;|&nbsp; Latent Space &nbsp;|&nbsp; 講演 47分10秒 &nbsp;|&nbsp; Alex Krentsel (UC Berkeley / Google Research)</p>
+    <div class="header-tags">
+      <span class="keyword-tag dark">#Exo</span>
+      <span class="keyword-tag lime">#RecursiveSelfImprovement</span>
+      <span class="keyword-tag dark">#AgentHarness</span>
+      <span class="keyword-tag lime">#LatentSpace</span>
+    </div>
+  </div>
+
+  <!-- ===== セクション1: テーゼと背景 ===== -->
+  <div class="section-divider"><i class="fa-solid fa-compass" aria-hidden="true"></i>セクション1: テーゼと背景 — Exo は何を狙うのか</div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-podcast fa-5x fa-beat-fade" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>イントロと チームの背景</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microphone-lines lime" aria-hidden="true"></i><span>登壇者は <span class="keyword-tag dark">Alex Krentsel</span> さん</span></li>
+          <li><i class="fa-solid fa-graduation-cap lime" aria-hidden="true"></i><span><span class="keyword-tag">UC Berkeley</span> と <span class="keyword-tag">Google Research</span> に所属</span></li>
+          <li><i class="fa-solid fa-tower-broadcast lime" aria-hidden="true"></i><span>AI技術系ポッドキャスト <span class="keyword-tag lime">Latent Space</span> の講演回</span></li>
+          <li><i class="fa-solid fa-clock lime" aria-hidden="true"></i><span>47分にわたる <span class="keyword-tag">濃い技術トーク</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-1);"></i> ハーネス設計の 最前線を語る回だ!</span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-turn-right fa-5x fa-bounce" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>Exo テーゼの 定義</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-quote-left steel" aria-hidden="true"></i><span>「Exo は <span class="keyword-tag dark">完全に再帰的</span> な agent である」</span></li>
+          <li><i class="fa-solid fa-wrench steel" aria-hidden="true"></i><span>実行中に <span class="keyword-tag lime">安全に</span> 自身の全側面を編集</span></li>
+          <li><i class="fa-solid fa-book-open steel" aria-hidden="true"></i><span>再帰的な <span class="keyword-tag">自分の改善</span> を目指すシステム手法</span></li>
+          <li><i class="fa-solid fa-layer-group steel" aria-hidden="true"></i><span>プロンプトから <span class="keyword-tag">ハーネスの規約</span> まで対象</span></li>
+        </ul>
+        <pre>"Exo is an agent that's
+fully recursive.
+It's able to safely edit
+all aspects of itself
+at runtime."  (2:23)</pre>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: #7FB32A;"></i> 動きながら 自分を書き直す、がこの講演のテーゼ!</span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x fa-flip" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>MLスタックの 大転換</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-weight-hanging" aria-hidden="true"></i><span>かつての主役は <span class="keyword-tag steel">モデルの重み</span></span></li>
+          <li><i class="fa-solid fa-arrow-down" aria-hidden="true"></i><span>改善の中心が <span class="keyword-tag">下の層</span> にあった時代</span></li>
+          <li><i class="fa-solid fa-sitemap" aria-hidden="true"></i><span>いまは <span class="keyword-tag lime">エージェントハーネス</span> へと移動</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>プロンプト・道具・権限など <span class="keyword-tag">上の層</span> が主戦場に</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>重み ↔ ハーネスで <span class="keyword-tag">改善の重心</span> が逆転</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> どこを磨くかが 変わりつつある!</span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#04</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-satellite fa-5x fa-beat" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>起源: Sky Discover</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-seedling lime" aria-hidden="true"></i><span>出発点は <span class="keyword-tag dark">Sky Discover</span> という取り組み</span></li>
+          <li><i class="fa-solid fa-magnifying-glass lime" aria-hidden="true"></i><span><span class="keyword-tag">AIによる発見</span> を駆動する探求</span></li>
+          <li><i class="fa-solid fa-route lime" aria-hidden="true"></i><span>その経験が <span class="keyword-tag lime">Exo の設計</span> に直結</span></li>
+          <li><i class="fa-solid fa-arrows-left-right-to-line lime" aria-hidden="true"></i><span>発見の仕組み → 自分の改善へ <span class="keyword-tag">視点を転回</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i> 「発見するAI」から「直すAI」へ!</span>
+      </div>
+    </div>
+
+    <!-- カード5 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-unbalanced-flip fa-5x fa-shake" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>OpenClaw との 比較</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cubes steel" aria-hidden="true"></i><span><span class="keyword-tag dark">OpenClaw</span>・Pi・Hermes と同じ <span class="keyword-tag">完全ハーネス</span></span></li>
+          <li><i class="fa-solid fa-toolbox steel" aria-hidden="true"></i><span>道具・タスク・外部との <span class="keyword-tag">連携</span> を支援</span></li>
+          <li><i class="fa-solid fa-arrows-up-down-left-right steel" aria-hidden="true"></i><span>環境への <span class="keyword-tag">適応力</span> はどれも持つ</span></li>
+          <li><i class="fa-solid fa-eye steel" aria-hidden="true"></i><span>決定的な差は <span class="keyword-tag lime">コードと実行ログの完全可視</span></span></li>
+        </ul>
+        <pre>OpenClaw / Pi / Hermes:
+  tools / tasks / integrations ✓
+Exo = それら + code & logs
+  への完全な視界</pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color: #7FB32A;"></i> 「自分が見える」ことが 最大の違い!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション2: 設計 — エージェントの解剖学 ===== -->
+  <div class="section-divider"><i class="fa-solid fa-compass-drafting" aria-hidden="true"></i>セクション2: 設計 — エージェントの解剖学</div>
+  <div class="section-layout">
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-gear fa-5x fa-beat-fade" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>エージェントとは何か</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 lime" aria-hidden="true"></i><span><span class="keyword-tag dark">ポリシー</span> — どう判断するかの規約</span></li>
+          <li><i class="fa-solid fa-2 lime" aria-hidden="true"></i><span><span class="keyword-tag dark">コンテキスト</span> — 何を見て考えるか</span></li>
+          <li><i class="fa-solid fa-3 lime" aria-hidden="true"></i><span><span class="keyword-tag dark">アクション</span> — 実際に何を行うか</span></li>
+          <li><i class="fa-solid fa-puzzle-piece lime" aria-hidden="true"></i><span>この3つで <span class="keyword-tag">agent の輪郭</span> を定義</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-rotate lime" aria-hidden="true"></i><span>3つとも Exo では <span class="keyword-tag lime">編集の対象</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-1);"></i> 定義を分解すると 改善点が見える!</span>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-building-shield fa-5x fa-bounce" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>Exo の アーキテクチャ概要</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>自身の <span class="keyword-tag steel">コード全体</span> に視界を持つ</span></li>
+          <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span><span class="keyword-tag steel">実行時ログ</span> も丸ごと参照できる</span></li>
+          <li><i class="fa-solid fa-stairs" aria-hidden="true"></i><span>少しずつ段階的に <span class="keyword-tag lime">全側面を改善</span></span></li>
+          <li><i class="fa-solid fa-clone" aria-hidden="true"></i><span>自分の <span class="keyword-tag">複製</span> と系統の管理まで可能</span></li>
+        </ul>
+        <pre>Exo visibility:
+  own code      ✓ full
+  runtime logs  ✓ full
+  → incremental improvement
+  → self-cloning & lineage</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-magnifying-glass-chart fa-lg" style="color: var(--ui-color-5);"></i> 自分の全体像を 見渡せるのが強み!</span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-compare fa-5x fa-flip" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>暗黙的な変更と 明示的な変更</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud lime" aria-hidden="true"></i><span><span class="keyword-tag">暗黙</span>: 記憶の更新やスキル作成</span></li>
+          <li><i class="fa-solid fa-users lime" aria-hidden="true"></i><span>たいていの agent は <span class="keyword-tag steel">ここまで</span></span></li>
+          <li><i class="fa-solid fa-file-pen lime" aria-hidden="true"></i><span><span class="keyword-tag">明示</span>: コードや規約そのものを書き換え</span></li>
+          <li><i class="fa-solid fa-bolt lime" aria-hidden="true"></i><span>Exo は <span class="keyword-tag lime">明示の領域</span> まで踏み込む</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check lime" aria-hidden="true"></i><span>プロンプト・道具・<span class="keyword-tag dark">規約自体</span> が対象</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color: #7FB32A;"></i> 「思い出を変える」から「体質を変える」へ!</span>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gamepad fa-5x fa-beat" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>実例: Exo が ポケモンをプレイ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gamepad-modern steel" aria-hidden="true"></i><span>実際の <span class="keyword-tag dark">ゲーム攻略</span> で実証</span></li>
+          <li><i class="fa-solid fa-hourglass-half steel" aria-hidden="true"></i><span>長く続く <span class="keyword-tag">実世界タスク</span> の代用として</span></li>
+          <li><i class="fa-solid fa-vr-cardboard steel" aria-hidden="true"></i><span>画面と操作だけの <span class="keyword-tag">限られた環境</span></span></li>
+          <li><i class="fa-solid fa-arrow-progress steel" aria-hidden="true"></i><span>進めながら <span class="keyword-tag lime">自分を調整</span> できるかが見もの</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-5);"></i> 遊びながら 説明するわかりやすい実例!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション3: 仕組み — 再帰と実運用 ===== -->
+  <div class="section-divider"><i class="fa-solid fa-microchip" aria-hidden="true"></i>セクション3: 仕組み — 再帰と実運用</div>
+  <div class="section-layout">
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-group fa-5x fa-beat-fade" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>研究の系譜と チーム体制</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-timeline lime" aria-hidden="true"></i><span>Krentsel さんの <span class="keyword-tag dark">研究の歩み</span> を振り返る</span></li>
+          <li><i class="fa-solid fa-gears lime" aria-hidden="true"></i><span>一貫するのは <span class="keyword-tag">システム思考</span> の姿勢</span></li>
+          <li><i class="fa-solid fa-user-tie lime" aria-hidden="true"></i><span><span class="keyword-tag dark">Martin Casado</span> と <span class="keyword-tag dark">Ankur Goyal</span> も言及</span></li>
+          <li><i class="fa-solid fa-diagram-successor lime" aria-hidden="true"></i><span>役割分担を踏まえた <span class="keyword-tag">チーム設計</span> の話</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-users-viewfinder fa-lg" style="color: var(--ui-color-1);"></i> どんな人たちが 作っているかの話!</span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cubes-stacked fa-5x fa-bounce" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>3層分解: Executor・ハーネス・サンドボックス</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span><span class="keyword-tag steel">Executor</span> — 考えて動く本体</span></li>
+          <li><i class="fa-solid fa-house-lock" aria-hidden="true"></i><span><span class="keyword-tag steel">Exo Harness</span> — 支える外骨格</span></li>
+          <li><i class="fa-solid fa-box" aria-hidden="true"></i><span><span class="keyword-tag steel">Sandbox</span> — 隔離された実行空間</span></li>
+          <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>設計で <span class="keyword-tag lime">安全性を保証</span> する狙い</span></li>
+        </ul>
+        <pre>"In harness space, we have
+an opportunity to enforce
+certain properties by the
+architecture of the system."
+(14:38)</pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-landmark fa-lg" style="color: #7FB32A;"></i> 規約ではなく 構造で守る発想!</span>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-infinity fa-5x fa-spin" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>完全な再帰的な 自分の改善</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-spin lime" aria-hidden="true"></i><span>プロンプト・記憶・道具・<span class="keyword-tag dark">規約</span> まで全て操作可能</span></li>
+          <li><i class="fa-solid fa-clone lime" aria-hidden="true"></i><span>自身の <span class="keyword-tag">複製</span> や系統の運用もこなす</span></li>
+          <li><i class="fa-solid fa-list-check lime" aria-hidden="true"></i><span>唯一さわれないのは <span class="keyword-tag lime">イベントログ</span></span></li>
+          <li><i class="fa-solid fa-rotate-left lime" aria-hidden="true"></i><span>試した履歴の <span class="keyword-tag">正史</span> として再帰ループを防止</span></li>
+        </ul>
+        <pre>immutable: event log
+  = canonical history
+  = "何を試したか"の記録
+→ ループにはまらないための命綱</pre>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-anchor fa-lg" style="color: var(--ui-color-5);"></i> 履歴だけは 誰も書き換えられない!</span>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-tower-cell fa-5x fa-beat" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>転送可能な agent と テレポーテーション</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-right-left steel" aria-hidden="true"></i><span>agent を <span class="keyword-tag dark">別環境へ移す</span> 発想</span></li>
+          <li><i class="fa-solid fa-box-open steel" aria-hidden="true"></i><span>状態をまとめて <span class="keyword-tag">持ち運び</span> 可能に</span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles steel" aria-hidden="true"></i><span>まるで <span class="keyword-tag lime">瞬間移動</span> のような再開</span></li>
+          <li><i class="fa-solid fa-laptop-code steel" aria-hidden="true"></i><span>別のマシンでも <span class="keyword-tag">仕事を継続</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-paper-plane fa-lg" style="color: var(--ui-color-1);"></i> 引っ越しできる agent という発想!</span>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-secret fa-5x fa-shake" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>サブエージェントと シークレット管理</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sitemap lime" aria-hidden="true"></i><span><span class="keyword-tag dark">サブエージェント</span> の活用を議論</span></li>
+          <li><i class="fa-solid fa-key lime" aria-hidden="true"></i><span>鍵や認証情報の <span class="keyword-tag">扱い</span> が課題</span></li>
+          <li><i class="fa-solid fa-user-shield lime" aria-hidden="true"></i><span>部下に渡す <span class="keyword-tag">権限の範囲</span> を絞る</span></li>
+          <li><i class="fa-solid fa-lock lime" aria-hidden="true"></i><span>秘匿情報は <span class="keyword-tag lime">隔てて管理</span> する設計</span></li>
+        </ul>
+        <pre>parent agent: 秘密を保持
+sub-agent  : 必要最小限だけ
+             受け取って実行</pre>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-shield fa-lg" style="color: #7FB32A;"></i> 鍵を全部渡さないのが ポイント!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション4: 実践と未来 ===== -->
+  <div class="section-divider"><i class="fa-solid fa-rocket" aria-hidden="true"></i>セクション4: 実践と未来 — 評価・コスト・展望</div>
+  <div class="section-layout">
+
+    <!-- カード15 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hand fa-5x fa-flip" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>割り込み可能な仕事と 標準化された手順</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-pause steel" aria-hidden="true"></i><span>途中で <span class="keyword-tag dark">止められる設計</span> を重視</span></li>
+          <li><i class="fa-solid fa-hand-point-right steel" aria-hidden="true"></i><span>人間が <span class="keyword-tag">割り込める</span> 構造づくり</span></li>
+          <li><i class="fa-solid fa-file-contract steel" aria-hidden="true"></i><span><span class="keyword-tag dark">ACP</span> などプロトコルの標準化</span></li>
+          <li><i class="fa-solid fa-plug-circle-bolt steel" aria-hidden="true"></i><span>つなぎ方を <span class="keyword-tag">共通言語</span> で揃える動き</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-hand-paper fa-lg" style="color: var(--ui-color-5);"></i> 止められる信頼が 長期運用の鍵!</span>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bullseye fa-5x fa-beat-fade" style="color: #7FB32A;" aria-hidden="true"></i>
+        <h2>評価と reward hacking への対処</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clipboard-check lime" aria-hidden="true"></i><span><span class="keyword-tag dark">評価</span> の難しさが大きな壁</span></li>
+          <li><i class="fa-solid fa-skull-crossbones lime" aria-hidden="true"></i><span><span class="keyword-tag">reward hacking</span> — 採点の裏をかく行動</span></li>
+          <li><i class="fa-solid fa-scale-balanced lime" aria-hidden="true"></i><span>改善が <span class="keyword-tag">本物かどうか</span> を測る仕組み</span></li>
+          <li><i class="fa-solid fa-user-check lime" aria-hidden="true"></i><span>人間による <span class="keyword-tag lime">検証</span> と組み合わせる道</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation lime" aria-hidden="true"></i><span>自分を採点する自分は <span class="keyword-tag steel">甘くなりがち</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-gauge-high fa-lg" style="color: var(--ui-color-1);"></i> 「良くなった」の証明が 一番むずかしい!</span>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-tags fa-5x fa-bounce" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>実運用の話: コストを 96% も削減</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-industry" aria-hidden="true"></i><span>実際の <span class="keyword-tag steel">プロダクション</span> での話</span></li>
+          <li><i class="fa-solid fa-arrow-down-long" aria-hidden="true"></i><span>コストを <span class="keyword-tag lime">96% 減</span> まで圧縮</span></li>
+          <li><i class="fa-solid fa-gauge-simple-high" aria-hidden="true"></i><span>改善を重ねて <span class="keyword-tag">効率を上げた</span> 実例</span></li>
+          <li><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i><span>自分を直す効果が <span class="keyword-tag">費用面</span> に現れた</span></li>
+        </ul>
+        <pre>production cost:
+  ████████████████ → ▏
+  (96% reduction)</pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-chart-line fa-lg" style="color: #7FB32A;"></i> 自己改善が 費用を劇的に下げた実話!</span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-atom fa-5x fa-spin fa-spin-reverse" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>なぜ今か: 収束と システム理論の未来</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-branch steel" aria-hidden="true"></i><span><span class="keyword-tag dark">コード生成</span> とハーネス開発が <span class="keyword-tag">重なった</span></span></li>
+          <li><i class="fa-solid fa-quote-left steel" aria-hidden="true"></i><span>「agent の媒体が <span class="keyword-tag lime">建材そのもの</span> と同じ」(43:26)</span></li>
+          <li><i class="fa-solid fa-square-root-variable steel" aria-hidden="true"></i><span><span class="keyword-tag dark">Lisp</span> やシステム理論への言及</span></li>
+          <li><i class="fa-solid fa-telescope steel" aria-hidden="true"></i><span>自分を書き直す系の <span class="keyword-tag">将来性</span> を展望</span></li>
+        </ul>
+        <pre>"The medium for these agents
+ is the same as the actual
+ building material." (43:26)
+
+コード = 素材 = 自分
+→ Lisp が夢見た再帰の系譜</pre>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: #7FB32A;"></i> 家と設計図が 同じ素材になった時代!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <div class="footer">
+    <p class="source-line">🎬 動画: <a href="https://www.youtube.com/watch?v=5lFD-34dhqE" target="_blank" rel="noopener">Latent Space</a> — 「Exo: Harnesses should see their own code and logs — Alex Krentsel, UC Berkeley / Google Research」</p>
+    <p>📨 元ネタ: 講演の説明文と22個のチャプター、引用文をもとに、Exo の設計思想と再帰的な自分の改善の仕組み中心に18枚に整理</p>
+    <p class="hashtag">#Exo #AgentHarness #RecursiveSelfImprovement #AIAgents #LatentSpace #UCBerkeley</p>
+  </div>
+
+</div>
+</body>
+</html>

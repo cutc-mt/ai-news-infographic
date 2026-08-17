@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prime Agentの/refineで自己修正（Julian Goldie）</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ui-color-1: #26456E;  /* ミッドナイトブルー */
+  --ui-color-2: #0FA3B1;  /* エレクトリックシアン */
+  --ui-color-3: #E7F2F5;  /* アイシーミスト */
+  --ui-color-4: #16283F;  /* ディープネイビー */
+  --ui-color-5: #C0554A;  /* コーラルレッド */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #F5F9FA;
+  color: #333333;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  padding: 20px;
+}
+
+.canvas { max-width: 2000px; margin: 0 auto; }
+
+/* ヘッダー */
+.header {
+  background: linear-gradient(135deg, var(--ui-color-4) 0%, var(--ui-color-1) 55%, var(--ui-color-2) 100%);
+  border-radius: 24px;
+  padding: 40px 30px;
+  text-align: center;
+  color: var(--ui-color-3);
+  margin-bottom: 30px;
+  box-shadow: 6px 6px 20px rgba(22,40,63,0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: -70px; right: -50px;
+  width: 230px; height: 230px;
+  border-radius: 50%;
+  background: rgba(15,163,177,0.30);
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  bottom: -90px; left: -50px;
+  width: 270px; height: 270px;
+  border-radius: 50%;
+  background: rgba(192,85,74,0.30);
+}
+
+.header .mega-icon {
+  font-size: 7em;
+  color: #7BE3ED;
+  animation: fa-spin 8s linear infinite;
+  position: relative;
+  z-index: 1;
+  text-shadow: 0 4px 18px rgba(15,163,177,0.6);
+}
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  margin: 12px 0 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  opacity: 0.94;
+  position: relative;
+  z-index: 1;
+}
+
+.header .date {
+  font-size: 14px;
+  color: rgba(231,242,245,0.8);
+  margin-top: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.header-tags { margin-top: 14px; position: relative; z-index: 1; }
+.header-tags .keyword-tag { margin: 0 4px; }
+
+/* セクション見出し */
+.section-divider {
+  text-align: center;
+  margin: 34px 0 18px;
+  color: var(--ui-color-4);
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.section-divider i { color: var(--ui-color-2); margin-right: 10px; }
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  align-items: stretch;
+}
+
+/* カード */
+.section-card {
+  flex: 1 1 23%;
+  min-width: 240px;
+  max-width: 460px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(22,40,63,0.14);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-2);
+  display: flex;
+  flex-direction: column;
+}
+
+.section-card.accent { border-top-color: var(--ui-color-5); }
+.section-card.deep { border-top-color: var(--ui-color-1); }
+
+.section-card:hover {
+  background-color: #F0F7F8;
+  box-shadow: 8px 8px 22px rgba(15,163,177,0.28);
+  transition: all 0.3s ease;
+}
+
+.card-num {
+  position: absolute;
+  top: 10px; right: 14px;
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+}
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 22px;
+  color: #555555;
+  margin-top: 10px;
+  font-weight: bold;
+}
+
+.card-content { padding: 0 10px 10px; flex: 1; }
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-1);
+  min-width: 18px;
+  margin-top: 4px;
+}
+
+.keyword-list li i.coral { color: var(--ui-color-5); }
+.keyword-list li i.cyan { color: var(--ui-color-2); }
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin: 0 3px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 14.5px;
+}
+
+.keyword-tag.coral {
+  background-color: #F6E3E0;
+  color: #8F3A32;
+}
+
+.keyword-tag.cyan {
+  background-color: #D5EEF2;
+  color: #0B6E77;
+}
+
+.keyword-tag.deep {
+  background-color: var(--ui-color-4);
+  color: var(--ui-color-3);
+}
+
+/* 手書き風吹き出し（標準） */
+.speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 14px;
+  margin: 15px 5px 8px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(22,40,63,0.12);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+}
+
+.speech-bubble.top {
+  transform: rotate(1deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+}
+
+/* 吹き出しバリエーション1（シアン） */
+.speech-bubble.variant-1 {
+  background: var(--ui-color-3);
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+/* 吹き出しバリエーション2（コーラル） */
+.speech-bubble.variant-2 {
+  background: #FBEAE7;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333333;
+  display: block;
+}
+
+/* コードプレビュー */
+pre {
+  background: var(--ui-color-4);
+  color: var(--ui-color-3);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  margin-top: 10px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  border-left: 4px solid var(--ui-color-2);
+}
+
+code.inline {
+  background: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+}
+
+/* フロー矢印 */
+.flow-arrow {
+  text-align: center;
+  color: var(--ui-color-2);
+  font-size: 20px;
+  margin: 4px 0;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  animation: fadeInScale 0.7s ease both;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9) translateY(15px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* フッター */
+.footer {
+  margin-top: 34px;
+  background: linear-gradient(135deg, var(--ui-color-4), var(--ui-color-1) 60%, var(--ui-color-2));
+  color: var(--ui-color-3);
+  border-radius: 20px;
+  padding: 22px 26px;
+  text-align: center;
+  font-size: 15px;
+  box-shadow: 5px 5px 15px rgba(22,40,63,0.3);
+}
+
+.footer a { color: #7BE3ED; font-weight: bold; }
+.footer .source-line { margin-bottom: 6px; }
+.footer .hashtag { font-size: 13px; opacity: 0.85; margin-top: 8px; }
+
+/* レスポンシブ */
+@media (max-width: 1600px) { .section-card { flex: 1 1 30%; min-width: 290px; } }
+@media (max-width: 1200px) { .section-card { flex: 1 1 45%; min-width: 320px; } }
+@media (max-width: 900px) { .section-card { flex: 1 1 100%; min-width: auto; max-width: 520px; margin: 0 auto; } }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <i class="fa-solid fa-arrows-rotate mega-icon" aria-hidden="true"></i>
+    <h1>Prime Agent の /refine で 自己の修正</h1>
+    <p class="subtitle">直近の仕事を 見直して 設定を書き換える 仕組みと バックグラウンドのガードレール</p>
+    <p class="date"><i class="fa-regular fa-calendar" aria-hidden="true"></i> 2026.08.17 &nbsp;|&nbsp; Julian Goldie SEO &nbsp;|&nbsp; 解説ショート</p>
+    <div class="header-tags">
+      <span class="keyword-tag deep">#PrimeAgent</span>
+      <span class="keyword-tag coral">#AIAutomation</span>
+      <span class="keyword-tag deep">#AutonomousAgents</span>
+      <span class="keyword-tag coral">#TechTips</span>
+    </div>
+  </div>
+
+  <!-- ===== セクション1: 仕組み — /refine は何をするのか ===== -->
+  <div class="section-divider"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>セクション1: 仕組み — /refine は何をするのか</div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sliders fa-5x fa-beat-fade" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>/refine とは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span><span class="keyword-tag deep">/refine</span> は <span class="keyword-tag">slash command</span> のひとつ</span></li>
+          <li><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>直近の仕事を <span class="keyword-tag">振り返る</span> 合図</span></li>
+          <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>agent が <span class="keyword-tag">自分を点検</span> する時間</span></li>
+          <li><i class="fa-solid fa-pause" aria-hidden="true"></i><span>仕事のあとに <span class="keyword-tag">ひと呼吸</span> を入れる習慣</span></li>
+        </ul>
+        <pre>&gt; /refine
+reviewing recent work ...</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-flag fa-lg" style="color: var(--ui-color-1);"></i> 仕事が終わったら ひと呼吸、が合図!</span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clock-rotate-left fa-5x fa-bounce" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>直近の仕事を 見直す</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>セッションの <span class="keyword-tag">履歴</span> を確認</span></li>
+          <li><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i><span>何をしたかを <span class="keyword-tag">棚卸し</span></span></li>
+          <li><i class="fa-solid fa-star-half-stroke" aria-hidden="true"></i><span><span class="keyword-tag">成功</span> と <span class="keyword-tag">失敗</span> を仕分ける</span></li>
+          <li><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>記憶が新しいうちに <span class="keyword-tag">まとめて</span> 処理</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 記憶が新しいうちに 見直すのがコツ!</span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bug fa-5x fa-shake" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>エラーの 検出</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass coral" aria-hidden="true"></i><span>出力の <span class="keyword-tag coral">間違い</span> を探し出す</span></li>
+          <li><i class="fa-solid fa-note-sticky coral" aria-hidden="true"></i><span>こけた箇所を <span class="keyword-tag coral">記録</span></span></li>
+          <li><i class="fa-solid fa-layer-group coral" aria-hidden="true"></i><span>エラーの <span class="keyword-tag">種類別</span> に分類</span></li>
+          <li><i class="fa-solid fa-eye coral" aria-hidden="true"></i><span>見逃しがちな <span class="keyword-tag">小さな破損</span> も拾う</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-5);"></i> 失敗は恥ではなく データ!</span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#04</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x fa-beat" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>失敗の パターンを見つける</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1" aria-hidden="true"></i><span>1回だけの失敗なら <span class="keyword-tag">様子見</span></span></li>
+          <li><i class="fa-solid fa-2" aria-hidden="true"></i><span>2〜3回 <span class="keyword-tag cyan">重なる</span> ら要注意</span></li>
+          <li><i class="fa-solid fa-arrows-repeat" aria-hidden="true"></i><span>繰り返す <span class="keyword-tag">原因</span> を特定</span></li>
+          <li><i class="fa-solid fa-repeat" aria-hidden="true"></i><span>「たまたま」を <span class="keyword-tag deep">「いつも」</span> に変える</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>見つけたパターンが <span class="keyword-tag">次の標的</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-crosshairs fa-lg" style="color: var(--ui-color-1);"></i> 繰り返し こける場所が 改善の的!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション2: 編集 — エビデンスに基づく書き換え ===== -->
+  <div class="section-divider"><i class="fa-solid fa-pen-ruler" aria-hidden="true"></i>セクション2: 編集 — エビデンスに基づく書き換え</div>
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x fa-flip" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>根拠（エビデンス）が 必須</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots" aria-hidden="true"></i><span>感想ではなく <span class="keyword-tag deep">証拠</span> 主体</span></li>
+          <li><i class="fa-solid fa-quote-left" aria-hidden="true"></i><span>ログから <span class="keyword-tag">引用</span> して裏付け</span></li>
+          <li><i class="fa-solid fa-ban coral" aria-hidden="true"></i><span>根拠がなければ <span class="keyword-tag coral">編集しない</span></span></li>
+          <li><i class="fa-solid fa-shield" aria-hidden="true"></i><span>思いつきの <span class="keyword-tag">書き換え</span> を防止</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-2);"></i> 「なぜ変える?」に 答えられるかが基準!</span>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-pen fa-5x fa-beat-fade" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>スキルの 説明を更新</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-tag coral" aria-hidden="true"></i><span>skill の <span class="keyword-tag coral">description</span> を更新</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation coral" aria-hidden="true"></i><span>失敗した場面を <span class="keyword-tag">言葉に追加</span></span></li>
+          <li><i class="fa-solid fa-arrow-right-arrow-left coral" aria-hidden="true"></i><span>次の <span class="keyword-tag">呼び出し方</span> が変わる</span></li>
+          <li><i class="fa-solid fa-tags coral" aria-hidden="true"></i><span>棚の <span class="keyword-tag">ラベル</span> を貼り直す感覚</span></li>
+        </ul>
+        <pre>skill: company-news
+description: "決算のニュースを
+  1ページにまとめる"</pre>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-5);"></i> ラベルが直ると 探し物が見つかる!</span>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-pen-nib fa-5x fa-bounce" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>プロンプトを 調整</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen" aria-hidden="true"></i><span>指示文の一部を <span class="keyword-tag cyan">書き換え</span></span></li>
+          <li><i class="fa-solid fa-circle-question" aria-hidden="true"></i><span>あいまいな表現を <span class="keyword-tag">具体化</span></span></li>
+          <li><i class="fa-solid fa-font" aria-hidden="true"></i><span>トーンや <span class="keyword-tag">形式の指定</span> を明確に</span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i><span><span class="keyword-tag">小さな差し替え</span> で大きな効果</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-pen-nib fa-lg" style="color: var(--ui-color-2);"></i> 一言 直すだけで 出力が変わる!</span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users-gear fa-5x fa-flip" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>サブエージェントを 調整</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>部下 agent の <span class="keyword-tag deep">spec</span> を微調整</span></li>
+          <li><i class="fa-solid fa-sitemap" aria-hidden="true"></i><span><span class="keyword-tag">担当と権限</span> を見直す</span></li>
+          <li><i class="fa-solid fa-toolbox" aria-hidden="true"></i><span>渡す <span class="keyword-tag">道具</span> を交換</span></li>
+          <li><i class="fa-solid fa-people-group" aria-hidden="true"></i><span>チーム編成の <span class="keyword-tag">見直し</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-users-gear fa-lg" style="color: var(--ui-color-2);"></i> 親だけでなく 部下まで鍛える!</span>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x fa-fade" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>バックグラウンドで 実行</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-display coral" aria-hidden="true"></i><span>画面の作業は <span class="keyword-tag coral">そのまま</span> 続行</span></li>
+          <li><i class="fa-solid fa-gears coral" aria-hidden="true"></i><span>作業の裏で <span class="keyword-tag">設定を更新</span></span></li>
+          <li><i class="fa-solid fa-forward coral" aria-hidden="true"></i><span><span class="keyword-tag">本業を止めない</span> のがポイント</span></li>
+          <li><i class="fa-solid fa-bell coral" aria-hidden="true"></i><span>気づいたら <span class="keyword-tag">賢くなってる</span></span></li>
+        </ul>
+        <pre>あなた : /refine
+agent  : (裏で設定を確認中 ...)
+       : 3件の調整を適用しました</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-moon fa-lg" style="color: var(--ui-color-5);"></i> 表では作業、 裏では成長!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション3: ガードレール — 安全に回す仕組み ===== -->
+  <div class="section-divider"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i>セクション3: ガードレール — 安全に回す仕組み</div>
+  <div class="section-layout">
+
+    <!-- カード10 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-road-barrier fa-5x fa-beat" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>ガードレールの 意味</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-fence" aria-hidden="true"></i><span>勝手に <span class="keyword-tag deep">書き換えない</span> のが鍵</span></li>
+          <li><i class="fa-solid fa-ruler" aria-hidden="true"></i><span>変更の <span class="keyword-tag">範囲を制限</span></span></li>
+          <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span><span class="keyword-tag">許可された場所</span> だけ触る</span></li>
+          <li><i class="fa-solid fa-road" aria-hidden="true"></i><span>暴走を防ぐ <span class="keyword-tag">境界線</span></span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>厳格なルールの下で <span class="keyword-tag">自律</span> が動く</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-road-barrier fa-lg" style="color: var(--ui-color-1);"></i> 守備範囲が あるから安心!</span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x fa-beat-fade" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>安全な 自律のチューニング</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-scale-unbalanced-flip cyan" aria-hidden="true"></i><span><span class="keyword-tag cyan">自律</span> と <span class="keyword-tag cyan">安全</span> の両立</span></li>
+          <li><i class="fa-solid fa-user-shield cyan" aria-hidden="true"></i><span>人手なしでも <span class="keyword-tag">暴れない</span></span></li>
+          <li><i class="fa-solid fa-gauge-high cyan" aria-hidden="true"></i><span>効率を追いながら <span class="keyword-tag">リスクを抑制</span></span></li>
+          <li><i class="fa-solid fa-handshake-angle cyan" aria-hidden="true"></i><span><span class="keyword-tag deep">信頼して任せる</span> 土台になる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-2);"></i> 任せていいのは 安全装置があるから!</span>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-handshake fa-5x fa-bounce" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>人間との 役割分担</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-tie coral" aria-hidden="true"></i><span>ルール作りは <span class="keyword-tag coral">人間</span></span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench coral" aria-hidden="true"></i><span>細かい調整は <span class="keyword-tag">agent</span></span></li>
+          <li><i class="fa-solid fa-user-check coral" aria-hidden="true"></i><span>重大な変更は <span class="keyword-tag">確認を通す</span></span></li>
+          <li><i class="fa-solid fa-people-arrows coral" aria-hidden="true"></i><span><span class="keyword-tag">審判と整備士</span> の関係</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-whistle fa-lg" style="color: var(--ui-color-5);"></i> 審判は人間、 練習はagent!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション4: 実践 — 改善のループを回す ===== -->
+  <div class="section-divider"><i class="fa-solid fa-arrows-spin" aria-hidden="true"></i>セクション4: 実践 — 改善のループを回す</div>
+  <div class="section-layout">
+
+    <!-- カード13 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-spin fa-5x fa-spin" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>自己の 改善ループ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1" aria-hidden="true"></i><span><span class="keyword-tag">仕事をする</span></span></li>
+          <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="keyword-tag deep">/refine</span> で振り返る</span></li>
+          <li><i class="fa-solid fa-3" aria-hidden="true"></i><span>根拠のある編集を <span class="keyword-tag">設定に反映</span></span></li>
+          <li><i class="fa-solid fa-4" aria-hidden="true"></i><span>次の仕事が <span class="keyword-tag">上手く</span> なる</span></li>
+        </ul>
+        <pre>仕事 → /refine → 設定を更新
+  ↑____________________|</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-arrows-spin fa-lg" style="color: var(--ui-color-1);"></i> ループを回すほど 上手くなる!</span>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-check fa-5x fa-beat" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>はじめる前の 確認</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-download cyan" aria-hidden="true"></i><span>まず <span class="keyword-tag cyan">Prime Agent</span> を導入</span></li>
+          <li><i class="fa-solid fa-sliders cyan" aria-hidden="true"></i><span>ガードレールの <span class="keyword-tag">最初の設定</span></span></li>
+          <li><i class="fa-solid fa-crop-simple cyan" aria-hidden="true"></i><span>見直す <span class="keyword-tag">範囲を決める</span></span></li>
+          <li><i class="fa-solid fa-seedling cyan" aria-hidden="true"></i><span>最初は <span class="keyword-tag coral">小さく試す</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-door-open fa-lg" style="color: var(--ui-color-2);"></i> まずは1つの skill で試そう!</span>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x fa-bounce" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>効果の 測り方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-trend-down coral" aria-hidden="true"></i><span>同じ失敗が <span class="keyword-tag coral">減ったか</span></span></li>
+          <li><i class="fa-solid fa-calculator coral" aria-hidden="true"></i><span>手直しの <span class="keyword-tag">回数を数える</span></span></li>
+          <li><i class="fa-solid fa-stopwatch coral" aria-hidden="true"></i><span>完了までの <span class="keyword-tag">速さ</span> を比較</span></li>
+          <li><i class="fa-solid fa-clipboard-list coral" aria-hidden="true"></i><span>設定の <span class="keyword-tag deep">変更のログ</span> を読む</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-chart-line fa-lg" style="color: var(--ui-color-5);"></i> 数字で比べると 成長が見える!</span>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card deep fade-in-scale">
+      <span class="card-num">#16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-compare fa-5x fa-flip" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>他のAIとの 違い</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>ただの <span class="keyword-tag">チャット</span> ではない</span></li>
+          <li><i class="fa-solid fa-file-code" aria-hidden="true"></i><span>設定ファイルを <span class="keyword-tag deep">自ら書き換え</span></span></li>
+          <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>貫くのは <span class="keyword-tag">エビデンス主義</span></span></li>
+          <li><i class="fa-solid fa-fence" aria-hidden="true"></i><span><span class="keyword-tag cyan">ガードレール内</span> で自律的に動く</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-code-compare fa-lg" style="color: var(--ui-color-1);"></i> 話すAIから 直すAIへ!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション5: まとめ ===== -->
+  <div class="section-divider"><i class="fa-solid fa-flag-checkered" aria-hidden="true"></i>セクション5: まとめ — 導入のヒントと全体像</div>
+  <div class="section-layout">
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-num">#17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb fa-5x fa-beat-fade" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>導入の ヒント</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-calendar-week cyan" aria-hidden="true"></i><span>週に <span class="keyword-tag cyan">1回の/refine</span> から</span></li>
+          <li><i class="fa-solid fa-notebook cyan" aria-hidden="true"></i><span>失敗メモを <span class="keyword-tag">ためておく</span></span></li>
+          <li><i class="fa-solid fa-minus cyan" aria-hidden="true"></i><span>変更は <span class="keyword-tag coral">小さく</span> 心がける</span></li>
+          <li><i class="fa-solid fa-pen-to-square cyan" aria-hidden="true"></i><span>変えた内容は <span class="keyword-tag deep">必ず記録</span></span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-plus" aria-hidden="true"></i><span>慣れたら <span class="keyword-tag">範囲を広げる</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-seedling fa-lg" style="color: var(--ui-color-2);"></i> 小さく始めて 習慣にする!</span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card accent fade-in-scale">
+      <span class="card-num">#18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-medal fa-5x fa-bounce" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>まとめ: 自分を 直すagent</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 coral" aria-hidden="true"></i><span><span class="keyword-tag deep">/refine</span> で直近を振り返る</span></li>
+          <li><i class="fa-solid fa-2 coral" aria-hidden="true"></i><span><span class="keyword-tag">根拠のある編集</span> だけを許す</span></li>
+          <li><i class="fa-solid fa-3 coral" aria-hidden="true"></i><span>スキル・プロンプト・<span class="keyword-tag">部下を調整</span></span></li>
+          <li><i class="fa-solid fa-4 coral" aria-hidden="true"></i><span>ガードレールの中で <span class="keyword-tag cyan">安全に回す</span></span></li>
+        </ul>
+        <pre>/refine = 振り返り + 根拠 + 微調整
+         (ガードレールの中で)</pre>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-5);"></i> AIが自分を 直す時代が来た!</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <div class="footer">
+    <p class="source-line">🎬 動画: <a href="https://www.youtube.com/watch?v=SrEcVrpNufM" target="_blank" rel="noopener">Julian Goldie SEO</a> — 「See how Prime Agent uses slash refine to self-correct.」</p>
+    <p>📨 元ネタ: 解説ショート動画 + 概要欄の情報をもとに、自己の修正の仕組みとガードレール中心に整理 (同チャンネルの /refine 3本目として構成)</p>
+    <p class="hashtag">#PrimeAgent #AIAutomation #AutonomousAgents #ArtificialIntelligence #TechTips</p>
+  </div>
+
+</div>
+</body>
+</html>

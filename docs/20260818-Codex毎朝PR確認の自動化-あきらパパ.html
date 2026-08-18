@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codexで毎朝のPR確認を自動化（あきらパパのAI活用学習部屋）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+:root{
+  /* ==== 指定カラーテーマ: ミッドナイトブルー×スカイブルー ==== */
+  --ui-color-1: #1E3A5F; /* ミッドナイトブルー（メイン） */
+  --ui-color-2: #7EB6E8; /* スカイブルー（差し色・アイコン） */
+  --ui-color-3: #D8EAF8; /* 淡スカイ（タグ背景） */
+  --ui-color-4: #16283F; /* 濃紺インク（テキスト） */
+  --ui-color-5: #E8912D; /* モーニングアンバー（注意・補強） */
+  --sky-bg: #F4F9FE;      /* 明るい空のキャンバス */
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+body{
+  background-color: var(--sky-bg);
+  background-image: radial-gradient(#7EB6E8 1.2px, transparent 1.2px);
+  background-size: 28px 28px;
+  background-blend-mode: soft-light;
+  color: var(--ui-color-4);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  font-size:16px;
+  line-height:1.5;
+}
+
+.page{ max-width:2000px; margin:0 auto; padding:24px 20px 10px; }
+
+/* ==== ヘッダー ==== */
+header.main-header{
+  background:#fff;
+  border-radius:24px;
+  border:4px solid var(--ui-color-1);
+  box-shadow:6px 6px 18px rgba(30,58,95,.20);
+  padding:28px 30px 22px;
+  margin-bottom:26px;
+  text-align:center;
+  position:relative;
+}
+.main-header .fa-7x{ color:var(--ui-color-1); animation: fa-bounce 2.6s ease-in-out infinite; }
+.main-header h1{
+  font-size:36px; color:#333; font-weight:bold; margin:10px 0 6px;
+  font-family:'Kaisei Decol', serif;
+}
+.main-header .sub{ font-size:16px; color:var(--ui-color-1); margin-bottom:8px; }
+.main-header .date{ font-size:14px; color:#777; }
+.header-tags{ margin-top:12px; }
+.header-note{
+  position:absolute; top:14px; right:18px;
+  font-family:'Yomogi', cursive; font-size:14px; color:var(--ui-color-2);
+  transform:rotate(3deg);
+}
+
+/* ==== 4カラムレイアウト ==== */
+.section-layout{
+  display:flex; flex-wrap:wrap; gap:20px; justify-content:center; align-items:stretch;
+}
+
+/* ==== カード ==== */
+.section-card{
+  flex:1 1 calc(25% - 20px);
+  min-width:230px;
+  max-width:460px;
+  background-color:#fff;
+  border-radius:20px;
+  padding:15px;
+  box-shadow:5px 5px 15px rgba(0,0,0,.1);
+  border-top:6px solid var(--ui-color-1);
+  position:relative;
+  overflow:hidden;
+  transition: transform .3s ease, box-shadow .3s ease, background-color .3s ease;
+}
+.section-card:nth-child(even){ border-top-color:var(--ui-color-2); transform:rotate(.3deg); }
+.section-card:nth-child(3n){ border-top-color:var(--ui-color-5); }
+.section-card:hover{
+  transform:translateY(-6px) rotate(0deg);
+  box-shadow:8px 10px 24px rgba(30,58,95,.25);
+  background-color:#FAFCFF;
+}
+.section-card.card-sky{ border-top-color:#7EB6E8; }
+
+.step-number{
+  position:absolute; top:10px; left:12px;
+  width:34px; height:34px; line-height:34px; text-align:center;
+  background:var(--ui-color-1); color:#fff; border-radius:50%;
+  font-family:'Yomogi', cursive; font-size:16px; font-weight:bold;
+  box-shadow:2px 2px 6px rgba(0,0,0,.2);
+}
+
+.mega-icon-container{ text-align:center; margin:15px 0 5px; }
+.mega-icon-container h2{
+  font-size:24px; color:#555; font-weight:bold; margin-top:10px;
+  font-family:'Kaisei Decol', serif;
+}
+
+.card-content{ padding:0 10px 15px; }
+
+.keyword-list{ margin:15px 0; padding:0; list-style-type:none; }
+.keyword-list li{
+  margin-bottom:10px; display:flex; align-items:flex-start; font-size:16px; color:#333;
+}
+.keyword-list li i{
+  margin-right:8px; color:var(--ui-color-2); min-width:20px; margin-top:3px;
+}
+.keyword-list.blue-icons li i{ color:var(--ui-color-1); }
+.list-heading{ font-size:18px; color:#333; font-weight:bold; margin:12px 0 2px; }
+
+.keyword-tag{
+  background-color:var(--ui-color-3);
+  color:var(--ui-color-4);
+  padding:3px 8px;
+  border-radius:5px;
+  margin-right:5px;
+  display:inline-block;
+  font-weight:bold;
+  font-size:16px;
+}
+
+/* ==== 手書き風吹き出し（3種） ==== */
+.speech-bubble{
+  position:relative;
+  background:#fff;
+  border:3px solid var(--ui-color-1);
+  border-radius:20px;
+  padding:10px 15px;
+  margin:15px 5px;
+  font-family:'Yomogi', cursive;
+  box-shadow:3px 3px 10px rgba(0,0,0,.1);
+  transform:rotate(-1deg);
+}
+.speech-bubble::after{
+  content:'';
+  position:absolute;
+  bottom:-13px; left:20px;
+  border-width:12px 8px 0;
+  border-style:solid;
+  border-color:var(--ui-color-1) transparent;
+  display:block; width:0;
+}
+.speech-bubble.right::after{ left:auto; right:20px; transform:rotate(15deg); }
+.speech-bubble.top::after{ bottom:auto; top:-13px; border-width:0 8px 12px; }
+.speech-bubble.variant-1{
+  background:#FFF9E3;
+  border-color:var(--ui-color-2);
+  transform:rotate(1deg);
+}
+.speech-bubble.variant-1::after{ border-color:var(--ui-color-2) transparent; }
+.speech-bubble.variant-2{
+  background:#FFEFE0;
+  border-color:var(--ui-color-5);
+  transform:rotate(-2deg);
+}
+.speech-bubble.variant-2::after{ border-color:var(--ui-color-5) transparent; }
+
+.handwritten{
+  font-family:'Yomogi', cursive;
+  font-size:15px;
+  line-height:1.5;
+  color:#333;
+}
+
+/* ==== コードプレビュー ==== */
+pre{
+  background:#16283F;
+  color:#D8EAF8;
+  padding:10px 12px;
+  border-radius:8px;
+  font-size:14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top:10px;
+  overflow-x:auto;
+  line-height:1.6;
+  border-left:5px solid var(--ui-color-2);
+  white-space:pre-wrap;
+  word-break:break-all;
+}
+pre .cmt{ color:#7EB6E8; }
+pre .hl{ color:#FFD98A; font-weight:bold; }
+
+/* ==== 矢印つなぎ ==== */
+.flow-arrow{
+  text-align:center; color:var(--ui-color-2); font-size:20px; margin:2px 0 6px;
+}
+
+/* ==== 出現アニメーション ==== */
+@keyframes fadeInScale{
+  0%{ opacity:0; transform:scale(.85) translateY(24px); }
+  100%{ opacity:1; transform:scale(1) translateY(0); }
+}
+.fade-in-scale{ animation:fadeInScale .8s ease both; }
+.section-layout .section-card{ opacity:0; animation:fadeInScale .8s ease both; }
+.section-layout .section-card:nth-child(1){ animation-delay:.05s; }
+.section-layout .section-card:nth-child(2){ animation-delay:.15s; }
+.section-layout .section-card:nth-child(3){ animation-delay:.25s; }
+.section-layout .section-card:nth-child(4){ animation-delay:.35s; }
+.section-layout .section-card:nth-child(5){ animation-delay:.45s; }
+.section-layout .section-card:nth-child(6){ animation-delay:.55s; }
+.section-layout .section-card:nth-child(7){ animation-delay:.65s; }
+.section-layout .section-card:nth-child(8){ animation-delay:.75s; }
+.section-layout .section-card:nth-child(9){ animation-delay:.85s; }
+.section-layout .section-card:nth-child(10){ animation-delay:.95s; }
+.section-layout .section-card:nth-child(11){ animation-delay:1.05s; }
+.section-layout .section-card:nth-child(12){ animation-delay:1.15s; }
+.section-layout .section-card:nth-child(13){ animation-delay:1.25s; }
+.section-layout .section-card:nth-child(14){ animation-delay:1.35s; }
+.section-layout .section-card:nth-child(15){ animation-delay:1.45s; }
+.section-layout .section-card:nth-child(16){ animation-delay:1.55s; }
+.section-layout .section-card:nth-child(17){ animation-delay:1.65s; }
+.section-layout .section-card:nth-child(18){ animation-delay:1.75s; }
+
+@keyframes highlightPop{
+  0%{ background-color:transparent; }
+  40%{ background-color:#FFE9B8; }
+  100%{ background-color:transparent; }
+}
+.highlight-word{ animation:highlightPop 3s ease 1.2s 2; border-radius:4px; padding:0 3px; }
+
+/* ==== フッター ==== */
+footer.main-footer{
+  background:#fff;
+  border-radius:20px;
+  border:4px solid var(--ui-color-2);
+  box-shadow:5px 5px 15px rgba(30,58,95,.15);
+  padding:20px 24px;
+  margin-top:26px;
+  text-align:center;
+}
+.main-footer p{ font-size:14px; color:#777; margin:6px 0; }
+.main-footer a{ color:var(--ui-color-1); text-decoration:underline; }
+.main-footer .video-link{ font-size:16px; color:var(--ui-color-4); }
+.main-footer .footer-tags{ margin-top:8px; }
+
+/* ==== レスポンシブ ==== */
+@media (max-width:1600px){ .section-card{ min-width:280px; } }
+@media (max-width:1200px){ .section-card{ min-width:320px; } }
+@media (max-width:900px){ .section-card{ min-width:380px; } }
+@media (max-width:768px){
+  .section-layout{ flex-direction:column; }
+  .section-card{ width:100%; min-width:auto; }
+  .header-note{ position:static; display:block; margin-top:8px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ==== ヘッダー ==== -->
+  <header class="main-header fade-in-scale">
+    <i class="fa-solid fa-robot fa-7x" aria-hidden="true"></i>
+    <h1>Codexで毎朝のPR確認を自動化</h1>
+    <div class="sub">手作業の巡回を、予定タスク向けメモへ変えるAI活用例</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月18日公開 ／ あきらパパのAI活用学習部屋</div>
+    <div class="header-note">「PR確認、もう毎朝開き直さない」<i class="fa-solid fa-mug-hot"></i></div>
+    <div class="header-tags">
+      <span class="keyword-tag">#Codex</span>
+      <span class="keyword-tag">#AI活用</span>
+      <span class="keyword-tag">#ChatGPT</span>
+      <span class="keyword-tag">#プログラミング</span>
+      <span class="keyword-tag">#業務効率化</span>
+    </div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- 1: 今日のテーマ -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-mug-hot fa-5x" style="color:var(--ui-color-1); animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>今日のテーマはひとつ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sun fa-lg" aria-hidden="true"></i><span>毎朝の <span class="keyword-tag">PR確認</span> をCodexに任せる話</span></li>
+          <li><i class="fa-solid fa-arrows-turn-right fa-lg" aria-hidden="true"></i><span>手作業の巡回 → <span class="keyword-tag">予定タスク向けメモ</span> へ変更</span></li>
+          <li><i class="fa-solid fa-clipboard-check fa-lg" aria-hidden="true"></i><span>今日試すことは、じつに<span class="highlight-word">一つだけ</span></span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2);"></i>
+            朝のルーティンがそのまま<br>
+            <span class="keyword-tag">自動化ネタ</span> になるのがポイント！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2: 毎朝のPR巡回 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-pull-request fa-5x" style="color:var(--ui-color-2); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>毎朝のPR巡回って？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>自分のリポジトリのPRを順番に開いて確認</span></li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">CI</span> が通ったか、コメントが来ていないか見る</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>残対応の有無を頭のなかで整理する</span></li>
+          <li><i class="fa-solid fa-repeat fa-lg" aria-hidden="true"></i><span>これを<span class="highlight-word">毎朝くり返す</span>のが地味にしんどい</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-tired fa-lg" style="color:var(--ui-color-5);"></i>
+            「開き直る」作業、あなたも<br>やっていませんか…？
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3: 手作業の課題 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="color:var(--ui-color-5); animation: fa-shake 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>手作業巡回の課題</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>確認だけで朝の<span class="keyword-tag">頭のいい時間</span>が消える</span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>ポジションによってはPRの<span class="keyword-tag">見落とし</span>も起こりやすい</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>「何か残ってたっけ？」の記憶あてが不安</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>規模が伸びると、巡回コストも<span class="highlight-word">比例して増える</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-bolt fa-lg" style="color:var(--ui-color-5);"></i>
+            まず「課題を言葉にする」のが<br>自動化の第一歩になります
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4: Codexとは -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="color:var(--ui-color-1); animation: fa-flip 3.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Codexってなに？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-brands fa-openai fa-lg" aria-hidden="true"></i><span>OpenAIが提供する<span class="keyword-tag">コーディングエージェント</span></span></li>
+          <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>リポジトリを読んで、調査・修正・報告まで代行</span></li>
+          <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>普段は<span class="keyword-tag">チャット</span>で、人間が対話しながら使う</span></li>
+          <li><i class="fa-solid fa-calendar-check fa-lg" aria-hidden="true"></i><span>さらに<span class="keyword-tag">予定タスク</span>にすると、時間で勝手に動く</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-circle-info fa-lg" style="color:var(--ui-color-2);"></i>
+            今回は「報告を任せる」使い方に<br>絞って紹介します
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5: 予定タスクとは -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-calendar-days fa-5x" style="color:var(--ui-color-2); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>予定タスク（スケジュール実行）</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>決まった時刻に、Codexが<span class="keyword-tag">自動で起動</span>する仕組み</span></li>
+          <li><i class="fa-solid fa-note-sticky fa-lg" aria-hidden="true"></i><span>動かす中身は <span class="keyword-tag">予定タスク向けメモ</span> に書いておく</span></li>
+          <li><i class="fa-solid fa-envelope-open-text fa-lg" aria-hidden="true"></i><span>朝、結果が<span class="highlight-word">レポートとして届く</span>イメージ</span></li>
+          <li><i class="fa-solid fa-user-clock fa-lg" aria-hidden="true"></i><span>自分が作業を始める前に、状況を把握できる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-arrow-right fa-lg" style="color:var(--ui-color-2);"></i>
+            「毎朝やる」作業こそ<br>予定化と相性がいい！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6: 予定タスク向けメモの型 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-note-sticky fa-5x" style="color:var(--ui-color-5); animation: fa-bounce 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>メモの書き方の型</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span>確認対象をはっきり書く（例: 自分のPR）</span></li>
+          <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span>見る項目を列挙する（<span class="keyword-tag">CI</span>・コメント・残対応）</span></li>
+          <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span>報告の<span class="keyword-tag">形式</span>まで指定する（三つで、など）</span></li>
+        </ul>
+        <pre><span class="cmt"># 予定タスク向けメモ（たたき台）</span>
+毎朝、自分のPRを確認して
+  1. CIの成否
+  2. レビューコメント
+  3. 残った対応
+の三つに分けて報告して</pre>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-pen fa-lg" style="color:var(--ui-color-5);"></i>
+            「何を・どう報告するか」を<br>箇条書きにするだけでOK
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7: 今日試すこと -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-play fa-5x" style="color:var(--ui-color-1); animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>今日試すこと（一つだけ）</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">通常チャット</span> でCodexに頼んでみる</span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>いきなり予定化せず、まず<span class="highlight-word">対話で動くか確認</span></span></li>
+          <li><i class="fa-solid fa-vial fa-lg" aria-hidden="true"></i><span>小さく試す → 様子を見る → 直す、の流れ</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i><span>結果が良さそうなら、次は<span class="keyword-tag">予定化</span>へ進む</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-seedling fa-lg" style="color:var(--ui-color-2);"></i>
+            最初から完璧に作らなくていい。<br>今日は「頼んでみる」だけ！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8: プロンプト例 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="color:var(--ui-color-2); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>そのまま使える聞き方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-quote-left fa-lg" aria-hidden="true"></i><span>動画で紹介された一文がこちら ↓</span></li>
+          <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">三つで報告</span> と報告形式まで指定するのがコツ</span></li>
+        </ul>
+        <pre><span class="cmt">// 通常チャットにそのまま貼る</span>
+「<span class="hl">PRのCI、レビューコメント、
+残った対応を三つで報告</span>」</pre>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-copy fa-lg" style="color:var(--ui-color-2);"></i>
+            長い指示じゃなくていい。<br>
+            <span class="keyword-tag">対象</span>と<span class="keyword-tag">形式</span>が伝われば動く！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9: 報告の三要素 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color:var(--ui-color-5); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>報告の三要素</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>① <span class="keyword-tag">CI</span>: テストとビルドが通ったかどうか</span></li>
+          <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>② <span class="keyword-tag">レビューコメント</span>: 指摘や返信の有無</span></li>
+          <li><i class="fa-solid fa-clipboard-list fa-lg" aria-hidden="true"></i><span>③ <span class="keyword-tag">残った対応</span>: まだ手が付いていないタスク</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-square-check fa-lg" aria-hidden="true"></i><span>この三つを見れば朝の<span class="highlight-word">全体像がつかめる</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-layer-group fa-lg" style="color:var(--ui-color-5);"></i>
+            「三つ」に絞るから<br>読みやすい報告になるんです
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10: まず通常チャットで -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comments fa-5x" style="color:var(--ui-color-1); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>まずは通常チャットで</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-paper-plane fa-lg" aria-hidden="true"></i><span>予定タスクにする<span class="keyword-tag">前</span>に、まず普通に頼む</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart fa-lg" aria-hidden="true"></i><span>自分のPRをきちんと拾ってくるか<span class="highlight-word">観察</span></span></li>
+          <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span>ズレていたら、その場で指示を直せる</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span>期待どおりの報告が返るかが<span class="keyword-tag">品質チェック</span></span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten">
+            <i class="fa-solid fa-keyboard fa-lg" style="color:var(--ui-color-2);"></i>
+            チャットは「練習場」。<br>納得してから予定化へ進もう
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11: 最初の数回は見直す -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass fa-5x" style="color:var(--ui-color-2); animation: fa-shake 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>最初の数回は見直す</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>予定化の前は、結果を<span class="keyword-tag">必ず見直す</span>のがセット</span></li>
+          <li><i class="fa-solid fa-file-circle-check fa-lg" aria-hidden="true"></i><span>報告が事実と合っているか、元のPRと突き合わせる</span></li>
+          <li><i class="fa-solid fa-ruler fa-lg" aria-hidden="true"></i><span>数回くり返して、<span class="highlight-word">精度の基準</span>を作っておく</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span>信頼できるまでは、鵜呑みにしない</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-scale-balanced fa-lg" style="color:var(--ui-color-2);"></i>
+            「自動化＝丸投げ」じゃない。<br>
+            導入期の<span class="keyword-tag">点検</span>が信頼を生みます
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12: 権限を絞る -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-shield fa-5x" style="color:var(--ui-color-5); animation: fa-beat 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>権限は必要な範囲だけ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i><span>予定化にあたり <span class="keyword-tag">権限設定</span> を見直す</span></li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>今回の用途は報告中心 → <span class="highlight-word">読み取り中心</span>で十分</span></li>
+          <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>書き込みや実行が不要なら、広めに渡さない</span></li>
+          <li><i class="fa-solid fa-arrow-down-short-wide fa-lg" aria-hidden="true"></i><span>権限は<span class="keyword-tag">最小から始めて</span>、足りない分だけ足す</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-lock fa-lg" style="color:var(--ui-color-5);"></i>
+            「報告だけ」のタスクに<br>強い権限は要りません！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13: サンドボックス -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-box fa-5x" style="color:var(--ui-color-1); animation: fa-flip 3.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>サンドボックスとは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span>エージェントの作業を<span class="keyword-tag">閉じた箱のなか</span>で行う仕組み</span></li>
+          <li><i class="fa-solid fa-shield fa-lg" aria-hidden="true"></i><span>外のファイルや環境へ、むやみに触らせない</span></li>
+          <li><i class="fa-solid fa-gauge-simple-high fa-lg" aria-hidden="true"></i><span>特に<span class="highlight-word">定期で勝手に動く</span>タスクでは重要な安全装置</span></li>
+          <li><i class="fa-solid fa-circle-nodes fa-lg" aria-hidden="true"></i><span>ネットワークやファイルアクセスを範囲で制限</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-circle-question fa-lg" style="color:var(--ui-color-2);"></i>
+            「箱のなかだけ動けますよ」<br>という<span class="keyword-tag">遊び場の柵</span>ですね
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14: サンドボックスの絞り方 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-filter fa-5x" style="color:var(--ui-color-2); animation: fa-beat-fade 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>サンドボックスの絞り方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-crosshairs fa-lg" aria-hidden="true"></i><span>タスクの目的に合わせて<span class="keyword-tag">必要な範囲</span>に限定</span></li>
+          <li><i class="fa-solid fa-folder-tree fa-lg" aria-hidden="true"></i><span>参照するのは対象リポジトリ周りだけに</span></li>
+          <li><i class="fa-solid fa-plug-circle-xmark fa-lg" aria-hidden="true"></i><span>使わないネットワーク接続は<span class="highlight-word">オフに寄せる</span></span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>権限とセットで整えると、<span class="keyword-tag">安全な定期実行</span>に</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-handshake-angle fa-lg" style="color:var(--ui-color-2);"></i>
+            柵を先に作ってから<br>放流するイメージです
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15: 予定化へのステップ -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-stairs fa-5x" style="color:var(--ui-color-5); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>予定化までの流れ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span>通常チャットで依頼文を試す</span></li>
+          <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span>最初の数回、<span class="keyword-tag">結果を見直して調整</span></span></li>
+          <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span>権限とサンドボックスを絞める</span></li>
+          <li><i class="fa-solid fa-4 fa-lg" aria-hidden="true"></i><span>依頼文を <span class="keyword-tag">予定タスク向けメモ</span> に移す</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-flag-checkered fa-lg" aria-hidden="true"></i><span>毎朝<span class="highlight-word">自動で報告</span>が届く状態へ！</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-route fa-lg" style="color:var(--ui-color-5);"></i>
+            一気にやらず、<br>段階的に上げるのが肝心
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 16: 自動化後の朝 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sun fa-5x" style="color:var(--ui-color-2); animation: fa-beat 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>自動化が回る朝</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-envelope fa-lg" aria-hidden="true"></i><span>朝いちばんに <span class="keyword-tag">三項目の報告</span> が待っている</span></li>
+          <li><i class="fa-solid fa-mug-saucer fa-lg" aria-hidden="true"></i><span>PR巡回の時間を<span class="highlight-word">コーヒー一杯ぶん</span>取り戻す</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>判断に集中でき、作業の着手が早くなる</span></li>
+          <li><i class="fa-solid fa-face-smile fa-lg" aria-hidden="true"></i><span>「開き直る」ストレスからもおさらば</span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten">
+            <i class="fa-solid fa-heart fa-lg" style="color:var(--ui-color-2);"></i>
+            朝の脳のいい時間を<br>本来の仕事に使えます！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 17: 効果とまとめ -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="color:var(--ui-color-1); animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>この取り組みの効果</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list blue-icons">
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>巡回の手間を <span class="keyword-tag">定期レポート</span> に置き換え</span></li>
+          <li><i class="fa-solid fa-square-check fa-lg" aria-hidden="true"></i><span>見るべき項目が決まっているから<span class="highlight-word">見落としが減る</span></span></li>
+          <li><i class="fa-solid fa-door-closed fa-lg" aria-hidden="true"></i><span>権限とサンドボックスの絞り込みで安心して運用</span></li>
+          <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>同じ型が他の<span class="keyword-tag">毎日の確認作業</span>にも転用可</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2);"></i>
+            「毎朝〇〇を確認」は全部<br>自動化の候補になります！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 18: まとめ -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color:var(--ui-color-5); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>まとめ: 今日から一歩</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>まず通常チャットで「三つで報告」を頼む</span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>予定化の前は、最初の数回しっかり見直す</span></li>
+          <li><i class="fa-solid fa-lock fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">権限</span>と<span class="keyword-tag">サンドボックス</span>は必要な範囲に絞る</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>うまくいったら、毎朝の<span class="highlight-word">予定タスク</span>へ昇格</span></li>
+        </ul>
+        <pre><span class="cmt">// 今日のひとこと</span>
+PR確認はCodexに任せて、
+朝の頭は<span class="hl">本題</span>に使おう</pre>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-thumbs-up fa-lg" style="color:var(--ui-color-5);"></i>
+            小さく始めて、様子を見て、<br>それから回す。これが鉄則！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /.section-layout -->
+
+  <!-- ==== フッター ==== -->
+  <footer class="main-footer">
+    <p class="video-link">🎬 動画: <a href="https://www.youtube.com/watch?v=BlIBrfblaKA" target="_blank" rel="noopener">あきらパパのAI活用学習部屋</a> ／ 「Codex｜PR確認、もう毎朝開き直さない」</p>
+    <p><i class="fa-solid fa-circle-info"></i> このインフォグラフィックは動画概要欄を元に作成しています。</p>
+    <p class="footer-tags">
+      <span class="keyword-tag">#Codex</span>
+      <span class="keyword-tag">#AI活用</span>
+      <span class="keyword-tag">#ChatGPT</span>
+      <span class="keyword-tag">#プログラミング</span>
+      <span class="keyword-tag">#業務効率化</span>
+    </p>
+  </footer>
+
+</div><!-- /.page -->
+</body>
+</html>

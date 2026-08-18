@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="EricssonがGemini Enterprise Agent Platformでネットワークの根本原因分析(RCA)を数時間から数分に短縮した事例を、グラフィックレコード風の1枚HTMLにまとめました（Google Cloud Tech の動画より）。">
+<title>Ericsson×Gemini エンタープライズエージェントで通信ネットワークの問題解決を加速（Google Cloud Tech）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+  /* ============ カラーテーマ（この動画専用: ミッドナイトインディゴ×シャンパンゴールド） ============ */
+  :root {
+        --ui-color-1: #1F3F61;  /* ミッドナイトインディゴ: メイン */
+    --ui-color-2: #D08C3C;  /* シャンパンゴールド: アクセント */
+    --ui-color-3: #F7EDDF;  /* 生成りのベール: タグ背景 */
+    --ui-color-4: #1E2A38;  /* チャコールネイビー: 濃い文字 */
+    --ui-color-5: #2F6E5E;  /* ディープスプリング: サブ */
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #FFF8F5;
+    background-image:
+      radial-gradient(circle at 8% 4%, rgba(208,140,60,0.13) 0, transparent 34%),
+      radial-gradient(circle at 94% 55%, rgba(22,50,79,0.07) 0, transparent 36%),
+      radial-gradient(circle at 45% 96%, rgba(47,110,94,0.08) 0, transparent 30%);
+    color: #333333;
+    font-family: 'Zen Kurenaido', 'Hiragino Kaku Gothic ProN', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .container {
+    max-width: 2000px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 30px 24px 10px;
+  }
+
+  /* ============ ヘッダー ============ */
+  .main-header {
+    text-align: center;
+    padding: 40px 15px 8px;
+  }
+  .main-header .header-icon {
+    color: var(--ui-color-1);
+    filter: drop-shadow(4px 5px 0 rgba(208,140,60,0.45));
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  .main-header h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #333333;
+    margin: 10px 0 8px;
+    line-height: 1.4;
+  }
+  .main-header h1 .accent { color: var(--ui-color-2); }
+  .main-header .subtitle {
+    font-size: 18px;
+    color: var(--ui-color-1);
+    margin: 4px 0;
+    font-weight: bold;
+  }
+  .main-header .date-note {
+    font-size: 14px;
+    color: #777777;
+    margin: 8px 0 0;
+  }
+  .main-header .date-note i { color: var(--ui-color-2); }
+
+  /* 動画のハイライトチップ */
+  .key-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 24px auto 6px;
+    padding: 14px 16px;
+    max-width: 1400px;
+    background: #ffffff;
+    border: 3px dashed var(--ui-color-5);
+    border-radius: 22px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.07);
+  }
+  .key-stats .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ui-color-3);
+    color: var(--ui-color-4);
+    border-radius: 999px;
+    padding: 7px 15px;
+    font-size: 15px;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .key-stats .stat-chip i { color: var(--ui-color-1); }
+
+  /* ============ セクション見出し ============ */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 44px 6px 16px;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ui-color-1);
+  }
+  .section-title .st-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: var(--ui-color-3);
+    color: var(--ui-color-2);
+    flex-shrink: 0;
+  }
+  .section-title .st-line {
+    flex: 1;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ui-color-5), transparent);
+    border-radius: 3px;
+  }
+
+  /* ============ カードレイアウト（4カラム・レスポンシブ） ============ */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  .section-card {
+    flex: 1 1 calc(25% - 20px);
+    min-width: 260px;
+    max-width: 460px;
+    background-color: #ffffff;
+    border-radius: 20px;
+    border-top: 6px solid var(--ui-color-1);
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow .3s ease, transform .3s ease, border-color .3s ease;
+  }
+  .section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 10px 22px rgba(22,50,79,0.18);
+    border-top-color: var(--ui-color-2);
+  }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0 5px;
+  }
+  .mega-icon-container i.mega-icon { color: var(--ui-color-1); }
+  .mega-icon-container h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: #555555;
+    margin: 12px 0 4px;
+    line-height: 1.4;
+  }
+  .mega-icon-container .card-sub {
+    font-size: 14px;
+    color: #777777;
+    margin: 0;
+  }
+
+  .card-content { padding: 0 10px 12px; }
+
+  .keyword-list {
+    margin: 15px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+  .keyword-list li {
+    margin-bottom: 9px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: #333333;
+    line-height: 1.55;
+  }
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 18px;
+    margin-top: 4px;
+  }
+
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin: 0 5px 2px 2px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  /* ============ 手書き風 吹き出し ============ */
+  .speech-bubble {
+    position: relative;
+    background: #ffffff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 18px 5px 12px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+  }
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+  .speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+  .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+  .speech-bubble.variant-2 {
+    background: #E4F2EC;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+  .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333333;
+    display: inline-block;
+  }
+  .handwritten i { color: var(--ui-color-2); }
+
+  /* ============ コードプレビュー ============ */
+  pre {
+    background: #f5f5f5;
+    border-left: 4px solid var(--ui-color-5);
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    color: #333333;
+    line-height: 1.5;
+  }
+  pre .c { color: var(--ui-color-2); }
+
+  /* ============ フッター ============ */
+  .main-footer {
+    margin-top: 50px;
+    padding: 26px 18px 30px;
+    border-top: 3px dashed var(--ui-color-2);
+    text-align: center;
+    font-size: 14px;
+    color: #666666;
+    line-height: 2;
+  }
+  .main-footer a { color: var(--ui-color-1); font-weight: bold; }
+  .main-footer .footer-source { font-size: 15px; }
+  .main-footer i { color: var(--ui-color-2); }
+
+  /* ============ アニメーション ============ */
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.92) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .fade-in-scale { animation: fadeInScale .7s ease-out backwards; }
+
+  /* スクロール連動のカード出現 */
+  .reveal-card { opacity: 0; }
+  .reveal-card.revealed {
+    opacity: 1;
+    animation: fadeInScale .65s ease-out backwards;
+  }
+
+  /* ============ レスポンシブ ============ */
+  @media (max-width: 1600px) {
+    .section-card { flex-basis: calc(25% - 20px); min-width: 280px; }
+  }
+  @media (max-width: 1400px) {
+    .section-card { flex-basis: calc(33.3% - 20px); }
+  }
+  @media (max-width: 1200px) {
+    .section-card { flex-basis: calc(33.3% - 20px); min-width: 320px; }
+  }
+  @media (max-width: 900px) {
+    .section-card { flex-basis: calc(50% - 20px); min-width: 320px; }
+  }
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; max-width: none; flex-basis: auto; }
+    .main-header h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header class="main-header fade-in-scale">
+    <div class="header-icon">
+      <i class="fa-solid fa-tower-cell fa-7x fa-beat-fade" aria-hidden="true"></i>
+    </div>
+    <h1>Ericsson×Gemini で通信網の<br>問題解決を<span class="accent">数時間から数分</span>へ</h1>
+    <p class="subtitle">Gemini Enterprise Agent Platform と OSS/BSS を統合した、プロアクティブなクローズドループの実例</p>
+    <p class="date-note"><i class="fa-solid fa-calendar-days fa-lg" aria-hidden="true"></i> 2026年8月18日公開　<i class="fa-solid fa-tv fa-lg" aria-hidden="true"></i> Google Cloud Tech（New Way Now）</p>
+  </header>
+
+  <div class="key-stats fade-in-scale">
+    <span class="stat-chip"><i class="fa-solid fa-stopwatch fa-lg" aria-hidden="true"></i>RCA が数時間 → 数分に</span>
+    <span class="stat-chip"><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i>エージェントが問題を特定・解決</span>
+    <span class="stat-chip"><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i>Google Cloud でデータ基盤構築</span>
+    <span class="stat-chip"><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i>クローズドループ自動化</span>
+    <span class="stat-chip"><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i>ROI とサービス立ち上げを加速</span>
+  </div>
+
+  <!-- ================= セクションA：背景と課題 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-tower-broadcast fa-lg" aria-hidden="true"></i></span>
+    背景と課題 —— 通信事業者が抱える壁
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-tower-cell fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>テレコム業界の現実</h2>
+        <p class="card-sub">Ericsson が挑む領域</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-globe fa-lg" aria-hidden="true"></i><span>世界各地の通信事業者（テレビ電話会社）にネットワーク機器とソフトウェアを提供する<span class="keyword-tag">Ericsson</span>。</span></li>
+          <li><i class="fa-solid fa-users fa-lg" aria-hidden="true"></i><span>その顧客である事業者は、何百万もの加入者に<span class="keyword-tag">24時間サービス</span>を提供し続ける使命がある。</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>ネットワークは巨大で複雑。障害の原因を突き止めるのは、昔から<span class="keyword-tag">大変な作業</span>だった。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i> 通信網が止まると、加入者の生活も仕事も止まる。だからこそ原因究明は急ぎの案件！</span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-gear fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>RCA の属人化と低速</h2>
+        <p class="card-sub">根本原因分析の壁</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>ネットワークで問題が起きたとき、その<span class="keyword-tag">根本原因</span>を分析する作業（RCA）はベテランエンジニアの<span class="keyword-tag">経験と勘</span>に頼ってきた。</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>膨大なログと警報を目で追うため、原因特定に<span class="keyword-tag">数時間</span>かかることも珍しくない。</span></li>
+          <li><i class="fa-solid fa-user-secret fa-lg" aria-hidden="true"></i><span>知識が特定の人に偏る<span class="keyword-tag">属人化</span>が進み、担当者が不在だと解決がさらに遅れる。</span></li>
+          <li><i class="fa-solid fa-thumbs-down fa-lg" aria-hidden="true"></i><span>同じような障害が起きても、毎回<span class="keyword-tag">手作業</span>での調査やり直しに。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg" aria-hidden="true"></i> 「原因不明のまま復旧して、また再発」の繰り返しから抜け出したい！</span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-timeline fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>対応が後手に回る構図</h2>
+        <p class="card-sub">リアクティブな運用の限界</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bell fa-lg" aria-hidden="true"></i><span>多くの運用は、障害が起きてから動く<span class="keyword-tag">リアクティブ</span>（受身の対応）方式。</span></li>
+          <li><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i><span>警報が鳴る → 調査 → 対応という流れでは、加入者が被害を受けてから<span class="keyword-tag">復旧作業</span>が始まる。</span></li>
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>エンジニアの時間は調査に取られ、<span class="keyword-tag">新サービス開発</span>に回せないジレンマも。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i> 「起きてから直す」ではなく「起きる前に防ぐ」運用への転換が鍵！</span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>OSS/BSS ポートフォリオ</h2>
+        <p class="card-sub">通信運用の土台となるシステム群</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">OSS</span>（運用支援システム）はネットワークの監視・設定・障害管理を支える仕組み。</span></li>
+          <li><i class="fa-solid fa-file-invoice-dollar fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">BSS</span>（業務支援システム）は契約・課金・顧客管理などを担う仕組み。</span></li>
+          <li><i class="fa-solid fa-handshake fa-lg" aria-hidden="true"></i><span>Ericsson はこの OSS/BSS ポートフォリオと Gemini Enterprise Agent Platform を<span class="keyword-tag">統合</span>。</span></li>
+          <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>既存の運用システムを壊さず、その上に<span class="keyword-tag">AIエージェント</span>の層を重ねる設計。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i> すでに動いている通信の基幹システムと、新しいAIをどう組み合わせるかが勝負どころ！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションB：データ基盤の構築 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i></span>
+    第1段階 —— Google Cloud でデータ基盤をつくる
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-filter fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>ネットワークデータを濾す</h2>
+        <p class="card-sub">フィルタリング</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wave-square fa-lg" aria-hidden="true"></i><span>ネットワークからは、警報・ログ・性能データなど<span class="keyword-tag">膨大なデータ</span>が絶えず流れてくる。</span></li>
+          <li><i class="fa-solid fa-filter-circle-xmark fa-lg" aria-hidden="true"></i><span>Google Cloud のツールでノイズを除き、<span class="keyword-tag">意味のあるデータ</span>だけを取り出す。</span></li>
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>この下ごしらえがあるからこそ、AIエージェントが<span class="keyword-tag">正確に判断</span>できる。</span></li>
+        </ul>
+        <pre><span class="c"># データの下ごしらえ（イメージ）</span>
+raw_network_data
+  → filter: 雑音を除去
+  → いる信号だけを残す</pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i> 料理と同じで、素材の下ごしらえが味を決める。AIの精度はここから！</span>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>データをまとめて集約</h2>
+        <p class="card-sub">重ね合わせて一枚岩に</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-boxes-stacked fa-lg" aria-hidden="true"></i><span>機器ごと・システムごとに散らばっていたデータを、Google Cloud 上に<span class="keyword-tag">集約</span>。</span></li>
+          <li><i class="fa-solid fa-table-columns fa-lg" aria-hidden="true"></i><span>別々の形式で保存されていた情報を、扱いやすい形に<span class="keyword-tag">整えて統合</span>。</span></li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>ネットワーク全体を<span class="keyword-tag">一望できる</span>データ基盤ができあがる。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i> ばらばらの情報を1か所に集めるだけで、見えてくる問題の全体像がある！</span>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>データ同士を関係づける</h2>
+        <p class="card-sub">相関化で原因が見える</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>「この警報と、この機器のログは<span class="keyword-tag">つながっている</span>」という関連付け（相関化）をデータ側で表現。</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart fa-lg" aria-hidden="true"></i><span>個別のイベントを並べて読み解くのではなく、<span class="keyword-tag">因果のつながり</span>として捉えられる。</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>この相関の糸をたどれば、根本原因に<span class="keyword-tag">一気に近づける</span>。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top variant-2">
+        <span class="handwritten"><i class="fa-solid fa-diagram-successor fa-lg" aria-hidden="true"></i> 点のデータを線でつなぐと、「なんとなく変」が「ここが原因」に変わる！</span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-warehouse fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>エージェントの土台完成</h2>
+        <p class="card-sub">判断できる状態への準備</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>濾す・集約・関係づけの3ステップで、<span class="keyword-tag">分析可能なデータ基盤</span>が完成。</span></li>
+          <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>この土台の上でなら、AIエージェントは迷わず<span class="keyword-tag">データを読んで推理</span>できる。</span></li>
+          <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>基盤づくり → エージェント構築 → 自動解決、という<span class="keyword-tag">順番</span>が重要。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-stairs fa-lg" aria-hidden="true"></i> いきなりAIに全部任せるのではなく、まずは<span class="keyword-tag">足場</span>を固めるのが正攻法！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションC：エージェント構築とオーケストレーション ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i></span>
+    第2段階 —— エージェントを構築・指揮する
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード9 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-landmark fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>Gemini Enterprise Agent Platform</h2>
+        <p class="card-sub">企業向けエージェント基盤</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i><span>Google が企業向けに提供する、AIエージェントを<span class="keyword-tag">構築・運用するための基盤</span>。</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span>エンタープライズ向けの<span class="keyword-tag">ガバナンス</span>やセキュリティの仕組みを備える。</span></li>
+          <li><i class="fa-solid fa-network-wired fa-lg" aria-hidden="true"></i><span>Ericsson はこの上に、ネットワーク運用に特化した<span class="keyword-tag">エージェント群</span>を構築。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i> 遊びのAIではなく、企業の基幹運用に耐えるエージェント基盤である点が要点！</span>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>問題を特定するエージェント</h2>
+        <p class="card-sub">自律的な原因の突き止め</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>データ基盤上の情報を自ら読み、<span class="keyword-tag">根本原因</span>を特定するエージェント。</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>警報とログの<span class="keyword-tag">相関</span>を追いかけ、人のように推理して結論を出す。</span></li>
+          <li><i class="fa-solid fa-stopwatch fa-lg" aria-hidden="true"></i><span>従来<span class="keyword-tag">数時間</span>かかっていた RCA が、<span class="keyword-tag">数分</span>に短縮。</span></li>
+          <li><i class="fa-solid fa-user-slash fa-lg" aria-hidden="true"></i><span>ベテランの経験に頼らず、誰がいても同じ<span class="keyword-tag">品質の分析</span>が可能に。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i> 「数時間 → 数分」は単なる高速化ではなく、<span class="keyword-tag">対応の質そのもの</span>が変わる進化！</span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wrench fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>問題を解決するエージェント</h2>
+        <p class="card-sub">特定したら、次は修復へ</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>原因を特定するだけでなく、<span class="keyword-tag">解決まで実行</span>するエージェントも用意。</span></li>
+          <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i><span>復旧処理や設定変更などを、手順に沿って<span class="keyword-tag">自動で処理</span>。</span></li>
+          <li><i class="fa-solid fa-arrow-right-arrow-left fa-lg" aria-hidden="true"></i><span>「調べて、直して、確認する」の一連の流れを<span class="keyword-tag">人手を介さず</span>完結。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i> 「発見」と「修復」を別々のエージェントが分担するのが、この仕組みの肝！</span>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-person-conducting-string-quartet fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>オーケストレーション</h2>
+        <p class="card-sub">エージェントたちの指揮者</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>複数のエージェントの動きを、プラットフォーム上で<span class="keyword-tag">指揮・調整</span>（オーケストレーション）。</span></li>
+          <li><i class="fa-solid fa-diagram-successor fa-lg" aria-hidden="true"></i><span>どのエージェントが何を担当し、結果をどう渡すかの<span class="keyword-tag">流れを設計</span>。</span></li>
+          <li><i class="fa-solid fa-users-gear fa-lg" aria-hidden="true"></i><span>特定の役割ごとにエージェントを用意し、<span class="keyword-tag">分担</span>して連携させる。</span></li>
+          <li><i class="fa-solid fa-music fa-lg" aria-hidden="true"></i><span>指揮者のもと、楽団のように<span class="keyword-tag">息を合わせた自動運用</span>が実現。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-person-conducting-string-quartet fa-lg" aria-hidden="true"></i> エージェント1体の賢さより、<span class="keyword-tag">指揮系統の設計</span>が全体の性能を決める！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションD：クローズドループと成果 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i></span>
+    第3段階 —— クローズドループが生む成果
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード13 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x mega-icon fa-spin" style="animation-duration:6s;" aria-hidden="true"></i>
+        <h2>プロアクティブなクローズドループ</h2>
+        <p class="card-sub">先回りの自動改善サイクル</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sync fa-lg" aria-hidden="true"></i><span>監視 → 原因特定 → 解決 → 学習を<span class="keyword-tag">循環</span>させるクローズドループ（閉じた環）。</span></li>
+          <li><i class="fa-solid fa-shoe-prints fa-lg" aria-hidden="true"></i><span>障害を待つのではなく、<span class="keyword-tag">先回りして検知・対処</span>するプロアクティブ運用へ。</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>回すほどに賢くなる、<span class="keyword-tag">自己改善</span>の仕組み。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-recycle fa-lg" aria-hidden="true"></i> 「起きてから直す」から「起こる前に整える」へ。環が回り続けるのが強み！</span>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>ROI 向上の構造</h2>
+        <p class="card-sub">投資対効果が上がる理由</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hourglass-end fa-lg" aria-hidden="true"></i><span>RCA の<span class="keyword-tag">所要時間が激減</span>し、エンジニアの工数が解放される。</span></li>
+          <li><i class="fa-solid fa-hand-holding-dollar fa-lg" aria-hidden="true"></i><span>障害の早期解決で<span class="keyword-tag">停止損失を抑制</span>し、収益を守る。</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span>属人化の解消で<span class="keyword-tag">研修コストを圧縮</span>、品質も安定。</span></li>
+          <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span>浮いたリソースを新サービスに再投資でき、<span class="keyword-tag">ROI が高まる</span>好循環。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i> 「時間を買う」投資として、プラットフォーム導入費用を回収していく発想！</span>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>新サービスの立ち上げ加速</h2>
+        <p class="card-sub">運用が軽くなると開発が進む</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>調査・復旧の自動化で、エンジニアが<span class="keyword-tag">新しい価値づくり</span>に集中できる。</span></li>
+          <li><i class="fa-solid fa-parachute-box fa-lg" aria-hidden="true"></i><span>新サービスの<span class="keyword-tag">立ち上げ（トライアル展開）も加速</span>。</span></li>
+          <li><i class="fa-solid fa-arrow-up-right-dots fa-lg" aria-hidden="true"></i><span>通信事業者はより速く<span class="keyword-tag">イノベーション</span>を起こせるようになった。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" aria-hidden="true"></i> 「守り」が自動化されたぶん、「攻め」に人の知恵を回せるのが最大の副産物！</span>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users fa-lg fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>加入者への好影響</h2>
+        <p class="card-sub">サービス提供に集中できる</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-signal fa-lg" aria-hidden="true"></i><span>障害の影響が小さく短くなり、加入者は<span class="keyword-tag">安定した通信</span>を楽しめる。</span></li>
+          <li><i class="fa-solid fa-headset fa-lg" aria-hidden="true"></i><span>事業者は障害対応に追われず、<span class="keyword-tag">サービス提供に集中</span>できるように。</span></li>
+          <li><i class="fa-solid fa-heart fa-lg" aria-hidden="true"></i><span>問題を<span class="keyword-tag">自律解決</span>できる通信網は、顧客満足の土台そのもの。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i> 果ては加入者の「つながるあたりまえ」を守る話。地味だけど価値は巨大！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションE：まとめと展望 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="fa-solid st-icon"><i class="fa-solid fa-compass fa-lg" aria-hidden="true"></i></span>
+    まとめ —— 他業界への示唆
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード17 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-ol fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>成功の型を分解する</h2>
+        <p class="card-sub">Ericsson がたどった3歩</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span>Google Cloud のツールでデータを<span class="keyword-tag">濾す・集約・関係づけ</span>し、基盤をつくる。</span></li>
+          <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span>Gemini Enterprise Agent Platform でエージェントを<span class="keyword-tag">構築・指揮</span>する。</span></li>
+          <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span>特定と解決を自動化し、<span class="keyword-tag">クローズドループ</span>で回し続ける。</span></li>
+        </ul>
+        <pre><span class="c"># 成功の型（要約）</span>
+data_platform()   # 1. データ基盤
+build_agents()    # 2. エージェント構築
+closed_loop()     # 3. 自動改善サイクル</pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-map fa-lg" aria-hidden="true"></i> 「基盤 → エージェント → 自動化」の3段構えは、どの業界にも当てはまる型！</span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-tie fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>登場人物と今後の道筋</h2>
+        <p class="card-sub">語り手とこれからの展望</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microphone-lines fa-lg" aria-hidden="true"></i><span>登場は <span class="keyword-tag">Jason Keane</span> 氏（Ericsson、ポートフォリオのビジネス・運用支援システム部門の責任者）。</span></li>
+          <li><i class="fa-solid fa-quote-left fa-lg" aria-hidden="true"></i><span>「New Way Now」シリーズの一編として、<span class="keyword-tag">現場の声</span>を伝える構成。</span></li>
+          <li><i class="fa-solid fa-road fa-lg" aria-hidden="true"></i><span>通信業以外でも、<span class="keyword-tag">データ基盤×エージェント</span>の組み合わせは転用可能。</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>問題を<span class="keyword-tag">自律解決</span>する組織づくりの参考にできる事例。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i> 自分の業界の「RCA に数時間」を、まず書き出してみると改善の糸口が見える！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer class="main-footer">
+    <p class="footer-source">🎬 動画: <a href="https://www.youtube.com/watch?v=63Y4KHNEXO0" target="_blank">Google Cloud Tech</a>「New Way Now: Ericsson boosts ROI and issue resolution with Gemini Enterprise Agent Platform」</p>
+    <p><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i> 出典: Google Cloud Tech「New Way Now」シリーズ（Ericsson OSS/BSS と Gemini Enterprise Agent Platform の統合事例）</p>
+    <p><i class="fa-solid fa-pen-nib fa-lg" aria-hidden="true"></i> この1枚は、動画の内容をグラフィックレコード風にまとめたものです（作成日: 2026年8月19日）。</p>
+  </footer>
+
+</div>
+
+<script>
+  // スクロールに連動したカードの出現効果（ふわっとスケールしながら）
+  document.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.section-card');
+    cards.forEach(function (card, i) {
+      card.style.animationDelay = ((i % 4) * 90) + 'ms';
+    });
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      cards.forEach(function (card) { io.observe(card); });
+    } else {
+      cards.forEach(function (card) { card.classList.add('revealed'); });
+    }
+  });
+</script>
+</body>
+</html>

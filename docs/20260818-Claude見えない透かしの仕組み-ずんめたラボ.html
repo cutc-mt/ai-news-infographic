@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claudeの文章に入る見えない透かしの仕組み｜ずんめたラボ</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ui-color-1: #6D597A; /* モーブパープル: メイン */
+  --ui-color-2: #B56576; /* ロージーレッド: アクセント */
+  --ui-color-3: #F5EBE0; /* クリーム背景: タグ背景 */
+  --ui-color-4: #2B2D42; /* ダークネイビー: タグ文字 */
+  --ui-color-5: #E56B6F; /* コーラル: 吹き出しバリエーション用 */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: #FFF8F5;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: #333333;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 40px 20px 30px;
+  background: linear-gradient(135deg, rgba(109,89,122,0.10), rgba(229,107,111,0.10));
+  border-radius: 24px;
+  margin-bottom: 30px;
+}
+
+.header .fa-7x { color: var(--ui-color-1); animation: fa-beat-fade 3s infinite; }
+
+.header h1 {
+  font-size: 36px;
+  color: #333333;
+  font-weight: bold;
+  margin: 15px 0 10px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.header .date { font-size: 14px; color: #777777; }
+.header .channel { font-size: 15px; color: var(--ui-color-2); margin-top: 6px; font-weight: bold; }
+
+/* レイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-1);
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.section-card:hover { background-color: rgba(245,235,224,0.45); transform: translateY(-4px); }
+.section-card.accent { border-top-color: var(--ui-color-2); }
+.section-card.coral { border-top-color: var(--ui-color-5); }
+
+.mega-icon-container { text-align: center; margin: 15px 0; }
+
+.mega-icon-container h2 {
+  font-size: 24px;
+  color: #555555;
+  margin-top: 10px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.card-content { padding: 0 10px 15px; }
+
+.list-heading { font-size: 18px; color: #333333; margin: 10px 0 6px; font-weight: bold; }
+
+.keyword-list { margin: 15px 0; padding: 0; list-style-type: none; }
+.keyword-list li { margin-bottom: 8px; display: flex; align-items: flex-start; font-size: 16px; color: #333333; }
+.keyword-list li i { margin-right: 8px; color: var(--ui-color-2); min-width: 18px; margin-top: 3px; }
+
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+/* 吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 18px 5px 15px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after { left: auto; right: 20px; }
+.speech-bubble.top::after { bottom: auto; top: -13px; border-width: 0 8px 12px; }
+
+.speech-bubble.variant-1 { background: #FFF9E3; border-color: var(--ui-color-2); transform: rotate(1deg); }
+.speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+
+.speech-bubble.variant-2 { background: #FFE9E9; border-color: var(--ui-color-5); transform: rotate(-2deg); }
+.speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+.handwritten { font-family: 'Yomogi', cursive; font-size: 15px; line-height: 1.5; color: #333; }
+
+/* フェードイン */
+.fade-in-scale { animation: fadeInScale 0.8s ease-out both; }
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 30px 20px;
+  margin-top: 30px;
+  font-size: 14px;
+  color: #777777;
+  border-top: 2px dashed var(--ui-color-1);
+}
+
+pre {
+  background: #f5f5f5;
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px) { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <i class="fa-solid fa-stamp fa-7x" aria-hidden="true"></i>
+    <h1>Claudeの文章に入る見えない透かしの仕組み</h1>
+    <p class="date"><i class="fa-solid fa-calendar fa-lg" style="color: var(--ui-color-2);"></i> 2026年8月18日</p>
+    <p class="channel"><i class="fa-solid fa-circle-play fa-lg" style="color: var(--ui-color-5);"></i> ずんめたラボ「Claudeの文章に見えない透かし 翻訳でも付き、あっても証拠にならない」</p>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- 1. 今回のトピック -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.05s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye-slash fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s infinite;" aria-hidden="true"></i>
+        <h2>見えない印のニュース</h2>
+      </div>
+      <div class="card-content">
+        <p class="list-heading"><i class="fa-solid fa-newspaper fa-lg" style="color: var(--ui-color-1);"></i> 今回のトピック</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>Claudeが書く文章に<span class="keyword-tag">見えない印</span>が入る仕組み</span></li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>入る場所は<span class="keyword-tag">文章そのもの</span>。あなたが読む文の中</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>見えないまま、大きな<span class="keyword-tag">3つの出来事</span>がすでに起きている</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 「僕の文章、全部バレちゃうのだ?」<br>冒頭でのだが不安がったこの話、<span class="keyword-tag">3つとも予想は外れ</span>だったのだ!</span>
+      </div>
+    </div>
+
+    <!-- 2. 出来事その1 -->
+    <div class="section-card accent fade-in-scale" style="animation-delay: 0.1s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-calendar-check fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>出来事① 印が始まった</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">8月2日以降</span>、Claudeのモデルは書いた文に印をつけ始めた</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>これは<span class="keyword-tag">もう始まっている</span>話。未来の予定じゃない</span></li>
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>対象はClaudeが書き出す<span class="keyword-tag">テキスト全般</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-bell fa-lg" style="color: var(--ui-color-2);"></i> 「もう始まってるのだ!」<br>気づかないうちに、<span class="keyword-tag">印つきの文</span>が出回っているのだ。</span>
+      </div>
+    </div>
+
+    <!-- 3. 出来事その2 -->
+    <div class="section-card coral fade-in-scale" style="animation-delay: 0.15s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-square-xmark fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>出来事② 剥がす道具も登場</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>印の発表の<span class="keyword-tag">直後</span>に、印を剥がすツールが公開された</span></li>
+          <li><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>公開のスピードが<span class="keyword-tag">とても速い</span></span></li>
+          <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>中身は後のカードで<span class="keyword-tag">詳しく解説</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-5);"></i> 「攻める人、早すぎるのだ…」<br>発表と同時に<span class="keyword-tag">剥がす側</span>も動き出したのだ。</span>
+      </div>
+    </div>
+
+    <!-- 4. 出来事その3 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.2s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>出来事③ 証明にならない</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>ここが<span class="keyword-tag">いちばん大事</span>なポイント</span></li>
+          <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>印は<span class="keyword-tag">あってもなくても証明にならない</span></span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>「証明にならない印って、何のため?」→ 理由は<span class="keyword-tag">法律の側</span>から見ると分かる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top variant-2">
+        <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color: var(--ui-color-5);"></i> 印は<span class="keyword-tag">証拠</span>ではなく「<span class="keyword-tag">かもしれない</span>」を教えるものなのだ。</span>
+      </div>
+    </div>
+
+    <!-- 5. EU AI法 透明性の義務 -->
+    <div class="section-card accent fade-in-scale" style="animation-delay: 0.25s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gavel fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>EU AI法の透明性の義務</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-book fa-lg" aria-hidden="true"></i><span>ヨーロッパのAI法には<span class="keyword-tag">透明性の義務</span>という項目がある</span></li>
+          <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>中身は単純: AIが作ったものには<span class="keyword-tag">機械が読める印</span>をつけなさい、ということ</span></li>
+          <li><i class="fa-solid fa-calendar-day fa-lg" aria-hidden="true"></i><span>義務の適用が<span class="keyword-tag">8月2日から開始</span></span></li>
+          <li><i class="fa-solid fa-signature fa-lg" aria-hidden="true"></i><span>Anthropicはその<span class="keyword-tag">行動規範に署名</span>。署名した組織は<span class="keyword-tag">約190</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-users fa-lg" style="color: var(--ui-color-2);"></i> <span class="keyword-tag">190組織</span>なら、Claudeだけの話じゃないのだ。他の開発元も<span class="keyword-tag">それぞれ独自の印</span>を入れてくる見込みなのだ。</span>
+      </div>
+    </div>
+
+    <!-- 6. 日本にも関係ある -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.3s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-earth-asia fa-5x" style="color: var(--ui-color-1); animation: fa-spin 8s infinite linear;" aria-hidden="true"></i>
+        <h2>日本にも関係ある理由</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>「でもヨーロッパの法律なら、日本の僕には関係ないのでは?」</span></li>
+          <li><i class="fa-solid fa-plane-departure fa-lg" aria-hidden="true"></i><span>ところが<span class="keyword-tag">関係あり</span>。<span class="keyword-tag">地域ごとに分ける</span>確実な方法がまだない</span></li>
+          <li><i class="fa-solid fa-globe fa-lg" aria-hidden="true"></i><span>だから最初から<span class="keyword-tag">世界中に同じように適用</span>されている</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i> 利用者の<span class="keyword-tag">居場所で絞れない</span>から、どこの国の人にも同じ印が入るのだ。</span>
+      </div>
+    </div>
+
+    <!-- 7. 対象は経路のほぼ全部 -->
+    <div class="section-card coral fade-in-scale" style="animation-delay: 0.35s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-door-open fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+        <h2>どこから使っても対象</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">チャット画面</span>も対象</span></li>
+          <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Claude Code</span>も対象</span></li>
+          <li><i class="fa-solid fa-user-gear fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">開発者向けの窓口</span>（API）も対象</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>使う経路の<span class="keyword-tag">ほぼ全部</span>に入る</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-arrow-right-arrow-left fa-lg" style="color: var(--ui-color-5);"></i> 画面を切り替えても、<span class="keyword-tag">どこから使っても印は入る</span>のだ。</span>
+      </div>
+    </div>
+
+    <!-- 8. 印の仕組み -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.4s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-dice fa-5x" style="color: var(--ui-color-1); animation: fa-shake 3s infinite;" aria-hidden="true"></i>
+        <h2>印の仕組み: サイコロの偏り</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen fa-lg" aria-hidden="true"></i><span>AIは文章を<span class="keyword-tag">1語ずつ順番に選んで</span>書いていく（少しずつ出てくる）</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>その途中に<span class="keyword-tag">どっちを選んでも意味が変わらない場所</span>が何度も出てくる</span></li>
+          <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span>公式の例: 「寒くて」の次を<span class="keyword-tag">「曇もり」or「どんより」</span>。読む側はどっちでも同じ</span></li>
+          <li><i class="fa-solid fa-dice-three fa-lg" aria-hidden="true"></i><span>普段はそこを<span class="keyword-tag">サイコロで決めている</span>ようなもの</span></li>
+          <li><i class="fa-solid fa-key fa-lg" aria-hidden="true"></i><span>そのサイコロを<span class="keyword-tag">秘密の鍵と直前の数語</span>から作るように変更。鍵を持つ人だけが並びを読める</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i> 文字は<span class="keyword-tag">1つも足していない</span>のに印になるのだ!単語の<span class="keyword-tag">選び方そのもの</span>が印なのだ。</span>
+      </div>
+    </div>
+
+    <!-- 9. 印の性質 -->
+    <div class="section-card accent fade-in-scale" style="animation-delay: 0.45s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-feather fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+        <h2>印で変わらないこと</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-text-height fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">文章は増えない</span>（文字を足さないから）</span></li>
+          <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">料金もかからない</span>（加算なし）</span></li>
+          <li><i class="fa-solid fa-gauge fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">速さもほとんど変わらない</span></span></li>
+          <li><i class="fa-solid fa-user-secret fa-lg" aria-hidden="true"></i><span>鍵にも印にも<span class="keyword-tag">誰が使ったかの情報は入っていない</span> → 個人は特定されない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-1);"></i> 見た目には<span class="keyword-tag">何も起きない</span>。「少し安心したのだ。」</span>
+      </div>
+    </div>
+
+    <!-- 10. 画像はC2PA -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.5s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-image fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s infinite;" aria-hidden="true"></i>
+        <h2>画像はC2PA方式</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-split fa-lg" aria-hidden="true"></i><span>画像は<span class="keyword-tag">方式が違う</span>。文章とは分けて考える</span></li>
+          <li><i class="fa-solid fa-file-image fa-lg" aria-hidden="true"></i><span>ファイルの<span class="keyword-tag">説明書きの部分（メタデータ）</span>に短い記録をつける</span></li>
+          <li><i class="fa-solid fa-camera fa-lg" aria-hidden="true"></i><span>写真の<span class="keyword-tag">撮影日やカメラの機種</span>が残る場所と同じ。いわば「写真の裏側の情報」</span></li>
+          <li><i class="fa-solid fa-signature fa-lg" aria-hidden="true"></i><span>Claudeが<span class="keyword-tag">作ったか触ったかの記録を署名付き</span>で残す</span></li>
+          <li><i class="fa-solid fa-certificate fa-lg" aria-hidden="true"></i><span>使うのは<span class="keyword-tag">C2PA</span>という業界共通の規格。<span class="keyword-tag">カメラ会社や写真編集ソフト</span>も使っている</span></li>
+          <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>対応ソフトなら読めるし、<span class="keyword-tag">後から書き換えられたか</span>も分かる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i> Anthropicはこれを<span class="keyword-tag">透かしとは別物</span>としている。中身（画素）には<span class="keyword-tag">何も埋めない</span>からなのだ。</span>
+      </div>
+    </div>
+
+    <!-- 11. 画像の記録は消えやすい -->
+    <div class="section-card coral fade-in-scale" style="animation-delay: 0.55s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eraser fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+        <h2>画像の記録は落ちやすい</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-arrow-down fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">形式を変えたり</span>、<span class="keyword-tag">画面を撮り直したり</span>すると記録ごと落ちる</span></li>
+          <li><i class="fa-solid fa-note-sticky fa-lg" aria-hidden="true"></i><span>中身ではなく<span class="keyword-tag">おまけの情報</span>だから、壊れやすい</span></li>
+          <li><i class="fa-solid fa-compare fa-lg" aria-hidden="true"></i><span>一方、文章の印は<span class="keyword-tag">単語の選び方</span>そのものなので頑丈</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i> 画像の記録は<span class="keyword-tag">意図せず消える</span>ことも多いのだ。取り扱い注意なのだ。</span>
+      </div>
+    </div>
+
+    <!-- 12. 印が入らない文 -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.6s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-filter-circle-xmark fa-5x" style="color: var(--ui-color-1); animation: fa-shake 4s infinite;" aria-hidden="true"></i>
+        <h2>印が入らない文もある</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-key fa-lg" aria-hidden="true"></i><span>鍵を仕込めるのは<span class="keyword-tag">選択肢がある場所だけ</span>だから</span></li>
+          <li><i class="fa-solid fa-calculator fa-lg" aria-hidden="true"></i><span>「満たすには、次ここは<span class="keyword-tag">4しか入らない</span>」ような文 → 選びようがない</span></li>
+          <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>有名な本の題名を答える文も同じ。<span class="keyword-tag">正解が1つ</span>なら印を入れる隙間がない</span></li>
+          <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>プログラムのコードも<span class="keyword-tag">原則は入らない</span>。別の書き方にすると動かなくなるから</span></li>
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>コードの中の<span class="keyword-tag">メモ書き（コメント）</span>のように自由に書ける部分だけ印が入る</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i> 「入らない文もあるのだ!」<br>選択の自由がない場所に印は入れない、というのが仕組みなのだ。</span>
+      </div>
+    </div>
+
+    <!-- 13. 翻訳には一番はっきり -->
+    <div class="section-card accent fade-in-scale" style="animation-delay: 0.65s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-language fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>翻訳には一番はっきり入る</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>「翻訳させただけなら大丈夫」→ 実は<span class="keyword-tag">逆</span></span></li>
+          <li><i class="fa-solid fa-pen-nib fa-lg" aria-hidden="true"></i><span>翻訳は<span class="keyword-tag">出てくる単語を全部Claudeが選ぶ</span>から、<span class="keyword-tag">いちばんはっきり印が入る</span></span></li>
+          <li><i class="fa-solid fa-user-pen fa-lg" aria-hidden="true"></i><span>自分で書いた文を訳してもらっただけでも印はつく</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-2);"></i> 「自分で書いた文なのに…」<br>ここが<span class="keyword-tag">いちばん意外</span>だったポイントなのだ!</span>
+      </div>
+    </div>
+
+    <!-- 14. 文法修正と長さ -->
+    <div class="section-card coral fade-in-scale" style="animation-delay: 0.7s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-ruler-horizontal fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3.2s infinite;" aria-hidden="true"></i>
+        <h2>検出の強さは使い方で変わる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-spell-check fa-lg" aria-hidden="true"></i><span>反対に、<span class="keyword-tag">文法的な点だけ直す使い方</span>は、選んだ語が少なくて<span class="keyword-tag">検出に届かない</span>ことがある</span></li>
+          <li><i class="fa-solid fa-align-left fa-lg" aria-hidden="true"></i><span>長さでも変わる: <span class="keyword-tag">短い文ほど精度が落ち</span>、<span class="keyword-tag">長い文ほど検出しやすく</span>なる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top right">
+        <span class="handwritten"><i class="fa-solid fa-arrow-down-short-wide fa-lg" style="color: var(--ui-color-5);"></i> 印の入り方は<span class="keyword-tag">グラデーション</span>。全部が同じ強さで入るわけではないのだ。</span>
+      </div>
+    </div>
+
+    <!-- 15. 剥がすツール -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.75s;">
+      <div class="mega-icon-container">
+        <i class="fa-brands fa-github fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.5s infinite;" aria-hidden="true"></i>
+        <h2>剥がすツールがGitHubに</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>発表直後に<span class="keyword-tag">GitHub</span>で公開。スター（いいねのような印）は<span class="keyword-tag">1万1600</span></span></li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">誰でも中身を見られる形</span>で公開。注目度はかなりの数</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>対応は<span class="keyword-tag">Claudeだけじゃない</span></span></li>
+        </ul>
+        <p class="list-heading"><i class="fa-solid fa-list-check fa-lg" style="color: var(--ui-color-1);"></i> ツールがやることは3つ</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">見えない特殊な文字の掃除</span>（Claudeの印は文字を足さないが、そういう作り方も世の中にはある）</span></li>
+          <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">本命: 別のAIに文章を丸ごと書き直させる</span>。書き直せば選んだ単語ごと変わる</span></li>
+          <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">画像やPDFから記録を剥がす</span>処理</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-user-shield fa-lg" style="color: var(--ui-color-2);"></i> 作者自身が<span class="keyword-tag">「確実ではない」と明記</span>。さらに「権限のある文章のためのもので、人が書いたと偽る不正のためではない」と<span class="keyword-tag">線を引いている</span>のだ。</span>
+      </div>
+    </div>
+
+    <!-- 16. あっても証拠にならない理由 -->
+    <div class="section-card accent fade-in-scale" style="animation-delay: 0.8s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-half-stroke fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+        <h2>あっても証拠にならない理由</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>検査は<span class="keyword-tag">ほどなく公開予定の専用の窓口</span>で行う予定。文章を通して鍵で並びを確かめる仕組み</span></li>
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>そこで出るのは<span class="keyword-tag">「Claudeが関わったっぽさ」だけ</span>。書いたか書いてないかではない</span></li>
+          <li><i class="fa-solid fa-arrows-split-up-and-left fa-lg" aria-hidden="true"></i><span>Claudeが<span class="keyword-tag">最初から書いたのか、あなたの文を直しただけかは区別できない</span>（翻訳と同じ）</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>印がなくても人の文章とは限らない: <span class="keyword-tag">古いモデルで書いた・大きく直した・短すぎて検出に届かなかった</span>、理由はいくらでもある</span></li>
+          <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>印で分かるのは<span class="keyword-tag">Claudeのことだけ</span>。他社のAIで書いたかは分からない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-scale-unbalanced fa-lg" style="color: var(--ui-color-5);"></i> つまり印は<span class="keyword-tag">「かもしれない」</span>。これを証拠のように扱うと、<span class="keyword-tag">人を疑う道具</span>になってしまうのだ。</span>
+      </div>
+    </div>
+
+    <!-- 17. 剥がすのは割に合わない -->
+    <div class="section-card fade-in-scale" style="animation-delay: 0.85s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate-left fa-5x" style="color: var(--ui-color-1); animation: fa-spin 6s infinite linear;" aria-hidden="true"></i>
+        <h2>剥がすのは割に合わない</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-equals fa-lg" aria-hidden="true"></i><span>剥がすことは<span class="keyword-tag">書き直すのと同じ</span>。印は単語の選び方そのものに散らばっている</span></li>
+          <li><i class="fa-solid fa-arrow-rotate-right fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">並べ替えても見出しを変えても動かない</span>。全部の言葉を入れ替えるしかない</span></li>
+          <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>しかも書き直すのは<span class="keyword-tag">別のAI</span>。文章の質は<span class="keyword-tag">書き直す側の実力までしか届かない</span></span></li>
+          <li><i class="fa-solid fa-sack-dollar fa-lg" aria-hidden="true"></i><span>ツールの説明書きにも断り書き: <span class="keyword-tag">「安いモデルで書き直す前提なら、高いモデルに払う意味は何か」</span>。剥がすことを推奨していない</span></li>
+          <li><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i><span>こうして書き直すほど、今度は<span class="keyword-tag">検出の精度の方が先に崩れる</span>ので見つけにくくもなる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color: var(--ui-color-1);"></i> 「消せるのに消さないのだ。」<br>上手なAIに書かせた意味がなくなるから、<span class="keyword-tag">消しに行かないのが正解</span>なのだ。</span>
+      </div>
+    </div>
+
+    <!-- 18. まとめ: 私たちがすべきこと -->
+    <div class="section-card accent fade-in-scale" style="animation-delay: 0.9s;">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2s infinite;" aria-hidden="true"></i>
+        <h2>私たちがすべき3つのこと</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">印を消しに行かない</span>こと（消し方が思っているより割に合わない）</span></li>
+          <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">翻訳・要約・構成をどこに使ったか、自分で言える</span>ようにしておくこと。提出物にルールがあるなら、印より先にそちらを確認</span></li>
+          <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">印を見て人を判定する側に回らない</span>こと。証拠扱いする人が出ると、いちばん困るのは書いた本人（疑われた側は証明できない）</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>本当に怖いのは印がバレることではなく、<span class="keyword-tag">印の弱さを知らない人が判定に使い始めること</span></span></li>
+        </ul>
+        <p class="list-heading"><i class="fa-solid fa-bullseye fa-lg" style="color: var(--ui-color-1);"></i> まとめの3行</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>印は<span class="keyword-tag">単語の選び方</span>に入っている。文章は増えず、料金も速さもほとんど変わらない</span></li>
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">翻訳にはっきり入り</span>、コード・式・短い文には入りにくい</span></li>
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>印は<span class="keyword-tag">あってもなくても証明にならない</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-2);"></i> 覚えて帰るのは1つでいい: <span class="keyword-tag">どこにAIを使ったかを言えるようにしておくこと</span>。次に動くのは検査の窓口が公開されてからなのだ。</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <p>🎬 動画: <a href="https://youtu.be/91sX3AtFo48" target="_blank" style="color: inherit;">ずんめたラボ</a>「Claudeの文章に見えない透かし 翻訳でも付き、あっても証拠にならない｜今知っておきたいAI透かしの話」</p>
+    <p style="margin-top: 6px;"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i> このインフォグラフィックは上の動画の内容を graphic recording 風にまとめたものです。</p>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloudflareとkote2ビルダーで作るファイル置き場（kote2のAI活用アイデア）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+:root{
+  /* ==== 指定カラーテーマ: サンセットオレンジ × ディープティール ==== */
+  --ui-color-1: #0F766E; /* ディープティール（メイン） */
+  --ui-color-2: #F97316; /* サンセットオレンジ（差し色・アイコン） */
+  --ui-color-3: #FFF1E4; /* ライトクリーム（タグ背景） */
+  --ui-color-4: #22333B; /* ダークスレート（テキスト） */
+  --ui-color-5: #C2410C; /* バーントオレンジ（注意・補強） */
+  --sunset-bg: #FFF8F3;  /* 夕焼け前のキャンバス */
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+
+body{
+  background-color: var(--sunset-bg);
+  background-image: radial-gradient(#F97316 1.2px, transparent 1.2px);
+  background-size: 28px 28px;
+  background-blend-mode: soft-light;
+  color: var(--ui-color-4);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  font-size:16px;
+  line-height:1.5;
+}
+
+.page{ max-width:2000px; margin:0 auto; padding:24px 20px 10px; }
+
+/* ==== ヘッダー ==== */
+header.main-header{
+  background:#fff;
+  border-radius:24px;
+  border:4px solid var(--ui-color-1);
+  box-shadow:6px 6px 18px rgba(15,118,110,.20);
+  padding:28px 30px 22px;
+  margin-bottom:26px;
+  text-align:center;
+  position:relative;
+}
+.main-header .fa-7x{ color:var(--ui-color-1); animation: fa-bounce 2.6s ease-in-out infinite; }
+.main-header h1{
+  font-size:36px; color:#333; font-weight:bold; margin:10px 0 6px;
+  font-family:'Kaisei Decol', serif;
+}
+.main-header .sub{ font-size:16px; color:var(--ui-color-1); margin-bottom:8px; }
+.main-header .date{ font-size:14px; color:#777; }
+.header-tags{ margin-top:12px; }
+.header-note{
+  position:absolute; top:14px; right:18px;
+  font-family:'Yomogi', cursive; font-size:14px; color:var(--ui-color-5);
+  transform:rotate(3deg);
+}
+
+/* ==== 4カラムレイアウト ==== */
+.section-layout{
+  display:flex; flex-wrap:wrap; gap:20px; justify-content:center; align-items:stretch;
+}
+
+/* ==== カード ==== */
+.section-card{
+  flex:1 1 calc(25% - 20px);
+  min-width:230px;
+  max-width:460px;
+  background-color:#fff;
+  border-radius:20px;
+  padding:15px;
+  box-shadow:5px 5px 15px rgba(0,0,0,.1);
+  border-top:6px solid var(--ui-color-1);
+  position:relative;
+  overflow:hidden;
+  transition: transform .3s ease, box-shadow .3s ease, background-color .3s ease;
+}
+.section-card:nth-child(even){ border-top-color:var(--ui-color-2); transform:rotate(.3deg); }
+.section-card:nth-child(3n){ border-top-color:var(--ui-color-5); }
+.section-card:hover{
+  transform:translateY(-6px) rotate(0deg);
+  box-shadow:8px 10px 24px rgba(15,118,110,.25);
+  background-color:#FFF9F4;
+}
+
+.step-number{
+  position:absolute; top:10px; left:12px;
+  width:34px; height:34px; line-height:34px; text-align:center;
+  background:var(--ui-color-1); color:#fff; border-radius:50%;
+  font-family:'Yomogi', cursive; font-size:16px; font-weight:bold;
+  box-shadow:2px 2px 6px rgba(0,0,0,.2);
+}
+
+.mega-icon-container{ text-align:center; margin:15px 0 5px; }
+.mega-icon-container h2{
+  font-size:24px; color:#555; font-weight:bold; margin-top:10px;
+  font-family:'Kaisei Decol', serif;
+}
+
+.card-content{ padding:0 10px 15px; }
+
+.keyword-list{ margin:15px 0; padding:0; list-style-type:none; }
+.keyword-list li{
+  margin-bottom:10px; display:flex; align-items:flex-start; font-size:16px; color:#333;
+}
+.keyword-list li i{
+  margin-right:8px; color:var(--ui-color-2); min-width:20px; margin-top:3px;
+}
+.keyword-list.teal-icons li i{ color:var(--ui-color-1); }
+.list-heading{ font-size:18px; color:#333; font-weight:bold; margin:12px 0 2px; }
+
+.keyword-tag{
+  background-color:var(--ui-color-3);
+  color:var(--ui-color-4);
+  padding:3px 8px;
+  border-radius:5px;
+  margin-right:5px;
+  display:inline-block;
+  font-weight:bold;
+  font-size:16px;
+}
+
+/* ==== 手書き風吹き出し（3種） ==== */
+.speech-bubble{
+  position:relative;
+  background:#fff;
+  border:3px solid var(--ui-color-1);
+  border-radius:20px;
+  padding:10px 15px;
+  margin:15px 5px;
+  font-family:'Yomogi', cursive;
+  box-shadow:3px 3px 10px rgba(0,0,0,.1);
+  transform:rotate(-1deg);
+}
+.speech-bubble::after{
+  content:'';
+  position:absolute;
+  bottom:-13px; left:20px;
+  border-width:12px 8px 0;
+  border-style:solid;
+  border-color:var(--ui-color-1) transparent;
+  display:block; width:0;
+}
+.speech-bubble.right::after{ left:auto; right:20px; transform:rotate(15deg); }
+.speech-bubble.top::after{ bottom:auto; top:-13px; border-width:0 8px 12px; }
+.speech-bubble.variant-1{
+  background:#E8F5F3;
+  border-color:var(--ui-color-2);
+  transform:rotate(1deg);
+}
+.speech-bubble.variant-1::after{ border-color:var(--ui-color-2) transparent; }
+.speech-bubble.variant-2{
+  background:#FFF1E4;
+  border-color:var(--ui-color-5);
+  transform:rotate(-2deg);
+}
+.speech-bubble.variant-2::after{ border-color:var(--ui-color-5) transparent; }
+
+.handwritten{
+  font-family:'Yomogi', cursive;
+  font-size:15px;
+  line-height:1.5;
+  color:#333;
+}
+
+/* ==== コードプレビュー ==== */
+pre{
+  background:#22333B;
+  color:#FFF1E4;
+  padding:10px 12px;
+  border-radius:8px;
+  font-size:14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top:10px;
+  overflow-x:auto;
+  line-height:1.6;
+  border-left:5px solid var(--ui-color-2);
+  white-space:pre-wrap;
+  word-break:break-all;
+}
+pre .cmt{ color:#5EEAD4; }
+pre .hl{ color:#FDBA74; font-weight:bold; }
+
+/* ==== 矢印つなぎ ==== */
+.flow-arrow{
+  text-align:center; color:var(--ui-color-2); font-size:20px; margin:2px 0 6px;
+}
+
+/* ==== 出現アニメーション ==== */
+@keyframes fadeInScale{
+  0%{ opacity:0; transform:scale(.85) translateY(24px); }
+  100%{ opacity:1; transform:scale(1) translateY(0); }
+}
+.fade-in-scale{ animation:fadeInScale .8s ease both; }
+.section-layout .section-card{ opacity:0; animation:fadeInScale .8s ease both; }
+.section-layout .section-card:nth-child(1){ animation-delay:.05s; }
+.section-layout .section-card:nth-child(2){ animation-delay:.15s; }
+.section-layout .section-card:nth-child(3){ animation-delay:.25s; }
+.section-layout .section-card:nth-child(4){ animation-delay:.35s; }
+.section-layout .section-card:nth-child(5){ animation-delay:.45s; }
+.section-layout .section-card:nth-child(6){ animation-delay:.55s; }
+.section-layout .section-card:nth-child(7){ animation-delay:.65s; }
+.section-layout .section-card:nth-child(8){ animation-delay:.75s; }
+.section-layout .section-card:nth-child(9){ animation-delay:.85s; }
+.section-layout .section-card:nth-child(10){ animation-delay:.95s; }
+.section-layout .section-card:nth-child(11){ animation-delay:1.05s; }
+.section-layout .section-card:nth-child(12){ animation-delay:1.15s; }
+.section-layout .section-card:nth-child(13){ animation-delay:1.25s; }
+.section-layout .section-card:nth-child(14){ animation-delay:1.35s; }
+.section-layout .section-card:nth-child(15){ animation-delay:1.45s; }
+.section-layout .section-card:nth-child(16){ animation-delay:1.55s; }
+.section-layout .section-card:nth-child(17){ animation-delay:1.65s; }
+.section-layout .section-card:nth-child(18){ animation-delay:1.75s; }
+
+@keyframes highlightPop{
+  0%{ background-color:transparent; }
+  40%{ background-color:#FDE4CF; }
+  100%{ background-color:transparent; }
+}
+.highlight-word{ animation:highlightPop 3s ease 1.2s 2; border-radius:4px; padding:0 3px; }
+
+/* ==== フッター ==== */
+footer.main-footer{
+  background:#fff;
+  border-radius:20px;
+  border:4px solid var(--ui-color-2);
+  box-shadow:5px 5px 15px rgba(194,65,12,.15);
+  padding:20px 24px;
+  margin-top:26px;
+  text-align:center;
+}
+.main-footer p{ font-size:14px; color:#777; margin:6px 0; }
+.main-footer a{ color:var(--ui-color-1); text-decoration:underline; }
+.main-footer .video-link{ font-size:16px; color:var(--ui-color-4); }
+.main-footer .footer-tags{ margin-top:8px; }
+
+/* ==== レスポンシブ ==== */
+@media (max-width:1600px){ .section-card{ min-width:280px; } }
+@media (max-width:1200px){ .section-card{ min-width:320px; } }
+@media (max-width:900px){ .section-card{ min-width:380px; } }
+@media (max-width:768px){
+  .section-layout{ flex-direction:column; }
+  .section-card{ width:100%; min-width:auto; }
+  .header-note{ position:static; display:block; margin-top:8px; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ==== ヘッダー ==== -->
+  <header class="main-header fade-in-scale">
+    <i class="fa-solid fa-cloud fa-7x" aria-hidden="true"></i>
+    <h1>Cloudflareとkote2ビルダーで作る ファイル置き場</h1>
+    <div class="sub">サーバー不要・無料で構築する、社内ユーザーだけの共有ツール</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月12日公開 ／ kote2のAI活用アイデア ／ 19分49秒</div>
+    <div class="header-note">「サーバーいらずの置き場、無料で立てる」<i class="fa-solid fa-sun"></i></div>
+    <div class="header-tags">
+      <span class="keyword-tag">#Cloudflare</span>
+      <span class="keyword-tag">#kote2ビルダー</span>
+      <span class="keyword-tag">#R2</span>
+      <span class="keyword-tag">#Access</span>
+      <span class="keyword-tag">#社内ツール</span>
+    </div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- 1: 今日の要点 -->
+    <div class="section-card">
+      <div class="step-number">①</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bullseye fa-5x" style="color:var(--ui-color-1); animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>今日の要点はひとつ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Cloudflare</span> と <span class="keyword-tag">kote2ビルダー</span> の組み合わせで作る話</span></li>
+          <li><i class="fa-solid fa-folder-open fa-lg" aria-hidden="true"></i><span>作るのは社内用の <span class="keyword-tag">ファイル置き場</span></span></li>
+          <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span>費用は <span class="highlight-word">無料枠で完結</span></span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2);"></i>
+            19分の実演の流れを、<br>
+            そのまま <span class="keyword-tag">手順</span> にまとめます！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2: きっかけの投稿 -->
+    <div class="section-card">
+      <div class="step-number">②</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-quote-left fa-5x" style="color:var(--ui-color-5); animation: fa-shake 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>きっかけはXの投稿</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>見かけたのは、こんな声</span></li>
+          <li><i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i><span>「社内にHTMLを気軽に <span class="keyword-tag">publish</span> したい！」</span></li>
+          <li><i class="fa-solid fa-user-lock fa-lg" aria-hidden="true"></i><span>公開先は <span class="highlight-word">社内ユーザーのみ</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-smile fa-lg" style="color:var(--ui-color-5);"></i>
+            「これ、作れるよ」と<br>実際に作ってみた回です
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3: なぜ今なのか -->
+    <div class="section-card">
+      <div class="step-number">③</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="color:var(--ui-color-2); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>なぜ今、必要？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>AIが資料・レポート・議事録を <span class="keyword-tag">HTML</span> で書き出せる時代に</span></li>
+          <li><i class="fa-solid fa-share-nodes fa-lg" aria-hidden="true"></i><span>書いたら、そのまま <span class="keyword-tag">共有</span> したい</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>公開する場所がボトルネックに <span class="highlight-word">なってきた</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-bolt fa-lg" style="color:var(--ui-color-5);"></i>
+            ドキュメントを作る側が<br>どんどん楽になった分、<br>置き場が求められています
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4: 従来の課題 -->
+    <div class="section-card">
+      <div class="step-number">④</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-envelope fa-5x" style="color:var(--ui-color-1); animation: fa-flip 3.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>メール添付のつらみ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-paperclip fa-lg" aria-hidden="true"></i><span>メールやSlackに <span class="keyword-tag">添付</span> して回す運用</span></li>
+          <li><i class="fa-solid fa-folder-open fa-lg" aria-hidden="true"></i><span>いちいち <span class="highlight-word">開かないと見れない</span></span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>ファイルが散らばり、<span class="keyword-tag">管理が煩雑</span> に</span></li>
+        </ul>
+        <div class="speech-bubble top right">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-tired fa-lg" style="color:var(--ui-color-5);"></i>
+            送る側も受け取る側も、<br>地味にしんどいんですよね…
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5: 動画の全体像 -->
+    <div class="section-card">
+      <div class="step-number">⑤</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color:var(--ui-color-5); animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>動画の進み方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list teal-icons">
+          <li><i class="fa-solid fa-play fa-lg" aria-hidden="true"></i><span>まず <span class="keyword-tag">完成品のデモ</span> を見せる</span></li>
+          <li><i class="fa-solid fa-utensils fa-lg" aria-hidden="true"></i><span>レシピ① <span class="keyword-tag">社内共有ボード</span> を再現（4:15〜）</span></li>
+          <li><i class="fa-solid fa-truck-fast fa-lg" aria-hidden="true"></i><span>レシピ② <span class="keyword-tag">ファイル便</span> を再現（11:39〜）</span></li>
+          <li><i class="fa-solid fa-flag-checkered fa-lg" aria-hidden="true"></i><span>まとめ（18:08〜）</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-hand-point-up fa-lg" style="color:var(--ui-color-1);"></i>
+            「見せる → 作る → まとめ」の<br>3部構成で進みます
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6: 完成品デモ ボード -->
+    <div class="section-card">
+      <div class="step-number">⑥</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-columns fa-5x" style="color:var(--ui-color-1); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>完成品① 共有ボード</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clipboard fa-lg" aria-hidden="true"></i><span>1つ目は <span class="keyword-tag">社内ファイル共有ボード</span></span></li>
+          <li><i class="fa-solid fa-table-list fa-lg" aria-hidden="true"></i><span>資料を <span class="keyword-tag">並べて置く</span> ためのボード</span></li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>デモで完成形を <span class="highlight-word">先に確認</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-magnifying-glass fa-lg" style="color:var(--ui-color-5);"></i>
+            ゴールを見てから作るので、<br>安心してついてこられます
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7: 完成品デモ ファイル便 -->
+    <div class="section-card">
+      <div class="step-number">⑦</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-truck-fast fa-5x" style="color:var(--ui-color-2); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>完成品② ファイル便</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-box fa-lg" aria-hidden="true"></i><span>2つ目は <span class="keyword-tag">ファイル便</span></span></li>
+          <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>置いたファイルは <span class="keyword-tag">約7日</span> で自動削除</span></li>
+          <li><i class="fa-solid fa-recycle fa-lg" aria-hidden="true"></i><span>置きっぱなしが <span class="highlight-word">消えていく</span> 設計</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2);"></i>
+            「便」の名前のとおり、<br>届いたら役目を終える置き場です
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8: 無料・サーバー不要 -->
+    <div class="section-card">
+      <div class="step-number">⑧</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-server fa-5x" style="color:var(--ui-color-5); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>サーバー不要という選択</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>自社で <span class="keyword-tag">サーバー</span> を立てない</span></li>
+          <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span>基盤はCloudflareの <span class="keyword-tag">無料枠</span></span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench fa-lg" aria-hidden="true"></i><span>運用・保守の<span class="highlight-word">手間が入らない</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-shield-halved fa-lg" style="color:var(--ui-color-1);"></i>
+            インフラの面倒を<br>Cloudflareに任せる形です
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9: 登場する道具 -->
+    <div class="section-card">
+      <div class="step-number">⑨</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cubes fa-5x" style="color:var(--ui-color-1); animation: fa-flip 3.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>登場する道具</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list teal-icons">
+          <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Cloudflare</span> ：基盤まるごと</span></li>
+          <li><i class="fa-solid fa-box-archive fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">R2</span> ：ファイルの置き場所</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Access</span> ：入場者のしばり</span></li>
+          <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">kote2ビルダー</span> ：組み立てる道具</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-pen-nib fa-lg" style="color:var(--ui-color-5);"></i>
+            この4つを押さえれば<br>流れは迷いません！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10: Cloudflare R2 -->
+    <div class="section-card">
+      <div class="step-number">⑩</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-box-archive fa-5x" style="color:var(--ui-color-2); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>R2 は倉庫</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>Cloudflareの <span class="keyword-tag">オブジェクトストレージ</span></span></li>
+          <li><i class="fa-solid fa-folder-tree fa-lg" aria-hidden="true"></i><span>ファイル置き場の <span class="highlight-word">本体</span> になる</span></li>
+          <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>動画内で紹介リンクを <span class="keyword-tag">案内</span></span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2);"></i>
+            ボードもファイル便も、<br>中身をしまうのはこの倉庫です
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11: Cloudflare Access -->
+    <div class="section-card">
+      <div class="step-number">⑪</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="color:var(--ui-color-1); animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Access は門番</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span>入れるのは <span class="keyword-tag">社内ユーザーのみ</span></span></li>
+          <li><i class="fa-solid fa-key fa-lg" aria-hidden="true"></i><span>アクセスに <span class="keyword-tag">認証</span> をかける</span></li>
+          <li><i class="fa-solid fa-lock fa-lg" aria-hidden="true"></i><span>外には <span class="highlight-word">漏れない</span> 作り</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-door-closed fa-lg" style="color:var(--ui-color-1);"></i>
+            「気軽にpublish」を<br>社内だけに保つ鍵になる機能です
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12: kote2ビルダーとレシピ -->
+    <div class="section-card">
+      <div class="step-number">⑫</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-utensils fa-5x" style="color:var(--ui-color-5); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>ビルダーとレシピ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list teal-icons">
+          <li><i class="fa-solid fa-download fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">kote2ビルダー</span> はnoteから入手</span></li>
+          <li><i class="fa-solid fa-receipt fa-lg" aria-hidden="true"></i><span>作り方は <span class="keyword-tag">レシピ</span> として公開中</span></li>
+          <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>レシピは <span class="highlight-word">2種類</span> 用意</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-hand-point-up fa-lg" style="color:var(--ui-color-5);"></i>
+            料理で言うところの<br>「キット」に近い安心感！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13: レシピ① 再現 -->
+    <div class="section-card">
+      <div class="step-number">⑬</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-folder-open fa-5x" style="color:var(--ui-color-1); animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>レシピ① ボードを再現</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-utensils fa-lg" aria-hidden="true"></i><span>「社内ファイル共有ボードの <span class="keyword-tag">レシピ</span>」を使う</span></li>
+          <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span>kote2ビルダーで <span class="keyword-tag">再現</span> する実演（4:15〜）</span></li>
+          <li><i class="fa-solid fa-cloud-arrow-up fa-lg" aria-hidden="true"></i><span>Cloudflare側に <span class="highlight-word">デプロイ</span></span></li>
+        </ul>
+        <div class="speech-bubble top right">
+          <span class="handwritten">
+            <i class="fa-solid fa-play fa-lg" style="color:var(--ui-color-2);"></i>
+            ここからは<span class="keyword-tag">ハンズオン</span>。<br>手を動かして作っていきます
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14: 共有ボードの利点 -->
+    <div class="section-card">
+      <div class="step-number">⑭</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users fa-5x" style="color:var(--ui-color-2); animation: fa-bounce 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>ボードの良いところ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>受け取った人は <span class="keyword-tag">リンクを開くだけ</span></span></li>
+          <li><i class="fa-solid fa-inbox fa-lg" aria-hidden="true"></i><span>添付を開き直す <span class="highlight-word">手間が減る</span></span></li>
+          <li><i class="fa-solid fa-warehouse fa-lg" aria-hidden="true"></i><span>資料が <span class="keyword-tag">一か所にまとまる</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-smile fa-lg" style="color:var(--ui-color-1);"></i>
+            「あの資料どこ？」が<br>減っていくのがうれしい
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15: レシピ② 再現 -->
+    <div class="section-card">
+      <div class="step-number">⑮</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-paper-plane fa-5x" style="color:var(--ui-color-1); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>レシピ② 便を再現</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-utensils fa-lg" aria-hidden="true"></i><span>「約7日で自動削除される <span class="keyword-tag">ファイル便のレシピ</span>」</span></li>
+          <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span>同じくビルダーで <span class="keyword-tag">再現</span>（11:39〜）</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>寿命つきの置き場を <span class="highlight-word">もう1つ</span> 作る</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-truck-fast fa-lg" style="color:var(--ui-color-5);"></i>
+            一度作り方を覚えれば、<br>2つ目は<span class="keyword-tag">早い</span>です！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 16: 自動削除の利点 -->
+    <div class="section-card">
+      <div class="step-number">⑯</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clock fa-5x" style="color:var(--ui-color-5); animation: fa-shake 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>約7日で消える理由</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list teal-icons">
+          <li><i class="fa-solid fa-trash-can fa-lg" aria-hidden="true"></i><span>ファイルは <span class="keyword-tag">約7日</span> で自動削除</span></li>
+          <li><i class="fa-solid fa-broom fa-lg" aria-hidden="true"></i><span>掃除しなくていい <span class="highlight-word">放ったらかしOK</span></span></li>
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>容量や <span class="keyword-tag">たまりすぎ</span> を気にしない</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:var(--ui-color-2);"></i>
+            「一時的に渡すだけ」の<br>ファイルにぴったりの仕組み
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 17: まとめ -->
+    <div class="section-card">
+      <div class="step-number">⑰</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color:var(--ui-color-1); animation: fa-bounce 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>まとめ（18:08〜）</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span>Cloudflareの <span class="keyword-tag">無料</span> 枠で構築</span></li>
+          <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">サーバー不要</span> で運用が軽い</span></li>
+          <li><i class="fa-solid fa-user-lock fa-lg" aria-hidden="true"></i><span>公開先は <span class="keyword-tag">社内ユーザーのみ</span></span></li>
+          <li><i class="fa-solid fa-utensils fa-lg" aria-hidden="true"></i><span>作り方は <span class="highlight-word">レシピ</span> が担保</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-seedling fa-lg" style="color:var(--ui-color-1);"></i>
+            欲しいと思っていた仕組みが<br>この形で実現できました
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 18: 今日の一手 -->
+    <div class="section-card">
+      <div class="step-number">⑱</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color:var(--ui-color-2); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>今日の一手</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list teal-icons">
+          <li><i class="fa-solid fa-download fa-lg" aria-hidden="true"></i><span>まず <span class="keyword-tag">kote2ビルダー</span> を入手</span></li>
+          <li><i class="fa-solid fa-receipt fa-lg" aria-hidden="true"></i><span>レシピを <span class="keyword-tag">1つ</span> 選んで再現</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>今日の10分は <span class="keyword-tag">レシピを開く</span> ところから</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span>公開範囲の判断は <span class="highlight-word">人が持つ</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-rocket fa-lg" style="color:var(--ui-color-5);"></i>
+            小さな置き場から、<br>社内の共有を楽にしていきましょう！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==== フッター ==== -->
+  <footer class="main-footer fade-in-scale">
+    <p class="video-link">🎬 動画: <a href="https://www.youtube.com/watch?v=aFX5WofNzU4" target="_blank">kote2のAI活用アイデア</a></p>
+    <p>「【Cloudflare・無料】Cloudflareとkote2ビルダーで作る簡単ファイル置き場。サーバー不要の社内ツール構築術」より作成</p>
+    <p class="footer-tags">
+      <span class="keyword-tag">#Cloudflare</span>
+      <span class="keyword-tag">#kote2ビルダー</span>
+      <span class="keyword-tag">#R2</span>
+      <span class="keyword-tag">#Access</span>
+      <span class="keyword-tag">#ファイル共有</span>
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Google Cloud Tech の動画「Real-time voice AI agents, explained」を18カードのグラフィックレコーディング風HTMLにまとめました。omni-app（知覚→推論→表現のループ）、Gemini Live API、GenAI SDK、Google ADK による構築ロードマップ全6エピソードを解説します。">
+<title>リアルタイム音声AIエージェント（omni-app）の仕組みと構築ロードマップ（Google Cloud Tech）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+  /* ============ カラーテーマ（この動画専用: ディープバイオレット × スプリンググリーン） ============ */
+  :root {
+    --ui-color-1: #4B2E83;  /* ディープバイオレット: メイン */
+    --ui-color-2: #1E9E6A;  /* スプリンググリーン: アクセント */
+    --ui-color-3: #E3F7EE;  /* ミントヴェール: タグ背景 */
+    --ui-color-4: #26183F;  /* チャコールバイオレット: 濃い文字 */
+    --ui-color-5: #7B5FC0;  /* ミディアムバイオレット: サブ */
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #FFF8F5;
+    background-image:
+      radial-gradient(circle at 8% 4%, rgba(30,158,106,0.13) 0, transparent 34%),
+      radial-gradient(circle at 94% 55%, rgba(75,46,131,0.09) 0, transparent 36%),
+      radial-gradient(circle at 45% 96%, rgba(123,95,192,0.10) 0, transparent 30%);
+    color: #333333;
+    font-family: 'Zen Kurenaido', 'Hiragino Kaku Gothic ProN', sans-serif;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .container {
+    max-width: 2000px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 30px 24px 10px;
+  }
+
+  /* ============ ヘッダー ============ */
+  .main-header {
+    text-align: center;
+    padding: 40px 15px 8px;
+  }
+  .main-header .header-icon {
+    color: var(--ui-color-1);
+    filter: drop-shadow(4px 5px 0 rgba(30,158,106,0.45));
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+  .main-header h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #333333;
+    margin: 10px 0 8px;
+    line-height: 1.4;
+  }
+  .main-header h1 .accent { color: var(--ui-color-2); }
+  .main-header .subtitle {
+    font-size: 18px;
+    color: var(--ui-color-1);
+    margin: 4px 0;
+    font-weight: bold;
+  }
+  .main-header .date-note {
+    font-size: 14px;
+    color: #777777;
+    margin: 8px 0 0;
+  }
+  .main-header .date-note i { color: var(--ui-color-2); }
+
+  /* 動画のハイライトチップ */
+  .key-stats {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin: 24px auto 6px;
+    padding: 14px 16px;
+    max-width: 1400px;
+    background: #ffffff;
+    border: 3px dashed var(--ui-color-5);
+    border-radius: 22px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.07);
+  }
+  .key-stats .stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ui-color-3);
+    color: var(--ui-color-4);
+    border-radius: 999px;
+    padding: 7px 15px;
+    font-size: 15px;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+  .key-stats .stat-chip i { color: var(--ui-color-1); }
+
+  /* ============ セクション見出し ============ */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 44px 6px 16px;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--ui-color-1);
+  }
+  .section-title .st-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 46px;
+    height: 46px;
+    border-radius: 14px;
+    background: var(--ui-color-3);
+    color: var(--ui-color-2);
+    flex-shrink: 0;
+  }
+  .section-title .st-line {
+    flex: 1;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ui-color-5), transparent);
+    border-radius: 3px;
+  }
+
+  /* ============ カードレイアウト（4カラム・レスポンシブ） ============ */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  .section-card {
+    flex: 1 1 calc(25% - 20px);
+    min-width: 260px;
+    max-width: 460px;
+    background-color: #ffffff;
+    border-radius: 20px;
+    border-top: 6px solid var(--ui-color-1);
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    transition: box-shadow .3s ease, transform .3s ease, border-color .3s ease;
+  }
+  .section-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 10px 22px rgba(75,46,131,0.18);
+    border-top-color: var(--ui-color-2);
+  }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0 5px;
+  }
+  .mega-icon-container i.mega-icon { color: var(--ui-color-1); }
+  .mega-icon-container h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: #555555;
+    margin: 12px 0 4px;
+    line-height: 1.4;
+  }
+  .mega-icon-container .card-sub {
+    font-size: 14px;
+    color: #777777;
+    margin: 0;
+  }
+
+  .card-content { padding: 0 10px 12px; }
+
+  .keyword-list {
+    margin: 15px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+  .keyword-list li {
+    margin-bottom: 9px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: #333333;
+    line-height: 1.55;
+  }
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 18px;
+    margin-top: 4px;
+  }
+
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin: 0 5px 2px 2px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  /* ============ 手書き風 吹き出し ============ */
+  .speech-bubble {
+    position: relative;
+    background: #ffffff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 18px 5px 12px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+  }
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+  .speech-bubble.variant-1 {
+    background: #F0FBF5;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+  .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+  .speech-bubble.variant-2 {
+    background: #EFE9F9;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+  .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333333;
+    display: inline-block;
+  }
+  .handwritten i { color: var(--ui-color-2); }
+
+  /* ============ コードプレビュー ============ */
+  pre {
+    background: #f5f5f5;
+    border-left: 4px solid var(--ui-color-5);
+    padding: 8px 10px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    color: #333333;
+    line-height: 1.5;
+  }
+  pre .c { color: var(--ui-color-2); }
+
+  /* ============ フッター ============ */
+  .main-footer {
+    margin-top: 50px;
+    padding: 26px 18px 30px;
+    border-top: 3px dashed var(--ui-color-2);
+    text-align: center;
+    font-size: 14px;
+    color: #666666;
+    line-height: 2;
+  }
+  .main-footer a { color: var(--ui-color-1); font-weight: bold; }
+  .main-footer .footer-source { font-size: 15px; }
+  .main-footer i { color: var(--ui-color-2); }
+
+  /* ============ アニメーション ============ */
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.92) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  .fade-in-scale { animation: fadeInScale .7s ease-out backwards; }
+
+  /* スクロール連動のカード出現 */
+  .reveal-card { opacity: 0; }
+  .reveal-card.revealed {
+    opacity: 1;
+    animation: fadeInScale .65s ease-out backwards;
+  }
+
+  /* ============ レスポンシブ ============ */
+  @media (max-width: 1600px) {
+    .section-card { flex-basis: calc(25% - 20px); min-width: 280px; }
+  }
+  @media (max-width: 1400px) {
+    .section-card { flex-basis: calc(33.3% - 20px); }
+  }
+  @media (max-width: 1200px) {
+    .section-card { flex-basis: calc(33.3% - 20px); min-width: 320px; }
+  }
+  @media (max-width: 900px) {
+    .section-card { flex-basis: calc(50% - 20px); min-width: 320px; }
+  }
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; max-width: none; flex-basis: auto; }
+    .main-header h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header class="main-header fade-in-scale">
+    <div class="header-icon">
+      <i class="fa-solid fa-headset fa-7x fa-beat-fade" aria-hidden="true"></i>
+    </div>
+    <h1>声を聞き、画面を見て、ブラウザを動かす<br>リアルタイム音声AIエージェント<span class="accent">「omni-app」</span>への道</h1>
+    <p class="subtitle">「より優れたチャットボット」ではない、双方向ライブマルチモーダルエージェントの全貌と構築ロードマップ</p>
+    <p class="date-note"><i class="fa-solid fa-calendar-days fa-lg" aria-hidden="true"></i> 2026年8月20日公開　<i class="fa-solid fa-tv fa-lg" aria-hidden="true"></i> Google Cloud Tech（解説: Annie Wang）　<i class="fa-solid fa-stopwatch fa-lg" aria-hidden="true"></i> 6分26秒</p>
+  </header>
+
+  <div class="key-stats fade-in-scale">
+    <span class="stat-chip"><i class="fa-solid fa-microphone-lines fa-lg" aria-hidden="true"></i>話している最中にリアルタイムで動作</span>
+    <span class="stat-chip"><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i>知覚 → 推論 → 表現を1つのループで</span>
+    <span class="stat-chip"><i class="fa-solid fa-map fa-lg" aria-hidden="true"></i>全6エピソードの構築ロードマップ</span>
+    <span class="stat-chip"><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i>Gemini Live API × Google ADK</span>
+    <span class="stat-chip"><i class="fa-solid fa-window-restore fa-lg" aria-hidden="true"></i>実際のブラウザを音声で操作</span>
+  </div>
+
+  <!-- ================= セクションA：導入とomni-appの概念 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i></span>
+    導入 —— 「実際に動く」エージェントと omni-app の概念
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microphone-lines fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>①デモ：話すだけで動く</h2>
+        <p class="card-sub">0:00 — 実際に行動するエージェント</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-play fa-lg" aria-hidden="true"></i><span>動画は<span class="keyword-tag">デモ</span>から始まる。Annie Wang 氏が声でエージェントに話しかける場面。</li>
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>エージェントは声で<span class="keyword-tag">応答</span>するだけでなく、実際に手を動かして作業する。</li>
+          <li><i class="fa-solid fa-hand-sparkles fa-lg" aria-hidden="true"></i><span>「よくできたチャットボット」ではなく、<span class="keyword-tag">本物に行動する</span>エージェントとの対話。</li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i> 話しかけたら、聞いて・見て・覚えて・動く。まずはその瞬間を見せるところからスタート！</span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-keyboard fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>②テキスト入出力の壁</h2>
+        <p class="card-sub">ほとんどのAIエージェントの限界</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>世の中のほとんどのAIエージェントは<span class="keyword-tag">テキスト入力・テキスト出力</span>のみ。</span></li>
+          <li><i class="fa-solid fa-ear-listen fa-lg" aria-hidden="true"></i><span>一方このエージェントは、あなたの<span class="keyword-tag">声を聞き</span>、</li>
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ページを見て</span>、文脈を<span class="keyword-tag">記憶</span>し、話し返し、実際のブラウザをリアルタイムで操作する。</li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i> 「読んで打ち返す」だけとの差が、体験をガラリと変える。あなたが話している最中にも動くのだ！</span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-nodes fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>③omni-app とは何か</h2>
+        <p class="card-sub">0:50 — Annie 氏の命名</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-quote-left fa-lg" aria-hidden="true"></i><span>Annie 氏はこの形のアプリを<span class="keyword-tag">omni-app（オムニアプリ）</span>と呼ぶ。</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>音声・視覚・記憶・行動といった<span class="keyword-tag">すべてのモダリティ</span>を1つのアプリに統合。</span></li>
+          <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">知覚 → 推論 → 表現</span>という一連のプロセスが、順番に処理されるのではなく1つの開いたループとして実行される。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-pen-nib fa-lg" aria-hidden="true"></i> omni = すべて。入力も出力も対話も、ぜんぶひっくるめて1つのアプリに。それがomni-app！</span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>④チャットボット vs omni-app</h2>
+        <p class="card-sub">1:35 — ワンターン vs ライブループ</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>チャットボットは<span class="keyword-tag">ワンターン</span>（1回ずつの応酬）。入力が来て、返して、また待つ。</span></li>
+          <li><i class="fa-solid fa-infinity fa-lg" aria-hidden="true"></i><span>omni-app は<span class="keyword-tag">1つのライブループ</span>。会話が途切れず、流れ続ける。</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>この差は「少し良いチャットボット」ではなく、<span class="keyword-tag">はるかに大きな飛躍</span>だと強調される。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" aria-hidden="true"></i> ピンポンの打ち合いではなく、ずっと流れ続ける川のような対話。発想の転換が必要！</span>
+      </div>
+    </div>
+
+    <!-- カード5 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-right-left fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>⑤「双方向」の本当の意味</h2>
+        <p class="card-sub">2:10 — bidirectional とは</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-headphones fa-lg" aria-hidden="true"></i><span>「双方向（<span class="keyword-tag">bidirectional</span>）」とは、送信と受信が<span class="keyword-tag">同時に</span>成立すること。</span></li>
+          <li><i class="fa-solid fa-user-clock fa-lg" aria-hidden="true"></i><span>あなたが<span class="keyword-tag">話している最中</span>にも、エージェントはリアルタイムで動作する。</span></li>
+          <li><i class="fa-solid fa-microphone-slash fa-lg" aria-hidden="true"></i><span>話し終わってから返事を待つ、という<span class="keyword-tag">順番待ちの前提</span>がなくなる。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i> 電話の全二重通信みたいなもの。お互いに同時に話せて、聞こえる。それがライブな双方向！</span>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>⑥ループ：知覚 → 推論 → 表現</h2>
+        <p class="card-sub">2:50 — Perceive → Reason → Express</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">知覚（Perceive）</span>：声や画面の情報を取り込む。</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">推論（Reason）</span>：文脈を思い出しながら、次の行動を考える。</span></li>
+          <li><i class="fa-solid fa-comment fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">表現（Express）</span>：声で応答し、ブラウザを操作する。</span></li>
+        </ul>
+        <pre><span class="c"># omni-app の心臓部（イメージ）</span>
+while True:          # 1つの開いたループ
+    perceive()       # 聞く・見る
+    reason()         # 考える（順番待ちなし）
+    express()        # 話す・動かす</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i> 3つの処理を「順番に」実行するのではなく、ループの中で同時に回し続けるのがポイント！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションB：シーズン1前半 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-map fa-lg" aria-hidden="true"></i></span>
+    シーズン1前半 —— エピソード1〜3：音声・フレームワーク・ツール
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード7 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-route fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>⑦シーズン1：全6エピソード</h2>
+        <p class="card-sub">3:25 — 構築ロードマップの全体像</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list-ol fa-lg" aria-hidden="true"></i><span>自分でomni-appを構築するための<span class="keyword-tag">全6エピソード</span>のロードマップを紹介。</span></li>
+          <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span>使う技術は <span class="keyword-tag">Gemini Live API</span> と <span class="keyword-tag">Google ADK</span>。</span></li>
+          <li><i class="fa-solid fa-flag-checkered fa-lg" aria-hidden="true"></i><span>音声 → フレームワーク → ツール → ブラウザ → メモリ → ビジョンの順で<span class="keyword-tag">積み上げていく</span>構成。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-map-signs fa-lg" aria-hidden="true"></i> この動画はイントロ編。ここから6話にわたって、少しずつ本物のomni-appへ近づいていく！</span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-volume-high fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>⑧Ep1·音声：読み上げ vs ライブ</h2>
+        <p class="card-sub">3:55 — text-to-speech vs live session</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-audio-description fa-lg" aria-hidden="true"></i><span>まず比べるのは、<span class="keyword-tag">テキスト読み上げ（TTS）</span>方式と<span class="keyword-tag">ライブセッション</span>方式。</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>TTSは応答文を書いてから音声化。<span class="keyword-tag">ライブ</span>は音声のやりとりそのものが対話。</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>この選択が、エージェントの<span class="keyword-tag">体験全体</span>を分ける最初の分岐点。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i> 「しゃべらせる」のと「対話する」のは全然違う。第1話はここから掘り下げる！</span>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hand fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>⑨Ep1·「中断」が変えるもの</h2>
+        <p class="card-sub">なぜ interruption が界面全体を変えるのか</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hand-paper fa-lg" aria-hidden="true"></i><span>ライブ対話では、ユーザーが<span class="keyword-tag">割り込める（中断できる）</span>のが自然。</span></li>
+          <li><i class="fa-solid fa-rotate-left fa-lg" aria-hidden="true"></i><span>この<span class="keyword-tag">中断</span>への対応が、インターフェース<span class="keyword-tag">全体の設計</span>を変えてしまう。</span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>応答の途中で止める・聞き直すが当たり前になると、<span class="keyword-tag">UIの前提</span>そのものを作り直すことに。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i> 人間同士の会話でも「ちょっと待って」は普通。それを機械側で受け止める仕組みが鍵になる！</span>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>⑩Ep2·フレームワーク選択</h2>
+        <p class="card-sub">4:30 — GenAI SDK vs Google ADK</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span>素の <span class="keyword-tag">GenAI SDK</span> で組むか、エージェント開発キット <span class="keyword-tag">Google ADK</span> を使うか。</span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>比較の軸は「<span class="keyword-tag">ループを駆動するのはどちらか</span>」。</span></li>
+          <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i><span>自前でループを制御したいのか、フレームワークに任せたいのかで<span class="keyword-tag">設計方針</span>が変わる。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i> 「車を自分で運転するか、運転任せにするか」。第2話はこの選択基準をじっくり比べる！</span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>⑪Ep3·ツールとレイテンシー</h2>
+        <p class="card-sub">5:00 — ライブ会話中の関数呼び出し</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span>ライブ会話の<span class="keyword-tag">途中で関数呼び出し（function calling）</span>を行うのがツールのテーマ。</span></li>
+          <li><i class="fa-solid fa-stopwatch fa-lg" aria-hidden="true"></i><span>ここで立ちはだかるのが<span class="keyword-tag">レイテンシー（遅延）問題</span>。</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>応答を待っている間に<span class="keyword-tag">ライブ感が失われる</span>と、体験が崩れてしまう。</span></li>
+        </ul>
+        <pre><span class="c"># ライブ対話でのツール呼び出し（イメージ）</span>
+user_speaks()      # 話している間も…
+agent.calls(tool)  # ツールを実行
+→ 待ち時間が発生 ⏱ ここの遅延が課題</pre>
+      </div>
+      <div class="speech-bubble right variant-1">
+        <span class="handwritten"><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i> 「ちょっと検索します」で沈黙が続いたら台無し。遅延との戦いが第3話の山場！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションC：シーズン1後半 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-forward fa-lg" aria-hidden="true"></i></span>
+    シーズン1後半 —— エピソード4〜6と、その先の未来
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード12 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hand-pointer fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>⑫Ep4·ブラウザに手を与える</h2>
+        <p class="card-sub">5:40 — giving the agent hands</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hand-sparkles fa-lg" aria-hidden="true"></i><span>テーマは、エージェントに<span class="keyword-tag">手を与える</span>こと。</span></li>
+          <li><i class="fa-solid fa-window-restore fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">音声制御によるブラウザ自動操作</span>を実現する。</span></li>
+          <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i><span>「話す」だけでなく「<span class="keyword-tag">操作する</span>」ことで、エージェントが実際に仕事をこなす。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-hand fa-lg" aria-hidden="true"></i> 目と耳と口に、最後は手を足す。これでエージェントは画面の向こう側まで働ける！</span>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>⑬Ep5·メモリの2層構造</h2>
+        <p class="card-sub">6:00 — facts, vectors, and live recall</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clipboard-list fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">構造化ファクト</span>：確定した事実を整理して覚える。</span></li>
+          <li><i class="fa-solid fa-network-wired fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ベクトルメモリ</span>：膨大な情報を意味で引き出せる形で保存。</span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>ポイントは<span class="keyword-tag">会話の途中で取得（live recall）</span>できること。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-bell fa-lg" aria-hidden="true"></i> 「あれ、さっき何て言ったっけ？」に即答できるのがomni-appの記憶。対話を壊さずに思い出す！</span>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>⑭Ep6·ビジョンの選択肢</h2>
+        <p class="card-sub">6:20 — snapshot vs continuous frames</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-camera fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">スナップショット</span>：必要な瞬間だけ静止画を渡す方式。</span></li>
+          <li><i class="fa-solid fa-film fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">連続フレームストリーム</span>：画面を絶えず流し込み続ける方式。</span></li>
+          <li><i class="fa-solid fa-scale-unbalanced-flip fa-lg" aria-hidden="true"></i><span>比較の基準は「<span class="keyword-tag">ライブ感を損なわない</span>こと」。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-video fa-lg" aria-hidden="true"></i> 見すぎると遅くなり、見なさすぎると取り残される。ビジョンの塩梅が最終エピソードの見どころ！</span>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>⑮開発者が構築できるもの</h2>
+        <p class="card-sub">6:55 — ロードマップの先にある未来</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-astronaut fa-lg" aria-hidden="true"></i><span>6エピソードを終えれば、開発者は<span class="keyword-tag">自分だけのomni-app</span>を構築できる。</span></li>
+          <li><i class="fa-solid fa-microchip fa-lg" aria-hidden="true"></i><span>音声・ツール・ブラウザ・メモリ・ビジョンを<span class="keyword-tag">1つのループ</span>につなぐ技術が身につく。</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>「話しかけると動くアプリ」という<span class="keyword-tag">新しい体験</span>が当たり前になる未来への招待。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i> これは入門編にすぎない。ここから先は、自分の手でループを回しにいこう！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションD：構築の道具箱 ================= -->
+  <h2 class="section-title fade-in-scale">
+    <span class="st-icon"><i class="fa-solid fa-toolbox fa-lg" aria-hidden="true"></i></span>
+    構築の道具箱 —— API・SDK・学習リソース
+    <span class="st-line"></span>
+  </h2>
+  <div class="section-layout">
+
+    <!-- カード16 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wave-square fa-5x mega-icon fa-beat-fade" aria-hidden="true"></i>
+        <h2>⑯Gemini Live API</h2>
+        <p class="card-sub">双方向ライブ対話の基盤</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>omni-appの<span class="keyword-tag">音声のライブセッション</span>を支える基盤技術。</span></li>
+          <li><i class="fa-solid fa-right-left fa-lg" aria-hidden="true"></i><span>話している最中の<span class="keyword-tag">双方向のやりとり</span>を実現する。</span></li>
+          <li><i class="fa-solid fa-book fa-lg" aria-hidden="true"></i><span>ドキュメントは<span class="keyword-tag">公式ドキュメント</span>で公開中（フッターにリンク）。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-plug-circle-bolt fa-lg" aria-hidden="true"></i> ライブ感の心臓部。エピソード1で最初に触る、一番大事な部品！</span>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cubes fa-5x mega-icon fa-bounce" aria-hidden="true"></i>
+        <h2>⑰GenAI SDK と Google ADK</h2>
+        <p class="card-sub">ループを駆動する2つの選択肢</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">GenAI SDK</span>：素のSDK。ループの制御を自分で書きたい人向け。</span></li>
+          <li><i class="fa-solid fa-sitemap fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Google ADK</span>（Agent Development Kit）：エージェント開発に最適化されたキット。</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>動画の「紹介製品」にも、この2つとLive APIの<span class="keyword-tag">3点セット</span>が挙げられている。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right variant-2">
+        <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i> どちらでループを回すか。シリーズを通じて付き合うことになる大きな選択！</span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card reveal-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x mega-icon fa-flip" aria-hidden="true"></i>
+        <h2>⑱リソースと学習の旅</h2>
+        <p class="card-sub">ロードマップ・コード・ドキュメント</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-map fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ロードマップのプレビュー</span>が公開されている。</span></li>
+          <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>本シリーズの<span class="keyword-tag">コード</span>もGitHubで配信予定。</span></li>
+          <li><i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Gemini Live API / ADK のドキュメント</span>へのリンクも完備。</span></li>
+          <li><i class="fa-solid fa-microphone-lines fa-lg" aria-hidden="true"></i><span>解説は <span class="keyword-tag">Annie Wang</span> 氏。Google Cloud Tech 公式チャンネルで展開中。</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top variant-1">
+        <span class="handwritten"><i class="fa-solid fa-graduation-cap fa-lg" aria-hidden="true"></i> 地図と道具は全部そろっている。あとはあなたが構築するだけ。次のエピソードへGO！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer class="main-footer">
+    <p class="footer-source">🎬 動画: <a href="https://www.youtube.com/watch?v=YGgErBnx6po" target="_blank">Google Cloud Tech</a>「Real-time voice AI agents, explained (before you build one)」（日本語ダビング版: リアルタイム音声AIエージェントの仕組み）</p>
+    <p><i class="fa-solid fa-map fa-lg" aria-hidden="true"></i> ロードマップ: <a href="https://goo.gle/mma-roadmap" target="_blank">goo.gle/mma-roadmap</a>　<i class="fa-solid fa-code fa-lg" aria-hidden="true"></i> シリーズのコード: <a href="https://goo.gle/mma-code" target="_blank">goo.gle/mma-code</a>　<i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i> <a href="https://goo.gle/4xxUoQD" target="_blank">Gemini Live API docs</a> ／ <a href="https://goo.gle/4g6JH0n" target="_blank">ADK docs</a></p>
+    <p><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i> 出典: Google Cloud Tech 公式チャンネル（チャンネル登録者数 144万人）· 解説: Annie Wang 氏 · 紹介製品: GenAI SDK / Google Agent Development Kit / Gemini Live API</p>
+    <p><i class="fa-solid fa-pen-nib fa-lg" aria-hidden="true"></i> この1枚は、動画の内容をグラフィックレコード風にまとめたものです（作成日: 2026年8月20日）。</p>
+  </footer>
+
+</div>
+
+<script>
+  // スクロールに連動したカードの出現効果（ふわっとスケールしながら）
+  document.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.section-card');
+    cards.forEach(function (card, i) {
+      card.style.animationDelay = ((i % 4) * 90) + 'ms';
+    });
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            io.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+      cards.forEach(function (card) { io.observe(card); });
+    } else {
+      cards.forEach(function (card) { card.classList.add('revealed'); });
+    }
+  });
+</script>
+</body>
+</html>

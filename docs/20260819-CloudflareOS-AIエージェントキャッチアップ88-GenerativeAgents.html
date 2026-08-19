@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIエージェントキャッチアップ #88 — Cloudflare OS（ジェネラティブエージェンツ）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Cloudflare Orange × Charcoal */
+  --orange:    #F6821F;
+  --flame:     #FBAD41;
+  --charcoal:  #36393F;
+  --ink:       #23262B;
+  --kinari:    #F8F5F0;
+  --ui-color-1: #36393F;
+  --ui-color-2: #F6821F;
+  --ui-color-3: #F8F5F0;
+  --ui-color-4: #23262B;
+  --ui-color-5: #C2410C;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--kinari);
+  color: var(--ink);
+  font-family: 'Zen Kurenaido', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.page-wrap {
+  width: 100%;
+  max-width: 1980px;
+  margin: 0 auto;
+  padding: 24px 20px 10px;
+}
+
+/* ========== ヘッダー ========== */
+.main-header {
+  text-align: center;
+  padding: 30px 20px 26px;
+  background: linear-gradient(135deg, #ffffff 0%, var(--kinari) 55%, #F3E9DD 100%);
+  border-bottom: 6px solid var(--orange);
+  border-radius: 24px;
+  box-shadow: 0 6px 24px rgba(35, 38, 43, 0.16);
+  margin-bottom: 26px;
+  position: relative;
+  overflow: hidden;
+}
+
+.main-header::before {
+  content: '';
+  position: absolute;
+  top: -70px; right: -70px;
+  width: 280px; height: 280px;
+  background: radial-gradient(circle, rgba(246, 130, 31, 0.26) 0%, transparent 68%);
+  border-radius: 50%;
+}
+
+.main-header::after {
+  content: '';
+  position: absolute;
+  bottom: -80px; left: -60px;
+  width: 240px; height: 240px;
+  background: radial-gradient(circle, rgba(54, 57, 63, 0.15) 0%, transparent 68%);
+  border-radius: 50%;
+}
+
+.header-icon { color: var(--charcoal); margin-bottom: 8px; position: relative; z-index: 1; }
+
+.main-header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  color: var(--ink);
+  margin: 10px 0 8px;
+  line-height: 1.35;
+  position: relative;
+  z-index: 1;
+}
+
+.main-header h1 .accent  { color: var(--orange); }
+.main-header h1 .accent2 { color: var(--charcoal); }
+
+.header-sub {
+  font-size: 17px;
+  color: var(--charcoal);
+  margin: 0 0 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.header-date {
+  font-size: 14px;
+  color: #777777;
+  margin-bottom: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.header-tags { margin-top: 6px; position: relative; z-index: 1; }
+
+/* ========== レイアウト（4 カラム） ========== */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  margin-bottom: 18px;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 280px;
+  max-width: 450px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.10);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--orange);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  background-color: #FDF9F3;
+  transform: translateY(-5px);
+  box-shadow: 8px 10px 22px rgba(54, 57, 63, 0.24);
+}
+
+.section-card.border-charcoal { border-top-color: var(--charcoal); }
+.section-card.border-orange   { border-top-color: var(--orange); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 6px;
+}
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--charcoal);
+  margin: 10px 0 4px;
+}
+
+.card-number {
+  display: inline-block;
+  font-family: 'Kaisei Decol', serif;
+  font-size: 14px;
+  font-weight: bold;
+  color: #ffffff;
+  background: var(--charcoal);
+  border-radius: 999px;
+  padding: 3px 14px;
+  margin-top: 8px;
+  letter-spacing: 0.08em;
+}
+
+/* テーマ バッジ */
+.theme-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #ffffff;
+  background: var(--orange);
+  border-radius: 999px;
+  padding: 3px 12px;
+  margin: 6px 0 0;
+}
+
+.theme-badge i { font-size: 11px; }
+
+.layer-badge {
+  display: inline-block;
+  font-size: 12px;
+  color: var(--ui-color-5);
+  border: 1.5px dashed var(--ui-color-5);
+  border-radius: 999px;
+  padding: 2px 10px;
+  margin: 6px 0 0 4px;
+  background: #FDF7F0;
+}
+
+.card-content { padding: 0 10px 15px; }
+
+/* ========== リスト ========== */
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 9px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.keyword-list li i {
+  margin-right: 9px;
+  color: var(--orange);
+  min-width: 18px;
+  margin-top: 3px;
+}
+
+.keyword-list li i.ic-charcoal { color: var(--charcoal); }
+.keyword-list li i.ic-rust     { color: var(--ui-color-5); }
+
+/* ========== タグ ========== */
+.keyword-tag {
+  background-color: var(--kinari);
+  color: var(--ink);
+  padding: 3px 9px;
+  border-radius: 5px;
+  margin: 2px 4px 2px 0;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+  border: 1px solid #E2D6C6;
+}
+
+.tag-charcoal { background-color: var(--charcoal); color: #ffffff; border-color: var(--charcoal); }
+.tag-orange   { background-color: var(--orange);   color: #ffffff; border-color: var(--orange); }
+.tag-rust     { background-color: var(--ui-color-5); color: #ffffff; border-color: var(--ui-color-5); }
+
+/* ========== 手書き風 吹き出し（3 種＋位置） ========== */
+.speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid var(--charcoal);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 18px 5px 15px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.10);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--charcoal) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FDF0DE;
+  border-color: var(--orange);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after { border-color: var(--orange) transparent; }
+
+.speech-bubble.variant-2 {
+  background: #EDEFF2;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333333;
+  display: inline;
+}
+
+.speech-bubble i { color: var(--charcoal); }
+.speech-bubble.variant-1 i { color: #C06A12; }
+.speech-bubble.variant-2 i { color: #A03E06; }
+
+/* ========== ポイント ボックス ========== */
+.point-box {
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  font-size: 15px;
+  line-height: 1.65;
+  background: #EAECEF;
+  border-left: 6px solid var(--charcoal);
+}
+
+.point-box.orange { background: #FDF0DE; border-left-color: var(--orange); }
+.point-box.slate  { background: #EDEFF2; border-left-color: var(--ui-color-5); }
+
+.point-box i { color: var(--charcoal); margin-right: 8px; }
+.point-box.orange i { color: #C06A12; }
+.point-box.slate i  { color: #A03E06; }
+
+/* ========== コード風プレビュー ========== */
+pre {
+  background: #F2EDE4;
+  border-left: 5px solid var(--orange);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: 'SFMono-Regular', Consolas, 'Courier New', monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+/* ========== 対応表 ========== */
+.os-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin-top: 10px;
+}
+
+.os-table th, .os-table td {
+  border: 1px solid #E2D6C6;
+  padding: 6px 8px;
+  text-align: left;
+}
+
+.os-table th {
+  background: var(--charcoal);
+  color: #ffffff;
+  font-weight: bold;
+}
+
+.os-table td:first-child { background: #F4F1EA; font-weight: bold; width: 38%; }
+
+/* ========== アニメーション ========== */
+@keyframes fadeInScale {
+  0%   { opacity: 0; transform: scale(0.90) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.js .fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(18px);
+  transition: opacity 0.65s ease, transform 0.65s ease;
+}
+
+.js .fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ========== フッター ========== */
+.main-footer {
+  text-align: center;
+  padding: 22px 16px 30px;
+  margin-top: 10px;
+  background: var(--ink);
+  color: #EDE8E1;
+  border-radius: 20px;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.main-footer a {
+  color: var(--flame);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.footer-note { font-size: 13px; color: #A8A49C; margin-top: 6px; }
+
+/* ========== レスポンシブ ========== */
+@media (max-width: 1600px) { .section-card { min-width: 300px; } }
+@media (max-width: 1200px) { .section-card { min-width: 340px; } }
+@media (max-width: 900px)  { .section-card { min-width: 400px; } }
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; align-items: stretch; }
+  .section-card { width: 100%; min-width: auto; max-width: none; }
+  .main-header h1 { font-size: 28px; }
+}
+</style>
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- ===== ヘッダー ===== -->
+  <header class="main-header">
+    <div class="header-icon">
+      <i class="fa-solid fa-cloud fa-7x fa-beat" style="--fa-animation-duration: 2.4s;" aria-hidden="true"></i>
+    </div>
+    <h1>AIエージェントキャッチアップ #88 <span class="accent2">—</span> <span class="accent">Cloudflare OS</span></h1>
+    <p class="header-sub">Cloudflare が社内で毎日使う「AI の仕事環境」を、初見でソースコードから読んでいくライブ配信のまとめ</p>
+    <p class="header-date"><i class="fa-regular fa-calendar fa-lg" style="color: var(--orange);"></i> 2026 年 8 月 16 日 ライブ配信 ／ ジェネラティブエージェンツ / Generative Agents（@generative-agents）— 58 分 25 秒 アーカイブ</p>
+    <div class="header-tags">
+      <span class="keyword-tag tag-orange">Cloudflare OS</span>
+      <span class="keyword-tag tag-charcoal">AIエージェント</span>
+      <span class="keyword-tag tag-rust">Workers</span>
+      <span class="keyword-tag tag-charcoal">Gadgets</span>
+      <span class="keyword-tag tag-orange">Gatekeepers</span>
+      <span class="keyword-tag tag-rust">Blueprints</span>
+      <span class="keyword-tag tag-charcoal">Durable Objects</span>
+      <span class="keyword-tag">オープンソース</span>
+    </div>
+  </header>
+
+  <!-- ===== 1 行目：配信の概要と Cloudflare OS の全体像 ===== -->
+  <div class="section-layout">
+
+    <!-- 1: この配信について -->
+    <div class="section-card border-charcoal fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">①</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-podcast"></i>配信の概要</span><span class="layer-badge">#88</span></div>
+        <i class="fa-solid fa-podcast fa-5x fa-bounce" style="color: var(--charcoal); --fa-animation-duration: 2.6s;" aria-hidden="true"></i>
+        <h2>この配信について</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>AI エージェントをキャッチアップする定期のライブ配信、第 <span class="keyword-tag tag-orange">88 回</span>。</span></li>
+          <li><i class="fa-solid fa-user-astronaut fa-lg ic-charcoal" aria-hidden="true"></i><span><span class="keyword-tag tag-charcoal">主催者も初見</span> の状態で、気になる AI エージェントを実際に動かしていく会。</span></li>
+          <li><i class="fa-solid fa-code fa-lg ic-rust" aria-hidden="true"></i><span>ソースコードを読んだり、技術的な話が多めになる回。</span></li>
+          <li><i class="fa-solid fa-cloud fa-lg" aria-hidden="true"></i><span>今回のテーマは <span class="keyword-tag tag-orange">Cloudflare OS</span> — AI による日々の業務の生産性向上環境。</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> 説明欄は短いけれど、中身は GitHub の公式リポジトリを読み込む、濃いめの回なのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2: Cloudflare OS とは -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">②</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-cloud"></i>全体像</span></div>
+        <i class="fa-solid fa-cloud fa-5x fa-beat-fade" style="color: var(--orange); --fa-animation-duration: 3s;" aria-hidden="true"></i>
+        <h2>Cloudflare OS とは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i><span>Cloudflare が社内利用のために開発した <span class="keyword-tag tag-orange">AI 生産性向上環境</span>。</span></li>
+          <li><i class="fa-solid fa-users fa-lg ic-charcoal" aria-hidden="true"></i><span>エンジニアから営業まで、<span class="keyword-tag tag-charcoal">社員の大部分</span> が毎日の仕事で使っている。</span></li>
+          <li><i class="fa-brands fa-github fa-lg ic-rust" aria-hidden="true"></i><span>2026 年 8 月に <span class="keyword-tag tag-rust">Apache 2.0</span> でオープンソース公開。</span></li>
+          <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>公開直後から <span class="keyword-tag tag-orange">8.6k スター</span>・952 フォーク（2026 年 8 月時点）。</span></li>
+        </ul>
+        <div class="point-box orange">
+          <i class="fa-solid fa-circle-check fa-lg"></i>狙いは「他社がコピーして自社向けに育てること」。Cloudflare OS をそのまま使うのではなく、<strong>「御社の OS」を作ってもらう</strong>という発想なのだ。
+        </div>
+      </div>
+    </div>
+
+    <!-- 3: 「OS」という名前の意味 -->
+    <div class="section-card border-orange fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">③</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-microchip"></i>命名の意図</span></div>
+        <i class="fa-solid fa-microchip fa-5x fa-flip" style="color: var(--charcoal); --fa-animation-duration: 3.2s;" aria-hidden="true"></i>
+        <h2>「OS」という名前の意味</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>従来のコンピューター用 OS ではない、と明言されている。</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg ic-charcoal" aria-hidden="true"></i><span>意味 1: AI と <span class="keyword-tag tag-charcoal">安全</span> に生産的になるための仕事環境。セキュリティチームが夜ぐっすり眠れる状態が目標。</span></li>
+          <li><i class="fa-solid fa-gears fa-lg ic-rust" aria-hidden="true"></i><span>意味 2: ワークロードを管理する <span class="keyword-tag tag-rust">伝統的 OS</span> との類推。</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> マーケティングだけの名前ではなく、技術的な対応表も本当にあるのだ（⑰で詳しく）。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4: 提供する 3 つの機能 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">④</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-cubes"></i>3 つの柱</span></div>
+        <i class="fa-solid fa-cubes fa-5x fa-shake" style="color: var(--orange); --fa-animation-duration: 3s;" aria-hidden="true"></i>
+        <h2>提供する 3 つの機能</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>1. <span class="keyword-tag tag-orange">エージェントチャット UI</span> — 会社の運用知識をあらかじめ読み込ませて、タスクを依頼できる。</span></li>
+          <li><i class="fa-solid fa-puzzle-piece fa-lg ic-charcoal" aria-hidden="true"></i><span>2. サンドボックス化されたアプリ開発 — <span class="keyword-tag tag-charcoal">ガジェット</span> という小さな個人アプリを安全に作って共有。</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg ic-rust" aria-hidden="true"></i><span>3. <span class="keyword-tag tag-rust">Gatekeepers</span> — エージェントにもアプリにもガードレールをかけるセキュリティの枠組み。</span></li>
+        </ul>
+        <div class="point-box slate">
+          <i class="fa-solid fa-user-group fa-lg"></i>非技術者のユーザーが安心して思いっきり使っても、悪いことが起こらないようにする — それがこの 3 本柱の狙い。
+        </div>
+      </div>
+    </div>
+
+    <!-- 5: まず動かしてみる -->
+    <div class="section-card border-charcoal fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑤</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-rocket"></i>クイックスタート</span></div>
+        <i class="fa-solid fa-rocket fa-5x fa-bounce" style="color: var(--ui-color-5); --fa-animation-duration: 2.8s;" aria-hidden="true"></i>
+        <h2>まず動かしてみる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-orange">pnpm</span> を入れて <span class="keyword-tag tag-charcoal">pnpm run-local</span> だけでローカル実行できる。</span></li>
+          <li><i class="fa-solid fa-globe fa-lg ic-charcoal" aria-hidden="true"></i><span>ブラウザで <span class="keyword-tag tag-rust">localhost:8787</span> を開けば OK。スタック全体が wrangler と workerd 上で動く。</span></li>
+          <li><i class="fa-solid fa-comment-dots fa-lg ic-rust" aria-hidden="true"></i><span>試せる例：「顧客との会議用スライドを作って」（内蔵ブループリントを使用）。</span></li>
+          <li><i class="fa-solid fa-gamepad fa-lg" aria-hidden="true"></i><span>「三目並べを作って」「この GitHub リポジトリの課題ダッシュボードを作って」なども。</span></li>
+        </ul>
+        <pre>$ pnpm run-local
+→ http://localhost:8787
+（本番運用向けではないが、
+ 動きを確かめるには十分）</pre>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg"></i> 「作って」と頼むだけで、テストまでエージェントがやってくれるのだ。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 2 行目：ガジェットとブループリント ===== -->
+  <div class="section-layout">
+
+    <!-- 6: ガジェットとは -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑥</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-puzzle-piece"></i>Gadgets</span></div>
+        <i class="fa-solid fa-puzzle-piece fa-5x fa-flip" style="color: var(--orange); --fa-animation-duration: 3.4s;" aria-hidden="true"></i>
+        <h2>ガジェットとは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clone fa-lg" aria-hidden="true"></i><span>スライド 1 枚を作るときも、<span class="keyword-tag tag-orange">その人専用のアプリ</span> のコピーが用意される。</span></li>
+          <li><i class="fa-solid fa-cloud-arrow-down fa-lg ic-charcoal" aria-hidden="true"></i><span>SaaS のようにクラウド上の共有ソフトを呼ぶのではなく、<span class="keyword-tag tag-charcoal">プライベートインスタンス</span> が動く。</span></li>
+          <li><i class="fa-solid fa-box fa-lg ic-rust" aria-hidden="true"></i><span>全員が別々の <span class="keyword-tag tag-rust">サンドボックス</span> で実行される。</span></li>
+        </ul>
+        <div class="point-box orange">
+          <i class="fa-solid fa-circle-info fa-lg"></i>「コネクター付きのチャットボット」ではなく、<strong>ソフトウェアの新しい考え方</strong> — これが Cloudflare OS の中心にある発想。
+        </div>
+      </div>
+    </div>
+
+    <!-- 7: 安全にコードを変えられる -->
+    <div class="section-card border-orange fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑦</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-lock"></i>サンドボックス</span></div>
+        <i class="fa-solid fa-user-shield fa-5x fa-beat" style="color: var(--charcoal); --fa-animation-duration: 2.4s;" aria-hidden="true"></i>
+        <h2>安全にコードを変えられる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bug-slash fa-lg" aria-hidden="true"></i><span>サンドボックスがアクセスを全部管理するので、<span class="keyword-tag tag-orange">漏洩系のバグ</span> が入りにくい構造。</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench fa-lg ic-charcoal" aria-hidden="true"></i><span>機能が足りなければ <span class="keyword-tag tag-charcoal">エージェントに追加を頼める</span>。安全だから改造も自由。</span></li>
+          <li><i class="fa-solid fa-network-wired fa-lg ic-rust" aria-hidden="true"></i><span>ガジェットは明示的に許可しない限り <span class="keyword-tag tag-rust">外部ネットワークと通信できない</span>（Dynamic Worker と Bindings で制御）。</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-feather fa-lg"></i> 「自分専用のコピーだから壊しても影響なし」— これが大胆な改造を可能にするのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8: オフィススイートのような体験 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑧</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-file-lines"></i>使い心地</span></div>
+        <i class="fa-solid fa-file-lines fa-5x fa-beat-fade" style="color: var(--ui-color-5); --fa-animation-duration: 3.1s;" aria-hidden="true"></i>
+        <h2>オフィススイートのような体験</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-table-cells fa-lg" aria-hidden="true"></i><span>基本の使い心地は <span class="keyword-tag tag-orange">Google Docs</span> のようなオンラインオフィスに近い。</span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles fa-lg ic-charcoal" aria-hidden="true"></i><span>ただし「文書・表計算・スライド」ではなく、各ファイルが <span class="keyword-tag tag-charcoal">AI が書いた独自アプリ</span> になり得る。</span></li>
+          <li><i class="fa-solid fa-lock fa-lg ic-rust" aria-hidden="true"></i><span>ドキュメントと同じく <span class="keyword-tag tag-rust">非公開がデフォルト</span>。思いつきで何個でも作れる。</span></li>
+          <li><i class="fa-solid fa-clone fa-lg" aria-hidden="true"></i><span>テンプレートにあたるのが <span class="keyword-tag tag-orange">ブループリント</span> — 中身はアプリ全体のコード。</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> 「ファイルを開く」の延長で、自分専用アプリが手に入る感覚なのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9: ブループリントで共有 -->
+    <div class="section-card border-charcoal fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑨</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-share-nodes"></i>Blueprints</span></div>
+        <i class="fa-solid fa-share-nodes fa-5x fa-shake" style="color: var(--orange); --fa-animation-duration: 2.9s;" aria-hidden="true"></i>
+        <h2>ブループリントで共有</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-drafting-compass fa-lg" aria-hidden="true"></i><span>ガジェットそのものではなく <span class="keyword-tag tag-orange">設計図（コードのコピー）</span> を共有すると、相手は自分のコピーを作れる。</span></li>
+          <li><i class="fa-solid fa-mobile-screen fa-lg ic-charcoal" aria-hidden="true"></i><span>モバイルアプリのように、<span class="keyword-tag tag-charcoal">使う人全員が自分のソフトを持つ</span> 形。</span></li>
+          <li><i class="fa-solid fa-hand-holding-heart fa-lg ic-rust" aria-hidden="true"></i><span>機能追加の要望を出す代わりに、<span class="keyword-tag tag-rust">エンドユーザーが AI で自分の問題を解決</span>できる。</span></li>
+          <li><i class="fa-solid fa-heart-crack fa-lg" aria-hidden="true"></i><span>個人開発者がオンラインサービスを維持する苦労から解放される側面も。</span></li>
+        </ul>
+        <div class="point-box">
+          <i class="fa-solid fa-clock-rotate-left fa-lg"></i>ここ 25 年のクラウド／SaaS の中心モデルからの大きな転換 — AI が誰でも機能を足せる時代には、中央集権型が合わなくなってきた、という主張。
+        </div>
+      </div>
+    </div>
+
+    <!-- 10: リアルタイム共同編集 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑩</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-users"></i>共同作業</span></div>
+        <i class="fa-solid fa-users fa-5x fa-bounce" style="color: var(--charcoal); --fa-animation-duration: 2.7s;" aria-hidden="true"></i>
+        <h2>リアルタイム共同編集</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>ガジェットはドキュメントのように共有できる（特定ユーザー指定 or <span class="keyword-tag tag-orange">共有リンク</span>）。</span></li>
+          <li><i class="fa-solid fa-eye fa-lg ic-charcoal" aria-hidden="true"></i><span>共同作業者の操作が <span class="keyword-tag tag-charcoal">リアルタイムで見える</span>。</span></li>
+          <li><i class="fa-solid fa-cube fa-lg ic-rust" aria-hidden="true"></i><span>仕組みは <span class="keyword-tag tag-rust">Durable Object</span> — Cloudflare のステートフルなサーバレス部品。</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg"></i> あまりに簡単なので、コーディングエージェントが頼まれなくても標準で組み込んでくれるのだ。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 3 行目：Gatekeepers とセキュリティ ===== -->
+  <div class="section-layout">
+
+    <!-- 11: Gatekeepers とは -->
+    <div class="section-card border-orange fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑪</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-shield-halved"></i>Gatekeepers</span></div>
+        <i class="fa-solid fa-shield-halved fa-5x fa-beat" style="color: var(--orange); --fa-animation-duration: 2.5s;" aria-hidden="true"></i>
+        <h2>Gatekeepers とは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-door fa-lg" aria-hidden="true"></i><span>エージェントやガジェットを外部リソースにつなぐとき、<span class="keyword-tag tag-orange">仲介役</span> として立つ仕組み。</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg ic-charcoal" aria-hidden="true"></i><span>README いわく <span class="keyword-tag tag-charcoal">「強化版 MCP サーバー」</span> のようなもの。</span></li>
+          <li><i class="fa-solid fa-server fa-lg ic-rust" aria-hidden="true"></i><span>実装は <span class="keyword-tag tag-rust">独立した Worker</span>。1 つ 1 つが別々に動く。</span></li>
+          <li><i class="fa-solid fa-road fa-lg" aria-hidden="true"></i><span>将来は OS インスタンスとは別に配備・運用する構想（詳細はまだ調整中）。</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> 外部サービスとの接続窓口を、専用の番人に任せてしまう発想なのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12: Gatekeeper の役割 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑫</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-list-check"></i>5 つの役割</span></div>
+        <i class="fa-solid fa-list-check fa-5x fa-flip" style="color: var(--charcoal); --fa-animation-duration: 3.3s;" aria-hidden="true"></i>
+        <h2>Gatekeeper の役割</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span>サービスの API をラップして、きれいな <span class="keyword-tag tag-orange">Cap'n Web API</span> を提供。</span></li>
+          <li><i class="fa-solid fa-key fa-lg ic-charcoal" aria-hidden="true"></i><span><span class="keyword-tag tag-charcoal">OAuth</span> などの認可を処理。</span></li>
+          <li><i class="fa-solid fa-filter fa-lg ic-rust" aria-hidden="true"></i><span>ユーザーが意図した <span class="keyword-tag tag-rust">リソースだけ</span> にアクセスを制限。</span></li>
+          <li><i class="fa-solid fa-clipboard-list fa-lg" aria-hidden="true"></i><span>ガジェットとエージェントの <span class="keyword-tag tag-orange">全操作をログ</span> に記録。</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg ic-charcoal" aria-hidden="true"></i><span>副作用のある操作は人間の <span class="keyword-tag tag-charcoal">承認・却下</span> 機会を用意。</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 13: 止まらない承認フロー -->
+    <div class="section-card border-charcoal fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑬</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-forward"></i>非同期承認</span></div>
+        <i class="fa-solid fa-forward fa-5x fa-shake" style="color: var(--ui-color-5); --fa-animation-duration: 2.8s;" aria-hidden="true"></i>
+        <h2>止まらない承認フロー</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>従来の human-in-the-loop は同期式。エージェントが承認待ちで <span class="keyword-tag tag-orange">停止</span> してしまう。</span></li>
+          <li><i class="fa-solid fa-mug-hot fa-lg ic-charcoal" aria-hidden="true"></i><span>コーヒーを取りに行って戻ると、最初の一歩で止まったまま…という事態に。</span></li>
+          <li><i class="fa-solid fa-vials fa-lg ic-rust" aria-hidden="true"></i><span>Gatekeeper は承認が必要な操作をローカルで <span class="keyword-tag tag-rust">シミュレート</span>。エージェントはそのまま先へ進める。</span></li>
+          <li><i class="fa-solid fa-check-double fa-lg" aria-hidden="true"></i><span>結果の読み取りにはシミュレーション結果を返し、あとで <span class="keyword-tag tag-orange">まとめて or 個別に承認</span> できる。</span></li>
+        </ul>
+        <div class="point-box slate">
+          <i class="fa-solid fa-triangle-exclamation fa-lg"></i>面倒で「自動承認」や <strong>--dangerously-skip-permissions</strong> に頼ってしまうのが人の性。それに頼らずにすむ、というのが大きな前進。
+        </div>
+      </div>
+    </div>
+
+    <!-- 14: ケイパビリティ型の権限管理 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑭</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-key"></i>権限モデル</span></div>
+        <i class="fa-solid fa-key fa-5x fa-beat-fade" style="color: var(--orange); --fa-animation-duration: 3.2s;" aria-hidden="true"></i>
+        <h2>ケイパビリティ型の権限管理</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>エージェントもガジェットも、<span class="keyword-tag tag-orange">デフォルトでは何にもアクセスできない</span>。</span></li>
+          <li><i class="fa-solid fa-handshake fa-lg ic-charcoal" aria-hidden="true"></i><span>リソースごとにユーザーが <span class="keyword-tag tag-charcoal">「紹介」</span> して初めて権限が与えられる。</span></li>
+          <li><i class="fa-solid fa-hand-point-up fa-lg ic-rust" aria-hidden="true"></i><span>エージェント側から「このリソースが必要」と <span class="keyword-tag tag-rust">申請</span> することも可能。</span></li>
+          <li><i class="fa-solid fa-code-compare fa-lg" aria-hidden="true"></i><span>MCP サーバーを事前一括設定して常時全権限を与える方式とは、ここが違う。</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> 「今の仕事に必要な分だけ」を都度わたす。合鍵の管理に似た発想なのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15: 対応している外部サービス -->
+    <div class="section-card border-orange fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑮</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-plug"></i>対応サービス</span></div>
+        <i class="fa-solid fa-plug fa-5x fa-bounce" style="color: var(--charcoal); --fa-animation-duration: 2.6s;" aria-hidden="true"></i>
+        <h2>対応している外部サービス</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-charcoal">GitHub</span> ・ <span class="keyword-tag tag-orange">Google</span> ・ <span class="keyword-tag tag-rust">Cloudflare</span> の各 API。</span></li>
+          <li><i class="fa-solid fa-database fa-lg ic-charcoal" aria-hidden="true"></i><span><span class="keyword-tag tag-charcoal">Supabase</span> ・ <span class="keyword-tag tag-orange">Notion</span> ・ <span class="keyword-tag tag-rust">Confluence</span>。</span></li>
+          <li><i class="fa-solid fa-envelope fa-lg ic-rust" aria-hidden="true"></i><span>Email Workers ・ <span class="keyword-tag tag-orange">Home Assistant</span> ・ <span class="keyword-tag tag-charcoal">Slack</span> ・ <span class="keyword-tag tag-rust">Spotify</span> ・ ZoomInfo。</span></li>
+          <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span>各 Gatekeeper パッケージに <span class="keyword-tag tag-orange">セットアップ手順</span> が同梱。</span></li>
+        </ul>
+        <div class="point-box orange">
+          <i class="fa-solid fa-circle-info fa-lg"></i>OAuth クライアント資格情報の取得など、設定はやや手間。対象が開発者向けに作られているサービスが多く、意図的に簡単にしていない面もある。
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 4 行目：Workers 基盤・開発者視点・まとめ ===== -->
+  <div class="section-layout">
+
+    <!-- 16: Workers チームが作った Workers アプリ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑯</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-gears"></i>技術基盤</span></div>
+        <i class="fa-solid fa-gears fa-5x fa-spin" style="color: var(--orange); --fa-animation-duration: 8s;" aria-hidden="true"></i>
+        <h2>Workers チームが作った Workers アプリ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>基盤は <span class="keyword-tag tag-orange">Cloudflare Workers</span>。Durable Objects・Dynamic Workers・<span class="keyword-tag tag-rust">Facets</span> を特に多用。</span></li>
+          <li><i class="fa-solid fa-cube fa-lg ic-charcoal" aria-hidden="true"></i><span>ワークスペースごとに独立した <span class="keyword-tag tag-charcoal">Durable Object</span>、ガジェットは Dynamic Worker の Facet で実行。</span></li>
+          <li><i class="fa-solid fa-users-gear fa-lg ic-rust" aria-hidden="true"></i><span>開発主体は <span class="keyword-tag tag-rust">Workers を作った本人たち</span>。Dynamic Workers や Facets は OS のためにランタイムへ追加された機能。</span></li>
+          <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span><span class="keyword-tag tag-orange">workerd</span> 自体がオープンソースなので、自社サーバー上でも丸ごと動かせる。</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-magnifying-glass-code fa-lg"></i> ソースを読むと「Workers チーム流の正しい使い方」が学べる、という読書素材としての価値も大きいのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 17: 本物の OS との対応表 -->
+    <div class="section-card border-charcoal fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑰</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-table"></i>OS 類推</span></div>
+        <i class="fa-solid fa-table-list fa-5x fa-flip" style="color: var(--charcoal); --fa-animation-duration: 3.5s;" aria-hidden="true"></i>
+        <h2>本物の OS との対応表</h2>
+      </div>
+      <div class="card-content">
+        <table class="os-table">
+          <tr><th>従来の OS</th><th>Cloudflare OS</th></tr>
+          <tr><td>kernel</td><td>workshop-backend</td></tr>
+          <tr><td>device drivers</td><td>gatekeeper-*</td></tr>
+          <tr><td>shell</td><td>workshop-frontend</td></tr>
+          <tr><td>processes</td><td>gadgets</td></tr>
+          <tr><td>executables</td><td>blueprints</td></tr>
+          <tr><td>ACLs</td><td>共有パーミッション</td></tr>
+          <tr><td>???</td><td>agents</td></tr>
+        </table>
+        <div class="point-box">
+          <i class="fa-solid fa-robot fa-lg"></i>エージェントは「ユーザー」とも「プログラム」とも違う存在。人間に責任を持ちつつ、独自の制限された権限を持つべき — <strong>従来 OS に欠けていた部品</strong>だ、という主張。
+        </div>
+      </div>
+    </div>
+
+    <!-- 18: エージェントの実力と今後 -->
+    <div class="section-card border-orange fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-number">⑱</span>
+        <div><span class="theme-badge"><i class="fa-solid fa-flag-checkered"></i>まとめ</span></div>
+        <i class="fa-solid fa-robot fa-5x fa-beat" style="color: var(--ui-color-5); --fa-animation-duration: 2.6s;" aria-hidden="true"></i>
+        <h2>エージェントの実力と今後</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>コーディングエージェントは汎用。<span class="keyword-tag tag-orange">Code Mode</span> — コードを書いて即実行する方式。</span></li>
+          <li><i class="fa-solid fa-brain fa-lg ic-charcoal" aria-hidden="true"></i><span>LLM は主要プロバイダー・自己ホストから <span class="keyword-tag tag-charcoal">自由に選べる</span>。</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg ic-rust" aria-hidden="true"></i><span>プラットフォーム密着のおかげで、同じモデルでも <span class="keyword-tag tag-rust">少ないトークンで速く</span> 動きやすい。</span></li>
+          <li><i class="fa-solid fa-arrows-to-circle fa-lg" aria-hidden="true"></i><span>アプリには標準で <span class="keyword-tag tag-orange">エージェント向け API</span> が付き、MCP サーバーの構築が不要。</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg ic-charcoal" aria-hidden="true"></i><span>v2 は全面的な書き直し。2026 年 8 月時点では <span class="keyword-tag tag-charcoal">早期アクセス</span> 状態で、粗い部分も多い。</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten"><i class="fa-solid fa-flag-checkered fa-lg"></i> 自社の仕事環境を「OS」として組み直す。次の仕事の形を感じさせてくれる配信だったのだ。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== フッター ===== -->
+  <footer class="main-footer">
+    <p>
+      🎬 動画: <a href="https://www.youtube.com/watch?v=89L-ga7A1lo" target="_blank" rel="noopener">ジェネラティブエージェンツ / Generative Agents「AIエージェントキャッチアップ #88 - Cloudflare OS」</a>
+    </p>
+    <p>
+      📂 公式リポジトリ: <a href="https://github.com/cloudflare/cloudflare-os" target="_blank" rel="noopener">cloudflare/cloudflare-os（Apache 2.0）</a> ／ 🚀 体験: <a href="https://os.cloudflare.app/deploy" target="_blank" rel="noopener">os.cloudflare.app/deploy</a>
+    </p>
+    <p class="footer-note"><i class="fa-brands fa-youtube fa-lg" style="color: var(--flame);"></i> このメモは 2026.08.16 ライブ配信（58 分 25 秒）の説明欄と、その中で紹介された公式リポジトリ README にもとづいて整理したものです ／ チャンネル登録者 930 人の ジェネラティブエージェンツ / Generative Agents（@generative-agents）</p>
+  </footer>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var targets = document.querySelectorAll('.fade-in-scale');
+  if (!('IntersectionObserver' in window)) {
+    targets.forEach(function (el) { el.classList.add('visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  targets.forEach(function (el) { observer.observe(el); });
+});
+</script>
+</body>
+</html>

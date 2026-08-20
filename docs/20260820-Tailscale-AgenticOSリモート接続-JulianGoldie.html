@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TailscaleでAgentic OSにどこからでもアクセス — スケジュール実行の仕組み | Julian Goldie SEO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+  :root {
+    --ui-color-1: #5B21B6; /* トワイライトバイオレット */
+    --ui-color-2: #CA8A04; /* スターゴールド */
+    --ui-color-3: #F1EAFB; /* 薄ラベンダー */
+    --ui-color-4: #2E1065; /* ミッドナイトパープル */
+    --ui-color-5: #BE123C; /* ローズレッド */
+    --bg-canvas: #FAF7FF;
+    --text-main: #333333;
+    --text-sub: #777777;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-canvas);
+    font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+    color: var(--text-main);
+    line-height: 1.5;
+  }
+
+  .canvas {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ヘッダー */
+  header {
+    text-align: center;
+    padding: 40px 20px 30px;
+    position: relative;
+  }
+
+  header .header-icon {
+    font-size: 7em;
+    color: var(--ui-color-1);
+    animation: fa-bounce 3s ease-in-out infinite;
+    display: block;
+    margin-bottom: 15px;
+  }
+
+  header h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    font-weight: bold;
+    color: var(--text-main);
+    margin: 10px 0;
+    line-height: 1.4;
+  }
+
+  header .date-info {
+    font-size: 14px;
+    color: var(--text-sub);
+  }
+
+  header .header-sub {
+    font-size: 18px;
+    color: var(--ui-color-1);
+    font-weight: bold;
+    margin-top: 8px;
+  }
+
+  header .header-tags {
+    margin-top: 15px;
+  }
+
+  /* セクション見出し */
+  .section-divider {
+    text-align: center;
+    margin: 40px 0 20px;
+    position: relative;
+  }
+
+  .section-divider h2 {
+    display: inline-block;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: var(--ui-color-4);
+    background: var(--ui-color-3);
+    padding: 8px 30px;
+    border-radius: 30px;
+    border: 2px dashed var(--ui-color-1);
+  }
+
+  .section-divider .divider-icon {
+    color: var(--ui-color-2);
+    margin-right: 8px;
+  }
+
+  /* 4カラムレイアウト */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    justify-content: center;
+    margin-bottom: 20px;
+  }
+
+  /* カードスタイル */
+  .section-card {
+    flex: 1;
+    min-width: 220px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    border-top: 5px solid var(--ui-color-1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+  }
+
+  .section-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 8px 10px 22px rgba(91, 33, 182, 0.25);
+    background-color: #FDFCFF;
+  }
+
+  .section-card:nth-child(2n) { border-top-color: var(--ui-color-2); }
+  .section-card:nth-child(3n) { border-top-color: var(--ui-color-5); }
+  .section-card:nth-child(4n) { border-top-color: var(--ui-color-4); }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0;
+  }
+
+  .mega-icon-container i.fa-5x {
+    display: block;
+    margin-bottom: 12px;
+  }
+
+  .card-content {
+    padding: 0 10px 15px;
+  }
+
+  .section-card h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: #555555;
+    margin: 8px 0 12px;
+    text-align: center;
+  }
+
+  .section-card h3 {
+    font-size: 18px;
+    color: var(--text-main);
+    margin: 15px 0 8px;
+    border-left: 4px solid var(--ui-color-2);
+    padding-left: 8px;
+  }
+
+  /* キーワードリスト */
+  .keyword-list {
+    margin: 15px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+
+  .keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: var(--text-main);
+  }
+
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 16px;
+    margin-top: 4px;
+  }
+
+  .keyword-list li i.blue { color: var(--ui-color-1); }
+  .keyword-list li i.rose { color: var(--ui-color-5); }
+
+  /* キーワードタグ */
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  .keyword-tag.gold {
+    background-color: #FBF3D9;
+    color: #713F12;
+  }
+
+  .keyword-tag.rose {
+    background-color: #FBE2E8;
+    color: #881337;
+  }
+
+  /* 手書き風吹き出し */
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+
+  .speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after {
+    border-color: var(--ui-color-2) transparent;
+  }
+
+  .speech-bubble.variant-2 {
+    background: #FFECEF;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after {
+    border-color: var(--ui-color-5) transparent;
+  }
+
+  /* 手書き文字 */
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333;
+    display: inline-block;
+  }
+
+  .handwritten i {
+    margin-right: 5px;
+  }
+
+  /* コードプレビュー */
+  pre {
+    background: #2E1065;
+    color: #F1EAFB;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Courier New', monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    border-left: 4px solid var(--ui-color-2);
+  }
+
+  pre .prompt { color: #FBBF24; }
+  pre .comment { color: #C4B5FD; }
+
+  /* アニメーション */
+  @keyframes fadeInScale {
+    0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+    100% { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .fade-in-scale {
+    animation: fadeInScale 0.7s ease-out both;
+  }
+
+  @keyframes highlightPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(202, 138, 4, 0.5); }
+    50% { box-shadow: 0 0 0 8px rgba(202, 138, 4, 0); }
+  }
+
+  .highlight-card {
+    animation: highlightPulse 2.5s ease-in-out infinite;
+  }
+
+  .flow-arrow {
+    text-align: center;
+    font-size: 28px;
+    color: var(--ui-color-2);
+    margin: 8px 0;
+    animation: fa-bounce 2s ease-in-out infinite;
+  }
+
+  /* フッター */
+  footer {
+    text-align: center;
+    padding: 40px 20px 30px;
+    margin-top: 30px;
+    border-top: 3px dashed var(--ui-color-1);
+    font-size: 14px;
+    color: var(--text-sub);
+  }
+
+  footer a {
+    color: var(--ui-color-1);
+    font-weight: bold;
+  }
+
+  footer .footer-title {
+    font-size: 15px;
+    color: var(--text-main);
+    margin-top: 6px;
+  }
+
+  /* レスポンシブ対応 */
+  @media (max-width: 1600px) {
+    .section-card { min-width: 280px; }
+  }
+
+  @media (max-width: 1200px) {
+    .section-card { min-width: 320px; }
+  }
+
+  @media (max-width: 900px) {
+    .section-card { min-width: 380px; }
+  }
+
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; }
+    header h1 { font-size: 28px; }
+    header .header-icon { font-size: 5em; }
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <header>
+    <i class="fa-solid fa-globe header-icon" aria-hidden="true"></i>
+    <h1>TailscaleでAgentic OSにどこからでもアクセス</h1>
+    <div class="header-sub">遠隔操作×毎日のスケジュール実行で、AIワークフローを止めない仕組み</div>
+    <div class="header-tags">
+      <span class="keyword-tag">Tailscale</span>
+      <span class="keyword-tag gold">Agentic OS</span>
+      <span class="keyword-tag rose">Hermes Muse</span>
+      <span class="keyword-tag">Hermes Astros</span>
+    </div>
+    <div class="date-info"><i class="fa-regular fa-calendar"></i> 2026年8月20日 | Julian Goldie SEO</div>
+  </header>
+
+  <!-- ===== セクション1: どこからでもつながる ===== -->
+  <div class="section-divider">
+    <h2><i class="fa-solid fa-tower-broadcast divider-icon"></i>セクション1：Tailscaleが開く「いつでもどこでも」接続</h2>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale highlight-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-network-wired fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Tailscale経由で遠隔アクセス</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>動画のテーマは<span class="keyword-tag">Tailscale</span>を活かした安全な接続</span></li>
+          <li><i class="fa-solid fa-shield-halved blue" aria-hidden="true"></i><span>デバイスどうしを<span class="keyword-tag gold">セキュア</span>につなぐしくみを利用</span></li>
+          <li><i class="fa-solid fa-plug blue" aria-hidden="true"></i><span>Agentic OSへの入り口を、外からも開けられる</span></li>
+          <li><i class="fa-solid fa-lock rose" aria-hidden="true"></i><span>むき出しのポートを開けずに、閉じた経路でつながる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+          自宅のマシンに、外出先から<br>
+          安全に入れるのがまず出発点!<br>
+          <span class="keyword-tag">secure</span>が大前提だよ
+        </span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-house-laptop fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Agentic OSを置いたマシンへ接続</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-robot blue" aria-hidden="true"></i><span>接続先は<span class="keyword-tag">agent OSをセットアップしたマシン</span></span></li>
+          <li><i class="fa-solid fa-server blue" aria-hidden="true"></i><span>エージェントたちの作業場所は、そのコンピュータの中</span></li>
+          <li><i class="fa-solid fa-desktop rose" aria-hidden="true"></i><span>手元のノートやスマホから、そのマシンへ入り込む</span></li>
+          <li><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i><span>「見に帰る」必要なく、外から操作できる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-1);"></i>
+          エージェントの城は自宅マシン。<br>
+          でも鍵はポケットの中✨<br>
+          どこからでも開けられるんだ
+        </span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-mug-saucer fa-5x" style="color: var(--ui-color-5); animation: fa-flip 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>場所を選ばない働き方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-mug-hot blue" aria-hidden="true"></i><span>カフェでも、旅先でも<span class="keyword-tag gold">any location</span>からOK</span></li>
+          <li><i class="fa-solid fa-person-walking blue" aria-hidden="true"></i><span>散歩の途中でふと思いついたら、すぐエージェントに相談</span></li>
+          <li><i class="fa-solid fa-mobile-screen rose" aria-hidden="true"></i><span>使う端末は問わない。小さな画面からでも入り口は同じ</span></li>
+          <li><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>「あのマシンの前に行かないと」がなくなる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-key fa-lg" style="color: var(--ui-color-5);"></i>
+          物理的な距離が消えると、<br>
+          作業のしかたも自由になる。<br>
+          場所しばりからの解放🌍
+        </span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="color: var(--ui-color-4); animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>ローカル性能を犠牲にしない</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-feather blue" aria-hidden="true"></i><span>重い処理は置いてあるマシンが引き受ける</span></li>
+          <li><i class="fa-solid fa-laptop blue" aria-hidden="true"></i><span>手元の端末は<span class="keyword-tag">軽いまま</span>サクサク動く</span></li>
+          <li><i class="fa-solid fa-battery-three-quarters rose" aria-hidden="true"></i><span>バッテリーを食う処理も自宅まかせにできる</span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>概要欄でも<span class="keyword-tag gold">性能を損なわない</span>点が強調されている</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i>
+          自分のPCが熱くならない!<br>
+          負荷は向こう、操作はこちら。<br>
+          いいとこ取りの構成⚡
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション2: セットアップの4ステップ ===== -->
+  <div class="section-divider">
+    <h2><i class="fa-solid fa-list-check divider-icon"></i>セクション2：セットアップはたった4ステップ</h2>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-location-crosshairs fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① エンドポイントを渡す</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-dot blue" aria-hidden="true"></i><span>まず<span class="keyword-tag">endpoint</span>（接続先の情報）を教える</span></li>
+          <li><i class="fa-solid fa-link blue" aria-hidden="true"></i><span>エージェントが「どこを見ればいいか」の道しるべになる</span></li>
+          <li><i class="fa-solid fa-route rose" aria-hidden="true"></i><span>Tailscaleで守られた通信路の先を指定</span></li>
+          <li><i class="fa-solid fa-flag-checkered" aria-hidden="true"></i><span>ここがすべてのスタート地点</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-map fa-lg" style="color: var(--ui-color-1);"></i>
+          「目的地の住所」を先に渡す。<br>
+          これが無いと代理人も<br>
+          どこへ行けばいいか分からない🗺️
+        </span>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② スキルを作る</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen-ruler blue" aria-hidden="true"></i><span>次に<span class="keyword-tag gold">skill</span>（専用の技）を作成</span></li>
+          <li><i class="fa-solid fa-book-open blue" aria-hidden="true"></i><span>手順をまとめた「どうやるか」の説明書のようなもの</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench rose" aria-hidden="true"></i><span>一度作れば、エージェントが何度でも使い回せる</span></li>
+          <li><i class="fa-solid fa-recycle" aria-hidden="true"></i><span>毎回ゼロから教え直す必要がなくなる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-scroll fa-lg" style="color: var(--ui-color-5);"></i>
+          経験を「技」として書き残す。<br>
+          エージェントの育て方の<br>
+          こつはここにある📝
+        </span>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-columns fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ HOSにタブを作る</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-window-restore blue" aria-hidden="true"></i><span><span class="keyword-tag">HOS（Agentic OS）</span>の中に専用タブを用意</span></li>
+          <li><i class="fa-solid fa-folder-tree blue" aria-hidden="true"></i><span>作ったスキルを、自分の画面からすぐ呼べる場所へ</span></li>
+          <li><i class="fa-solid fa-eye rose" aria-hidden="true"></i><span>離れた場所から開いても、同じ並びで見える</span></li>
+          <li><i class="fa-solid fa-thumbs-up" aria-hidden="true"></i><span>「探す手間」が消えて、いきなり実行へ進める</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-bars-progress fa-lg" style="color: var(--ui-color-2);"></i>
+          技を棚に並べる作業。<br>
+          使うときは一発で取り出せる🧰
+        </span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale highlight-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-calendar-check fa-5x" style="color: var(--ui-color-4); animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ 毎日のスケジュールに登録</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots blue" aria-hidden="true"></i><span>あとは<span class="keyword-tag">「毎日スケジュールで回して」</span>と頼むだけ</span></li>
+          <li><i class="fa-solid fa-language blue" aria-hidden="true"></i><span>むずかしい設定画面ではなく、ふつうのことばで依頼</span></li>
+          <li><i class="fa-solid fa-repeat rose" aria-hidden="true"></i><span>これで<span class="keyword-tag gold">on a daily basis</span>の自動実行になる</span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>エンドポイント→スキル→タブ→定時実行、の流れが完成</span></li>
+        </ul>
+        <h3><i class="fa-solid fa-terminal"></i> 依頼のことば</h3>
+        <pre><span class="prompt">あなた&gt;</span> このスキルを毎日の
+  スケジュールで実行してね
+<span class="comment"># これだけで定時ジョブ化する</span></pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-bullhorn fa-lg" style="color: var(--ui-color-4);"></i>
+          最後のひとことが大事!<br>
+          「ルーチンにして」と言えば<br>
+          毎日勝手に動き出す📣
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション3: スケジュール実行のしくみ ===== -->
+  <div class="section-divider">
+    <h2><i class="fa-solid fa-clock-rotate-left divider-icon"></i>セクション3：スケジュール実行で「止まらない」を作る</h2>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード9 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>ルーチンとして頼むだけ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microphone blue" aria-hidden="true"></i><span>スケジュール実行のやり方は<span class="keyword-tag">「routineにして」</span>と頼むだけ</span></li>
+          <li><i class="fa-solid fa-gears blue" aria-hidden="true"></i><span>複雑な cron の設定を、こちらで書く必要がない</span></li>
+          <li><i class="fa-solid fa-brain rose" aria-hidden="true"></i><span>エージェント側が意図をくみ取って<span class="keyword-tag">定時ジョブ</span>を組む</span></li>
+          <li><i class="fa-solid fa-face-smile" aria-hidden="true"></i><span>「お願い」の積み重ねでシステムが育っていく</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-comments fa-lg" style="color: var(--ui-color-2);"></i>
+          設定ファイルと格闘しない。<br>
+          会話の流れのまま管理できちゃう<br>
+          のが新しいんです🗣️
+        </span>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-flip 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>スケジュールタスクの正体</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock blue" aria-hidden="true"></i><span>仕組みとしては<span class="keyword-tag gold">scheduled task</span>（定時タスク）として登録</span></li>
+          <li><i class="fa-solid fa-laptop-code blue" aria-hidden="true"></i><span>自分のマシン上で、エージェントが定刻に起動する</span></li>
+          <li><i class="fa-solid fa-shuffle rose" aria-hidden="true"></i><span>手動で開始するのとは違い、<span class="keyword-tag">決まった時刻</span>に自動で動く</span></li>
+          <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>概要欄の言う<span class="keyword-tag">continuous execution</span>（継続実行）がこれ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-alarm-clock fa-lg" style="color: var(--ui-color-5);"></i>
+          目覚まし時計みたいに、<br>
+          決まった時間に自分で起きる。<br>
+          起こす役は不要⏰
+        </span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sun fa-5x" style="color: var(--ui-color-5); animation: fa-spin 10s linear infinite;" aria-hidden="true"></i>
+        <h2>毎日、着実に動き続ける</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-calendar-day blue" aria-hidden="true"></i><span>「毎日1回」のペースで確実にまわる</span></li>
+          <li><i class="fa-solid fa-layer-group blue" aria-hidden="true"></i><span>1日1回でも、<span class="keyword-tag gold">積み重ね</span>で成果の量が変わってくる</span></li>
+          <li><i class="fa-solid fa-chart-line rose" aria-hidden="true"></i><span>やる気が波でも、システムの波はない</span></li>
+          <li><i class="fa-solid fa-seedling" aria-hidden="true"></i><span>「続けること」を機械に任せる発想</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-calendar-check fa-lg" style="color: var(--ui-color-1);"></i>
+          3日坊主でも大丈夫。<br>
+          登録しちゃえば、祝日も<br>
+          体調不良の日も勝手に続く🌱
+        </span>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye-slash fa-5x" style="color: var(--ui-color-4); animation: fa-beat 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>見ていなくても回り続ける</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-clock blue" aria-hidden="true"></i><span>あなたが画面の前にいなくても実行される</span></li>
+          <li><i class="fa-solid fa-door-closed blue" aria-hidden="true"></i><span>外出中も、寝ている間も<span class="keyword-tag">ジョブは継続</span></span></li>
+          <li><i class="fa-solid fa-box-archive rose" aria-hidden="true"></i><span>結果はあとから確認すればいい</span></li>
+          <li><i class="fa-solid fa-moon" aria-hidden="true"></i><span>「夜のあいだにやってもらう」使い方も自然にできる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-mug-hot fa-lg" style="color: var(--ui-color-2);"></i>
+          朝起きたら前夜の成果が!<br>
+          みたいな暮らし方が<br>
+          現実になる☕
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション4: Hermes Muse の実例 ===== -->
+  <div class="section-divider">
+    <h2><i class="fa-solid fa-lightbulb divider-icon"></i>セクション4：実例① Hermes Muse が毎日回る</h2>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale highlight-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Hermes Muse は毎日実行</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-play blue" aria-hidden="true"></i><span>デモで見せた<span class="keyword-tag">Hermes Muse</span>は<span class="keyword-tag gold">every single day</span>で稼働</span></li>
+          <li><i class="fa-solid fa-clock blue" aria-hidden="true"></i><span>「毎日スケジュールで動く」実例そのもの</span></li>
+          <li><i class="fa-solid fa-circle-nodes rose" aria-hidden="true"></i><span>人間が開始ボタンを押しているわけではない</span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>先ほどの4ステップが、もう適用済みの状態</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-1);"></i>
+          「理屈は分かった、でも実際は?」<br>
+          に答えるのがこの実例。<br>
+          毎日ちゃんと動いてる⭐
+        </span>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>コンテンツを毎日分析</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-chart-column blue" aria-hidden="true"></i><span>Museの仕事は<span class="keyword-tag gold">analyzing content</span>（内容の分析）</span></li>
+          <li><i class="fa-solid fa-newspaper blue" aria-hidden="true"></i><span>何が読まれているか、どう伸びているかを日々チェック</span></li>
+          <li><i class="fa-solid fa-trend-up rose" aria-hidden="true"></i><span>変化の流れを、毎日欠かさず追いかける</span></li>
+          <li><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i><span>手動だと忘れがちな「観察」を自動化</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-glasses fa-lg" style="color: var(--ui-color-5);"></i>
+          毎日見続けるのは大変だけど、<br>
+          機械なら苦にならない。<br>
+          得意なことを任せるのがコツ🔍
+        </span>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>新しいアイデアを発掘</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rocket blue" aria-hidden="true"></i><span>分析の先には<span class="keyword-tag">finding new ideas</span>（新しい題材さがし）がある</span></li>
+          <li><i class="fa-solid fa-gem blue" aria-hidden="true"></i><span>毎日の分析から、次にやるべき種が見つかる</span></li>
+          <li><i class="fa-solid fa-arrows-rotate rose" aria-hidden="true"></i><span>分析→発見を<span class="keyword-tag gold">毎日ループ</span>させるのが強み</span></li>
+          <li><i class="fa-solid fa-box-open" aria-hidden="true"></i><span>気づいたらアイデアの在庫がたまっている状態へ</span></li>
+        </ul>
+        <h3><i class="fa-solid fa-terminal"></i> 毎日のループ</h3>
+        <pre><span class="comment"># Hermes Muse の定時ジョブ</span>
+<span class="prompt">[毎日]</span> コンテンツ分析
+   ↓ 新しいアイデアを発見
+   ↓ ネタの在庫に積もる</pre>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-seedling fa-lg" style="color: var(--ui-color-2);"></i>
+          アイデアに困る日が減る。<br>
+          毎日コツコツ掘るからこそ<br>
+          山になる💡
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== セクション5: Astros とまとめ ===== -->
+  <div class="section-divider">
+    <h2><i class="fa-solid fa-rocket divider-icon"></i>セクション5：実例② Astros も同じ、そして全体像</h2>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Hermes Astros も同じ仕組み</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-nodes blue" aria-hidden="true"></i><span>動画の締めは<span class="keyword-tag">Hermes Astros</span>にも同じ話が及ぶ構成</span></li>
+          <li><i class="fa-solid fa-clone blue" aria-hidden="true"></i><span>Museで示したパターンが<span class="keyword-tag gold">そのまま使い回せる</span></span></li>
+          <li><i class="fa-solid fa-users-gear rose" aria-hidden="true"></i><span>エージェントが増えても、組み方は1つで済む</span></li>
+          <li><i class="fa-solid fa-shapes" aria-hidden="true"></i><span>「1つ覚えれば全部に応用」の設計思想</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-arrows-split-up-and-left fa-lg" style="color: var(--ui-color-5);"></i>
+          Museのやり方をコピって<br>
+          Astrosにも貼るだけ。<br>
+          学び直しが不要なのが楽🚀
+        </span>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>日々のタスクを自動化</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt blue" aria-hidden="true"></i><span>概要欄が掲げるのは<span class="keyword-tag">automate daily tasks</span></span></li>
+          <li><i class="fa-solid fa-broom blue" aria-hidden="true"></i><span>単調な毎日の作業から、まずひとつ外へ出す</span></li>
+          <li><i class="fa-solid fa-hourglass-half rose" aria-hidden="true"></i><span>浮いた時間を、人間にしかできない仕事へ回す</span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>遠隔アクセス×定時実行の組み合わせが前提</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-2);"></i>
+          自動化は自分へのやさしさ。<br>
+          毎日の小さな手間を<br>
+          そっと引き取ってもらう💗
+        </span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card fade-in-scale highlight-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-earth-americas fa-5x" style="color: var(--ui-color-4); animation: fa-spin 12s linear infinite;" aria-hidden="true"></i>
+        <h2>どこにいてもワークフローが回る</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-street-view blue" aria-hidden="true"></i><span>どこからでもアクセスできて<span class="keyword-tag">止まらない</span>稼働</span></li>
+          <li><i class="fa-solid fa-scale-balanced blue" aria-hidden="true"></i><span>手元は軽く、重い処理は自宅マシンへ<span class="keyword-tag gold">いいとこ取り</span></span></li>
+          <li><i class="fa-solid fa-diagram-successor rose" aria-hidden="true"></i><span>Muse・Astrosのように、エージェントを増やして拡張</span></li>
+          <li><i class="fa-solid fa-flag-checkered" aria-hidden="true"></i><span>まとめ:<span class="keyword-tag">つなぐ→仕組み化→毎日自動</span>の3段構え</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-4);"></i>
+          Tailscaleで道をひらき、<br>
+          スケジュールで毎日回す。<br>
+          これがAgentic OSの使いこなし🏆
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>
+    <div>🎬 動画: <a href="https://youtu.be/sE3cWzZChGg">Julian Goldie SEO</a>「Access your Agentic OS from anywhere using Tailscale.」</div>
+    <div class="footer-title">Tailscaleでどこからでも入り、Hermes Muse・Astros を毎日のスケジュールで回し続けるしくみ。</div>
+    <div style="margin-top:8px;"><i class="fa-regular fa-copyright"></i> 2026 Infographic Summary — グラフィックレコーディング風にまとめた学習ノート</div>
+  </footer>
+
+</div>
+</body>
+</html>

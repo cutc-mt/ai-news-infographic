@@ -12,7 +12,7 @@ def update_index_html(index_file_path, docs_folder):
 
     # Get all HTML files in the docs folder
     for filename in os.listdir(docs_folder):
-        if re.match(r'^\d{8}-.*\.html$', filename):
+        if re.match(r'^\d{8}[-_].*\.html$', filename):
             file_path = os.path.join(docs_folder, filename)
             
             # Extract date from filename

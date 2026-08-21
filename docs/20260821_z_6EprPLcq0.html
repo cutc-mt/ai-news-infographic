@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek HarnessでAIエージェントを組み替える｜Julian Goldie SEO</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* 独自テーマ: 深海のブルースチール × 焼き銅（Copper） */
+    --ui-color-1: #33538D;   /* 鋼鉄ブルー: 主色・脳・論理 */
+    --ui-color-2: #C2601E;   /* 焼成銅オレンジ: 強調・体・行動 */
+    --ui-color-3: #E9EFF8;   /* 淡ブルーグレイ: タグ背景 */
+    --ui-color-4: #1D2A45;   /* 濃紺: 濃いテキスト */
+    --ui-color-5: #B34747;   /* くすんだ赤: 注意・リスク */
+    --bg-color:   #F7F9FC;   /* キャンバス */
+    --card-bg:    #FFFFFF;
+    --text-color: #333333;
+    --text-muted: #777777;
+    --accent-soft: #FFF6E8;  /* バリアント1の吹き出し背景 */
+    --alert-soft: #FDEDED;   /* バリアント2の吹き出し背景 */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-color);
+    font-family: 'Kaisei Decol', 'Zen Kurenaido', serif;
+    color: var(--text-color);
+    line-height: 1.6;
+  }
+
+  .page {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 30px 24px 40px;
+  }
+
+  /* ===== ヘッダー ===== */
+  header {
+    text-align: center;
+    padding: 40px 20px 30px;
+    background: linear-gradient(160deg, #FFFFFF 55%, var(--ui-color-3));
+    border-radius: 24px;
+    box-shadow: 0 8px 24px rgba(29, 42, 69, 0.10);
+    margin-bottom: 26px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  header .header-icons { display: flex; justify-content: center; align-items: center; gap: 26px; flex-wrap: wrap; }
+
+  header h1 {
+    font-size: 36px;
+    color: var(--text-color);
+    margin: 18px 0 10px;
+    line-height: 1.4;
+  }
+
+  header h1 .accent { color: var(--ui-color-1); }
+  header h1 .accent2 { color: var(--ui-color-2); }
+
+  header .subtitle {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  header .meta {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  header .meta .tag-inline {
+    background: var(--ui-color-3);
+    color: var(--ui-color-4);
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-weight: bold;
+    display: inline-block;
+    margin: 0 4px;
+  }
+
+  .header-wave { font-size: 15px; color: var(--ui-color-2); margin-top: 10px; }
+
+  /* ===== チャプター見出し ===== */
+  .chapter-head {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 34px 6px 16px;
+  }
+
+  .chapter-head .ch-time {
+    background: var(--ui-color-1);
+    color: #fff;
+    font-family: 'Yomogi', cursive;
+    font-size: 16px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+    box-shadow: 2px 3px 8px rgba(51, 83, 141, 0.35);
+  }
+
+  .chapter-head h2.ch-title {
+    font-size: 22px;
+    color: var(--ui-color-4);
+    border-bottom: 3px dotted var(--ui-color-2);
+    padding-bottom: 4px;
+    flex: 1;
+  }
+
+  .chapter-head > i { color: var(--ui-color-2); font-size: 22px; }
+
+  /* ===== 4カラムグリッド ===== */
+  .section-layout {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 20px;
+    align-items: stretch;
+  }
+
+  /* ===== カード ===== */
+  .section-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 16px 14px;
+    box-shadow: 5px 5px 15px rgba(29, 42, 69, 0.10);
+    position: relative;
+    overflow: hidden;
+    border-top: 6px solid var(--ui-color-1);
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+    transition: transform 0.45s ease, opacity 0.45s ease, box-shadow 0.3s ease;
+  }
+
+  .section-card.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .section-card:hover { box-shadow: 8px 10px 22px rgba(29, 42, 69, 0.18); transform: translateY(-4px); }
+  .section-card.copper { border-top-color: var(--ui-color-2); }
+  .section-card.alert { border-top-color: var(--ui-color-5); }
+
+  .mega-icon-container { text-align: center; margin: 12px 0 6px; }
+
+  .mega-icon-container h3 {
+    font-size: 24px;
+    color: #555555;
+    margin-top: 10px;
+    line-height: 1.35;
+  }
+
+  .card-content { padding: 0 6px 6px; flex: 1; }
+
+  .card-lead {
+    font-size: 15px;
+    color: var(--text-color);
+    background: var(--ui-color-3);
+    border-radius: 10px;
+    padding: 8px 10px;
+    margin: 10px 0 4px;
+    line-height: 1.55;
+  }
+
+  .list-caption {
+    font-size: 18px;
+    color: #333;
+    font-weight: bold;
+    margin: 12px 2px 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .list-caption i { color: var(--ui-color-1); }
+
+  .keyword-list { margin: 6px 0; padding: 0; list-style-type: none; }
+
+  .keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: var(--text-color);
+  }
+
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 18px;
+    margin-top: 5px;
+  }
+
+  .keyword-list li.list-blue i { color: var(--ui-color-1); }
+  .keyword-list li.list-red i { color: var(--ui-color-5); }
+
+  .keyword-tag {
+    background: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin: 0 3px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  .keyword-tag.warm { background: #FBEADD; color: #8A3E0C; }
+  .keyword-tag.alert { background: var(--alert-soft); color: #7C2323; }
+
+  /* ===== コードプレビュー ===== */
+  pre {
+    background: #22304E;
+    color: #DCE7F8;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    line-height: 1.55;
+    border-left: 5px solid var(--ui-color-2);
+  }
+
+  pre .cmt { color: #8FB0DE; }
+
+  /* ===== 手書き風吹き出し ===== */
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 14px;
+    margin: 16px 4px 8px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.10);
+    transform: rotate(-1deg);
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after { left: auto; right: 20px; }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+  }
+
+  .speech-bubble.variant-1 {
+    background: var(--accent-soft);
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+  .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+
+  .speech-bubble.variant-2 {
+    background: var(--alert-soft);
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+  .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333;
+    display: block;
+  }
+
+  .handwritten i { color: var(--ui-color-2); margin-right: 6px; }
+  .speech-bubble.variant-2 .handwritten i { color: var(--ui-color-5); }
+
+  /* ===== 関係を示す矢印 ===== */
+  .flow-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    color: var(--ui-color-1);
+    margin: 10px 0 2px;
+    flex-wrap: wrap;
+  }
+  .flow-note i { color: var(--ui-color-2); }
+
+  /* ===== フッター ===== */
+  footer {
+    margin-top: 40px;
+    text-align: center;
+    font-size: 15px;
+    color: var(--text-muted);
+    background: #fff;
+    border-radius: 18px;
+    padding: 20px;
+    box-shadow: 4px 4px 14px rgba(29, 42, 69, 0.08);
+  }
+
+  footer a { color: var(--ui-color-1); font-weight: bold; }
+  footer .src-title { font-size: 14px; margin-top: 8px; }
+
+  /* ===== アニメーション ===== */
+  @keyframes floatY { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .floaty { animation: floatY 3.2s ease-in-out infinite; }
+
+  .highlight-word {
+    background: linear-gradient(transparent 62%, rgba(194, 96, 30, 0.28) 62%);
+    font-weight: bold;
+    padding: 0 2px;
+  }
+
+  /* ===== レスポンシブ ===== */
+  @media (max-width: 1600px) { .section-layout { grid-template-columns: repeat(4, minmax(240px, 1fr)); } }
+  @media (max-width: 1200px) { .section-layout { grid-template-columns: repeat(2, minmax(300px, 1fr)); } }
+  @media (max-width: 768px) {
+    .section-layout { grid-template-columns: 1fr; }
+    header h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== ヘッダー ===== -->
+  <header>
+    <div class="header-icons">
+      <i class="fa-solid fa-whale fa-7x floaty" style="color: var(--ui-color-1); animation: fa-beat 3s ease-in-out infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-shake 4s ease-in-out infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-5); animation: fa-flip 5s ease-in-out infinite;" aria-hidden="true"></i>
+    </div>
+    <h1><span class="accent">DeepSeek Harness</span>で<br>AIエージェントを<span class="accent2">組み替える</span></h1>
+    <p class="subtitle">「NEW DeepSeek Harness Is WILD for AI Agents」より — 8分32秒の解説動画</p>
+    <p class="meta">
+      <span class="tag-inline"><i class="fa-solid fa-calendar-days"></i> 2026.08.21</span>
+      <span class="tag-inline"><i class="fa-solid fa-user-group"></i> Julian Goldie SEO</span>
+      <span class="tag-inline"><i class="fa-solid fa-clock"></i> 6チャプター構成</span>
+    </p>
+    <p class="header-wave"><i class="fa-solid fa-circle-info fa-lg"></i> 脳・記憶・道具を、まるごと交換できるオープンな「ハーネス」の話</p>
+  </header>
+
+  <!-- ===== Chapter 0: Intro ===== -->
+  <div class="chapter-head">
+    <span class="ch-time"><i class="fa-solid fa-flag"></i> 0:00 Intro</span>
+    <i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i>
+    <h2 class="ch-title">はじめに — どんなニュースなのか</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- Card 1 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>DeepSeek Harness 登場</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">DeepSeekが、AIエージェント用の<span class="highlight-word">新しいオープンなHarness</span>を公開しました。しかも、無料で。</p>
+        <p class="list-caption"><i class="fa-solid fa-circle-question fa-lg"></i> これ、何がすごい？</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>エージェントの<span class="keyword-tag">脳</span>・<span class="keyword-tag">記憶</span>・<span class="keyword-tag">道具</span>を部品として交換できる</span></li>
+          <li><i class="fa-solid fa-laptop-code fa-lg" aria-hidden="true"></i><span>自分のラップトップ上で、ローカルに動かせる</span></li>
+          <li><i class="fa-solid fa-money-bill-wave fa-lg" aria-hidden="true"></i><span>基本は<span class="keyword-tag warm">無料</span>で試せるので、入りやすい</span></li>
+          <li class="list-blue"><i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i><span>動画では「実際に何がwildなのか」を検証</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i>8分32秒の動画の要点を、この一枚にまとめました。チャプター順に読めますよ。</span>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ui-color-2); animation: fa-spin 6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>「引きちぎって、組み替える」</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">動画の冒頭では、エージェントを<span class="highlight-word">Rip apart（引きちぎる）</span>して、一つずつ組み直す、と表現されます。</p>
+        <p class="list-caption"><i class="fa-solid fa-screwdriver-wrench fa-lg"></i> できること</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>思考（脳）を、別のモデルへ<span class="keyword-tag">交換</span></span></li>
+          <li class="list-blue"><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>記憶（メモリ）の保存先を、まるごと入れ替える</span></li>
+          <li><i class="fa-solid fa-toolbox fa-lg" aria-hidden="true"></i><span>道具（ツール）も、必要に応じて追加・交換</span></li>
+          <li class="list-red"><i class="fa-solid fa-ban fa-lg" aria-hidden="true"></i><span>「一体型で、中が見えない」構成とは、ここでお別れ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg"></i>全部乗りのクローズドな道具ではなく、<b>自分で選んで組み立てる</b>時代が来た、という話ですね。</span>
+      </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>Harness（ハーネス）とは</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">「ハーネス」は、もとは<span class="highlight-word">馬具</span>のこと。体を支えて、力を外に伝えるための仕組みです。</p>
+        <p class="list-caption"><i class="fa-solid fa-book-open fa-lg"></i> AIにおいては</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>LLMを、実際の作業へつなぐ<span class="keyword-tag">骨組み</span></span></li>
+          <li><i class="fa-solid fa-microchip fa-lg" aria-hidden="true"></i><span>モデルそのものではなく、<span class="keyword-tag">モデルを動かす枠組み</span></span></li>
+          <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>実行・道具・記憶を、まとめて管理する層</span></li>
+          <li class="list-blue"><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>DeepSeekが公式に、オープンな形で提供</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-horse fa-lg"></i>馬で言うハーネスは「馬の力を車に伝える道具」。AI版も同じで、<b>脳の力を仕事に伝える</b>装置です。</span>
+      </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-5); animation: fa-flip 4.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>脳 vs 体 — 分ける発想</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">動画 0:44〜 の核心。エージェントを<span class="highlight-word">脳</span>と<span class="highlight-word">体</span>に切り分けて考えます。</p>
+        <div class="flow-note">
+          <i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i> 脳（判断する）
+          <i class="fa-solid fa-right-left fa-lg" aria-hidden="true"></i>
+          <i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i> 体（動く）
+        </div>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i><span><b>脳</b> = LLM。計画を立てて、判断する</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span><b>体</b> = Harness。実際に手を動かす</span></li>
+          <li><i class="fa-solid fa-scissors fa-lg" aria-hidden="true"></i><span>両者を分けるので、<span class="keyword-tag warm">別々に進化</span>できる</span></li>
+          <li class="list-blue"><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>どちらか一方だけ、最新へ交換可能に</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg"></i>脳だけあっても動けない。体だけあっても判断できない。<b>分けて考える</b>のが設計の出発点です。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Chapter 1: Harness explained ===== -->
+  <div class="chapter-head">
+    <span class="ch-time"><i class="fa-solid fa-gears"></i> 0:44 Harness explained</span>
+    <i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i>
+    <h2 class="ch-title">脳と体 — それぞれの中身</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- Card 5 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>脳の側：LLMの役割</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">LLMは<span class="highlight-word">判断と計画</span>を担当。考える部分に集中します。</p>
+        <p class="list-caption"><i class="fa-solid fa-list-check fa-lg"></i> 主な仕事</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-pen-nib fa-lg" aria-hidden="true"></i><span>文章を書き、読み解き、まとめる</span></li>
+          <li><i class="fa-solid fa-diagram-successor fa-lg" aria-hidden="true"></i><span>手順を立てて、次の一手を決める</span></li>
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span>設定を書き換えるだけで<span class="keyword-tag">脳を交換</span>できる</span></li>
+          <li class="list-blue"><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span>新モデル登場時も、追従がかんたん</span></li>
+        </ul>
+<pre><span class="cmt"># 脳（LLM）の差し替えイメージ</span>
+model:
+  provider: deepseek
+  name:     v4-pro
+  context:  1,000,000 tokens</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i>「今日から別の脳で考えよう」が、設定ひとつで叶う。<span class="keyword-tag">脳は部品</span>なんですね。</span>
+      </div>
+    </div>
+
+    <!-- Card 6 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gears fa-5x" style="color: var(--ui-color-2); animation: fa-spin 7s linear infinite;" aria-hidden="true"></i>
+        <h3>体の側：Harnessの役割</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">Harnessは<span class="highlight-word">実行</span>を担当。頭の中の計画を、現実の作業へ変えます。</p>
+        <p class="list-caption"><i class="fa-solid fa-hands fa-lg"></i> 実際にやること</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>道具（ツール）を呼び出して、実行する</span></li>
+          <li class="list-blue"><i class="fa-solid fa-memory fa-lg" aria-hidden="true"></i><span>記憶の保存と、必要なときの呼び出し</span></li>
+          <li><i class="fa-solid fa-window-maximize fa-lg" aria-hidden="true"></i><span>画面（UI）の描画と、操作の受け付け</span></li>
+          <li class="list-red"><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>失敗したら、やり直す仕組みも体の側</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-hand fa-lg"></i>「考えた」で終わらせず、<b>最後までやる</b>のが体の役割。地味ですが、一番大事な部分です。</span>
+      </div>
+    </div>
+
+    <!-- Card 7 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>すべてはプラグインという思想</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">1:47〜 のビッグアイデア。<span class="highlight-word">Everything's a plugin</span> — 何もかも、プラグイン。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>記憶も、道具も、<span class="keyword-tag">骨組みさえも</span>交換対象</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>「絶対に変えられない部分」をなくす設計</span></li>
+          <li><i class="fa-solid fa-users fa-lg" aria-hidden="true"></i><span>誰かが作った部品を、持ってきて使える</span></li>
+          <li class="list-blue"><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span>自分の道具箱を、組み合わせで作る</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-comment-dots fa-lg"></i>スマホにアプリを足す感覚で、<b>エージェントの能力を足す</b>。それがこの思想の核心です。</span>
+      </div>
+    </div>
+
+    <!-- Card 8 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-thumbs-up fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>プラグイン化のメリット</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">「全部が部品」になると、うれしいことが<span class="highlight-word">三つ</span>あります。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span><b>追従が速い</b>: 新モデルが出たら、すぐ交換</span></li>
+          <li class="list-blue"><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span><b>原因が切り分けやすい</b>: 部品ごとに試せる</span></li>
+          <li><i class="fa-solid fa-handshake fa-lg" aria-hidden="true"></i><span><b>資産の再利用</b>: みんなの部品を使い回せる</span></li>
+          <li class="list-blue"><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span>壊れたら、その部品だけを直せばよい</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg"></i>全部つながった黒い箱だと、直すにも一から。<b>部品化</b>は、保守の味方ですね。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Chapter 2: Everything's a plugin ===== -->
+  <div class="chapter-head">
+    <span class="ch-time"><i class="fa-solid fa-plug"></i> 1:47 Everything's a plugin</span>
+    <i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i>
+    <h2 class="ch-title">差し替えの実際 — 何を入れ替えるのか</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- Card 9 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>差し替え例：記憶・道具・脳</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">動画で示される<span class="highlight-word">swap（交換）</span>の三連。どこからでも変えられます。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">記憶</span> ローカル保存 ↔ クラウド保存</span></li>
+          <li><i class="fa-solid fa-toolbox fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">道具</span> 検索・コード実行・ブラウザ操作など</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">脳</span> 新しいモデルが出たら、すぐ追随</span></li>
+          <li class="list-blue"><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>組み合わせ次第で、性格も速度も変わる</span></li>
+        </ul>
+<pre><span class="cmt"># 部品の入れ替えイメージ</span>
+memory: local-store  <span class="cmt"># → cloud-store へ</span>
+tools:  [search, code, browser]
+brain:  deepseek-v4-pro</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i>「入れ替え」は設定の書き換えだけで済むのがポイント。<b>作り直しは不要</b>です。</span>
+      </div>
+    </div>
+
+    <!-- Card 10 -->
+    <div class="section-card alert">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-5); animation: fa-shake 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>The Catch — v0.1プレビュー</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">2:43〜。動画が指摘する、誰も警告してくれない<span class="highlight-word">唯一の落とし穴</span>です。</p>
+        <ul class="keyword-list">
+          <li class="list-red"><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>現状は<span class="keyword-tag alert">v0.1</span>。まだプレビュー版</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>仕様が流動的。<span class="keyword-tag alert">破壊的な変更</span>があり得る</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>安定を求める業務には、まだ早い場面も</span></li>
+          <li class="list-blue"><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>「様子を見る」のも、立派な戦略</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg"></i>盛り上がりの中で、この<b>注意点</b>を言う人は少ない。だからこそ、動画はここを強調します。</span>
+      </div>
+    </div>
+
+    <!-- Card 11 -->
+    <div class="section-card alert">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5); animation: fa-beat 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>導入前の心得</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">プレビュー版と付き合うなら、<span class="highlight-word">守り</span>を先に用意します。</p>
+        <p class="list-caption"><i class="fa-solid fa-clipboard-check fa-lg"></i> やっておくこと</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-flask fa-lg" aria-hidden="true"></i><span>まず小さな案件で<span class="keyword-tag warm">試験導入</span></span></li>
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>更新履歴（変更ログ）を、こまめに確認</span></li>
+          <li class="list-red"><i class="fa-solid fa-box-archive fa-lg" aria-hidden="true"></i><span>前の状態に<span class="keyword-tag alert">戻せる設計</span>を用意する</span></li>
+          <li><i class="fa-solid fa-user-gear fa-lg" aria-hidden="true"></i><span>本番は、 stable 版が出てからでも遅くない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-anchor fa-lg"></i>新しいものは、<b>逃げ道を作ってから</b>触る。これが鉄則です。</span>
+      </div>
+    </div>
+
+    <!-- Card 12 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gem fa-5x" style="color: var(--ui-color-1); animation: fa-flip 5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>DeepSeek V4 Pro 登場</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">4:17〜。Harnessと並んで語られる、新しい<span class="highlight-word">主力モデル</span>の話です。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">DeepSeek V4 Pro</span> — 上位版の位置づけ</span></li>
+          <li><i class="fa-solid fa-ruler-horizontal fa-lg" aria-hidden="true"></i><span>コンテキストは<span class="keyword-tag warm">1Mトークン</span></span></li>
+          <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>エージェント用途に、専用の調整を施した</span></li>
+          <li class="list-blue"><i class="fa-solid fa-whale fa-lg" aria-hidden="true"></i><span>Harnessの「脳」として組み合わせる想定</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i>ハーネス（体）と新モデル（脳）が同時にそろう。<b>組み合わせて本領を発揮</b>する話です。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Chapter 3: DeepSeek V4 Pro ===== -->
+  <div class="chapter-head">
+    <span class="ch-time"><i class="fa-solid fa-gem"></i> 4:17 DeepSeek V4 Pro</span>
+    <i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i>
+    <h2 class="ch-title">1Mトークンとエージェント調整</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- Card 13 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>1Mトークンの意味</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">百万トークン。ひとことで言えば、<span class="highlight-word">一度に読める量</span>が桁違いです。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>長大な文書を、丸ごと読み込める</span></li>
+          <li class="list-blue"><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>長い作業でも、<span class="keyword-tag warm">文脈が切れにくい</span></span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>複数の資料を、同時に参照できる</span></li>
+          <li><i class="fa-solid fa-scissors fa-lg" aria-hidden="true"></i><span>「途中で要約して詰める」手間が減る</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-book fa-lg"></i>エージェントは作業の履歴をどんどん読み返します。窓が広いほど、<b>忘れずに働ける</b>んですね。</span>
+      </div>
+    </div>
+
+    <!-- Card 14 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>エージェント調整（チューニング）</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">「agent-tuned」＝<span class="highlight-word">働く前提で調整済み</span>。ここが汎用モデルとの違いです。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>手順（ステップ）の実行がうまい</span></li>
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span>道具の呼び出しを、的確に判断</span></li>
+          <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>失敗からの立て直し（回復）が得意</span></li>
+          <li class="list-blue"><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>おしゃべりより、<span class="keyword-tag">作業</span>に重み</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-gears fa-lg"></i>「話す模型」ではなく<b>「働く模型」</b>。Harnessという体と、相性が良い設計です。</span>
+      </div>
+    </div>
+
+    <!-- Card 15 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-flip 4.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>4つの実行モード</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">5:10〜。仕事の内容に合わせて、<span class="highlight-word">走らせ方を選べる</span>のが Harness の強み。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>軽い作業向けの、<span class="keyword-tag warm">速さ重視</span>なモード</span></li>
+          <li class="list-blue"><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>じっくり調べる、<span class="keyword-tag">深さ重視</span>なモード</span></li>
+          <li><i class="fa-solid fa-users-gear fa-lg" aria-hidden="true"></i><span>複数の処理を、同時に回すモード</span></li>
+          <li class="list-blue"><i class="fa-solid fa-right-left fa-lg" aria-hidden="true"></i><span>案件ごとに、<span class="keyword-tag warm">選んで切り替え</span></span></li>
+        </ul>
+<pre><span class="cmt"># 切り替えイメージ（詳細は動画本編で）</span>
+run:
+  mode: "..."      <span class="cmt"># 4種から選択</span>
+  job:  "調査"     <span class="cmt"># 仕事に合わせる</span></pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-sliders fa-lg"></i>車の走行モードと同じで、<b>状況で選ぶ</b>のが正解。全部盛りにする必要はありません。</span>
+      </div>
+    </div>
+
+    <!-- Card 16 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sliders fa-5x" style="color: var(--ui-color-1); animation: fa-beat 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ジョブごとの選び方</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">モード選びの指針は、<span class="highlight-word">適材適所</span>のひとことに集まります。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>単純な繰り返し → 速く、軽く。無駄なし</span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>リサーチ → 深く。思考と道具を組む</span></li>
+          <li><i class="fa-solid fa-boxes-stacked fa-lg" aria-hidden="true"></i><span>量のある処理 → 並列で、一気に進める</span></li>
+          <li class="list-red"><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i><span>重いモードは、コストも増える。見合うかを考えよう</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg"></i>「とりあえず最強設定」より、<b>仕事に合った設定</b>。結果も、コストも変わります。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Chapter 4: Local & Free / まとめ ===== -->
+  <div class="chapter-head">
+    <span class="ch-time"><i class="fa-solid fa-flag-checkered"></i> まとめ</span>
+    <i class="fa-solid fa-laptop-code fa-lg" aria-hidden="true"></i>
+    <h2 class="ch-title">ローカルで無料 — そして何が"WILD"か</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- Card 17 -->
+    <div class="section-card copper">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ローカルで動く、無料</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">もう一つの武器。自分のPCで動かせて、<span class="highlight-word">無料</span>という点です。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-house fa-lg" aria-hidden="true"></i><span>自分のラップトップ上で完結</span></li>
+          <li><i class="fa-solid fa-lock fa-lg" aria-hidden="true"></i><span>データを手元に置ける、安心感</span></li>
+          <li><i class="fa-solid fa-money-bill-wave fa-lg" aria-hidden="true"></i><span>月額なし。<span class="keyword-tag warm">試すコストがゼロ</span></span></li>
+          <li class="list-blue"><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>オープンに公開されているので、中も見られる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i>「無料で、自分のPCで、部品を交換できる」。この<b>三つ揃い</b>が、今回の山場です。</span>
+      </div>
+    </div>
+
+    <!-- Card 18 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>まとめ：何が WILD なのか</h3>
+      </div>
+      <div class="card-content">
+        <p class="card-lead">8分32秒の結論を、三行で。</p>
+        <ul class="keyword-list">
+          <li class="list-blue"><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span><b>脳と体の分離</b>で、エージェントが「部品」になった</span></li>
+          <li class="list-red"><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>ただし<span class="keyword-tag alert">v0.1</span>。導入は、段階的に</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>新脳<span class="keyword-tag">V4 Pro</span>との組み合わせに、期待</span></li>
+          <li class="list-blue"><i class="fa-solid fa-face-smile fa-lg" aria-hidden="true"></i><span>まずは、一度手元で動かしてみよう</span></li>
+        </ul>
+        <div class="flow-note">
+          <i class="fa-solid fa-whale fa-lg" aria-hidden="true"></i> 分解する
+          <i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i>
+          <i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i> 組み替える
+          <i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i>
+          <i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i> 動かす
+        </div>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-comment-dots fa-lg"></i>詳細な手順やモードの名前は、ぜひ動画本編で確認してみてください。この一枚が、観る前の予習になりますように。</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== フッター ===== -->
+  <footer>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=z_6EprPLcq0" target="_blank">Julian Goldie SEO</a></p>
+    <p class="src-title">「NEW DeepSeek Harness Is WILD for AI Agents」（8分32秒）より作成 | 2026.08.21</p>
+  </footer>
+</div>
+
+<script>
+  // スクロールに合わせてカードを出す
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry, idx) => {
+      if (entry.isIntersecting) {
+        setTimeout(() => entry.target.classList.add('visible'), (entry.target.dataset.order % 4) * 90);
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.section-card').forEach((card, i) => {
+    card.dataset.order = i;
+    observer.observe(card);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>vLLM×TPUでエンベディングを速くする｜今知っておきたいAI インフォグラフィック</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+:root {
+  --ui-color-1: #274690; /* ウルトラマリンブルー */
+  --ui-color-2: #E4761B; /* バーントオレンジ */
+  --ui-color-3: #E8EAF6; /* ペールインディゴ */
+  --ui-color-4: #1A1B41; /* オックスフォードネイビー */
+  --ui-color-5: #7A9CC6; /* スチールブルー */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #F8F9FE;
+  color: #333333;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 40px 20px 30px;
+  background: linear-gradient(135deg, rgba(39,70,144,0.10), rgba(228,118,27,0.12));
+  border-radius: 25px;
+  margin-bottom: 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+.header .fa-7x {
+  font-size: 7em;
+  color: var(--ui-color-1);
+  animation: fa-beat 3s infinite;
+  margin-bottom: 15px;
+}
+
+.header h1 {
+  font-size: 36px;
+  color: #333333;
+  font-weight: bold;
+  margin: 15px 0 10px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: var(--ui-color-1);
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #777777;
+}
+
+/* セクションレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+/* カードスタイル */
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(26,27,65,0.12);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-2);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 10px 20px rgba(39,70,144,0.22);
+}
+
+.section-card:nth-child(even) {
+  border-top-color: var(--ui-color-1);
+}
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  font-size: 5em;
+  margin-bottom: 10px;
+}
+
+.mega-icon-container h2 {
+  font-size: 24px;
+  color: #555555;
+  margin: 10px 0 0;
+  font-family: 'Kaisei Decol', serif;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-5);
+  min-width: 16px;
+}
+
+.keyword-list li span {
+  flex: 1;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.keyword-tag.accent {
+  background-color: rgba(228,118,27,0.16);
+  color: #A85410;
+}
+
+.keyword-tag.blue {
+  background-color: rgba(39,70,144,0.12);
+  color: var(--ui-color-1);
+}
+
+.keyword-tag.steel {
+  background-color: rgba(122,156,198,0.28);
+  color: #46689A;
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FDEEDF;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #E7EEF8;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+  display: inline;
+}
+
+/* コードプレビュー */
+pre {
+  background: #1A1B41;
+  color: #E8EAF6;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: "Courier New", monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+pre .hl {
+  color: #E4761B;
+}
+
+pre .ok {
+  color: #F0B27A;
+}
+
+pre .ng {
+  color: #A9C4E8;
+}
+
+pre .tl {
+  color: #9FB8D9;
+}
+
+/* フェードインアニメーション */
+.fade-in-scale {
+  animation: fadeInScale 0.6s ease-out both;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 30px 20px;
+  margin-top: 30px;
+  background: rgba(39,70,144,0.07);
+  border-radius: 20px;
+  font-size: 14px;
+  color: #777777;
+}
+
+.footer .footer-links {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.footer a {
+  color: var(--ui-color-1);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; max-width: none; }
+  .header h1 { font-size: 28px; }
+  .header .fa-7x { font-size: 5em; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <i class="fa-solid fa-vector-square fa-7x" aria-hidden="true"></i>
+    <h1>vLLM×TPUでエンベディングを速くする<br>大量テキストをベクトル化するしくみ</h1>
+    <div class="subtitle">Google Cloud ｜ Embedding models with vLLM TPU：PagedAttentionとTPU VMでスループットを伸ばす</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026年8月22日</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- 1. Embeddingとは -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-vector-square fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>Embedding とは何か</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info" aria-hidden="true"></i><span>テキストの意味を<span class="keyword-tag">数字の並び</span>に置き換える技</span></li>
+          <li><i class="fa-solid fa-arrows-left-right" aria-hidden="true"></i><span>「意味が近い＝数字が近い」になるよう調整</span></li>
+          <li><i class="fa-solid fa-cubes" aria-hidden="true"></i><span>ベクトルの<span class="keyword-tag accent">次元</span>はモデルごとに異なる</span></li>
+          <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>LLMの<span class="keyword-tag">最後の層</span>から取り出すのが一般的</span></li>
+        </ul>
+        <pre>たとえると
+  「猫」 → [0.21, -0.4, 0.87, …]
+  「犬」 → [0.19, -0.38, 0.84, …]
+    → <span class="hl">数字がよく似る</span>＝意味が近い</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 「意味を計算できる形にする」という発想がすべての入口！</span>
+      </div>
+    </div>
+
+    <!-- 2. なぜ必要なのか -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-trend-up fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+        <h2>なぜ今、必要なのか</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-book-open-reader" aria-hidden="true"></i><span><span class="keyword-tag">RAG</span>：外の知識を引いてくる仕組みの土台</span></li>
+          <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span><span class="keyword-tag accent">意味の検索</span>：言い方が違っても拾える</span></li>
+          <li><i class="fa-solid fa-thumbs-up" aria-hidden="true"></i><span><span class="keyword-tag blue">推薦</span>：好みの傾向を数値で表現</span></li>
+          <li><i class="fa-solid fa-tags" aria-hidden="true"></i><span>分類や<span class="keyword-tag steel">まとめ分け</span>にも活用</span></li>
+        </ul>
+        <pre>活躍の場
+  文書検索 / 社内QA / 推薦
+   → どれも <span class="hl">ベクトル化</span> から始まる
+   → 土台の速度が全体を左右</pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-1);"></i> 生成AIの裏方として、需要が急伸している領域！</span>
+      </div>
+    </div>
+
+    <!-- 3. ベクトル検索のしくみ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-5); animation: fa-flip 4s infinite;" aria-hidden="true"></i>
+        <h2>ベクトル検索のしくみ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ruler" aria-hidden="true"></i><span>似ている度合いを<span class="keyword-tag">角度</span>で測る（コサイン類似度）</span></li>
+          <li><i class="fa-solid fa-arrows-to-dot" aria-hidden="true"></i><span>質問も文書も<span class="keyword-tag accent">同じ空間</span>に置く</span></li>
+          <li><i class="fa-solid fa-sort" aria-hidden="true"></i><span>近い順に並べて<span class="keyword-tag blue">上位</span>を返す</span></li>
+          <li><i class="fa-solid fa-warehouse" aria-hidden="true"></i><span>索引（<span class="keyword-tag steel">Index</span>）を使い、探す時間を短縮</span></li>
+        </ul>
+        <pre>流れの絵
+  質問 → <span class="hl">ベクトル化</span>
+  文書 → <span class="hl">ベクトル化</span>（事前に）
+   → 近い順に <span class="ok">照合</span> → 答えの材料に</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-2);"></i> 「意味で探す」検索の心臓部分がここ！</span>
+      </div>
+    </div>
+
+    <!-- 4. 大量テキストの壁 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--ui-color-1); animation: fa-shake 4s infinite;" aria-hidden="true"></i>
+        <h2>大量テキストの壁</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-copy" aria-hidden="true"></i><span>文書が増えるほど<span class="keyword-tag">変換する量</span>もふくらむ</span></li>
+          <li><i class="fa-solid fa-hourglass-half" aria-hidden="true"></i><span>数百万件ともなると<span class="keyword-tag accent">時間がかかる</span></span></li>
+          <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>依頼を<span class="keyword-tag blue">まとめて処理</span>する流れが必須</span></li>
+          <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>単位時間あたりの<span class="keyword-tag steel">処理量</span>が勝負</span></li>
+        </ul>
+        <pre>課題の構図
+  文書 100万件
+   → 1件ずつでは <span class="ng">日が暮れる</span>
+   → まとめて流す <span class="hl">工夫</span> が必要</pre>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-5);"></i> 品質だけでなく「速く安く」が問われる場面！</span>
+      </div>
+    </div>
+
+    <!-- 5. vLLMとは -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>vLLM とは何か</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-open" aria-hidden="true"></i><span>誰でも使える<span class="keyword-tag">公開の推論枠組み</span></span></li>
+          <li><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span><span class="keyword-tag accent">PagedAttention</span>による省メモリが看板</span></li>
+          <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>もともと<span class="keyword-tag blue">文章生成</span>向けに発展</span></li>
+          <li><i class="fa-solid fa-cubes-stacked" aria-hidden="true"></i><span>エンベディング配信にも<span class="keyword-tag steel">対応</span></span></li>
+        </ul>
+        <pre>特徴まとめ
+  高速 / 省メモリ / API付き
+   → 生成も <span class="hl">埋め込み</span> も同じ道具で
+   → 導入事例が豊富で安心</pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-1);"></i> 「速い・安い・使いやすい」で人気の定番エンジン！</span>
+      </div>
+    </div>
+
+    <!-- 6. PagedAttention -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-cells-large fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+        <h2>PagedAttention の勘所</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-scissors" aria-hidden="true"></i><span>計算の途中結果を<span class="keyword-tag">細かく分ける</span>発想</span></li>
+          <li><i class="fa-solid fa-boxes-packing" aria-hidden="true"></i><span>メモリの<span class="keyword-tag accent">すき間</span>をほぼなくす</span></li>
+          <li><i class="fa-solid fa-memory" aria-hidden="true"></i><span>同じ容量で<span class="keyword-tag blue">同時処理数</span>を増やせる</span></li>
+          <li><i class="fa-solid fa-server" aria-hidden="true"></i><span>OSの<span class="keyword-tag steel">仮想メモリ</span>と似た考え</span></li>
+        </ul>
+        <pre>たとえ話
+  トラックに荷物を積む
+   → すき間なく <span class="hl">詰め込む</span>
+   → 1台で運べる量が増える</pre>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> メモリの使い方を変えるだけで、数字が大きく動く！</span>
+      </div>
+    </div>
+
+    <!-- 7. エンベディングのサーブ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.5s infinite;" aria-hidden="true"></i>
+        <h2>エンベディングの配信</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-toggle-on" aria-hidden="true"></i><span>起動時に<span class="keyword-tag">タスクを切替</span>（embedモード）</span></li>
+          <li><i class="fa-solid fa-filter" aria-hidden="true"></i><span>最終層をまとめて（<span class="keyword-tag accent">プーリング</span>）出力</span></li>
+          <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>API越しに<span class="keyword-tag blue">ベクトル</span>を返す</span></li>
+          <li><i class="fa-solid fa-recycle" aria-hidden="true"></i><span>生成と同じ<span class="keyword-tag steel">運用の型</span>が使える</span></li>
+        </ul>
+        <pre>イメージ
+  vllm serve モデル名
+    --task embed
+  → /v1/embeddings で <span class="ok">受付</span>
+  → 文字を入れると <span class="hl">ベクトル</span> が返る</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-arrows-turn-right fa-lg" style="color: var(--ui-color-2);"></i> 生成で培った速さが、そのまま埋め込みでも活きる！</span>
+      </div>
+    </div>
+
+    <!-- 8. TPUのきほん -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2.4s infinite;" aria-hidden="true"></i>
+        <h2>TPU のきほん</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube" aria-hidden="true"></i><span>Googleが育てた<span class="keyword-tag">AI専用チップ</span></span></li>
+          <li><i class="fa-solid fa-xmark" aria-hidden="true"></i><span>行列の掛け算を<span class="keyword-tag accent">一気に</span>こなす設計</span></li>
+          <li><i class="fa-solid fa-sitemap" aria-hidden="true"></i><span>複数チップを<span class="keyword-tag blue">束ねて</span>大きな処理へ</span></li>
+          <li><i class="fa-solid fa-cloud" aria-hidden="true"></i><span>Google Cloud 上で<span class="keyword-tag steel">VMとして借りられる</span></span></li>
+        </ul>
+        <pre>得意分野
+  ニューラルネットの中身
+   = 行列 × 行列 の連続
+    → <span class="hl">専用回路</span>でまとめて処理</pre>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-face-grin-stars fa-lg" style="color: var(--ui-color-1);"></i> 汎用チップでなく「AIのためだけ」に作られた加速装置！</span>
+      </div>
+    </div>
+
+    <!-- 9. TPUとGPUの違い -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-5); animation: fa-shake 4s infinite;" aria-hidden="true"></i>
+        <h2>TPU と GPU の違い</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bullseye" aria-hidden="true"></i><span>GPU：<span class="keyword-tag">幅広い用途</span>に効く万能型</span></li>
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>TPU：<span class="keyword-tag accent">AIの計算に特化</span>した専門型</span></li>
+          <li><i class="fa-solid fa-handshake" aria-hidden="true"></i><span>大規模な学習・推論と<span class="keyword-tag blue">好相性</span></span></li>
+          <li><i class="fa-solid fa-vial" aria-hidden="true"></i><span>実際は<span class="keyword-tag steel">両方試して比べる</span>のが鉄則</span></li>
+        </ul>
+        <pre>使い分けの目安
+  画像など多目的 → GPU
+  巨大モデルの一括処理 → <span class="hl">TPU</span>
+  どちらも <span class="ok">計測して比較</span> を</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> 優劣ではなく「得意分野が違う」とらえ方が正しい！</span>
+      </div>
+    </div>
+
+    <!-- 10. Cloudコンソールでの準備 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+        <h2>Cloud コンソールで準備</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-window-maximize" aria-hidden="true"></i><span>コンソールの画面から<span class="keyword-tag">TPU VM</span> を作成</span></li>
+          <li><i class="fa-solid fa-location-dot" aria-hidden="true"></i><span><span class="keyword-tag accent">ゾーン</span>と<span class="keyword-tag accent">バージョン</span>を選ぶ</span></li>
+          <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span><span class="keyword-tag blue">SSH</span>でVMに入り作業を開始</span></li>
+          <li><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>利用上限（<span class="keyword-tag steel">クォータ</span>）の確認も忘れずに</span></li>
+        </ul>
+        <pre>準備の流れ
+  コンソールで TPU を作成
+    ↓ SSH で接続
+  環境を整えて <span class="hl">vLLM を導入</span>
+    ↓ すぐ動かせる状態へ</pre>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-paper-plane fa-lg" style="color: var(--ui-color-2);"></i> 画面を数クリックするだけで、数分で立ち上がる！</span>
+      </div>
+    </div>
+
+    <!-- 11. TPU VMの起動手順 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3.2s infinite;" aria-hidden="true"></i>
+        <h2>TPU VM の起動手順</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-keyboard" aria-hidden="true"></i><span>コマンド（<span class="keyword-tag">gcloud</span>）でも作成できる</span></li>
+          <li><i class="fa-solid fa-diagram-successor" aria-hidden="true"></i><span><span class="keyword-tag accent">トポロジー</span>でチップの数を指定</span></li>
+          <li><i class="fa-solid fa-list" aria-hidden="true"></i><span>用途に合わせ<span class="keyword-tag blue">種類を選ぶ</span>（v5eなど）</span></li>
+          <li><i class="fa-solid fa-book" aria-hidden="true"></i><span>手順は<span class="keyword-tag steel">公式ガイド</span>に沿って進める</span></li>
+        </ul>
+        <pre>コマンド例（※公式ガイド参照）
+  gcloud compute tpus create …
+    --zone=…
+    --version=…
+  → 作成後に SSH で <span class="ok">接続</span></pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-map fa-lg" style="color: var(--ui-color-1);"></i> 公式の手順をなぞるだけで、初めてでも迷いにくい！</span>
+      </div>
+    </div>
+
+    <!-- 12. vLLMを入れて動かす -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-play fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>vLLM を入れて動かす</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-download" aria-hidden="true"></i><span>TPU向けの<span class="keyword-tag">公式ガイド</span>に沿って導入</span></li>
+          <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>数行のコマンドで<span class="keyword-tag accent">起動まで</span>たどり着く</span></li>
+          <li><i class="fa-solid fa-box" aria-hidden="true"></i><span>モデルは<span class="keyword-tag blue">引数で指定</span>して切替</span></li>
+          <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>動いたら<span class="keyword-tag steel">APIで試す</span>だけ</span></li>
+        </ul>
+        <pre>イメージ（※公式ガイド参照）
+  vllm serve <span class="hl">モデル名</span>
+    --task embed …
+  → API として <span class="ok">待受開始</span></pre>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-sun fa-lg" style="color: var(--ui-color-2);"></i> まず動かす、それから調整！の流れが一番早い！</span>
+      </div>
+    </div>
+
+    <!-- 13. OpenAI互換API -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.8s infinite;" aria-hidden="true"></i>
+        <h2>OpenAI 互換の API</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-envelope-circle-check" aria-hidden="true"></i><span><span class="keyword-tag">/v1/embeddings</span> に依頼を送る</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>既存の<span class="keyword-tag accent">ライブラリ</span>からそのまま接続</span></li>
+          <li><i class="fa-solid fa-list-ol" aria-hidden="true"></i><span>入力は<span class="keyword-tag blue">文字列のリスト</span>でまとめて送れる</span></li>
+          <li><i class="fa-solid fa-reply-all" aria-hidden="true"></i><span>返答の中に<span class="keyword-tag steel">ベクトル</span>が並ぶ</span></li>
+        </ul>
+        <pre>リクエスト例
+  POST /v1/embeddings
+  { "model": "…",
+    "input": ["文1", "文2", …] }
+  → <span class="hl">ベクトル</span> のリストが返る</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-face-smile-wink fa-lg" style="color: var(--ui-color-2);"></i> いつもの書き方のままで使えるのは、移行が楽！</span>
+      </div>
+    </div>
+
+    <!-- 14. バッチ処理で速く -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>まとめ処理で速く</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-inbox" aria-hidden="true"></i><span>入力を<span class="keyword-tag">まとめて送る</span>と処理量が向上</span></li>
+          <li><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>積み込む量（<span class="keyword-tag accent">バッチサイズ</span>）の調整が鍵</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>大きすぎると<span class="keyword-tag blue">メモリ不足</span>に注意</span></li>
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>TPU は<span class="keyword-tag steel">まとめた処理</span>が特に得意</span></li>
+        </ul>
+        <pre>効果の絵
+  1件ずつ → <span class="ng">もたつく</span>
+  まとめて → <span class="hl">一気に変換</span>
+   → 1件あたりのコストが下がる</pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-1);"></i> 「まとめる」だけでも数字が変わる、お手軽な改善！</span>
+      </div>
+    </div>
+
+    <!-- 15. スケーリング -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-up-down-left-right fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3.2s infinite;" aria-hidden="true"></i>
+        <h2>規模を広げる考え方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sitemap" aria-hidden="true"></i><span>チップの束（<span class="keyword-tag">Pod</span>）で並列化</span></li>
+          <li><i class="fa-solid fa-users-between-lines" aria-hidden="true"></i><span>複数VMで<span class="keyword-tag accent">分業</span>させる構成も</span></li>
+          <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>流量に合わせ<span class="keyword-tag blue">台数を増減</span></span></li>
+          <li><i class="fa-solid fa-door-open" aria-hidden="true"></i><span>入口の<span class="keyword-tag steel">負荷分散</span>も組み合わせて設計</span></li>
+        </ul>
+        <pre>構成の絵
+  利用者 → 入口（負荷分散）
+   → vLLM サーバ
+   → <span class="hl">TPU VM 群</span> で分業
+   → 文書量に合わせて拡張</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-earth-americas fa-lg" style="color: var(--ui-color-5);"></i> 小さく始めて、文書が増えたら育てられる設計！</span>
+      </div>
+    </div>
+
+    <!-- 16. 性能を出すこつ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.2s infinite;" aria-hidden="true"></i>
+        <h2>性能を出すこつ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bullseye" aria-hidden="true"></i><span>まず<span class="keyword-tag">目指す指標</span>を決める（件/秒など）</span></li>
+          <li><i class="fa-solid fa-text-height" aria-hidden="true"></i><span>文の長さ・<span class="keyword-tag accent">次元の数</span>も結果に影響</span></li>
+          <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>設定→計測→改善の<span class="keyword-tag blue">循環</span>を回す</span></li>
+          <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>一度作ったベクトルは<span class="keyword-tag steel">再利用</span>も検討</span></li>
+        </ul>
+        <pre>回す手順
+  ① 目標を決める（例: 1万件/時）
+  ② 設定を <span class="hl">少しずつ変更</span>
+  ③ 良いものを <span class="ok">残す</span> → 繰り返し</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-trophy fa-lg" style="color: var(--ui-color-2);"></i> 「完璧な1手」より「測って決める習慣」が強い！</span>
+      </div>
+    </div>
+
+    <!-- 17. 運用のポイント -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3.6s infinite;" aria-hidden="true"></i>
+        <h2>運用のポイント</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i><span>料金は<span class="keyword-tag">稼働時間</span>で発生。使わない時は停止を</span></li>
+          <li><i class="fa-solid fa-chart-area" aria-hidden="true"></i><span>Cloud Monitoring で<span class="keyword-tag accent">状態を把握</span></span></li>
+          <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span>認証と権限の<span class="keyword-tag blue">整理</span>も先に済ませる</span></li>
+          <li><i class="fa-solid fa-bell" aria-hidden="true"></i><span>更新情報は<span class="keyword-tag steel">公式ページ</span>でこまめに確認</span></li>
+        </ul>
+        <pre>守りの基本
+  稼働 → <span class="ok">止め忘れ注意</span>
+  監視 → 異常の <span class="hl">早期発見</span>
+  権限 → 必要な人だけに</pre>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-battery-full fa-lg" style="color: var(--ui-color-1);"></i> 立てっぱなしにしないのが、費用対策の基本！</span>
+      </div>
+    </div>
+
+    <!-- 18. まとめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>まとめ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rocket" aria-hidden="true"></i><span>vLLM でエンベディングを<span class="keyword-tag">効率よく配信</span></span></li>
+          <li><i class="fa-solid fa-table-cells-large" aria-hidden="true"></i><span><span class="keyword-tag accent">PagedAttention</span>でメモリを有効活用</span></li>
+          <li><i class="fa-solid fa-cloud" aria-hidden="true"></i><span>TPU VM は<span class="keyword-tag blue">コンソールから数分</span>で作成</span></li>
+          <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>OpenAI 互換 API で<span class="keyword-tag steel">そのまま接続</span></span></li>
+          <li><i class="fa-solid fa-book-open" aria-hidden="true"></i><span>手順の詳細は<span class="keyword-tag">公式ガイド</span>へ</span></li>
+          <li><i class="fa-solid fa-bell" aria-hidden="true"></i><span>次の一手：<span class="keyword-tag accent">クイックスタートで試す</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-2);"></i> まず1台の TPU VM で動かして、速さを体感しよう！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div>🎬 動画: <a href="https://www.youtube.com/watch?v=lvt6kwrYjOw" target="_blank" style="color: inherit;">Google Cloud</a>　「Embedding models with vLLM TPU」</div>
+    <div class="footer-links">
+      <a href="https://www.youtube.com/watch?v=lvt6kwrYjOw" target="_blank"><i class="fa-solid fa-link"></i> 動画URL（YouTube）</a>
+      <a href="https://goo.gle/4ijMNkj" target="_blank"><i class="fa-solid fa-link"></i> Learn more（概要欄リンク）</a>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

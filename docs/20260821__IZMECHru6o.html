@@ -1,0 +1,779 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zed Delta 徹底解説 と GLM-5.5 テスト | AI Code King</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* 独自パレット: ベリートワイライト（ベリーマゼンタ × ハニーアンバー × スレート） */
+  --ui-color-1: #8E2F63;   /* ベリーマゼンタ：メイン */
+  --ui-color-2: #E8A13C;   /* ハニーアンバー：アクセント */
+  --ui-color-3: #F9E9F0;   /* ペイルローズ：タグ背景 */
+  --ui-color-4: #2C1A2A;   /* ダークプラム：濃い文字 */
+  --ui-color-5: #64748B;   /* スレートブルー：サブアクセント */
+  --canvas-bg: #FDF7FA;    /* ほのかなベリーがかった白 */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  background-color: var(--canvas-bg);
+  color: #333333;
+  line-height: 1.6;
+  padding: 25px 15px;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ================= ヘッダー ================= */
+.main-header {
+  text-align: center;
+  padding: 45px 20px 35px;
+  background: linear-gradient(135deg, var(--ui-color-3) 0%, #ffffff 50%, #FBF0DD 100%);
+  border-radius: 26px;
+  border: 3px dashed var(--ui-color-1);
+  box-shadow: 6px 6px 20px rgba(142, 47, 99, 0.18);
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.main-header .header-icon {
+  font-size: 7em;
+  color: var(--ui-color-1);
+  margin-bottom: 12px;
+  display: block;
+  animation: fa-beat-fade 3s ease-in-out infinite;
+}
+
+.main-header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  color: #333333;
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+
+.main-header .subtitle {
+  font-size: 19px;
+  color: var(--ui-color-1);
+  font-weight: bold;
+  margin-bottom: 14px;
+}
+
+.main-header .date-info {
+  font-size: 14px;
+  color: #777777;
+  margin-bottom: 16px;
+}
+
+.header-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.header-tag {
+  background: #ffffff;
+  color: var(--ui-color-4);
+  border: 2px solid var(--ui-color-2);
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+/* ================= 流れストリップ ================= */
+.flow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 4px 4px 14px rgba(44, 26, 42, 0.10);
+  padding: 16px 18px;
+  margin-bottom: 30px;
+}
+
+.flow-step {
+  background: var(--ui-color-3);
+  color: var(--ui-color-4);
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-weight: bold;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.flow-step i { color: var(--ui-color-1); }
+
+.flow-arrow {
+  color: var(--ui-color-2);
+  font-size: 20px;
+  animation: fa-fade 2.5s ease-in-out infinite;
+}
+
+/* ================= 4カラム グリッド ================= */
+.section-layout {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 22px;
+  align-items: stretch;
+}
+
+/* ================= カード ================= */
+.section-card {
+  background-color: #ffffff;
+  border-radius: 20px;
+  border-top: 6px solid var(--ui-color-1);
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0, 0, 0, 0.10);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(-0.4deg);
+  box-shadow: 9px 9px 22px rgba(142, 47, 99, 0.25);
+  border-top-color: var(--ui-color-2);
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-5); }
+.section-card:nth-child(even):hover { border-top-color: var(--ui-color-1); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 14px 0 8px;
+}
+
+.mega-icon-container i.fa-5x {
+  display: block;
+  margin-bottom: 10px;
+}
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  color: #555555;
+  font-weight: bold;
+  line-height: 1.4;
+}
+
+.card-content {
+  padding: 0 8px 10px;
+  flex: 1;
+}
+
+/* ================= リスト ================= */
+.keyword-list {
+  margin: 14px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 9px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #333333;
+  line-height: 1.5;
+}
+
+.keyword-list li i {
+  margin-right: 9px;
+  color: var(--ui-color-2);
+  min-width: 18px;
+  margin-top: 4px;
+}
+
+/* ================= タグ ================= */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 9px;
+  border-radius: 6px;
+  margin: 2px 3px 2px 0;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+  border: 1px solid rgba(142, 47, 99, 0.25);
+}
+
+.keyword-tag.accent {
+  background-color: #FBF0DD;
+  border-color: rgba(232, 161, 60, 0.5);
+}
+
+/* ================= コードプレビュー ================= */
+.code-preview {
+  background: var(--ui-color-4);
+  color: #F3E8EF;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.55;
+}
+
+.code-preview .cmt { color: #9DA8BC; }
+.code-preview .kw { color: var(--ui-color-2); }
+.code-preview .str { color: #8FD3C7; }
+
+/* ================= 手書き風吹き出し ================= */
+.speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 14px;
+  margin: 16px 6px 8px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0, 0, 0, 0.10);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+}
+
+.speech-bubble.variant-1 {
+  background: #FFF6E3;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #FFEDE0;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #333333;
+  display: inline;
+}
+
+.speech-bubble i {
+  color: var(--ui-color-2);
+}
+
+/* ================= 出現アニメーション ================= */
+.fade-in-scale {
+  opacity: 0;
+  transform: translateY(24px) scale(0.97);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ================= フッター ================= */
+.main-footer {
+  text-align: center;
+  padding: 28px 20px;
+  background: #ffffff;
+  border-radius: 22px;
+  border: 3px dashed var(--ui-color-5);
+  margin-top: 32px;
+  font-size: 15px;
+  color: #555555;
+  box-shadow: 4px 4px 14px rgba(44, 26, 42, 0.10);
+}
+
+.main-footer a {
+  color: var(--ui-color-1);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.main-footer a:hover {
+  color: var(--ui-color-2);
+}
+
+.main-footer .footer-note {
+  font-size: 14px;
+  color: #777777;
+  margin-top: 8px;
+}
+
+/* ================= レスポンシブ ================= */
+@media (max-width: 1500px) {
+  .section-layout { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 1050px) {
+  .section-layout { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 640px) {
+  .section-layout { grid-template-columns: 1fr; }
+  .main-header h1 { font-size: 28px; }
+  .main-header .header-icon { font-size: 5em; }
+  .flow-arrow { display: none; }
+  .flow-strip { gap: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ============ ヘッダー ============ -->
+  <header class="main-header">
+    <i class="fa-solid fa-wand-magic-sparkles header-icon" aria-hidden="true"></i>
+    <h1>「Zed Delta」登場！ 会話がそのまま履歴になる新感覚GUI</h1>
+    <p class="subtitle">エージェントとの会話・コードの変更・バージョンの歴史まで、ぜんぶつなげて追跡！</p>
+    <p class="date-info"><i class="fa-regular fa-calendar"></i> 2026.08.21 ｜ <i class="fa-solid fa-crown"></i> AI Code King</p>
+    <div class="header-tags">
+      <span class="header-tag"><i class="fa-solid fa-bolt"></i> Zed Delta</span>
+      <span class="header-tag"><i class="fa-solid fa-database"></i> DeltaDB</span>
+      <span class="header-tag"><i class="fa-solid fa-robot"></i> AIエージェント</span>
+      <span class="header-tag"><i class="fa-solid fa-globe"></i> WebAssembly</span>
+      <span class="header-tag"><i class="fa-solid fa-flask"></i> GLM-5.5 テスト</span>
+    </div>
+  </header>
+
+  <!-- ============ 流れストリップ ============ -->
+  <div class="flow-strip">
+    <span class="flow-step"><i class="fa-solid fa-comments"></i> 会話</span>
+    <i class="fa-solid fa-arrow-right flow-arrow"></i>
+    <span class="flow-step"><i class="fa-solid fa-clipboard-list"></i> 計画</span>
+    <i class="fa-solid fa-arrow-right flow-arrow"></i>
+    <span class="flow-step"><i class="fa-solid fa-vial"></i> テスト</span>
+    <i class="fa-solid fa-arrow-right flow-arrow"></i>
+    <span class="flow-step"><i class="fa-solid fa-code"></i> コードの変更</span>
+    <i class="fa-solid fa-arrow-right flow-arrow"></i>
+    <span class="flow-step"><i class="fa-solid fa-database"></i> DeltaDB の歴史</span>
+  </div>
+
+  <!-- ============ カード 18枚 ============ -->
+  <div class="section-layout">
+
+    <!-- 1. Deltaとは？ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Delta とは？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg"></i><span>Zed が送る、新しい <span class="keyword-tag">AIエージェントGUI</span></span></li>
+          <li><i class="fa-solid fa-cube fa-lg"></i><span>ほかの道具に頼らない <span class="keyword-tag">単独アプリ</span></span></li>
+          <li><i class="fa-solid fa-comments fa-lg"></i><span>スレッド形式の会話で、コードを書き進める</span></li>
+          <li><i class="fa-solid fa-lightbulb fa-lg"></i><span>「会話 = 作業の現場」になる設計</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> チャット画面で開発が進む、<br>まったく新しいスタイルだ！</span>
+      </div>
+    </div>
+
+    <!-- 2. DeltaDB -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-database fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>DeltaDB とは？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-layer-group fa-lg"></i><span>新しい <span class="keyword-tag">バージョン管理の層</span></span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg"></i><span>コミットの「間」の操作も、すべて記録</span></li>
+          <li><i class="fa-solid fa-floppy-disk fa-lg"></i><span>エージェントの動きを、まるごと保存</span></li>
+        </ul>
+        <div class="code-preview"><span class="cmt">// イメージ</span>
+DeltaDB {
+  commit_A ... commit_B
+  <span class="kw">↑ この間も</span> 全部の記録が残る
+}</div>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-pen fa-lg"></i> Git は「結果」だけ。<br>DeltaDB は「過程」まで残す！</span>
+      </div>
+    </div>
+
+    <!-- 3. すべてが追跡可能 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-link fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>すべて追跡できる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-branch fa-lg"></i><span>コードの変更に、いちいち「由来」がつく</span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg"></i><span>「この変更、どの会話で生まれた？」が一目で分かる</span></li>
+          <li><i class="fa-solid fa-arrow-right fa-lg"></i><span>クリックすれば、元の会話へ jump</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg"></i> 「なぜ このコード？」が<br>すぐ答えられるのは大きい！</span>
+      </div>
+    </div>
+
+    <!-- 4. スレッド会話 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>スレッド会話スタイル</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list fa-lg"></i><span>会話をスレッドに分けて進行</span></li>
+          <li><i class="fa-solid fa-tags fa-lg"></i><span>用件ごとに、話題を分けられる</span></li>
+          <li><i class="fa-solid fa-rotate-left fa-lg"></i><span>昔のスレッドを、いつでも再開</span></li>
+          <li><i class="fa-solid fa-book fa-lg"></i><span>会話の束が、そのまま作業の記録に</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-comment-dots fa-lg"></i> 整理されたチャットが、<br>そのまま開発ノートになる！</span>
+      </div>
+    </div>
+
+    <!-- 5. 本物のエディタ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="color: var(--ui-color-5); animation: fa-shake 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>本物のエディタ搭載</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-folder-tree fa-lg"></i><span>ファイルツリー付きで、中身を眺められる</span></li>
+          <li><i class="fa-solid fa-palette fa-lg"></i><span><span class="keyword-tag">シンタックスハイライト</span> にも対応</span></li>
+          <li><i class="fa-solid fa-sliders fa-lg"></i><span>モデルの設定画面も内蔵</span></li>
+          <li><i class="fa-solid fa-gear fa-lg"></i><span>細かな好みも、アプリの中で調整</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg"></i> 見た目は軽いのに、<br>中身は本格派なんだ！</span>
+      </div>
+    </div>
+
+    <!-- 6. Git互換 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-2); animation: fa-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Git とも仲良し</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-check fa-lg"></i><span>Git 互換で、そのまま使える</span></li>
+          <li><i class="fa-solid fa-box-open fa-lg"></i><span>今あるリポジトリも OK</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg"></i><span>コミットの歴史は、そのまま維持</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-heart fa-lg"></i> 乗り換えのコストが<br>低いのがうれしい！</span>
+      </div>
+    </div>
+
+    <!-- 7. マルチプレイヤー -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>マルチプレイヤー協働</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-plus fa-lg"></i><span>チームの仲間が、スレッドに参加</span></li>
+          <li><i class="fa-solid fa-comment fa-lg"></i><span>コメントで、意見を交わす</span></li>
+          <li><i class="fa-solid fa-person-walking-arrow-right fa-lg"></i><span>誰かの作業を途中から継続できる</span></li>
+        </ul>
+        <p><span class="keyword-tag accent">共同編集</span><span class="keyword-tag accent">引き継ぎ</span></p>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-handshake fa-lg"></i> 一緒にコードを育てる<br> 感覚が気持ちいい！</span>
+      </div>
+    </div>
+
+    <!-- 8. ブラウザ版 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-5); animation: fa-spin 8s linear infinite;" aria-hidden="true"></i>
+        <h2>ブラウザ版もある</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-window-maximize fa-lg"></i><span><span class="keyword-tag">delta.dev</span> で、ブラウザから起動</span></li>
+          <li><i class="fa-solid fa-gear fa-lg"></i><span>Rust のアプリを <span class="keyword-tag">WebAssembly</span> に変換</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg"></i><span>入れずに、すぐ体験できる手軽さ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-flag-checkered fa-lg"></i> まずはブラウザで、<br>ちょろっと触ってみよう！</span>
+      </div>
+    </div>
+
+    <!-- 9. 対応モデル -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>対応モデルいろいろ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-house fa-lg"></i><span><span class="keyword-tag">Zed-hosted</span> モデル</span></li>
+          <li><i class="fa-solid fa-key fa-lg"></i><span>OpenAI（<span class="keyword-tag">ChatGPT Plus / Pro</span>）</span></li>
+          <li><i class="fa-solid fa-a fa-lg"></i><span>Anthropic</span></li>
+          <li><i class="fa-solid fa-shuffle fa-lg"></i><span>OpenRouter</span></li>
+          <li><i class="fa-solid fa-server fa-lg"></i><span>Baseten</span></li>
+          <li><i class="fa-brands fa-github fa-lg"></i><span>GitHub Copilot</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-wallet fa-lg"></i> 持っている契約を<br>そのまま活かせる！</span>
+      </div>
+    </div>
+
+    <!-- 10. 隔離worktree -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-tree fa-5x" style="color: var(--ui-color-1); animation: fa-shake 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>隔離 worktree</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database fa-lg"></i><span>DeltaDB 搭載の <span class="keyword-tag">worktree</span> で動作</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg"></i><span>メインの作業フォルダは無傷のまま</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg"></i><span>エージェントが暴れても、影響なし</span></li>
+        </ul>
+        <div class="code-preview"><span class="cmt"># イメージ</span>
+main/      <span class="cmt">← 無事</span>
+  └ worktree/ <span class="kw">← ここで Agent が作業</span></div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-grin-stars fa-lg"></i> 安全な砂場で、<br>思う存分遊べる！</span>
+      </div>
+    </div>
+
+    <!-- 11. デモ movie-tracker -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-film fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>デモ：movie-tracker</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clapperboard fa-lg"></i><span>映画を記録するアプリ <span class="keyword-tag">movie-tracker</span> を作成</span></li>
+          <li><i class="fa-solid fa-gauge-high fa-lg"></i><span>軽快なランディングページが完成</span></li>
+          <li><i class="fa-solid fa-star fa-lg"></i><span>デモでも、本気のコードを書く</span></li>
+        </ul>
+        <p><span class="keyword-tag accent">計画</span><span class="keyword-tag accent">実装</span><span class="keyword-tag accent">完成</span></p>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg"></i> 仕上がりの速さに、<br>思わず「クレイジー」！</span>
+      </div>
+    </div>
+
+    <!-- 12. デモの流れ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>デモの進め方</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 fa-lg"></i><span>まず <span class="keyword-tag">計画</span> を立てる</span></li>
+          <li><i class="fa-solid fa-2 fa-lg"></i><span>テストを先に書く</span></li>
+          <li><i class="fa-solid fa-3 fa-lg"></i><span>変更をちゃんとコミット</span></li>
+          <li><i class="fa-solid fa-4 fa-lg"></i><span>ページを組み立てて完成へ</span></li>
+        </ul>
+        <div class="code-preview"><span class="kw">plan</span> → <span class="kw">test</span> → <span class="kw">commit</span> → <span class="str">build 🎉</span></div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-vial fa-lg"></i> テストを大切にする、<br>まじめな進め方なんだ！</span>
+      </div>
+    </div>
+
+    <!-- 13. Claude Code 統合 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-1); animation: fa-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Claude Code 統合</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug-circle-check fa-lg"></i><span><span class="keyword-tag">Claude Code</span> とも連携できる</span></li>
+          <li><i class="fa-solid fa-terminal fa-lg"></i><span>おなじみの体験を、Delta の中で</span></li>
+          <li><i class="fa-solid fa-arrow-right-arrow-left fa-lg"></i><span>好きな道具と、いいとこ取り</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-face-laugh-beam fa-lg"></i> Claude 派の人にも、<br>うれしい知らせ！</span>
+      </div>
+    </div>
+
+    <!-- 14. ACP対応 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>ACP に対応</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-book-open fa-lg"></i><span><span class="keyword-tag">ACP</span>（Agent Client Protocol）に対応</span></li>
+          <li><i class="fa-solid fa-rotate fa-lg"></i><span>外部のエージェントをつなぐ、共通の「差し口」</span></li>
+          <li><i class="fa-solid fa-network-wired fa-lg"></i><span>いろんな道具と、つなぎ放題</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-diagram-project fa-lg"></i> つなぎ口が共通なら、<br>選択肢が広がるね！</span>
+      </div>
+    </div>
+
+    <!-- 15. クラウドランナー -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>クラウドランナー</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud-arrow-up fa-lg"></i><span><span class="keyword-tag">クラウドランナー</span> を内蔵</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg"></i><span>バックグラウンドで、作業を続行</span></li>
+          <li><i class="fa-solid fa-mug-hot fa-lg"></i><span>離れている間にも、仕事が進む</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-moon fa-lg"></i> お茶を飲んでる間に、<br>コードが育つかも！</span>
+      </div>
+    </div>
+
+    <!-- 16. 会話×バージョン管理 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clock-rotate-left fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>会話 × バージョン管理</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-link fa-lg"></i><span>会話・変更・歴史が、ぜんぶ直結</span></li>
+          <li><i class="fa-solid fa-circle-info fa-lg"></i><span>「いつ・なぜ・どうやって」が分かる</span></li>
+          <li><i class="fa-solid fa-book fa-lg"></i><span>歴史を「読む」ような開発体験</span></li>
+        </ul>
+        <p><span class="keyword-tag">完全な追跡</span><span class="keyword-tag accent">透明性</span></p>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> ここが Delta の核となる<br>アイデアだね！</span>
+      </div>
+    </div>
+
+    <!-- 17. GLM-5.5 テスト -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-2); animation: fa-shake 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>GLM-5.5 テストの触れ込み</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-flask fa-lg"></i><span>動画の題名は「<span class="keyword-tag">Ox Alpha</span> を完全テスト」</span></li>
+          <li><i class="fa-solid fa-face-surprise fa-lg"></i><span>「これが GLM-5.5？！ クレイジー！」</span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg"></i><span>その正体や結果は、動画で確認！</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg"></i> 題名の GLM-5.5 話題も、<br>要チェックだ！</span>
+      </div>
+    </div>
+
+    <!-- 18. 総評 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-thumbs-up fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>総評：試す価値あり</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star fa-lg"></i><span>会話を、バージョン管理に直結した設計</span></li>
+          <li><i class="fa-solid fa-heart fa-lg"></i><span>AIコーディングの道具の中でも、特に面白い一本</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg"></i><span>新しいアプローチとして、高く評価</span></li>
+        </ul>
+        <p><span class="keyword-tag accent">Zed Delta</span><span class="keyword-tag accent">delta.dev</span></p>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-grin-stars fa-lg"></i> 会話が歴史になる未来、<br>ちょっと見てみたくない？</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ フッター ============ -->
+  <footer class="main-footer">
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=_IZMECHru6o" target="_blank" rel="noopener">AI Code King</a> ｜ 「Ox Alpha (Fully Tested) : So, This is GLM-5.5?! IT'S CRAZY!」</p>
+    <p class="footer-note"><i class="fa-solid fa-circle-info"></i> この資料は、動画の概要欄の内容（Zed Delta / DeltaDB）をもとに作成した非公式のまとめです。</p>
+  </footer>
+
+</div>
+
+<script>
+// スクロールに合わせてカードを出す
+document.addEventListener('DOMContentLoaded', function () {
+  var targets = document.querySelectorAll('.fade-in-scale');
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          obs.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    targets.forEach(function (t) { obs.observe(t); });
+  } else {
+    targets.forEach(function (t) { t.classList.add('visible'); });
+  }
+});
+</script>
+</body>
+</html>

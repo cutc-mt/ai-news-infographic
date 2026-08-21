@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ソフトウェアはもう当て推量じゃない｜DeepSeek Harnessが変える開発</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<style>
+  :root {
+    /* 独自テーマ: 工房の粘土 × 暖炉（Atelier Clay & Hearth）
+       元パレット UI/UX (1B6C8C / BF8136 / F2E8E4 / 260101 / BF5656) を粘土の質感へ調整 */
+    --ui-color-1: #0F7B7B;   /* 深い粘土ティール: 主色・理屈・UI */
+    --ui-color-2: #D2691E;   /* 暖炉のチャコリアンバー: 強調・手・行動 */
+    --ui-color-3: #F5E9DD;   /* 焼きたてシェル: タグ背景 */
+    --ui-color-4: #2B1015;   /* 焦げたチェリー黒: 濃いテキスト */
+    --ui-color-5: #C0574F;   /* 窯変のテラコッタ: 注意・旧来 */
+    --bg-color:   #FBF7F2;   /* 素焼きキャンバス */
+    --card-bg:    #FFFFFF;
+    --text-color: #333333;
+    --text-muted: #777777;
+    --accent-soft: #FFF4DC;  /* バリアント1の吹き出し背景 */
+    --alert-soft: #FBE9E4;   /* バリアント2の吹き出し背景 */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-color);
+    font-family: 'Kaisei Decol', 'Zen Kurenaido', serif;
+    color: var(--text-color);
+    line-height: 1.6;
+  }
+
+  .page {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 30px 24px 40px;
+  }
+
+  /* ===== ヘッダー ===== */
+  header {
+    text-align: center;
+    padding: 40px 20px 30px;
+    background: linear-gradient(160deg, #FFFFFF 55%, var(--ui-color-3));
+    border-radius: 24px;
+    box-shadow: 0 8px 24px rgba(43, 16, 21, 0.10);
+    margin-bottom: 26px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  header .header-icons { display: flex; justify-content: center; align-items: center; gap: 26px; flex-wrap: wrap; }
+
+  header h1 {
+    font-size: 36px;
+    color: var(--text-color);
+    margin: 18px 0 10px;
+    line-height: 1.4;
+  }
+
+  header h1 .accent { color: var(--ui-color-1); }
+  header h1 .accent2 { color: var(--ui-color-2); }
+
+  header .subtitle {
+    font-size: 18px;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+
+  header .meta {
+    font-size: 14px;
+    color: var(--text-muted);
+  }
+
+  header .meta .tag-inline {
+    background: var(--ui-color-3);
+    color: var(--ui-color-4);
+    border-radius: 6px;
+    padding: 2px 10px;
+    margin: 0 3px;
+    display: inline-block;
+    font-weight: bold;
+  }
+
+  /* ===== セクション見出し ===== */
+  .chapter {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 34px 8px 18px;
+  }
+
+  .chapter .chapter-icon {
+    font-size: 34px;
+    color: var(--ui-color-2);
+    animation: fa-beat-fade 3s ease-in-out infinite;
+  }
+
+  .chapter h2 {
+    font-size: 26px;
+    color: var(--ui-color-4);
+    position: relative;
+    padding-left: 16px;
+  }
+
+  .chapter h2::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 6px;
+    border-radius: 4px;
+    background: linear-gradient(var(--ui-color-1), var(--ui-color-2));
+  }
+
+  .chapter .chapter-note {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-left: auto;
+    text-align: right;
+  }
+
+  /* ===== 4カラムグリッド ===== */
+  .section-layout {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 22px;
+    margin-bottom: 10px;
+  }
+
+  .section-card {
+    background: var(--card-bg);
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(43, 16, 21, 0.10);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background 0.3s ease;
+    border-top: 5px solid var(--ui-color-1);
+  }
+
+  .section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+
+  .section-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 8px 12px 24px rgba(43, 16, 21, 0.16);
+    background: #FFFDF9;
+  }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0 8px;
+  }
+
+  .mega-icon-container i.mega {
+    font-size: 64px;
+    margin-bottom: 10px;
+    display: inline-block;
+  }
+
+  .mega-icon-container h3 {
+    font-size: 24px;
+    color: #555555;
+    line-height: 1.4;
+  }
+
+  .card-no {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    font-size: 13px;
+    color: var(--text-muted);
+    font-family: 'Yomogi', cursive;
+  }
+
+  .card-content { padding: 0 10px 15px; }
+
+  .card-content p.lead {
+    font-size: 16px;
+    line-height: 1.5;
+    margin-bottom: 10px;
+    color: var(--text-color);
+  }
+
+  /* キーワードリスト */
+  .keyword-list {
+    margin: 12px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+
+  .keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 18px;
+    margin-top: 4px;
+  }
+
+  .keyword-list li i.teal { color: var(--ui-color-1); }
+  .keyword-list li i.red { color: var(--ui-color-5); }
+
+  /* キーワードタグ */
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  .keyword-tag.deep { background: #E2ECEC; color: #0F5E5E; }
+  .keyword-tag.warn { background: var(--alert-soft); color: #8A3B34; }
+
+  /* 手書き吹き出し（標準） */
+  .speech-bubble {
+    position: relative;
+    background: #FFFFFF;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(43, 16, 21, 0.10);
+    transform: rotate(-1deg);
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    border-color: var(--ui-color-1) transparent;
+  }
+
+  .speech-bubble.variant-1 {
+    background: var(--accent-soft);
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+
+  .speech-bubble.variant-2 {
+    background: var(--alert-soft);
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333333;
+    display: inline-block;
+  }
+
+  .speech-bubble i.bubble-icon {
+    color: var(--ui-color-2);
+    margin-right: 6px;
+  }
+
+  .speech-bubble.variant-1 i.bubble-icon { color: var(--ui-color-2); }
+  .speech-bubble.variant-2 i.bubble-icon { color: var(--ui-color-5); }
+
+  /* コードプレビュー */
+  pre {
+    background: #2B1015;
+    color: #F5E9DD;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+
+  pre .c { color: #8FBFAF; }
+  pre .k { color: #E8A24C; }
+  pre .s { color: #D9A08C; }
+
+  /* フロー矢印 */
+  .flow-note {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 14px 0 4px;
+    font-family: 'Yomogi', cursive;
+    color: var(--ui-color-1);
+    font-size: 15px;
+  }
+
+  .flow-note i { color: var(--ui-color-2); }
+
+  /* タグ行 */
+  .tag-row {
+    text-align: center;
+    margin: 10px 0 4px;
+  }
+
+  /* アニメーション */
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.92) translateY(18px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .fade-in-scale { animation: fadeInScale 0.7s ease-out both; }
+  .d1 { animation-delay: 0.05s; }
+  .d2 { animation-delay: 0.1s; }
+  .d3 { animation-delay: 0.15s; }
+  .d4 { animation-delay: 0.2s; }
+  .d5 { animation-delay: 0.25s; }
+  .d6 { animation-delay: 0.3s; }
+
+  /* フッター */
+  footer {
+    margin-top: 40px;
+    padding: 26px 20px;
+    text-align: center;
+    background: linear-gradient(180deg, #FFFFFF, var(--ui-color-3));
+    border-radius: 20px;
+    box-shadow: 0 6px 18px rgba(43, 16, 21, 0.08);
+    font-size: 15px;
+    color: var(--text-color);
+  }
+
+  footer a { color: var(--ui-color-1); font-weight: bold; text-decoration: underline; }
+  footer .footer-meta { font-size: 13px; color: var(--text-muted); margin-top: 10px; }
+
+  /* レスポンシブ */
+  @media (max-width: 1600px) { .section-layout { grid-template-columns: repeat(4, 1fr); } }
+  @media (max-width: 1200px) { .section-layout { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 768px)  { .section-layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===== ヘッダー ===== -->
+  <header>
+    <div class="header-icons">
+      <i class="fa-solid fa-hands-holding-circle fa-7x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.4s ease infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-shapes fa-5x" style="color: var(--ui-color-5); animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+    </div>
+    <h1>ソフトウェアは、もう<span class="accent">当て推量</span>じゃない<br><span class="accent2">DeepSeek Harness</span>が変える開発のかたち</h1>
+    <p class="subtitle">37秒のショート動画が伝えた、UIを「粘土」にするという大転換</p>
+    <p class="meta">
+      公開: <span class="tag-inline">2026年8月21日</span> /
+      <span class="tag-inline">Julian Goldie SEO</span> /
+      <span class="tag-inline">37秒ショート</span>
+    </p>
+  </header>
+
+  <!-- ===== 第1章: これまでの常識 ===== -->
+  <div class="chapter">
+    <i class="fa-solid fa-rotate-left chapter-icon" aria-hidden="true"></i>
+    <h2>第1章　いままでのソフトウェアは、こうできていた</h2>
+    <span class="chapter-note"><i class="fa-solid fa-clock fa-lg" style="color: var(--ui-color-2);"></i> 旧来の常識をまず整理</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- 1 -->
+    <div class="section-card fade-in-scale d1">
+      <span class="card-no">#01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-astronaut mega fa-5x" style="color: var(--ui-color-1); animation: fa-flip 5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>架空の「平均ユーザー」</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">いままで作られてきたソフトウェアは、じつは<b>実在しない誰か</b>のために設計されてきた。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-group fa-lg teal" aria-hidden="true"></i><span>多様な人全員を、<span class="keyword-tag">ひとりの典型</span>にまとめてしまう</span></li>
+          <li><i class="fa-solid fa-compass-drafting fa-lg" aria-hidden="true"></i><span>デザイン判断は、<span class="keyword-tag">推測</span>と<span class="keyword-tag">統計</span>の上に成立</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg red" aria-hidden="true"></i><span>結果として、<b>誰にもぴったり</b>ではない道具に</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg bubble-icon" aria-hidden="true"></i>「平均的な人」なんて、実際にはいない。ここがすべての始まり！</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="section-card fade-in-scale d2">
+      <span class="card-no">#02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-slash mega fa-5x" style="color: var(--ui-color-5); animation: fa-shake 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>あなた専用じゃない理由</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">欲しい機能と、実際に使える機能のあいだには、いつも<b>溝</b>があった。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-question fa-lg teal" aria-hidden="true"></i><span>「このボタン、ここにあってほしいのになあ」</span></li>
+          <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i><span>設定を変えても、<span class="keyword-tag">許された範囲</span>でしか調整できない</span></li>
+          <li><i class="fa-solid fa-ban fa-lg red" aria-hidden="true"></i><span>ない機能は、<b>自分では追加できない</b></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-face-sad-tear fa-lg bubble-icon" aria-hidden="true"></i>使いにくい…でも我慢するしかない、という時代が長かった。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="section-card fade-in-scale d3">
+      <span class="card-no">#03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-person-digging mega fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s ease infinite;" aria-hidden="true"></i>
+        <h3>開発側の苦労</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">作る側も、見たことのないユーザーの<span class="keyword-tag">想像</span>を頼りに開発を進めてきた。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clipboard fa-lg teal" aria-hidden="true"></i><span>要件定義は、<b>思い込み</b>を文書化する作業になりがち</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>フィードバック → 修正の<span class="keyword-tag">ループ</span>は、ゆっくりで高コスト</span></li>
+          <li><i class="fa-solid fa-hourglass fa-lg red" aria-hidden="true"></i><span>届くころには、<b>ユーザーの必要</b>が変わっている</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-comments fa-lg bubble-icon" aria-hidden="true"></i>作る人と使う人の距離が、ずっと埋まらなかった。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="section-card fade-in-scale d4">
+      <span class="card-no">#04</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-box-archive mega fa-5x" style="color: var(--ui-color-1); animation: fa-beat 3s ease infinite;" aria-hidden="true"></i>
+        <h3>静的な道具の限界</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">出荷された瞬間、ソフトウェアは<span class="keyword-tag">固定</span>される。これが当たり前だった。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube fa-lg teal" aria-hidden="true"></i><span>UIは<span class="keyword-tag">かたち</span>が決まった「器」であり続けた</span></li>
+          <li><i class="fa-solid fa-arrows-up-down-left-right fa-lg" aria-hidden="true"></i><span>使う側が道具に<b>合わせる</b>構図が、何十年も続いた</span></li>
+          <li><i class="fa-solid fa-lock fa-lg red" aria-hidden="true"></i><span>変化するのは、<b>更新</b>が来たときだけ</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-key bubble-icon" aria-hidden="true"></i>道具が人に合わせる。これが、この先の話。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="flow-note"><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i> ここに、DeepSeek Harness が登場する <i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i></div>
+
+  <!-- ===== 第2章: 粘土という発想 ===== -->
+  <div class="chapter">
+    <i class="fa-solid fa-hand-scissors chapter-icon" aria-hidden="true"></i>
+    <h2>第2章　インターフェースは、「粘土」である</h2>
+    <span class="chapter-note"><i class="fa-solid fa-hand-point-up fa-lg" style="color: var(--ui-color-2);"></i> Harness の核となる比喩</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- 5 -->
+    <div class="section-card fade-in-scale d1">
+      <span class="card-no">#05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hand-holding-droplet mega fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>粘土のようなUI</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">DeepSeek Harness は、画面を<span class="keyword-tag">こねて変えられる</span>ものとして扱う。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-shapes fa-lg teal" aria-hidden="true"></i><span>ボタンもパネルも、<b>柔らかい素材</b>みたいに自由</span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i><span>かたちを決めるのは、<span class="keyword-tag">ことば</span>での指示</span></li>
+          <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>一度決めても、<b>何度でも練り直せる</b></span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten"><i class="fa-solid fa-hand-sparkles fa-lg bubble-icon" aria-hidden="true"></i>触って変わる画面。まるで工房の作業台だね。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="section-card fade-in-scale d2">
+      <span class="card-no">#06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-square-poll-horizontal mega fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ことばで描く部品</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">必要な<span class="keyword-tag">ボタン</span>・<span class="keyword-tag">パネル</span>・<span class="keyword-tag">ワークフロー</span>を、そのまま言葉で記述する。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-dot fa-lg teal" aria-hidden="true"></i><span>「ここに、この作業用のボタンが欲しい」</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>「この情報だけを並べた画面にして」</span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>「この手順を、ワンクリックの流れにして」</span></li>
+        </ul>
+        <pre><span class="c"># ことば → 画面</span>
+<span class="k">describe</span>(<span class="s">"予約を一覧できる
+  パネルと、確認ボタン"</span>)</pre>
+        <div class="speech-bubble right">
+          <span class="handwritten"><i class="fa-solid fa-comment-dots bubble-icon" aria-hidden="true"></i>お願いするだけで、部品が生えてくる感覚。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="section-card fade-in-scale d3">
+      <span class="card-no">#07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-right-arrow-left mega fa-5x" style="color: var(--ui-color-5); animation: fa-shake 3.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ギャップがつぶれる</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead"><b>欲しい</b>と<b>使える</b>のあいだの距離が、一気に縮まる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-heart fa-lg teal" aria-hidden="true"></i><span>「こうあったらいいな」が、<span class="keyword-tag">そのまま実現</span>に近づく</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>発見 → 導入 → 定着の<span class="keyword-tag">時間</span>が、劇的に短縮</span></li>
+          <li><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i><span>我慢して使う、という選択肢が消えていく</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-bolt-lightning fa-lg bubble-icon" aria-hidden="true"></i>思った瞬間が、使いはじめる瞬間になる。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8 -->
+    <div class="section-card fade-in-scale d4">
+      <span class="card-no">#08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-fingerprint mega fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.4s ease infinite;" aria-hidden="true"></i>
+        <h3>自分専用のかたち</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">同じソフトでも、人によって<span class="keyword-tag">違う姿</span>になるのが自然になる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-check fa-lg teal" aria-hidden="true"></i><span>あなたの作業の流れに、<b>画面が従う</b></span></li>
+          <li><i class="fa-solid fa-palette fa-lg" aria-hidden="true"></i><span>見た目も構成も、<span class="keyword-tag">好み</span>で組み替え自由</span></li>
+          <li><i class="fa-solid fa-people-arrows fa-lg" aria-hidden="true"></i><span>「みんな同じ」から「<b>それぞれ最適</b>」へ</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-scroll bubble-icon" aria-hidden="true"></i>道具の側が、指紋のようにその人らしい形に。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="flow-note"><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i> 個人最適化の先に、エージェント型OSがある <i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i></div>
+
+  <!-- ===== 第3章: エージェント型OSへ ===== -->
+  <div class="chapter">
+    <i class="fa-solid fa-diagram-nested chapter-icon" aria-hidden="true"></i>
+    <h2>第3章　静かな道具から、働くOSへ</h2>
+    <span class="chapter-note"><i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-2);"></i> 動きだすソフトウェア</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- 9 -->
+    <div class="section-card fade-in-scale d1">
+      <span class="card-no">#09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot mega fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.2s ease infinite;" aria-hidden="true"></i>
+        <h3>エージェントとは</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">自分で判断し、手を動かすソフトウェアのこと。指示を<b>待つだけ</b>じゃない。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain fa-lg teal" aria-hidden="true"></i><span>状況を見て、<span class="keyword-tag">次の手</span>を自分で考える</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>手順の一部を、<b>代理で実行</b>してくれる</span></li>
+          <li><i class="fa-solid fa-timeline fa-lg" aria-hidden="true"></i><span>繰り返しの作業を、<span class="keyword-tag">流れ</span>として引き受ける</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten"><i class="fa-solid fa-robot bubble-icon" aria-hidden="true"></i>言われたことをやる道具から、話し合う相手へ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="section-card fade-in-scale d2">
+      <span class="card-no">#10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench mega fa-5x" style="color: var(--ui-color-2); animation: fa-spin 7s linear infinite;" aria-hidden="true"></i>
+        <h3>カスタマイズOS</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">静的なツールが、<span class="keyword-tag">自分用に仕立てた</span>エージェント型OSへと変わる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-window-restore fa-lg teal" aria-hidden="true"></i><span>作業環境そのものが、<b>育つ生き物</b>みたいに</span></li>
+          <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>部品を足し、<span class="keyword-tag">組み替え</span>、捨てる自由</span></li>
+          <li><i class="fa-solid fa-user-gear fa-lg" aria-hidden="true"></i><span>OSが、あなたの<b>仕事のやり方</b>を学習していく</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-seedling fa-lg bubble-icon" aria-hidden="true"></i>使うほどに、自分の仕事ぶりに馴染んでいく。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 11 -->
+    <div class="section-card fade-in-scale d3">
+      <span class="card-no">#11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open-reader mega fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ことばが力になる</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">プログラムを書けなくても、<span class="keyword-tag">説明できる</span>ことが力になる時代。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen-nib fa-lg teal" aria-hidden="true"></i><span>欲しいものを<b>言語化</b>する技能が、そのまま開発力に</span></li>
+          <li><i class="fa-solid fa-language fa-lg" aria-hidden="true"></i><span>専門用語よりも、<span class="keyword-tag">意図</span>の伝え方が鍵</span></li>
+          <li><i class="fa-solid fa-graduation-cap fa-lg" aria-hidden="true"></i><span>学ぶべきは文法より、<b>望む働きの描写</b></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-feather-pointed fa-lg bubble-icon" aria-hidden="true"></i>「ちゃんと説明できる人」が、強くなる。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="section-card fade-in-scale d4">
+      <span class="card-no">#12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic mega fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>仕事の速さが変わる</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">機能追加を待つ時間が消え、<span class="keyword-tag">生産性</span>の議論自体が変わる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-stopwatch fa-lg teal" aria-hidden="true"></i><span>「改善したい」から「<b>改善した</b>」までが、即日に</span></li>
+          <li><i class="fa-solid fa-boxes-stacked fa-lg" aria-hidden="true"></i><span>複数の道具を、<span class="keyword-tag">ひとつの流れ</span>にまとめられる</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>作業の無駄を、<b>その場で削れる</b>ようになる</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-gauge-high bubble-icon" aria-hidden="true"></i>ストレスを減らすボタンを、自分で足せる時代。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== 第4章: 仕事と未来 ===== -->
+  <div class="chapter">
+    <i class="fa-solid fa-telescope chapter-icon" aria-hidden="true"></i>
+    <h2>第4章　つくる人の役割と、この先</h2>
+    <span class="chapter-note"><i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i> 37秒の先に見えたもの</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- 13 -->
+    <div class="section-card fade-in-scale d1">
+      <span class="card-no">#13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users-gear mega fa-5x" style="color: var(--ui-color-1); animation: fa-beat 3s ease infinite;" aria-hidden="true"></i>
+        <h3>開発者の役割変化</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">コードを書く人に求められるのは、<span class="keyword-tag">土台</span>と<span class="keyword-tag">体験</span>の設計へと変わる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cubes-stacked fa-lg teal" aria-hidden="true"></i><span>部品そのものより、<b>粘土の質</b>を磨く仕事に</span></li>
+          <li><i class="fa-solid fa-handshake-angle fa-lg" aria-hidden="true"></i><span>ユーザーとの<span class="keyword-tag">対話</span>を設計する役割が拡大</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg red" aria-hidden="true"></i><span>安全で健全な<span class="keyword-tag">拡張</span>の筋道を保証する側に</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten"><i class="fa-solid fa-user-gear bubble-icon" aria-hidden="true"></i>書く人から、育てる人へ。それがこれからの開発者像。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14 -->
+    <div class="section-card fade-in-scale d2">
+      <span class="card-no">#14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced mega fa-5x" style="color: var(--ui-color-5); animation: fa-shake 4.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>自由と、責任</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">画面を自由に変えられるのは、嬉しい半面、<span class="keyword-tag warn">見えない責任</span>も増える。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check fa-lg teal" aria-hidden="true"></i><span>便利さは、自分の<b>裁量</b>で手に入る</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg red" aria-hidden="true"></i><span>誤った設定や、<span class="keyword-tag warn">壊れた流れ</span>も自己責任に</span></li>
+          <li><i class="fa-solid fa-book fa-lg" aria-hidden="true"></i><span>何を足したか記録する<b>習慣</b>が、保険になる</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-clipboard-check fa-lg bubble-icon" aria-hidden="true"></i>自由度が上がった分、自分の判断が試される。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15 -->
+    <div class="section-card fade-in-scale d3">
+      <span class="card-no">#15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-group mega fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.8s ease infinite;" aria-hidden="true"></i>
+        <h3>チームでの使い方</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">個人だけじゃない。<span class="keyword-tag">現場ごと</span>に最適な画面を作れるのが強み。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-tie fa-lg teal" aria-hidden="true"></i><span>営業向けには、<b>顧客一覧</b>を中心に据える</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench fa-lg" aria-hidden="true"></i><span>整備向けには、<span class="keyword-tag">手順書</span>を前面に置く</span></li>
+          <li><i class="fa-solid fa-share-nodes fa-lg" aria-hidden="true"></i><span>良い構成は、<b>共有して再利用</b>できる</span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten"><i class="fa-solid fa-puzzle-piece bubble-icon" aria-hidden="true"></i>役割ごとに、別の道具があるみたいに。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 16 -->
+    <div class="section-card fade-in-scale d4">
+      <span class="card-no">#16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb mega fa-6x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>はじめる一歩</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">難しく考えなくていい。まずは<span class="keyword-tag">不満</span>を言葉にするところから。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen-to-square fa-lg teal" aria-hidden="true"></i><span>毎日の作業で、<b>引っかかる瞬間</b>を書き出す</span></li>
+          <li><i class="fa-solid fa-comment fa-lg" aria-hidden="true"></i><span>理想の画面を、<span class="keyword-tag">誰かに説明</span>するつもりで書く</span></li>
+          <li><i class="fa-solid fa-vial fa-lg" aria-hidden="true"></i><span>小さなパネルから、<b>試しに</b>作ってみる</span></li>
+        </ul>
+        <pre><span class="c"># 最初の一歩は小さく</span>
+<span class="k">try</span>(<span class="s">"調子が悪い朝の
+  チェックリスト画面"</span>)</pre>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-shoe-prints bubble-icon" aria-hidden="true"></i>完璧を目指さず、まず一つの部品から。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="flow-note"><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i> 最後に、この転換を大きく捉え直す <i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i></div>
+
+  <!-- ===== 第5章: 展望 ===== -->
+  <div class="chapter">
+    <i class="fa-solid fa-mountain-sun chapter-icon" aria-hidden="true"></i>
+    <h2>第5章　当て推量の終わり</h2>
+    <span class="chapter-note"><i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--ui-color-2);"></i> まとめと展望</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- 17 -->
+    <div class="section-card fade-in-scale d1">
+      <span class="card-no">#17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-split-up-and-left mega fa-5x" style="color: var(--ui-color-1); animation: fa-flip 6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>設計の常識が反転</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">「平均のユーザー」への最適化という発想そのものが、<b>過去のもの</b>になる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rotate fa-lg teal" aria-hidden="true"></i><span>多数派のための<span class="keyword-tag">妥協</span>ではなく、各自のための設計</span></li>
+          <li><i class="fa-solid fa-person-rays fa-lg" aria-hidden="true"></i><span>ソフトが<b>個</b>に寄り添うのが、新しい標準に</span></li>
+          <li><i class="fa-solid fa-compass fa-lg" aria-hidden="true"></i><span>作り手の<span class="keyword-tag">推測</span>から、使い手の<span class="keyword-tag">宣言</span>へ</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten"><i class="fa-solid fa-rotate bubble-icon" aria-hidden="true"></i>当て推量で作る時代は、静かに終わっていく。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 18 -->
+    <div class="section-card fade-in-scale d2">
+      <span class="card-no">#18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket mega fa-6x" style="color: var(--ui-color-2); animation: fa-bounce 2s ease infinite;" aria-hidden="true"></i>
+        <h3>あなたの番</h3>
+      </div>
+      <div class="card-content">
+        <p class="lead">DeepSeek Harness が示した方向は、<span class="keyword-tag">誰もが主役</span>になる未来。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal fa-lg teal" aria-hidden="true"></i><span>今日の不満を、<b>明日の機能</b>に変えてみよう</span></li>
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i><span>ことばで UI を描く体験は、<span class="keyword-tag">一度</span>試すと戻れない</span></li>
+          <li><i class="fa-solid fa-heart fa-lg" aria-hidden="true"></i><span>道具に合わせる人生は、もう<span class="keyword-tag">おしまい</span></span></li>
+        </ul>
+        <div class="tag-row">
+          <span class="keyword-tag deep">#Deepseek</span>
+          <span class="keyword-tag deep">#AgenticAI</span>
+          <span class="keyword-tag deep">#SoftwareDevelopment</span>
+          <span class="keyword-tag deep">#Productivity</span>
+        </div>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-star fa-lg bubble-icon" aria-hidden="true"></i>欲しいを、そのまま使えるに。さあ、語ってみよう。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== フッター ===== -->
+  <footer>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=Jp7PXv1QneM" target="_blank">Julian Goldie SEO</a>　「Software is no longer a guess: Deepseek Harness changes the game.」（37秒）</p>
+    <p class="footer-meta">このインフォグラフィックは、上の動画の概要欄に書かれた主張を、18枚のカードに展開してまとめたものです。</p>
+    <p class="footer-meta">生成日: 2026-08-21 ／ テーマ: 工房の粘土 × 暖炉（Atelier Clay &amp; Hearth）</p>
+  </footer>
+
+</div>
+</body>
+</html>

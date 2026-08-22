@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIエージェントが壊れる理由と Trajectory View での直し方 インフォグラフィック｜Julian Goldie SEO</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+:root {
+  --ui-color-1: #D1490B; /* バーントオレンジ（サンセットのメイン） */
+  --ui-color-2: #F4A259; /* アプリコット（アクセント） */
+  --ui-color-3: #FBE6D0; /* ペールピーチ（タグの背景） */
+  --ui-color-4: #7A2E0E; /* ディープラスト（濃い文字） */
+  --ui-color-5: #9B2226; /* ガーネット（注意のアクセント） */
+  --ui-amber:  #FCA311;  /* アンバー（サブアクセント） */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #FFF3E8;
+  color: #333333;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ===== ヘッダー ===== */
+.header {
+  text-align: center;
+  padding: 40px 20px 32px;
+  background: linear-gradient(135deg, rgba(122,46,14,0.95), rgba(209,73,11,0.6)), linear-gradient(0deg, #FFF3E8, #FFF3E8);
+  border-radius: 25px;
+  margin-bottom: 30px;
+  position: relative;
+  overflow: hidden;
+  color: #FFF3E8;
+}
+
+.header .fa-7x {
+  font-size: 7em;
+  color: var(--ui-amber);
+  animation: fa-beat 3s infinite;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
+}
+
+.header h1 {
+  font-size: 36px;
+  color: #FFFFFF;
+  font-weight: bold;
+  margin: 15px 0 10px;
+  font-family: 'Kaisei Decol', serif;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.4);
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: #FFD9B3;
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #FFE5CC;
+}
+
+.header .prompt-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #FFFFFF;
+  color: #7A2E0E;
+  font-family: 'Yomogi', cursive;
+  font-size: 16px;
+  padding: 8px 24px;
+  border-radius: 30px;
+  margin-top: 14px;
+  box-shadow: 2px 3px 8px rgba(0,0,0,0.3);
+  font-weight: bold;
+}
+
+/* サンセット風ドット */
+.sunset-dots {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sunset-dots span {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+  animation: fa-beat 2.4s infinite;
+}
+
+.sunset-dots span:nth-child(1) { background: #D1490B; }
+.sunset-dots span:nth-child(2) { background: #F4A259; animation-delay: 0.2s; border-radius: 50%; }
+.sunset-dots span:nth-child(3) { background: #FCA311; animation-delay: 0.4s; }
+.sunset-dots span:nth-child(4) { background: #9B2226; animation-delay: 0.6s; border-radius: 50%; }
+.sunset-dots span:nth-child(5) { background: #FFFFFF; animation-delay: 0.8s; }
+
+/* ===== セクションレイアウト（4カラム） ===== */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 8px 20px rgba(209,73,11,0.25);
+  background-color: #FFFBF6;
+}
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container .fa-5x {
+  font-size: 5em;
+  color: var(--ui-color-1);
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* カードタイトル */
+.card-content h2, .mega-icon-container h2 {
+  font-size: 24px;
+  color: #555555;
+  font-weight: bold;
+  text-align: center;
+  margin: 10px 0 12px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #333333;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 16px;
+}
+
+/* リスト見出し */
+.list-heading {
+  font-size: 18px;
+  color: #333333;
+  font-weight: bold;
+  margin: 12px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FFF9E3;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #FFE9E9;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* コードプレビュー */
+pre {
+  background: #3D1D0E;
+  color: #FFE0C2;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: ui-monospace, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+pre .ok { color: #7BE495; }
+pre .ng { color: #FF8A8A; font-weight: bold; }
+pre .cmt { color: #F4A259; }
+
+/* 矢印でつなぐ視覚要素 */
+.flow-arrow {
+  text-align: center;
+  color: var(--ui-color-2);
+  font-size: 22px;
+  margin: 4px 0;
+  animation: fa-beat-fade 2.5s infinite;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  animation: fadeInScale 0.8s ease both;
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  background: linear-gradient(transparent 60%, var(--ui-amber) 60%);
+  font-weight: bold;
+}
+
+/* ===== フッター ===== */
+.footer {
+  margin-top: 40px;
+  padding: 25px 20px;
+  background: linear-gradient(135deg, #7A2E0E, #D1490B);
+  border-radius: 20px;
+  color: #FFF3E8;
+  text-align: center;
+}
+
+.footer .source-link a {
+  color: #FFD9B3;
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.footer .source-link a:hover {
+  color: #FFFFFF;
+}
+
+.footer .hashtags {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #FFE5CC;
+}
+
+.footer .copyright {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #FFD9B3;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== ヘッダー ===== -->
+  <div class="header">
+    <i class="fa-solid fa-route fa-7x" aria-hidden="true"></i>
+    <h1>AIエージェントが壊れるワケと<br>「Trajectory View」での直し方</h1>
+    <div class="subtitle">〜 軌跡を見える化して、失敗をすばやく修正 〜</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026.08.22 ｜ Julian Goldie SEO（YouTube ショート）</div>
+    <div class="prompt-banner">
+      <i class="fa-solid fa-wrench fa-lg" style="color:#D1490B;"></i>
+      壊れたエージェントも、軌跡が見えれば直せる！
+    </div>
+    <div class="sunset-dots">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </div>
+
+  <!-- ===== 18カード ===== -->
+  <div class="section-layout">
+
+    <!-- 1. AIエージェントの現実 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>① AIエージェントの現実</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg"></i><span>じつは<span class="keyword-tag">よく壊れる</span>——それが今のスタンダード</span></li>
+          <li><i class="fa-solid fa-gears fa-lg"></i><span>自動でタスクをこなす反面、制御はむずかしい</span></li>
+          <li><i class="fa-solid fa-users fa-lg"></i><span>開発者の多くが「動かない」経験を共有</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            かしこいのに、まだ<span class="highlight-text">壊れやすい</span>。
+            <br>これがAIエージェントの素顔なんだ！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. なぜ壊れるのか -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-face-dizzy fa-5x" style="animation: fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+        <h2>② なぜ壊れるのか</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain fa-lg"></i><span><span class="keyword-tag">注意散漫</span>になりやすい性質</span></li>
+          <li><i class="fa-solid fa-circle-exclamation fa-lg"></i><span>小さな<span class="keyword-tag">エラー</span>を積み重ねて暴走</span></li>
+          <li><i class="fa-solid fa-compass fa-lg"></i><span>ゴールを見失って別の道にそれる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-2);"></i>
+            気を散らしやすい × ミスしやすい。
+            <br>この2つが重なると事故になる…！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 失敗の典型例 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="animation: fa-flip 3s infinite; color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>③ しっぱいの典型パターン</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-screwdriver-wrench fa-lg"></i><span>ツール呼び出しに失敗（引数ミスなど）</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg"></i><span>手順の<span class="keyword-tag">ステップ飛ばし</span></span></li>
+          <li><i class="fa-solid fa-ghost fa-lg"></i><span>事実とちがう内容を自信満々に生成</span></li>
+          <li><i class="fa-solid fa-infinity fa-lg"></i><span>同じ処理をぐるぐる<span class="keyword-tag">ループ</span></span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 4. 従来ツールの問題 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye-slash fa-5x" style="animation: fa-shake 3.2s infinite;" aria-hidden="true"></i>
+        <h2>④ 従来ツールの問題</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-box-open fa-lg"></i><span>ジョブが失敗しても<span class="keyword-tag">手がかりゼロ</span></span></li>
+          <li><i class="fa-solid fa-file-circle-xmark fa-lg"></i><span>何をしたかの記録が残らない</span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg"></i><span>「なぜだめだった？」に答えられない</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-sad-tear fa-lg" style="color: var(--ui-color-5);"></i>
+            失敗のあとに<span class="highlight-text">何も残らない</span>——
+            <br>これが一番つらい痛点なんだ。
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. デバッグの困難さ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bug fa-5x" style="animation: fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+        <h2>⑤ デバッグのむずかしさ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass fa-lg"></i><span>どこで脱線したか<span class="keyword-tag">特定できない</span></span></li>
+          <li><i class="fa-solid fa-arrows-rotate fa-lg"></i><span>同じ失敗を再現するのも一苦労</span></li>
+          <li><i class="fa-solid fa-box fa-lg"></i><span>中身がブラックボックスで読めない</span></li>
+        </ul>
+        <pre><span class="cmt"># こんなログだけじゃ原因不明…</span>
+[ERROR] agent task failed
+cause: <span class="ng">???</span>
+hint:   <span class="ng">none</span></pre>
+      </div>
+    </div>
+
+    <!-- 6. Trajectory Viewとは -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-route fa-5x" style="animation: fa-beat 2.6s infinite; color: var(--ui-amber);" aria-hidden="true"></i>
+        <h2>⑥ Trajectory View とは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-map fa-lg"></i><span>エージェントの<span class="keyword-tag">軌跡を可視化</span>するビュー</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg"></i><span>どこで・なぜ失敗したかを正確に表示</span></li>
+          <li><i class="fa-solid fa-wrench fa-lg"></i><span>効果的に<span class="keyword-tag">修正</span>できるよう設計</span></li>
+        </ul>
+        <div class="speech-bubble top variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-star fa-lg" style="color: var(--ui-amber);"></i>
+            <span class="highlight-text">透明性</span>で、失敗を「直せる」に変える！
+            <br><span class="keyword-tag">Trajectory View</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. 透明性の提供 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye fa-5x" style="animation: fa-flip 3.4s infinite;" aria-hidden="true"></i>
+        <h2>⑦ 透明性をくれる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-door-open fa-lg"></i><span>ブラックボックスが<span class="keyword-tag">見える化</span></span></li>
+          <li><i class="fa-solid fa-footprints fa-lg"></i><span>思考のステップをひとつずつ追跡</span></li>
+          <li><i class="fa-solid fa-link fa-lg"></i><span>隠れた処理がない状態を作れる</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 8. どこで失敗したか特定 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-location-crosshairs fa-5x" style="animation: fa-beat-fade 2.2s infinite; color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>⑧ どこで失敗したか特定</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-map-pin fa-lg"></i><span>失敗ポイントを<span class="keyword-tag">ピンポイント</span>で表示</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg"></i><span>ステップ単位で確認できる</span></li>
+          <li><i class="fa-solid fa-timeline fa-lg"></i><span>時系列の流れで追跡できる</span></li>
+        </ul>
+        <pre><span class="cmt"># trajectory のイメージ</span>
+step 1: plan     <span class="ok">OK</span>
+step 2: search   <span class="ok">OK</span>
+step 3: tool call <span class="ng">FAIL ← ココ！</span>
+step 4: reply    <span class="ng">skipped</span></pre>
+      </div>
+    </div>
+
+    <!-- 9. なぜ失敗したか分析 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="animation: fa-flip 2.8s infinite;" aria-hidden="true"></i>
+        <h2>⑨ なぜ失敗したか分析</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots fa-lg"></i><span><span class="keyword-tag">プロンプト</span>の指示が悪かった？</span></li>
+          <li><i class="fa-solid fa-toolbox fa-lg"></i><span>ツール選びのミス？ → チェック可能</span></li>
+          <li><i class="fa-solid fa-clipboard-list fa-lg"></i><span>原因ごとに対応を分けて考えられる</span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten">
+            <i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-2);"></i>
+            「どこ」だけじゃなく
+            <br><span class="highlight-text">「なぜ」</span>まで分かるのが強み！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. 軌跡を見る意味 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shoe-prints fa-5x" style="animation: fa-bounce 3s infinite; color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>⑩ 軌跡（trajectory）を見る意味</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain fa-lg"></i><span>エージェントの<span class="keyword-tag">考え方の道すじ</span>が見える</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg"></i><span>人間が目で確認しやすい形式</span></li>
+          <li><i class="fa-solid fa-thumbs-up fa-lg"></i><span>「任せて大丈夫」の根拠になる</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-arrow-down"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-chart-simple fa-lg"></i><span>軌跡データを貯めると<span class="keyword-tag">改善のネタ</span>に</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 11. 修正のサイクル -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x" style="animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+        <h2>⑪ 修正のサイクル</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 fa-lg"></i><span><span class="keyword-tag">見る</span>：軌跡を確認</span></li>
+          <li><i class="fa-solid fa-2 fa-lg"></i><span><span class="keyword-tag">特定</span>：失敗点と原因を割り出し</span></li>
+          <li><i class="fa-solid fa-3 fa-lg"></i><span><span class="keyword-tag">直す</span>：プロンプトや設定を修正</span></li>
+          <li><i class="fa-solid fa-4 fa-lg"></i><span><span class="keyword-tag">再テスト</span>：動かして検証</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-rotate fa-lg" style="color: var(--ui-color-2);"></i>
+            このループを回すほど
+            <br>エージェントが<span class="highlight-text">育っていく</span>よ！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12. 信頼性の向上 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="animation: fa-beat 2.8s infinite; color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>⑫ エージェントの信頼性アップ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-trend-down fa-lg"></i><span>同じ失敗が<span class="keyword-tag">減っていく</span></span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg"></i><span>動きが予測しやすくなる</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg"></i><span>本番投入への<span class="keyword-tag">自信</span>がつく</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 13. 自動化と監視のバランス -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="animation: fa-flip 3.2s infinite;" aria-hidden="true"></i>
+        <h2>⑬ 自動化と見守りのバランス</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban fa-lg"></i><span>完全放置の自動化はリスク大</span></li>
+          <li><i class="fa-solid fa-user-group fa-lg"></i><span><span class="keyword-tag">人間のチェック</span>をどこに入れるか設計</span></li>
+          <li><i class="fa-solid fa-gauge-high fa-lg"></i><span>監視コストと効率のバランスを調整</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-5);"></i>
+            自動に任せつつ、
+            <br><span class="highlight-text">要所は人が見る</span>。それがコツ！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14. DeepSeekなどとの組み合わせ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>⑭ DeepSeek などとの組み合わせ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-coins fa-lg"></i><span>低コストなLLMでエージェント構築と好相性</span></li>
+          <li><i class="fa-solid fa-hashtag fa-lg"></i><span>概要欄にも <span class="keyword-tag">#Deepseek</span> のタグ</span></li>
+          <li><i class="fa-solid fa-puzzle-piece fa-lg"></i><span>安いモデルこそ<span class="keyword-tag">軌跡の見える化</span>が効く</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg"></i><span>自動化パイプラインへの組み込みも自由</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 15. 生産性への影響 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x" style="animation: fa-beat-fade 2.6s infinite; color: var(--ui-amber);" aria-hidden="true"></i>
+        <h2>⑮ 生産性への影響</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock fa-lg"></i><span>手直しの時間を<span class="keyword-tag">大幅カット</span></span></li>
+          <li><i class="fa-solid fa-bolt fa-lg"></i><span>原因が分かるので修正がはやい</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg"></i><span>AIへの投資が<span class="keyword-tag">成果</span>につながる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-amber);"></i>
+            「壊れた→直せた」の積み重ねが
+            <br><span class="highlight-text">AI生産性</span>の底上げになる！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 16. 導入のすすめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>⑯ 導入のすすめ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-seedling fa-lg"></i><span>まず<span class="keyword-tag">小さなタスク</span>で試してみる</span></li>
+          <li><i class="fa-solid fa-heart fa-lg"></i><span>失敗を怖がらない（失敗は教材！）</span></li>
+          <li><i class="fa-solid fa-eye fa-lg"></i><span>軌跡を見る<span class="keyword-tag">習慣</span>をつける</span></li>
+          <li><i class="fa-solid fa-stairs fa-lg"></i><span>少しずつ複雑なジョブへ拡張</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 17. 学習リソース -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open-reader fa-5x" style="animation: fa-flip 3s infinite; color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>⑰ 学習リソース</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-code fa-lg"></i><span>エージェント開発の<span class="keyword-tag">公式ドキュメント</span></span></li>
+          <li><i class="fa-solid fa-circle-play fa-lg"></i><span>Julian Goldie SEO の<span class="keyword-tag">解説動画</span></span></li>
+          <li><i class="fa-solid fa-comments fa-lg"></i><span>コミュニティでの失敗談・対策の共有</span></li>
+          <li><i class="fa-solid fa-terminal fa-lg"></i><span>実際に組んで軌跡を出して遊ぶのが一番</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- 18. チャンネル紹介 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-brands fa-youtube fa-5x" style="animation: fa-beat 2.4s infinite; color: #9B2226;" aria-hidden="true"></i>
+        <h2>⑱ チャンネル紹介</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bullhorn fa-lg"></i><span><span class="keyword-tag">Julian Goldie SEO</span>（Julian Goldie Agency）</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart fa-lg"></i><span>AI × SEO の実践情報を発信</span></li>
+          <li><i class="fa-solid fa-mobile-screen fa-lg"></i><span>37秒のショート動画でサクッと解説</span></li>
+          <li><i class="fa-solid fa-lightbulb fa-lg"></i><span>AIツールの活用法を続々アウトプット中</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-bell fa-lg" style="color: var(--ui-color-2);"></i>
+            気になったらチャンネルを
+            <br>チェックしてみてね！
+            <br><span class="keyword-tag">フォロー</span>してみて！
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===== フッター ===== -->
+  <div class="footer">
+    <div class="source-link">
+      🎬 動画: <a href="https://www.youtube.com/watch?v=93s8sQygk0k" target="_blank" rel="noopener">Why AI agents break and how to fix them with Trajectory View.｜Julian Goldie SEO</a>
+    </div>
+    <div class="hashtags">
+      <i class="fa-solid fa-hashtag"></i> AIAgents ／ Deepseek ／ Automation ／ TechExplained ／ AIProductivity
+    </div>
+    <div class="copyright">
+      <i class="fa-regular fa-copyright"></i> 2026.08.22 インフォグラフィック｜出典: YouTube ショート動画（37秒）
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

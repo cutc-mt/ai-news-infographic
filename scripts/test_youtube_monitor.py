@@ -43,24 +43,32 @@ class TestLoadChannels:
 class TestGetChannelId:
     """handle→channel_id変換のテスト"""
 
+    @patch('youtube_monitor.load_channel_id_cache', return_value={})
+    @patch('youtube_monitor.get_channel_id_scrape')
     @patch('youtube_monitor.requests_get')
-    def test_get_channel_id_by_handle(self, mock_get):
+    def test_get_channel_id_by_handle(self, mock_get, mock_scrape, mock_cache):
+        mock_scrape.return_value = None  # スクレイピング失敗→APIフォールバック
         mock_get.return_value = MagicMock(
             status_code=200,
             json=MagicMock(return_value={
                 'items': [{'id': 'UC123', 'snippet': {'title': 'Test'}}]
             })
         )
-        result = get_channel_id('@TestChannel', 'fake_key')
+        with patch('youtube_monitor.save_channel_id_cache'):
+            result = get_channel_id('@TestChannel', 'fake_key')
         assert result == 'UC123'
 
+    @patch('youtube_monitor.load_channel_id_cache', return_value={})
+    @patch('youtube_monitor.get_channel_id_scrape')
     @patch('youtube_monitor.requests_get')
-    def test_get_channel_id_not_found(self, mock_get):
+    def test_get_channel_id_not_found(self, mock_get, mock_scrape, mock_cache):
+        mock_scrape.return_value = None  # スクレイピング失敗→APIフォールバック
         mock_get.return_value = MagicMock(
             status_code=200,
             json=MagicMock(return_value={'items': []})
         )
-        result = get_channel_id('@NotFound', 'fake_key')
+        with patch('youtube_monitor.save_channel_id_cache'):
+            result = get_channel_id('@NotFound', 'fake_key')
         assert result is None
 
 
@@ -74,8 +82,8 @@ class TestGetLatestVideos:
             json=MagicMock(return_value={
                 'items': [
                     {
-                        'id': {'videoId': 'vid1'},
                         'snippet': {
+                            'resourceId': {'videoId': 'vid1'},
                             'title': 'Test Video 1',
                             'publishedAt': '2026-08-04T10:00:00Z',
                             'channelTitle': 'Test Channel',
@@ -147,6 +155,11 @@ class TestYouTubeMonitor:
                     {'video_id': 'vid1', 'title': 'New Video', 'publishedAt': '2026-08-04T10:00:00Z'}
                 ]):
                     with patch.object(monitor, 'get_known_video_ids', return_value=set()):
-                        result = monitor.check_all_channels()
-                        assert len(result) == 1
-                        assert result[0]['video_id'] == 'vid1'
+                        # publishedAtが未来日だと日付フィルタで落ちるので、現在時刻に固定
+                        with patch('youtube_monitor.datetime') as mock_dt:
+                            from datetime import datetime as real_dt, timezone as real_tz
+                            mock_dt.now = lambda tz=None: real_dt(2026, 8, 5, 12, 0, 0, tzinfo=real_tz.utc)
+                            mock_dt.fromisoformat = real_dt.fromisoformat
+                            result = monitor.check_all_channels()
+                            assert len(result) == 1
+                            assert result[0]['video_id'] == 'vid1'

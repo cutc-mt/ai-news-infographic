@@ -232,6 +232,60 @@ def filter_by_date(videos: list, max_days: int = 1) -> list:
     return [v for v in videos if is_recent(v.get('publishedAt', ''), max_days)]
 
 
+# --- 動画の長さフィルタ ---
+
+def parse_duration(iso_duration: str) -> int:
+    """ISO 8601 duration (PT1H2M3S) を秒数に変換"""
+    import re as _re
+    if not iso_duration:
+        return 0
+    match = _re.match(
+        r'^P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$',
+        iso_duration,
+    )
+    if not match:
+        return 0
+    days, hours, minutes, seconds = (int(g) if g else 0 for g in match.groups())
+    return days * 86400 + hours * 3600 + minutes * 60 + seconds
+
+
+def get_video_durations(video_ids: list, api_key: str) -> dict:
+    """videos.list APIで複数動画の長さを一括取得（50件まで1リクエスト=1 unit）"""
+    if not video_ids:
+        return {}
+    # 50件ずつバッチ処理
+    durations = {}
+    for i in range(0, len(video_ids), 50):
+        batch = video_ids[i:i + 50]
+        url = (
+            f"https://www.googleapis.com/youtube/v3/videos"
+            f"?part=contentDetails&id={','.join(batch)}&key={api_key}"
+        )
+        try:
+            result = requests_get(url)
+        except Exception:
+            continue
+        status_code = result.get('status_code') if isinstance(result, dict) else getattr(result, 'status_code', None)
+        if status_code != 200:
+            continue
+        items = result['json']().get('items', [])
+        for item in items:
+            durations[item.get('id', '')] = parse_duration(
+                item.get('contentDetails', {}).get('duration', '')
+            )
+    return durations
+
+
+def filter_by_duration(videos: list, durations: dict, min_seconds: int = 300) -> list:
+    """指定秒数未満の動画を除外する。長さ不明（API失敗等）の動画は誤除外を防ぐため残す"""
+    result = []
+    for v in videos:
+        dur = durations.get(v.get('video_id'))
+        if dur is None or dur >= min_seconds:
+            result.append(v)
+    return result
+
+
 # --- 統合クラス ---
 
 class YouTubeMonitor:
@@ -276,12 +330,13 @@ class YouTubeMonitor:
                 pass
         return known
 
-    def check_all_channels(self, max_per_channel: int = 5, max_days: int = 2) -> list:
+    def check_all_channels(self, max_per_channel: int = 5, max_days: int = 2, min_duration_seconds: int = 300) -> list:
         """全チャンネルをチェックして新着動画を返す
 
         Args:
             max_per_channel: チャンネルあたり最大取得数
             max_days: 監視時点から遡って何日以内の動画を対象とするか
+            min_duration_seconds: この長さ（秒）未満の動画は対象外（デフォルト5分）
         """
         known_ids = self.get_known_video_ids()
         new_videos = []
@@ -299,6 +354,17 @@ class YouTubeMonitor:
             videos = filter_shorts(videos)
             videos = filter_by_date(videos, max_days=max_days)
             fresh = filter_new_videos(videos, known_ids)
+
+            # 5分未満の動画を除外（長さはまとめて一括取得）
+            if fresh and min_duration_seconds > 0:
+                durations = get_video_durations(
+                    [v['video_id'] for v in fresh], self.api_key
+                )
+                before = len(fresh)
+                fresh = filter_by_duration(fresh, durations, min_seconds=min_duration_seconds)
+                skipped = before - len(fresh)
+                if skipped:
+                    print(f"  ⏭️ {name}: {skipped} video(s) skipped (< {min_duration_seconds // 60} min)")
 
             for v in fresh:
                 v['channel_handle'] = handle

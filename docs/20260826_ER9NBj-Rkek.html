@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>n8nで解約防止を自動化したら最初の実行ですぐ壊れた話｜Julian Goldie SEO</title>
+<!--
+  独自カラーテーマ: Automation / Workflow（自動化・ワークフローエンジン）
+  <palette>
+  <color name='Auto-1' rgb='D6496E' r='214' g='73' b='110' />  … ワークフローピンク（n8n風の核色・メイン）
+  <color name='Auto-2' rgb='2E9E8F' r='46' g='158' b='143' />  … テールグリーン（安定稼働・接続OK）
+  <color name='Auto-3' rgb='F9EDF1' r='249' g='237' b='241' /> … うすローズ（下地・タグ背景）
+  <color name='Auto-4' rgb='2B2D42' r='43' g='45' b='66' />   … ダークネイビー（テキスト）
+  <color name='Auto-5' rgb='E8833A' r='232' g='131' b='58' />  … アンバーオレンジ（アラート・注意）
+  <color name='Auto-6' rgb='8A7BE0' r='138' g='123' b='224' /> … ペリウィンクル（AIアシスタント）
+  </palette>
+-->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+
+:root {
+  --ui-color-1: #D6496E;
+  --ui-color-2: #2E9E8F;
+  --ui-color-3: #F9EDF1;
+  --ui-color-4: #2B2D42;
+  --ui-color-5: #E8833A;
+  --ui-color-6: #8A7BE0;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: #FFF9FA;
+  background-image: radial-gradient(circle at 10% 5%, rgba(214,73,110,0.07) 0, transparent 35%),
+                    radial-gradient(circle at 90% 40%, rgba(46,158,143,0.08) 0, transparent 40%),
+                    radial-gradient(circle at 30% 90%, rgba(138,123,224,0.07) 0, transparent 35%);
+  color: #333333;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  line-height: 1.5;
+  padding: 20px;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ===== ヘッダー ===== */
+header {
+  text-align: center;
+  padding: 40px 20px 30px;
+  margin-bottom: 25px;
+  background: linear-gradient(135deg, rgba(214,73,110,0.10), rgba(46,158,143,0.10), rgba(138,123,224,0.12));
+  border-radius: 25px;
+  border: 3px dashed var(--ui-color-1);
+}
+
+header .header-icon {
+  font-size: 7em;
+  color: var(--ui-color-1);
+  animation: fa-beat 2.5s infinite;
+  filter: drop-shadow(3px 3px 0 rgba(46,158,143,0.5));
+}
+
+header h1 {
+  font-size: 36px;
+  color: #333333;
+  font-weight: bold;
+  margin: 15px 0 8px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+header .subtitle {
+  font-size: 20px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+header .meta {
+  font-size: 14px;
+  color: #777777;
+  margin-top: 8px;
+}
+
+.header-tags { margin-top: 12px; }
+
+/* ===== セクション見出し ===== */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 35px 10px 15px;
+  font-size: 26px;
+  color: var(--ui-color-4);
+  font-family: 'Kaisei Decol', serif;
+}
+
+.section-title i { color: var(--ui-color-1); }
+.section-title .section-line {
+  flex: 1;
+  height: 3px;
+  background: linear-gradient(90deg, var(--ui-color-2), transparent);
+  border-radius: 2px;
+}
+
+/* ===== カードグリッド（4カラム） ===== */
+.section-layout {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  align-items: stretch;
+}
+
+.section-card {
+  min-width: 0;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-1);
+  opacity: 0;
+  transform: translateY(24px) scale(0.98);
+  transition: opacity 0.6s ease, transform 0.6s ease, box-shadow 0.3s ease;
+}
+
+.section-card.in-view {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.section-card:hover {
+  box-shadow: 8px 8px 20px rgba(214,73,110,0.25);
+  background-color: #FFFDFE;
+}
+
+.section-card.tone-green  { border-top-color: var(--ui-color-2); }
+.section-card.tone-amber  { border-top-color: var(--ui-color-5); }
+.section-card.tone-violet { border-top-color: var(--ui-color-6); }
+
+/* ブランチバッジ */
+.branch-badge {
+  display: inline-block;
+  font-family: 'Kaisei Decol', serif;
+  font-size: 14px;
+  font-weight: bold;
+  color: white;
+  padding: 2px 12px;
+  border-radius: 999px;
+  margin-bottom: 6px;
+}
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  filter: drop-shadow(2px 3px 2px rgba(43,45,66,0.2));
+}
+
+.card-content { padding: 0 10px 15px; }
+
+.mega-icon-container h2 {
+  font-size: 24px;
+  color: #555555;
+  font-weight: bold;
+  margin-top: 10px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #333333;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 18px;
+  margin-top: 3px;
+}
+
+.list-heading {
+  font-size: 18px;
+  color: #333333;
+  font-weight: bold;
+  margin: 12px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.list-heading i { color: var(--ui-color-1); }
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.keyword-tag.tag-green  { background-color: #E2F2EF; }
+.keyword-tag.tag-amber  { background-color: #FCEEDF; }
+.keyword-tag.tag-violet { background-color: #EEEBFA; }
+.keyword-tag.tag-pink   { background-color: var(--ui-color-3); }
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FFF9E3;
+  border-color: var(--ui-color-5);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #FFE9E9;
+  border-color: #BF5656;
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: #BF5656 transparent;
+}
+
+.speech-bubble.variant-3 {
+  background: #E9F6F3;
+  border-color: var(--ui-color-2);
+  transform: rotate(1.5deg);
+}
+
+.speech-bubble.variant-3::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+}
+
+.handwritten i { margin-right: 5px; }
+
+/* コードプレビュー */
+pre {
+  background: #f5f5f5;
+  border-left: 4px solid var(--ui-color-6);
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  margin-top: 10px;
+  overflow-x: auto;
+  font-family: "Consolas", "Menlo", monospace;
+  color: #2B2D42;
+}
+
+/* フロー図（アイコンと矢印） */
+.flow-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 8px;
+  background: var(--ui-color-3);
+  border-radius: 12px;
+}
+
+.flow-strip .fs-item {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ui-color-4);
+  font-weight: bold;
+}
+
+.flow-strip .fs-item i {
+  display: block;
+  font-size: 20px;
+  margin-bottom: 2px;
+  color: var(--ui-color-1);
+}
+
+.flow-strip .fs-item.ok i { color: var(--ui-color-2); }
+.flow-strip .fs-item.alert i { color: var(--ui-color-5); }
+
+.flow-strip > i.fa-arrow-right {
+  color: var(--ui-color-4);
+  font-size: 14px;
+  animation: fa-fade 2s infinite;
+}
+
+/* 矢印つなぎ（リスト内） */
+.connect-arrow {
+  text-align: center;
+  color: var(--ui-color-5);
+  margin: 4px 0;
+  animation: fa-bounce 1.8s infinite;
+}
+
+/* ハイライトポップ */
+.pop {
+  display: inline-block;
+  animation: pop-in 0.8s ease both;
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* フッター */
+footer {
+  margin-top: 40px;
+  padding: 25px 20px;
+  text-align: center;
+  border-top: 3px solid var(--ui-color-3);
+  color: #555555;
+  font-size: 14px;
+}
+
+footer a { color: var(--ui-color-1); font-weight: bold; }
+footer .footer-note { color: #777777; margin-top: 8px; font-size: 13px; }
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-layout { grid-template-columns: repeat(4, 1fr); }
+}
+
+@media (max-width: 1200px) {
+  .section-layout { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .section-layout { grid-template-columns: 1fr; }
+  header h1 { font-size: 28px; }
+}
+</style>
+<noscript>
+<style>
+  .section-card { opacity: 1; transform: none; }
+</style>
+</noscript>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== ヘッダー ===== -->
+  <header>
+    <i class="fa-solid fa-diagram-project fa-7x header-icon" aria-hidden="true"></i>
+    <h1>n8nで「解約防止」を自動化したら<br>最初の実行ですぐ壊れた話</h1>
+    <p class="subtitle">Skoolコミュニティ向け Turn Prevention ワークフロー開発の全記録</p>
+    <p class="header-tags">
+      <span class="keyword-tag tag-pink"><i class="fa-solid fa-bolt"></i> n8n</span>
+      <span class="keyword-tag tag-green"><i class="fa-solid fa-rotate"></i> ワークフロー自動化</span>
+      <span class="keyword-tag tag-amber"><i class="fa-solid fa-users"></i> Skoolコミュニティ</span>
+      <span class="keyword-tag tag-violet"><i class="fa-solid fa-user-slash"></i> 解約（churn）防止</span>
+    </p>
+    <p class="meta">📅 2026.08.26 ｜ 📺 Julian Goldie SEO ｜ 🎭 登場はデジタルアバターの「Pipa」</p>
+  </header>
+
+  <!-- ===== セクション1: 前提 ===== -->
+  <div class="section-title">
+    <i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i>
+    <span>まずは前提 — なぜ人はやめるのか、n8nとは何か</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-slash fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>入って2週間でやめる人</h2>
+      </div>
+      <div class="card-content">
+        <p class="list-heading"><i class="fa-solid fa-magnifying-glass"></i> 原因をさぐると</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-xmark"></i><span>ほとんどの場合、<span class="keyword-tag">コンテンツのせい</span>ではない</span></li>
+          <li><i class="fa-solid fa-volume-xmark"></i><span>正体は「<span class="keyword-tag">静かになった</span>のに、誰も気づかなかった」こと</span></li>
+          <li><i class="fa-solid fa-lightbulb"></i><span>そこで「気づいてくれる仕組み」を自分で作った</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>大変なのは作ることではなく、<span class="keyword-tag tag-amber">そのあと</span>だった</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-frown fa-lg" style="color: var(--ui-color-5);"></i>
+          会員が音を消しても、
+          コミュニティ側は気づかない…
+          これが解約の本丸だよ
+        </span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card tone-green">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-boxes-stacked fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+        <h2>n8nとは（ざっくり）</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-square-plus"></i><span>まっさらなキャンバスに「<span class="keyword-tag tag-green">ノード</span>」という箱を置く</span></li>
+          <li><i class="fa-solid fa-arrow-right-arrow-left"></i><span>1つはデータ取得、1つは変換、1つはメール送信…と役割分担</span></li>
+          <li><i class="fa-solid fa-link"></i><span>箱どうしを線でつなげば、それがワークフロー</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>ルール・分岐・小さなコードも足せる → おもちゃでなく<span class="keyword-tag tag-green">本物のシステム</span>に</span></li>
+        </ul>
+        <pre>キャンバス
+ ├─[ノード] データを取る
+ ├─[ノード] 値を変える
+ └─[ノード] メールを送る
+ （線でつなぐだけ）</pre>
+      </div>
+      <div class="speech-bubble variant-3 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+          箱と線さえ分かれば、
+          あとは組み立てるだけ！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card tone-amber">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-5); animation: fa-beat 1.6s infinite;" aria-hidden="true"></i>
+        <h2>すべてはトリガーから</h2>
+      </div>
+      <div class="card-content">
+        <p class="list-heading"><i class="fa-solid fa-plug"></i> 目をさまさせる3タイプ</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock"></i><span><span class="keyword-tag tag-amber">スケジュール</span>: 「毎朝8時」のような時刻指定</span></li>
+          <li><i class="fa-solid fa-tower-broadcast"></i><span><span class="keyword-tag tag-amber">Webhook</span>: 何か起きた時に他アプリが叩くWebアドレス</span></li>
+          <li><i class="fa-solid fa-hand-pointer"></i><span><span class="keyword-tag tag-amber">手動ボタン</span>: 自分で押して起動</span></li>
+        </ul>
+        <pre>trigger の3形態
+schedule : 毎朝 8:00 に起動
+webhook : URL を他サービスが叩く
+manual  : ボタンで自分起点</pre>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i>
+          トリガーが「起こす」、
+          ノードが「働く」——
+          この分担がすべての基本！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card tone-violet">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="color: var(--ui-color-6); animation: fa-fade 2.2s infinite;" aria-hidden="true"></i>
+        <h2>「1実行」の意味</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info"></i><span><span class="keyword-tag tag-violet">1実行</span> = ワークフロー1回ぶんの完全な実行</span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span>中のノード数は無関係。15ノードでも3ノードでも<span class="keyword-tag tag-violet">1実行</span></span></li>
+          <li><i class="fa-solid fa-calendar-day"></i><span>クラウド試用版は<span class="keyword-tag tag-violet">14日・1,000実行</span></span></li>
+          <li><i class="fa-solid fa-thumbs-up"></i><span>テストには十分な余裕</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-gauge-high fa-lg" style="color: var(--ui-color-6);"></i>
+          実行数のまとめ方は
+          「ノード数」じゃなく
+          「回数」だから安心♪
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== セクション2: 作ったもの ===== -->
+  <div class="section-title">
+    <i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i>
+    <span>作ったもの — 「AI Profit Boardroom Turn Prevention」</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-network-wired fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>ワークフロー全体像</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock"></i><span><span class="keyword-tag">毎朝8時にスケジュール実行</span></span></li>
+          <li><i class="fa-solid fa-download"></i><span>Skoolコミュニティから「最近の投稿」と「メンバーリスト」を取得</span></li>
+          <li><i class="fa-solid fa-calculator"></i><span>メンバーごとにリスクスコアを計算して保存</span></li>
+          <li><i class="fa-solid fa-code-branch"></i><span>静かになった度合いで<span class="keyword-tag">3つのパス</span>に振り分け</span></li>
+        </ul>
+        <div class="flow-strip">
+          <span class="fs-item"><i class="fa-solid fa-clock"></i>朝8時</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="fs-item"><i class="fa-solid fa-download"></i>投稿+会員</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="fs-item"><i class="fa-solid fa-calculator"></i>スコア</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="fs-item alert"><i class="fa-solid fa-code-branch"></i>振り分け</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="fs-item ok"><i class="fa-solid fa-envelope"></i>連絡</span>
+        </div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-robot fa-lg" style="color: var(--ui-color-1);"></i>
+          名前は「Turn Prevention」。
+          解約まえに引き止める、
+          毎朝の見張り番だよ
+        </span>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card tone-green">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>リスクスコアと履歴ログ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-check"></i><span>各メンバーの<span class="keyword-tag tag-green">リスクスコア</span>を毎日計算</span></li>
+          <li><i class="fa-solid fa-floppy-disk"></i><span>スコアを保存し、履歴ログを残す</span></li>
+          <li><i class="fa-solid fa-timeline"></i><span>時間の経過による<span class="keyword-tag tag-green">推移</span>が見える</span></li>
+        </ul>
+        <pre>member   | day1  | day2  | ...
+@tanaka  | 12    | 18    | ↑やばい
+@suzuki  | 4     | 3     | → 安定
+（スコアの推移イメージ）</pre>
+      </div>
+      <div class="speech-bubble variant-3">
+        <span class="handwritten">
+          <i class="fa-solid fa-chart-line fa-lg" style="color: var(--ui-color-2);"></i>
+          数字をためておくと
+          「今・助けが必要な人」が
+          ぱっと見えてくる！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card tone-amber">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3s infinite;" aria-hidden="true"></i>
+        <h2>最重要: 3つに振り分ける</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>ここが<span class="keyword-tag tag-amber">いちばん間違えやすい</span>ポイント</span></li>
+          <li><i class="fa-solid fa-volume-high"></i><span>全員を同じ扱いにすると、自動化はただの<span class="keyword-tag tag-amber">ノイズ</span>になる</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>昨日投稿した人にチェックインは不要</span></li>
+          <li><i class="fa-solid fa-hand-holding-heart"></i><span>3週間何も開いていない人には、<span class="keyword-tag tag-amber">本物の人間</span>からの本物のメッセージを</span></li>
+        </ul>
+        <pre>router node
+ ├ watch    → コンテンツ配信メール
+ ├ at-risk  → チェックインメール
+ └ critical → チームへWhatsApp</pre>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg" style="color: #BF5656;"></i>
+          「静かさの度合い」で
+          動きを変える——
+          ここが肝なんだ！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card tone-green">
+      <div class="mega-icon-container">
+        <span class="branch-badge" style="background: var(--ui-color-2);">BRANCH 1</span><br>
+        <i class="fa-solid fa-envelope-open-text fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>ウォッチ層</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-book-open"></i><span>役に立つ<span class="keyword-tag tag-green">コンテンツの1編</span>をメールで届ける</span></li>
+          <li><i class="fa-solid fa-face-smile"></i><span>「構って」感はゼロ。ただ有用なものがinboxに届くだけ</span></li>
+          <li><i class="fa-solid fa-paper-plane"></i><span>相手に負担をかけない<span class="keyword-tag tag-green">さりげない接触</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3">
+        <span class="handwritten">
+          <i class="fa-solid fa-envelope fa-lg" style="color: var(--ui-color-2);"></i>
+          「まだいますよ」の合図を
+          毎日はしない。
+          ちょうどいい頻度で！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card tone-amber">
+      <div class="mega-icon-container">
+        <span class="branch-badge" style="background: var(--ui-color-5);">BRANCH 2</span><br>
+        <i class="fa-solid fa-hand-holding-heart fa-5x" style="color: var(--ui-color-5); animation: fa-beat 2s infinite;" aria-hidden="true"></i>
+        <h2>リスクあり層</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-pen"></i><span><span class="keyword-tag tag-amber">パーソナライズされたチェックインメール</span>を送る</span></li>
+          <li><i class="fa-solid fa-comments"></i><span>テンプレの一斉送信ではなく、その人向けの一文</span></li>
+          <li><i class="fa-solid fa-door-open"></i><span>「話しかけるきっかけ」を手動で作る層</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-heart fa-lg" style="color: var(--ui-color-5);"></i>
+          名前や行動に合わせた
+          文面で「気にかけてるよ」を
+          伝えるブランチ！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card tone-violet">
+      <div class="mega-icon-container">
+        <span class="branch-badge" style="background: var(--ui-color-6);">BRANCH 3</span><br>
+        <i class="fa-solid fa-comment-sms fa-5x" style="color: var(--ui-color-6); animation: fa-shake 2.4s infinite;" aria-hidden="true"></i>
+        <h2>危急層 — 人が入る</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban"></i><span>ここでは<span class="keyword-tag tag-violet">メールは送らない</span></span></li>
+          <li><i class="fa-solid fa-bell"></i><span>ワークフローがアラートを組み立て、チームへ<span class="keyword-tag tag-violet">WhatsAppでping</span></span></li>
+          <li><i class="fa-solid fa-person-running"></i><span>受け取った<span class="keyword-tag tag-violet">人間が介入</span>する</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-brands fa-whatsapp fa-lg" style="color: var(--ui-color-2);"></i>
+          機械の役目は「知らせる」まで。
+          最後の一歩は人が踏む！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-list fa-5x" style="color: var(--ui-color-1); animation: fa-fade 2.4s infinite;" aria-hidden="true"></i>
+        <h2>やったことを必ずログに</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen-to-square"></i><span>各ブランチの最後に、<span class="keyword-tag">何をしたかを記録</span></span></li>
+          <li><i class="fa-solid fa-user-clock"></i><span>「誰に・いつ連絡したか」がわかる状態を保つ</span></li>
+          <li><i class="fa-solid fa-circle-question"></i><span>記録がないと「役立っている」のか「静かにスパムしている」のか区別できない</span></li>
+        </ul>
+        <pre>log: branch=at-risk
+member=@tanaka
+action=checkin_mail
+date=2026-08-26</pre>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-clipboard-check fa-lg" style="color: var(--ui-color-1);"></i>
+          自動化は「やった証拠」を
+          残さないと振り返れない。
+          ログが命だよ！
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== セクション3: 最初の実行で壊れた ===== -->
+  <div class="section-title">
+    <i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i>
+    <span>最初の実行ですぐ壊れた — クレデンシャルの壁</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード12 -->
+    <div class="section-card tone-violet">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-6); animation: fa-bounce 2.8s infinite;" aria-hidden="true"></i>
+        <h2>AIに作らせたら「完成」…だったが</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>n8n内のAIアシスタントに構築を依頼</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>全ノード・全接続・全分岐が完成。<span class="keyword-tag tag-violet">完成品に見えた</span></span></li>
+          <li><i class="fa-solid fa-circle-xmark"></i><span>ところが実行したら<span class="keyword-tag tag-violet">最初のデータノードで即失敗</span></span></li>
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>理由を聞いたら、AIアシスタントは淡々と答えた → 「<span class="keyword-tag tag-violet">5つのノードが未設定</span>」</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-ghost fa-lg" style="color: var(--ui-color-6);"></i>
+          見た目は完璧でも
+          中身は空っぽ、という
+          落とし穴があった…
+        </span>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card tone-amber">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug-circle-xmark fa-5x" style="color: var(--ui-color-5); animation: fa-shake 2s infinite;" aria-hidden="true"></i>
+        <h2>壊れた原因の内訳</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud-arrow-down"></i><span>投稿・メンバー取得の2ノード → <span class="keyword-tag tag-amber">Apifyクレデンシャル未設定</span>（HTTPノードで特定の資格情報型が必要）</span></li>
+          <li><i class="fa-solid fa-envelope"></i><span>メール2ノード → <span class="keyword-tag tag-amber">SendGrid接続なし</span>。1通も送れない</span></li>
+          <li><i class="fa-brands fa-whatsapp"></i><span>WhatsAppアラートノード → 接続なし。チームにpingが飛ばない</span></li>
+          <li><i class="fa-solid fa-marker"></i><span>さらにリクエストボディに<span class="keyword-tag tag-amber">プレースホルダー文字</span>が残存 — 管理者メール・パスワード・コミュニティslugがダミー値のまま</span></li>
+        </ul>
+        <pre>{
+  "adminEmail":    "YOUR_EMAIL_HERE",
+  "password":      "YOUR_PASSWORD",
+  "communitySlug": "your-community"
+}  ← このまま動くわけがない</pre>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-key fa-lg" style="color: #BF5656;"></i>
+          鍵が5本ない家。
+          玄関は立派でも
+          開かないんだ…！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-lock fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+        <h2>教訓: クレデンシャルの壁</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt"></i><span>AIはワークフローの<span class="keyword-tag">構造なら数秒</span>で組める</span></li>
+          <li><i class="fa-solid fa-lock"></i><span>でも<span class="keyword-tag">あなたのアカウントにはログインできない</span></span></li>
+          <li><i class="fa-solid fa-tower-observation"></i><span>クレデンシャルこそが壁。そして<span class="keyword-tag tag-pink">全員がぶつかる</span></span></li>
+        </ul>
+        <div class="connect-arrow"><i class="fa-solid fa-arrow-down fa-lg"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-screwdriver-wrench"></i><span>接続は自分の手で、1つずつ設定するしかない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--ui-color-1);"></i>
+          AIに任せていいのは
+          「設計」まで。
+          「鍵をわたす」のは無理！
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== セクション4: 存在しないものと処方箋 ===== -->
+  <div class="section-title">
+    <i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i>
+    <span>AIが指示した「存在しないもの」と処方箋（しょほうせん）</span>
+    <div class="section-line"></div>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード15 -->
+    <div class="section-card tone-green">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud-arrow-down fa-5x" style="color: var(--ui-color-2); animation: fa-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>なぜApifyを使う？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban"></i><span>Skoolは<span class="keyword-tag tag-green">公開APIを提供していない</span> — 開発者ダッシュボードもなく、APIキーも作れない</span></li>
+          <li><i class="fa-solid fa-server"></i><span>そこで使うのが<span class="keyword-tag tag-green">Apify actor</span>: Webサイトからデータを取ってくる小さなプログラムを走らせるプラットフォーム</span></li>
+          <li><i class="fa-solid fa-right-to-bracket"></i><span>Skool用actorが<span class="keyword-tag tag-green">管理者メール・パスワード・コミュニティslug</span>でログインし、投稿とメンバーをきれいなデータで返す</span></li>
+          <li><i class="fa-solid fa-user-shield"></i><span>使うのは<span class="keyword-tag tag-green">自分が管理者のコミュニティ</span>だけ。他人のデータではない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3">
+        <span class="handwritten">
+          <i class="fa-solid fa-database fa-lg" style="color: var(--ui-color-2);"></i>
+          正式な入口がなければ、
+          合法な別入口を
+          用意すればいい！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card tone-amber">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-ban fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3.2s infinite;" aria-hidden="true"></i>
+        <h2>指示された設定先が存在しない</h2>
+      </div>
+      <div class="card-content">
+        <p class="list-heading"><i class="fa-solid fa-envelope-open-text"></i> 2つ目のワークフロー</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-person-walking-arrow-right"></i><span>入会 → Skoolがn8nをping → <span class="keyword-tag tag-amber">Gmailでパーソナライズ歓迎メール</span></span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>ワークフロー自体は完成し、Webhookアドレスも発行された</span></li>
+        </ul>
+        <div class="connect-arrow"><i class="fa-solid fa-arrow-down fa-lg"></i></div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>AIの指示「Skoolのグループ設定で<span class="keyword-tag tag-amber">webhook / integrationセクション</span>を探して member joined イベントに追加」</span></li>
+          <li><i class="fa-solid fa-circle-xmark"></i><span>→ <span class="pop"><span class="keyword-tag tag-amber">そのセクションは存在しない！</span></span></span></li>
+          <li><i class="fa-solid fa-circle-info"></i><span>現状のSkoolに公開APIも、公式のmember joined webhookもない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-surprise fa-lg" style="color: #BF5656;"></i>
+          ワークフローは正しかった。
+          ダメだったのは
+          「もう半分の指示」だった…！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card tone-violet">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye fa-5x" style="color: var(--ui-color-6); animation: fa-beat 2.2s infinite;" aria-hidden="true"></i>
+        <h2>自分の目で確かめる + 3つのドア</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-quote-left"></i><span>AIは<span class="keyword-tag tag-violet">確認できない部分を、自信たっぷりに埋めてくる</span></span></li>
+          <li><i class="fa-solid fa-eye"></i><span>自分でコントロールできないプラットフォーム内の設定を指示されたら、<span class="keyword-tag tag-violet">まず自分の目で見に行く</span></span></li>
+        </ul>
+        <p class="list-heading"><i class="fa-solid fa-door-open"></i> 修正の選択肢（同じ結果、別のドア）</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hand-pointer"></i><span>歓迎ワークフローを<span class="keyword-tag tag-violet">自分でトリガー</span>する</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left"></i><span>ターン防止と同じ<span class="keyword-tag tag-violet">メンバーデータ取得をスケジュール</span>で回す</span></li>
+          <li><i class="fa-solid fa-file-signature"></i><span><span class="keyword-tag tag-violet">サインアップ処理</span>からトリガーする</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-door-open fa-lg" style="color: var(--ui-color-5);"></i>
+          行き先が同じなら、
+          入り口はいくつあってもいい。
+          これで午後まるごと節約！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-ol fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>週末を失わない構築順序</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">まず1ブランチだけ</span>作る。デイリートリガー+データ取得1ノード。実行して出力だけを見る</span></li>
+          <li><i class="fa-solid fa-2"></i><span>ノードは1つずつ追加。<span class="keyword-tag">クレデンシャルも1つずつ接続して単体テスト</span>。5つ同時につなぐと犯人不明になる</span></li>
+          <li><i class="fa-solid fa-3"></i><span>本番の人に向ける前に<span class="keyword-tag tag-amber">フェイクデータでテスト</span>。初回実行で全員にメールは最悪</span></li>
+          <li><i class="fa-solid fa-4"></i><span><span class="keyword-tag tag-green">WhatsAppは最後に</span>: Meta開発者アカウント・ビジネスID・アクセストークンが必要。メールを先に</span></li>
+          <li><i class="fa-solid fa-5"></i><span>スケジュールはゆっくり。<span class="keyword-tag">デイリーで十分</span> — 人は15分で静かにならない。毎時実行は枠を燃やすだけ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten">
+          <i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--ui-color-1);"></i>
+          トリガー1つ・取得1つ・
+          メール1つだけのミニ版から
+          作り始めるのが近道！
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== フッター ===== -->
+  <footer>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=ER9NBj-Rkek">Julian Goldie SEO</a> — 「I Automated Churn Prevention With n8n」</p>
+    <p class="footer-note">
+      <i class="fa-solid fa-people-group" style="color: var(--ui-color-2);"></i>
+      紹介されたコミュニティ: <strong>AI Profit Boardroom</strong>（4,000人以上）— n8nチュートリアル、ライブコーチング、プロンプト集、30日ロードマップ。
+      動画内のn8nリンクは<span class="keyword-tag tag-amber">アフィリエイト</span>です。
+    </p>
+    <p class="footer-note">🖼️ グラフィックレコーディング風インフォグラフィック ｜ 作成日: 2026-08-26</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var cards = document.querySelectorAll('.section-card');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('in-view'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('in-view');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { observer.observe(c); });
+})();
+</script>
+</body>
+</html>

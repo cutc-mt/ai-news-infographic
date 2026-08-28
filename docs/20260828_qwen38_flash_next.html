@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Qwen 3.8 Flash Next 徹底検証｜GLM 5.3 Flash と直接対決</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+  --ui-color-1: #2E4057; /* ストームスレート: メイン */
+  --ui-color-2: #7CB518; /* フラッシュライム: 差色 */
+  --ui-color-3: #EEF3E2; /* ライトライムクリーム: タグ地 */
+  --ui-color-4: #22303C; /* ディープインク: 濃色 */
+  --ui-color-5: #D95D39; /* エンバー: 強調 */
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #FAFBF6;
+  background-image:
+    radial-gradient(circle at 10% 6%, rgba(46,64,87,0.08) 0, transparent 34%),
+    radial-gradient(circle at 90% 4%, rgba(124,181,24,0.09) 0, transparent 30%),
+    radial-gradient(circle at 50% 100%, rgba(217,93,57,0.07) 0, transparent 38%);
+  font-family: 'Zen Kurenaido', sans-serif;
+  color: #333333;
+  line-height: 1.5;
+}
+.canvas {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+}
+/* ===== ヘッダー ===== */
+.header {
+  text-align: center;
+  padding: 34px 20px 26px;
+  margin-bottom: 22px;
+  background: linear-gradient(135deg, rgba(46,64,87,0.13), rgba(250,251,246,0.9) 55%, rgba(217,93,57,0.12));
+  border-radius: 24px;
+  position: relative;
+  overflow: hidden;
+}
+.header::before, .header::after {
+  content: '';
+  position: absolute;
+  width: 150px; height: 150px;
+  border: 3px dashed rgba(46,64,87,0.25);
+  border-radius: 50%;
+}
+.header::before { top: -60px; left: -50px; }
+.header::after { bottom: -70px; right: -40px; }
+.header .topic-badge {
+  display: inline-block;
+  background: var(--ui-color-1);
+  color: #fff;
+  padding: 6px 18px;
+  border-radius: 999px;
+  font-size: 15px;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  font-weight: bold;
+  color: var(--ui-color-4);
+  margin: 12px 0 8px;
+  line-height: 1.4;
+}
+.header .subtitle {
+  font-size: 17px;
+  color: #555;
+}
+.header .meta {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #777;
+}
+.header .header-icon {
+  font-size: 72px;
+  color: var(--ui-color-2);
+  animation: fa-bounce 3s ease-in-out infinite;
+  display: inline-block;
+  filter: drop-shadow(2px 3px 0 rgba(46,64,87,0.25));
+}
+/* ===== セクション見出し帯 ===== */
+.section-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 30px 6px 14px;
+  color: var(--ui-color-1);
+  font-family: 'Kaisei Decol', serif;
+  font-size: 22px;
+  font-weight: bold;
+}
+.section-divider::after {
+  content: '';
+  flex: 1;
+  border-top: 3px dotted rgba(46,64,87,0.4);
+}
+/* ===== 4カラムレイアウト ===== */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: stretch;
+}
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: #fff;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--ui-color-1);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+.section-card:hover {
+  transform: translateY(-5px) rotate(-0.4deg);
+  box-shadow: 8px 10px 22px rgba(34,48,60,0.2);
+  background-color: #FCFDF8;
+}
+.section-card.alt-top { border-top-color: var(--ui-color-5); }
+.section-card.lime-top { border-top-color: var(--ui-color-2); }
+.card-number {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-family: 'Kaisei Decol', serif;
+  font-size: 26px;
+  font-weight: bold;
+  color: rgba(46,64,87,0.18);
+}
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+.mega-icon-container i.mega-icon {
+  font-size: 60px;
+  color: var(--ui-color-1);
+  display: inline-block;
+}
+.mega-icon-container i.ember { color: var(--ui-color-5); }
+.mega-icon-container i.lime { color: var(--ui-color-2); }
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  color: #555;
+  margin: 10px 0 4px;
+}
+.card-content { padding: 0 10px 15px; }
+/* ===== リスト ===== */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #333;
+}
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-5);
+  min-width: 18px;
+  margin-top: 3px;
+}
+.keyword-list li i.lime-ic { color: #5E8F12; }
+.keyword-list li i.slate-ic { color: var(--ui-color-1); }
+.list-heading {
+  font-size: 18px;
+  color: #333;
+  font-weight: bold;
+  margin: 12px 0 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* ===== タグ ===== */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+.keyword-tag.ember {
+  background-color: #FBE7DE;
+  color: #A03D1F;
+}
+.keyword-tag.slate {
+  background-color: #E2E8F0;
+  color: var(--ui-color-1);
+}
+.keyword-tag.lime {
+  background-color: #EAF4D2;
+  color: #55790D;
+}
+/* ===== 吹き出し ===== */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+.speech-bubble.variant-1 {
+  background: #F6FAE8;
+  border-color: #7CB518;
+  transform: rotate(1deg);
+}
+.speech-bubble.variant-1::after {
+  border-color: #7CB518 transparent;
+}
+.speech-bubble.variant-2 {
+  background: #FDEEE7;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+  display: block;
+}
+/* ===== スコアバー ===== */
+.score-row {
+  margin-bottom: 10px;
+}
+.score-row .task-name {
+  font-size: 14px;
+  color: #444;
+  margin-bottom: 3px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+}
+.score-row .task-name .win-mark {
+  font-size: 12px;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.score-bar-bg {
+  background: #EFF1EC;
+  border-radius: 6px;
+  height: 14px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+.score-bar {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 1s ease;
+}
+.score-bar.qwen { background: linear-gradient(90deg, #2E4057, #4A6484); }
+.score-bar.glm { background: linear-gradient(90deg, #D95D39, #E8845F); }
+.legend {
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: #555;
+  margin: 6px 0 10px;
+  flex-wrap: wrap;
+}
+.legend .dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  margin-right: 4px;
+}
+.total-score {
+  background: var(--ui-color-3);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: bold;
+  color: var(--ui-color-4);
+  text-align: center;
+  margin-top: 8px;
+  border: 2px dashed #7CB518;
+}
+/* ===== テーブル ===== */
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 8px 0;
+}
+.mini-table th, .mini-table td {
+  border: 1px solid #DDE3DA;
+  padding: 6px 8px;
+  text-align: left;
+}
+.mini-table th {
+  background: var(--ui-color-3);
+  color: var(--ui-color-4);
+}
+.mini-table tr:nth-child(even) td { background: #F7F9F2; }
+/* ===== コードプレビュー ===== */
+pre {
+  background: #233038;
+  color: #DCE8D4;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+pre .cmt { color: #8FB460; }
+pre .cmd { color: #F0C987; }
+/* ===== 矢印でつなぐ ===== */
+.flow-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--ui-color-5);
+  font-size: 15px;
+  margin: 4px 0;
+  font-family: 'Yomogi', cursive;
+}
+/* ===== フッター ===== */
+.footer {
+  margin-top: 40px;
+  padding: 24px 20px;
+  background: #fff;
+  border-radius: 20px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+  text-align: center;
+  font-size: 14px;
+  color: #777;
+}
+.footer a { color: var(--ui-color-1); }
+.footer .footer-icons {
+  font-size: 30px;
+  color: var(--ui-color-2);
+  margin-bottom: 8px;
+}
+/* ===== アニメーション ===== */
+@keyframes fadeInScale {
+  0% { opacity: 0; transform: scale(0.92) translateY(16px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.fade-in-scale {
+  opacity: 0;
+}
+.fade-in-scale.shown {
+  animation: fadeInScale 0.7s ease forwards;
+}
+.highlight-pulse {
+  animation: fa-beat 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+/* ===== レスポンシブ対応 ===== */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; max-width: none; }
+  .header h1 { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- ================= ヘッダー ================= -->
+  <div class="header">
+    <span class="topic-badge"><i class="fa-solid fa-bolt"></i> AI モデルレビュー ｜ AI Code King</span><br>
+    <i class="fa-solid fa-bolt-lightning header-icon" aria-hidden="true"></i>
+    <h1>Qwen 3.8 Flash Next 徹底検証<br>GLM 5.3 Flash と直接対決</h1>
+    <div class="subtitle">Alibaba が見せた次世代アーキテクチャの sneak peek（先行公開）を、独自ベンチ「KingBench」でガチ審査</div>
+    <div class="meta"><i class="fa-regular fa-calendar"></i> 2026年8月28日 ｜ <i class="fa-brands fa-youtube"></i> 動画まとめ</div>
+  </div>
+
+  <!-- ================= セクション1: 登場と基本情報 ================= -->
+  <div class="section-divider"><i class="fa-solid fa-flag-checkered"></i> セクション1｜登場のあらすじと基本スペック</div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket mega-icon" style="animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>実験モデルが登場</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info slate-ic"></i><span>Alibaba が実験的プレビューとして <span class="keyword-tag">Qwen 3.8 Flash Next</span> を公開</span></li>
+          <li><i class="fa-solid fa-magnifying-glass slate-ic"></i><span>次世代 Qwen アーキテクチャの <span class="keyword-tag">sneak peek</span>（先行お披露目）</span></li>
+          <li><i class="fa-solid fa-bolt lime-ic"></i><span>名前の「Flash」は低コスト・高速の位置づけ</span></li>
+          <li><i class="fa-brands fa-youtube"></i><span>AI Code King が GLM 5.3 Flash と並べて徹底比較</span></li>
+        </ul>
+        <div class="speech-bubble top right">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:#7CB518;"></i>
+            まだ実験段階。これからの Qwen の「設計の新作予告」的な位置づけだね
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card alt-top fade-in-scale">
+      <span class="card-number">02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip mega-icon ember" style="animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>中身のスペック</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-weight-hanging"></i><span>総パラメータ <span class="keyword-tag ember">125B</span> の <span class="keyword-tag">MoE</span></span></li>
+          <li><i class="fa-solid fa-bolt lime-ic"></i><span>1トークンあたり実際に動くのは <span class="keyword-tag lime">6B のみ</span></span></li>
+          <li><i class="fa-solid fa-people-group"></i><span>MoE = 必要な「専門家」だけ発火するしくみ</span></li>
+          <li><i class="fa-solid fa-gauge-high"></i><span>計算量はフラッシュ級の軽さ</span></li>
+        </ul>
+        <div class="flow-note"><i class="fa-solid fa-arrow-right-long"></i> 重い辞書を持つけど、よむのは一ページだけ、という設計</div>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-scale-balanced fa-lg" style="color:#2E4057;"></i>
+            125B は「持っている知識の総量」、6B は「一度に使う頭脳の幅」。この差がコストを下げる鍵！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card lime-top fade-in-scale">
+      <span class="card-number">03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-coins mega-icon lime" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>API 価格は激安</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-right-arrow-left"></i><span>入力 <span class="keyword-tag lime">$0.16</span> / M tokens</span></li>
+          <li><i class="fa-solid fa-arrow-up"></i><span>出力 <span class="keyword-tag lime">$0.47</span> / M tokens</span></li>
+          <li><i class="fa-solid fa-down-long"></i><span>Qwen 3.8 Max の<b>約12分の1</b>の値段</span></li>
+          <li><i class="fa-solid fa-graduation-cap"></i><span>Alibaba いわく「3.7 Plus より <span class="keyword-tag">1/n の学習コスト</span>で良い結果」</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-piggy-bank fa-lg" style="color:#D95D39;"></i>
+            ハードがなくても、この値段なら気軽に試せるね。
+            <span class="keyword-tag lime">budget friendly</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">04</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lock-open mega-icon" style="animation: fa-shake 3.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>完全オープンウェイト</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-brands fa-huggingface"></i><span>Hugging Face から誰でも取得できる</span></li>
+          <li><i class="fa-solid fa-file-contract"></i><span>ライセンスは <span class="keyword-tag">Qwen community license</span></span></li>
+          <li><i class="fa-solid fa-cube"></i><span>Unsloth 製 <span class="keyword-tag slate">GGUF クォント</span>も登場（後述）</span></li>
+          <li><i class="fa-solid fa-house-chimney"></i><span>メモリさえあれば自宅マシンでも動かせる</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-heart fa-lg" style="color:#D95D39;"></i>
+            「クラウドか、自宅か」を自分で選べる自由さがうれしい
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= セクション2: 新アーキテクチャ ================= -->
+  <div class="section-divider"><i class="fa-solid fa-drafting-compass"></i> セクション2｜新アーキテクチャの読みどころ</div>
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group mega-icon" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① ハイブリッドアテンション</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-repeat"></i><span>全48層を <span class="keyword-tag">gated delta ×3 + QSA ×1</span> の繰り返しで組む</span></li>
+          <li><i class="fa-solid fa-wave-square"></i><span>gated delta = <span class="keyword-tag slate">線形アテンション</span>（軽い流し読み担当）</span></li>
+          <li><i class="fa-solid fa-filter"></i><span><span class="keyword-tag">QSA</span> = Qwen Sparse Attention。トークンでなく <span class="keyword-tag ember">microblock</span> 単位で選ぶ</span></li>
+          <li><i class="fa-solid fa-stopwatch"></i><span>長文コンテキストとエージェント workload で低レイテンシ</span></li>
+        </ul>
+        <pre><span class="cmt"># 48層のリズム（イメージ）</span>
+for block in range(12):
+    layers += [GatedDelta] * 3   <span class="cmt"># 速い</span>
+    layers += [QSA]       * 1    <span class="cmt"># 精査</span></pre>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-gauge-high fa-lg" style="color:#2E4057;"></i>
+            全部をじっくりよむのではなく、要点だけじっくり。速さと精度のバランス設計だね
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card alt-top fade-in-scale">
+      <span class="card-number">06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book mega-icon ember" style="animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② n-gram 埋め込み層</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star"></i><span>125B のうち <span class="keyword-tag ember">51B</span> が bigram / trigram 埋め込み！</span></li>
+          <li><i class="fa-solid fa-quote-right"></i><span>いわば <span class="keyword-tag">フレーズ辞書を内蔵</span>するしくみ</span></li>
+          <li><i class="fa-solid fa-memory"></i><span>この層は GPU でなく<span class="keyword-tag slate">通常 RAM</span> に置ける</span></li>
+          <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>パラメータを増やしても<b>計算量は増えない</b> → メモリ制約ハード向き</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:#7CB518;"></i>
+            容量は食うけど、辞書のよみ書きはほぼタダ。発想の逆転がおもしろい！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card lime-top fade-in-scale">
+      <span class="card-number">07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project mega-icon lime" style="animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ MoE の中身</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users-gear"></i><span>専門家 <span class="keyword-tag lime">512体</span> のうち <span class="keyword-tag lime">11体</span> だけアクティブ</span></li>
+          <li><i class="fa-solid fa-forward-fast"></i><span><span class="keyword-tag">multi-token prediction</span> で推論を高速化</span></li>
+          <li><i class="fa-solid fa-shield-halved"></i><span><span class="keyword-tag slate">gated residuals</span> で学習を安定させる</span></li>
+          <li><i class="fa-solid fa-arrow-right-long"></i><span>「幅広い知識 × 少人数の実働」の組み合わせ</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-people-arrows fa-lg" style="color:#D95D39;"></i>
+            512人体制の職場で、実際に話を聞くのは11人だけ。 payroll は軽い！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-ruler-horizontal mega-icon" style="animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ コンテキストの長さ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-left-right-to-line"></i><span>ネイティブで <span class="keyword-tag">262K tokens</span></span></li>
+          <li><i class="fa-solid fa-expand"></i><span><span class="keyword-tag slate">YaRN</span> を使えば <span class="keyword-tag ember">1M</span> まで拡張できる</span></li>
+          <li><i class="fa-solid fa-book-open-reader"></i><span>長文 RAG や大量の履歴を読むエージェント向き</span></li>
+        </ul>
+        <div class="flow-note"><i class="fa-solid fa-arrow-right-long"></i> 262K →（YaRN）→ 1M tokens</div>
+        <div class="speech-bubble top right">
+          <span class="handwritten">
+            <i class="fa-solid fa-book fa-lg" style="color:#2E4057;"></i>
+            100万トークンって、ぶあつい本がなんども読める量。長いおくりものも安心
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card alt-top fade-in-scale">
+      <span class="card-number">09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain mega-icon ember" style="animation: fa-beat 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ じっくり考える設計</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-thought-bubble"></i><span>デフォルトで <span class="keyword-tag">thinking model</span></span></li>
+          <li><i class="fa-solid fa-spinner"></i><span>一度じっくり推論してから回答するスタイル</span></li>
+          <li><i class="fa-solid fa-toggle-on"></i><span>とはいえ <span class="keyword-tag slate">オフも可能</span>。速答したいときは切れる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-smile fa-lg" style="color:#7CB518;"></i>
+            せかされず考えてから答える、デフォルトで慎重派なモデルだね
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= セクション3: ベンチマーク対決 ================= -->
+  <div class="section-divider"><i class="fa-solid fa-ranking-star"></i> セクション3｜公式ベンチと KingBench 直接対決</div>
+  <div class="section-layout">
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-column mega-icon" style="animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>公式ベンチ（ベンダー数値）</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-screwdriver-wrench"></i><span><span class="keyword-tag">SWE-bench Pro</span>: <b>62.5</b> ／ Claude Opus 4.6 の 53.4 を上回る主張</span></li>
+          <li><i class="fa-solid fa-atom"></i><span><span class="keyword-tag">GPQA Diamond</span>: <b>91.7</b></span></li>
+          <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag slate">DeepSeek V4 Flash</span>（284B / 13B active）のコーディング超えを主張</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>あくまで<span class="keyword-tag ember">ベンダー発表</span>。鵜呑みには注意</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-scale-unbalanced fa-lg" style="color:#D95D39;"></i>
+            公式の数値は塩で味付けして味見。ここからが独自実測の本番だよ
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card lime-top fade-in-scale">
+      <span class="card-number">11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-check mega-icon lime" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>KingBench とは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-crown"></i><span>AI Code King の<span class="keyword-tag lime">独自実測</span>ベンチマーク</span></li>
+          <li><i class="fa-solid fa-list-ol"></i><span>8問 × 10点 = <span class="keyword-tag">満点 80</span></span></li>
+          <li><i class="fa-solid fa-user-ninja"></i><span>今回の対戦相手は <span class="keyword-tag ember">GLM 5.3 Flash</span></span></li>
+          <li><i class="fa-solid fa-laptop-code"></i><span>実際にコードを書かせて、出来ばえを探点するガチ審査</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-fire fa-lg" style="color:#D95D39;"></i>
+            3JS、SVG、エージェント作業まで、現場に近いお題がずらり。顔真っ赤の勝負！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card alt-top fade-in-scale">
+      <span class="card-number">12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-cells-large mega-icon ember" style="animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>8課題の得点表</h2>
+      </div>
+      <div class="card-content">
+        <div class="legend">
+          <span><span class="dot" style="background:#2E4057;"></span>Qwen 3.8 Flash Next</span>
+          <span><span class="dot" style="background:#D95D39;"></span>GLM 5.3 Flash</span>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-elevator"></i> エレベーターシミュ</span><span class="win-mark" style="color:#D95D39;">GLM +1</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:50%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:60%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-eye-dropper"></i> コンタクトレンズケース (3JS)</span><span class="win-mark" style="color:#2E4057;">Qwen +1</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:80%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:70%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-chair"></i> 折りたたみテーブル</span><span class="win-mark" style="color:#D95D39;">GLM +5</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:20%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:70%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-burger"></i> パンダバーガー SVG</span><span class="win-mark" style="color:#D95D39;">GLM +2</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:60%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:80%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-bow-arrow"></i> 弓矢ゲーム</span><span class="win-mark" style="color:#55790D;">引き分け</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:80%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:80%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-square-root-variable"></i> 数学（順列、答え 2460）</span><span class="win-mark" style="color:#55790D;">両方満点</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:100%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:100%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-solid fa-robot"></i> エージェントタスク</span><span class="win-mark" style="color:#55790D;">両方満点</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:100%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:100%;"></div></div>
+        </div>
+        <div class="score-row">
+          <div class="task-name"><span><i class="fa-regular fa-clock"></i> 3D 腕時計</span><span class="win-mark" style="color:#55790D;">引き分け</span></div>
+          <div class="score-bar-bg"><div class="score-bar qwen" style="width:70%;"></div></div>
+          <div class="score-bar-bg"><div class="score-bar glm" style="width:70%;"></div></div>
+        </div>
+        <div class="total-score">合計：Qwen 56/80（70%） vs GLM 63/80（78.75%）</div>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-magnifying-glass-chart fa-lg" style="color:#7CB518;"></i>
+            折りたたみテーブルで大差。フロントエンドの見た目調整が鬼門みたい
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-trophy mega-icon" style="animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>リーダーボードの位置</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-up"></i><span><span class="keyword-tag">GPT 5.6</span>・<span class="keyword-tag">Luna</span>・<span class="keyword-tag">Sonnet 5</span>・<span class="keyword-tag">Grok 4.5</span> より上</span></li>
+          <li><i class="fa-solid fa-crown"></i><span>ただし首位 <span class="keyword-tag ember">GLM 5.3 フル版</span>（91.25%）には届かず</span></li>
+          <li><i class="fa-solid fa-medal"></i><span><span class="keyword-tag slate">Qwen 3.8 Max</span>（81.25%）にも及ばず</span></li>
+          <li><i class="fa-solid fa-percent"></i><span>今回の成績は <b>56/80 = 70%</b></span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-chess-knight fa-lg" style="color:#2E4057;"></i>
+            十分強いけど、まだ王者の椅子ではない。次世代設計の「序章」ってかんじ
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card lime-top fade-in-scale">
+      <span class="card-number">14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-unbalanced mega-icon lime" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>得手と不得手</h2>
+      </div>
+      <div class="card-content">
+        <div class="list-heading"><i class="fa-solid fa-thumbs-up" style="color:#55790D;"></i> 得意な分野</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-square-root-variable lime-ic"></i><span>数学は<span class="keyword-tag lime">満点</span>（順列の答え 2460 を両者とも正解）</span></li>
+          <li><i class="fa-solid fa-robot lime-ic"></i><span>エージェントタスクも<span class="keyword-tag lime">満点</span>。データセット生成 → finetune → Web UI まで自力で完走</span></li>
+          <li><i class="fa-solid fa-cubes lime-ic"></i><span>3D 腕時計・弓矢ゲームもまずまず</span></li>
+        </ul>
+        <div class="list-heading"><i class="fa-solid fa-thumbs-down" style="color:#D95D39;"></i> 苦手な分野</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-palette"></i><span>失点はほぼ <span class="keyword-tag ember">フロントエンド / 3D系</span> に集中</span></li>
+          <li><i class="fa-solid fa-chair"></i><span>折りたたみテーブルは フロント末端のポーズで崩壊（2点）</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-meh fa-lg" style="color:#D95D39;"></i>
+            計算と実行は完璧なのに、見た目の仕上げでつまずく……もったいない！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card alt-top fade-in-scale">
+      <span class="card-number">15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb mega-icon ember" style="animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>結論：どう使い分ける？</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-xmark"></i><span>メインのコーディングモデルの<b>代替にはならない</b></span></li>
+          <li><i class="fa-solid fa-check"></i><span>ただし <span class="keyword-tag lime">安く速いエージェントパイプライン</span> なら最良クラス</span></li>
+          <li><i class="fa-solid fa-toolbox"></i><span><span class="keyword-tag">ツール呼び</span>や<span class="keyword-tag">長文コンテキスト</span>用途にぴったり</span></li>
+          <li><i class="fa-solid fa-arrows-split-up-and-left"></i><span>「速攻の下請け + 人間が最終チェック」の分担が吉</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-clapperboard fa-lg" style="color:#2E4057;"></i>
+            主持役ではなく、よく働く脇役。安さと速さで挽回するタイプだね
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= セクション4: ローカル実行 ================= -->
+  <div class="section-divider"><i class="fa-solid fa-house-laptop"></i> セクション4｜ローカルで動かすには</div>
+  <div class="section-layout">
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-memory mega-icon" style="animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>GGUF クォントのラインナップ</h2>
+      </div>
+      <div class="card-content">
+        <table class="mini-table">
+          <tr><th>クォント</th><th>サイズ</th><th>ひとこと</th></tr>
+          <tr><td>1bit</td><td>72〜74GB</td><td>最軽量</td></tr>
+          <tr><td>2bit</td><td>79GB</td><td>軽め</td></tr>
+          <tr><td>3bit</td><td>82〜90GB</td><td>バランス</td></tr>
+          <tr><td>4bit</td><td>94〜111GB</td><td>高精細</td></tr>
+        </table>
+        <ul class="keyword-list">
+          <li><i class="fa-brands fa-huggingface"></i><span>配布元は <span class="keyword-tag">Unsloth</span> の GGUF</span></li>
+          <li><i class="fa-solid fa-sliders"></i><span>RAM の余裕に合わせて bit 数を選ぶ</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-compress fa-lg" style="color:#7CB518;"></i>
+            1bit でも 72GB 超！ 「小さい」といっても大人サイズなのに注意
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card alt-top fade-in-scale">
+      <span class="card-number">17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-server mega-icon ember" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>必要なマシンの目安</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database"></i><span>快適に動かすなら <span class="keyword-tag ember">96〜128GB RAM</span></span></li>
+          <li><i class="fa-brands fa-apple"></i><span><span class="keyword-tag slate">128GB unified memory の Mac</span> がスイートスポット</span></li>
+          <li><i class="fa-solid fa-bolt lime-ic"></i><span>6B active なので、トークンあたりの計算はごく微小</span></li>
+          <li><i class="fa-solid fa-microchip"></i><span><span class="keyword-tag lime">memory hungry but compute light</span></span></li>
+          <li><i class="fa-solid fa-desktop"></i><span>GPU がなくても <b>CPU だけで実用速度</b>が出る設計</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color:#2E4057;"></i>
+            「メモリは食うけど計算は軽い」という逆転の発想。RAM 盛り盛りの Mac がまさに狙い撃ち！
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card lime-top fade-in-scale">
+      <span class="card-number">18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal mega-icon lime" style="animation: fa-flip 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>実行の方法は3つ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-feather"></i><span><span class="keyword-tag lime">Ollama</span>: まずひとつ試すならこれ</span></li>
+          <li><i class="fa-solid fa-server"></i><span><span class="keyword-tag">llama.cpp</span>: OpenAI 互換サーバーとして起動</span></li>
+          <li><i class="fa-solid fa-industry"></i><span><span class="keyword-tag slate">vLLM / SGLang</span>: 本番運用向け</span></li>
+          <li><i class="fa-solid fa-cloud"></i><span>ハードがなければ <span class="keyword-tag ember">$0.16/M の API</span> も一択</span></li>
+        </ul>
+        <pre><span class="cmt"># Ollama で動かす（QUANT は Q2_K などに置き換え）</span>
+<span class="cmd">ollama run</span> hf.co/unsloth/qwen3.8-flash-next-gguf:QUANT
+
+<span class="cmt"># llama.cpp で OpenAI 互換サーバー</span>
+<span class="cmd">llama-server</span> -m qwen3.8-flash-next-Q4_K_M.gguf \
+  --port 8080</pre>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-person-running fa-lg" style="color:#D95D39;"></i>
+            とりあえず Ollama の一行から。動かなかったら API に逃げても痛くない値段！
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <div class="footer">
+    <div class="footer-icons">
+      <i class="fa-solid fa-bolt-lightning highlight-pulse"></i>
+      <i class="fa-solid fa-code"></i>
+      <i class="fa-solid fa-trophy"></i>
+    </div>
+    <div>
+      🎬 動画: <a href="https://www.youtube.com/watch?v=KAyYP19CfCU" target="_blank" rel="noopener" style="color: inherit;"><b>AI Code King</b> — Qwen 3.8 Flash Next (Fully Tested &amp; VS GLM)</a><br>
+      📅 2026年8月28日 ｜ このグラレコまとめは上の動画の内容を日本語で再構成したものです
+    </div>
+  </div>
+
+</div>
+
+<script>
+// スクロールに合わせてカードを出す
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.style.opacity = 1; });
+    return;
+  }
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        e.target.classList.add('shown');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c, i) {
+    c.style.animationDelay = (i % 4) * 0.12 + 's';
+    io.observe(c);
+  });
+});
+</script>
+</body>
+</html>

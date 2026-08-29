@@ -2,7 +2,8 @@ import os
 import re
 from datetime import datetime
 
-def update_index_html(index_file_path, docs_folder):
+def update_index_html(index_file_path, docs_folders):
+    # docs_folders: list of (absolute_folder_path, relative_url_prefix) tuples
     # Read the existing index.html content
     with open(index_file_path, 'r', encoding='utf-8') as f:
         index_content = f.read()
@@ -10,29 +11,30 @@ def update_index_html(index_file_path, docs_folder):
     # List to store information about each infographic file
     infographics = []
 
-    # Get all HTML files in the docs folder
-    for filename in os.listdir(docs_folder):
-        if re.match(r'^\d{8}[-_].*\.html$', filename):
-            file_path = os.path.join(docs_folder, filename)
-            
-            # Extract date from filename
-            date_str = filename[:8]
-            
-            # Read the infographic file to get its title
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    infographic_content = f.read()
-                    title_match = re.search(r'<title>(.*?)</title>', infographic_content, re.IGNORECASE)
-                    title = title_match.group(1) if title_match else filename
-            except Exception as e:
-                print(f"Error reading {file_path}: {e}")
-                title = filename # Fallback title
+    # Get all HTML files in each folder
+    for folder_path, url_prefix in docs_folders:
+        for filename in os.listdir(folder_path):
+            if re.match(r'^\d{8}[-_].*\.html$', filename):
+                file_path = os.path.join(folder_path, filename)
 
-            infographics.append({
-                'date': datetime.strptime(date_str, '%Y%m%d'),
-                'title': title,
-                'filename': f'docs/{filename}' # Relative path for href with forward slash
-            })
+                # Extract date from filename
+                date_str = filename[:8]
+
+                # Read the infographic file to get its title
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        infographic_content = f.read()
+                        title_match = re.search(r'<title>(.*?)</title>', infographic_content, re.IGNORECASE)
+                        title = title_match.group(1) if title_match else filename
+                except Exception as e:
+                    print(f"Error reading {file_path}: {e}")
+                    title = filename # Fallback title
+
+                infographics.append({
+                    'date': datetime.strptime(date_str, '%Y%m%d'),
+                    'title': title,
+                    'filename': f'{url_prefix}{filename}' # Relative path for href with forward slash
+                })
 
     # Sort infographics by date in descending order
     infographics.sort(key=lambda x: x['date'], reverse=True)
@@ -100,4 +102,8 @@ if __name__ == "__main__":
     script_dir = os.path.dirname(__file__)
     index_html_path = os.path.join(script_dir, 'index.html')
     docs_path = os.path.join(script_dir, 'docs')
-    update_index_html(index_html_path, docs_path)
+    ai_news_path = os.path.join(script_dir, 'ai-news-infographics')
+    update_index_html(index_html_path, [
+        (ai_news_path, 'ai-news-infographics/'),
+        (docs_path, 'docs/'),
+    ])

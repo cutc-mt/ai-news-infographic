@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【必見】エージェントの「牧場」を築く『Herder』- tmuxをエージェント時代に作り直したRust製マルチプレクサ</title>
+    <style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+:root { --ui-color-1:#818CF8;--ui-color-2:#34D399;--ui-color-3:rgba(99,102,241,0.25);--ui-color-4:#1E1B4B;--ui-color-5:#6366F1;--accent:#10B981;--accent-dark:#34D399;--bg:#10182B;--card-bg:#1A2440; }
+body { font-family:'Zen Kurenaido',sans-serif; background:var(--bg); color:#DCE3F3; line-height:1.6; margin:0; padding:20px; }
+.container { max-width:2000px; margin:0 auto; padding:20px; }
+header { text-align:center; margin-bottom:40px; padding:30px; background:linear-gradient(135deg,#1E1B4B 0%,#312E81 50%,#064E3B 100%); border-radius:24px; box-shadow:0 8px 30px rgba(99,102,241,0.25); border:1px solid #312E81; }
+header h1 { font-family:'Kaisei Decol',serif; font-size:36px; font-weight:bold; color:#E0E7FF; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap; }
+.header-icon { font-size:56px; color:var(--accent-dark); animation:fa-beat 3s infinite; }
+header p { font-size:16px; color:#A5B4FC; margin-top:10px; }
+.subtitle { font-family:'Yomogi',cursive; font-size:18px; color:#A7F3D0; }
+.section-layout { display:flex; flex-wrap:wrap; gap:25px; justify-content:center; }
+.card { flex:1; min-width:280px; max-width:450px; background:var(--card-bg); border-radius:20px; padding:20px; box-shadow:5px 5px 15px rgba(0,0,0,0.35); position:relative; overflow:hidden; transition:transform 0.3s,box-shadow 0.3s; border-top:4px solid var(--ui-color-5); }
+.card:nth-child(even) { border-top-color:var(--accent); }
+.card:hover { transform:translateY(-5px); box-shadow:8px 8px 25px rgba(99,102,241,0.3); }
+.mega-icon-container { text-align:center; margin:15px 0; }
+.mega-icon-container i { animation-duration:3s; animation-iteration-count:infinite; }
+.card h2 { font-family:'Kaisei Decol',serif; font-size:22px; color:#A5B4FC; text-align:center; margin-top:10px; line-height:1.4; }
+.card-content { padding:0 10px 15px; }
+.keyword-list { margin:12px 0; padding:0; list-style-type:none; }
+.keyword-list li { margin-bottom:10px; display:flex; align-items:flex-start; font-size:15px; line-height:1.6; }
+.keyword-list li i { margin-right:8px; color:var(--ui-color-1); min-width:18px; margin-top:3px; }
+.card:nth-child(even) .keyword-list li i { color:var(--accent-dark); }
+.keyword-tag { background:var(--ui-color-3); color:#C7D2FE; padding:2px 8px; border-radius:6px; margin-right:4px; display:inline-block; font-weight:bold; font-size:14px; border:1px solid rgba(129,140,248,0.4); }
+.highlight { background:linear-gradient(transparent 60%,rgba(16,185,129,0.4) 60%); padding:0 2px; font-weight:bold; color:#E8F5EE; }
+pre { background:#0D1322; border:1px dashed var(--accent-dark); padding:8px 10px; border-radius:8px; font-size:13px; margin-top:10px; overflow-x:auto; color:#A7F3D0; }
+.speech-bubble { position:relative; background:#E0E7FF; border:2.5px solid var(--ui-color-5); border-radius:18px; padding:10px 14px; margin:12px 5px; font-family:'Yomogi',cursive; font-size:15px; line-height:1.6; color:var(--ui-color-4); box-shadow:3px 3px 10px rgba(0,0,0,0.25); transform:rotate(-0.5deg); }
+.speech-bubble::after { content:''; position:absolute; bottom:-12px; left:20px; border-width:12px 8px 0; border-style:solid; border-color:var(--ui-color-5) transparent; width:0; }
+.speech-bubble.right::after { left:auto; right:20px; }
+.speech-bubble.top::after { bottom:auto; top:-12px; border-width:0 8px 12px; }
+.speech-bubble.variant-1 { background:#D1FAE5; border-color:#059669; transform:rotate(0.5deg); }
+.speech-bubble.variant-1::after { border-color:#059669 transparent; }
+.speech-bubble.variant-2 { background:#C7D2FE; border-color:#4338CA; transform:rotate(-1deg); }
+.speech-bubble.variant-2::after { border-color:#4338CA transparent; }
+.handwritten { font-family:'Yomogi',cursive; font-size:15px; line-height:1.5; color:var(--ui-color-4); }
+footer { text-align:center; margin-top:40px; padding:20px; background:linear-gradient(135deg,#1E1B4B 0%,#312E81 50%,#064E3B 100%); border-radius:20px; color:#A5B4FC; font-size:16px; border:1px solid #312E81; }
+footer a { color:var(--accent-dark); text-decoration:none; font-weight:bold; }
+footer a:hover { text-decoration:underline; }
+@keyframes fadeInScale { from{opacity:0;transform:scale(0.9)} to{opacity:1;transform:scale(1)} }
+.fade-in-scale { animation:fadeInScale 0.5s ease-out forwards; }
+@media(max-width:768px){ .section-layout{flex-direction:column} .card{width:100%;min-width:auto} header h1{font-size:26px} }
+</style>
+</head>
+<body>
+<div class="container">
+<header>
+    <i class="fas fa-terminal header-icon"></i>
+    <h1>【必見】エージェントの「牧場」を築く『Herder』</h1>
+    <p class="subtitle">tmuxをエージェント時代向けにゼロから作り直した、Rust製ターミナル常駐マルチプレクサを徹底解説</p>
+    <p>📅 2026年8月29日 | 🎬 AI Code King</p>
+</header>
+<div class="section-layout">
+<div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-dog fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;"></i>
+        <h2>①Herderとは何か?</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-circle-info"></i><span>ターミナルの中で飼う、<span class='highlight'>AIエージェント専用のマルチプレクサ</span></span></li>
+<li><i class="fa-solid fa-bolt"></i><span><span class='keyword-tag'>Rust製</span>。既存の端末を置き換えず、中で動くスタイル</span></li>
+<li><i class="fa-solid fa-brain"></i><span>エージェントの<span class='highlight'>「いま何をしているか」を本当に理解</span>しているのが肝</span></li>
+<li><i class="fa-solid fa-handshake"></i><span>CLIとsocket APIで<span class='highlight'>agent同士が連携</span>できる。Pro向けの急所</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: #059669;"></i> 放置するしかなかった並列エージェントが、ここでは“牧場”として管理されるよ!</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-magnifying-glass fa-5x" style="color: var(--accent-dark); animation: fa-shake 3s infinite;"></i>
+        <h2>②本当の問題は「見えないこと」</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-eye"></i><span>Claude Codeが改修、Codexがバグ潰し、調査役が…と<span class='highlight'>タブやペインに散らばる</span></span></li>
+<li><i class="fa-solid fa-circle-question"></i><span>「まだ動いてる?」「<span class='highlight'>許可プロンプトで10分も止まってる?</span>」「20分前に終わってた?」</span></li>
+<li><i class="fa-solid fa-ban"></i><span>tmuxにとってエージェントは<span class='highlight'>ただのプロセス</span>。状態を知るすべがない</span></li>
+<li><i class="fa-solid fa-lightbulb"></i><span>課題は起動ではなく<span class='highlight'>追跡と協調</span>。ここにHerderが答える</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: #4338CA;"></i> 動かすのは簡単。つらいのは「誰が・どこで・どうなってるか」が見えないことなんだ</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;"></i>
+        <h2>③tmuxを作り直す</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-cube"></i><span>ワークスペースは<span class='keyword-tag'>spaces</span>、タブ、分割ペインを装備</span></li>
+<li><i class="fa-solid fa-link"></i><span>切断しても生き残る<span class='highlight'>しぶといセッション</span>も標準搭載</span></li>
+<li><i class="fa-solid fa-up-right-and-down-left-from-center"></i><span>分割は方向つきで<span class='highlight'>自由なレイアウト</span>が組める</span></li>
+<li><i class="fa-solid fa-circle-check"></i><span>多重度の基本は<span class='highlight'>ひととおり押さえつつ</span>、上にエージェント層を建てた設計</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: #059669;"></i> 「tmuxの資産」+「エージェントの理解」。発想として一番しっくりくる作りだね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-list-check fa-5x" style="color: var(--accent-dark); animation: fa-fade 3s infinite;"></i>
+        <h2>④サイドバー=状況の司令室</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-eye"></i><span>見つけた<span class='highlight'>全エージェントとライブ状態</span>を一覧表示</span></li>
+<li><i class="fa-solid fa-arrows-spin"></i><span>ペインを飛行機のように<span class='highlight'>ぐるぐる見回さなくていい</span></span></li>
+<li><i class="fa-solid fa-bell"></i><span>どれが助けを求めているか<span class='highlight'>一目でわかる</span></span></li>
+<li><i class="fa-solid fa-arrow-up"></i><span>現実に並走できる<span class='highlight'>体数が変わる</span>ほどの体験</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg" style="color: #4338CA;"></i> これだけで「同時に何体動かすか」の感覚が変わる。地味に大きい改善なんだ</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;"></i>
+        <h2>⑤約20種のCLIを自動で見つける</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-robot"></i><span><span class='keyword-tag'>Claude Code</span> <span class='keyword-tag'>Codex</span> <span class='keyword-tag'>OpenCode</span> <span class='keyword-tag'>Cursor Agent</span> <span class='keyword-tag'>Copilot CLI</span></span></li>
+<li><i class="fa-solid fa-microchip"></i><span>Groq CLI、Qwen Code、Kilo Code、Droid、Amp、Devonro なども対応</span></li>
+<li><i class="fa-solid fa-triangle-exclamation"></i><span>Gemini CLIとKleinは検出されるが<span class='highlight'>検証が浅め</span></span></li>
+<li><i class="fa-solid fa-door-open"></i><span>載っていなくても<span class='highlight'>普通の端末として動く</span>。特定ベンダーへの固めなし</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-paw fa-lg" style="color: #059669;"></i> 状態の追跡なしでも締め出さない。このゆるさが長く使える理由だね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-download fa-5x" style="color: var(--accent-dark); animation: fa-beat 3s infinite;"></i>
+        <h2>⑥入れ方はすぐ終わる</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-mug-hot"></i><span>macOSなら <span class='keyword-tag'>brew install herder</span> の一発</span></li>
+<li><i class="fa-solid fa-linux"></i><span>Linuxは公式の<span class='highlight'>curlワンライナー</span>、WindowsはPowerShell版</span></li>
+<li><i class="fa-solid fa-crab"></i><span>Rust勢は <span class='keyword-tag'>cargo install herder</span> でもOK</span></li>
+<li><i class="fa-solid fa-terminal"></i><span>入れたら<span class='highlight'>her と打つだけ</span>。フォント・色・shell設定はそのまま</span></li>
+        </ul>
+        <pre>$ brew install herder   # macOS
+$ curl -fsSL https://herder.dev | sh  # Linux
+$ her                   # 起動</pre>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-plug fa-lg" style="color: #4338CA;"></i> 既存の端末の中に描画されるから、環境を持ち込まれないのが嬉しいポイント</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-computer-mouse fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;"></i>
+        <h2>⑦操作はtmuxの筋肉+マウス</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-keyboard"></i><span>prefixは<span class='keyword-tag'>Ctrl+B</span>。tmux勢なら無意識に使える</span></li>
+<li><i class="fa-solid fa-circle-question"></i><span><span class='keyword-tag'>Ctrl+B → ?</span> で割り当て一覧を表示</span></li>
+<li><i class="fa-solid fa-hand-pointer"></i><span>マウスが<span class='highlight'>第一級の扱い</span>。クリックで聚焦、ドラッグで幅変更</span></li>
+<li><i class="fa-solid fa-window-restore"></i><span>右クリックのメニューで<span class='highlight'>分割やクローズを直接指示</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-hand-sparkles fa-lg" style="color: #059669;"></i> prefix体操をしなくていい。「慣れ」と「楽さ」を両取りの設計だね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-traffic-light fa-5x" style="color: var(--accent-dark); animation: fa-beat-fade 3s infinite;"></i>
+        <h2>⑧4つの状態を追う</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-gear fa-spin"></i><span><span class='keyword-tag'>working</span> : 処理中。集中して動いている状態</span></li>
+<li><i class="fa-solid fa-hand"></i><span><span class='keyword-tag'>blocked</span> : 許可や質問で<span class='highlight'>あなたの返事を待機中</span></span></li>
+<li><i class="fa-solid fa-mug-hot"></i><span><span class='keyword-tag'>idle</span> : 指示待ちでのんびり待機</span></li>
+<li><i class="fa-solid fa-flag-checkered"></i><span><span class='keyword-tag'>done</span> : 完了したのに<span class='highlight'>まだ結果を見ていない</span>状態</span></li>
+        </ul>
+        <pre>working → 順調 / blocked → 要対応
+idle    → 待機 / done   → 未確認の完成</pre>
+    </div>
+    <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: #4338CA;"></i> idleとdoneの違いは「結果を見たかどうか」。見るまで旗が立ったままなのが偉い!</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-satellite-dish fa-5x" style="color: var(--ui-color-1); animation: fa-shake 3s infinite;"></i>
+        <h2>⑨状態を見つける2つの仕組み</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-plug"></i><span>対応エージェントは<span class='highlight'>自分で状態を直接報告</span>。いちばん正確な信号</span></li>
+<li><i class="fa-solid fa-eye"></i><span>フックがない場合は画面の下端を<span class='highlight'>既知のUIと照合</span>して判定</span></li>
+<li><i class="fa-solid fa-shield-halved"></i><span>blocked検出は<span class='highlight'>控えめに設計</span>。誤報で悩まされない</span></li>
+<li><i class="fa-solid fa-triangle-exclamation"></i><span>あくまで推定で、<span class='highlight'>直接の信号ではない</span>点は頭に入れておく</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: #059669;"></i> 許可画面の見た目を覚えて「blocked」と判別する、地頭のいい工夫なんだね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-plug fa-5x" style="color: var(--accent-dark); animation: fa-bounce 3s infinite;"></i>
+        <h2>⑩連携設定と通知</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-screwdriver-wrench"></i><span><span class='keyword-tag'>her integration install claude</span> でClaude Code連携を構築</span></li>
+<li><i class="fa-solid fa-clipboard-list"></i><span><span class='keyword-tag'>herder integration status</span> で有効な連携を確認</span></li>
+<li><i class="fa-solid fa-bell"></i><span>背面ペインの状態が変わると<span class='highlight'>通知が飛ぶ</span></span></li>
+<li><i class="fa-solid fa-user-clock"></i><span>没頭中でも<span class='highlight'>完了や停滞を拾ってくれる</span>ので見守り不要</span></li>
+        </ul>
+        <pre>$ her integration install claude
+$ herder integration status</pre>
+    </div>
+    <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-bell fa-lg" style="color: #4338CA;"></i> バックグラウンドのagentが終わったり詰まったりしたら知らせてくれる。並列作業がぐっと楽に!</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-gears fa-5x" style="color: var(--ui-color-1); animation: fa-spin 3s infinite;"></i>
+        <h2>⑪agent自身が操るAPI</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-code"></i><span>CLIと<span class='highlight'>ローカルのsocket API</span>を公開</span></li>
+<li><i class="fa-solid fa-robot"></i><span>呼べるのは人間だけじゃない。<span class='highlight'>エージェントも呼べる</span>のが急所</span></li>
+<li><i class="fa-solid fa-diagram-project"></i><span>分割、起動、指示送り、完了待ち、出力の取得まで丸ごと</span></li>
+<li><i class="fa-solid fa-crown"></i><span>つまり表示装置ではなく<span class='highlight'>指揮をまかせる基盤</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: #059669;"></i> 「agentがagentを指揮する」。Proユーザーが一番食いつくlayerだね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-table-cells fa-5x" style="color: var(--accent-dark); animation: fa-fade 3s infinite;"></i>
+        <h2>⑫pane系のコマンド</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-table-cells-large"></i><span><span class='keyword-tag'>pane split</span> : 方向を指定して枠を分割</span></li>
+<li><i class="fa-solid fa-play"></i><span><span class='keyword-tag'>pane run</span> : 好きなコマンドを実行</span></li>
+<li><i class="fa-solid fa-keyboard"></i><span><span class='keyword-tag'>send-text / send-keys</span> : 生の入力を送る</span></li>
+<li><i class="fa-solid fa-hourglass-half"></i><span><span class='keyword-tag'>wait-output / pane read</span> : 出力を待つ・読み込む</span></li>
+        </ul>
+        <pre>$ herder pane split --right
+$ herder pane run "npm test"
+$ herder pane wait-output "PASS"
+$ herder pane read</pre>
+    </div>
+    <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-terminal fa-lg" style="color: #4338CA;"></i> 端末の操作をそのまま脚本にできる感じ。夢がひろがるね!</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-users-gear fa-5x" style="color: var(--ui-color-1); animation: fa-beat 3s infinite;"></i>
+        <h2>⑬agent系のコマンド</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-rocket"></i><span><span class='keyword-tag'>agent start --kind</span> : codexやgeminiなど種別を指定して起動</span></li>
+<li><i class="fa-solid fa-paper-plane"></i><span><span class='keyword-tag'>agent prompt --wait</span> : 指示を送り、目標の状態まで待つ</span></li>
+<li><i class="fa-solid fa-hourglass"></i><span><span class='keyword-tag'>agent wait</span> : idle / done / blocked などの状態を待機</span></li>
+<li><i class="fa-solid fa-tag"></i><span><span class='keyword-tag'>agent read / rename</span> : 出力を取得、「reviewer」などの名前を付ける</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-signature fa-lg" style="color: #059669;"></i> 番号ではなく「名前」で呼べるのは地味に大事。脚本がぐっと読みやすくなるよ</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-diagram-project fa-5x" style="color: var(--accent-dark); animation: fa-beat-fade 3s infinite;"></i>
+        <h2>⑭実例: 実装→レビューの自動連携</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-code"></i><span>Claude Codeに「機能を作り、<span class='highlight'>終わったら審査役を立てろ</span>」と指示</span></li>
+<li><i class="fa-solid fa-arrow-right"></i><span>右に枠を作り、<span class='keyword-tag'>--kind codex</span> のreviewerを起動</span></li>
+<li><i class="fa-solid fa-paper-plane"></i><span>レビュー指示を<span class='keyword-tag'>--wait</span> 付きで送信</span></li>
+<li><i class="fa-solid fa-rotate"></i><span>完了したら<span class='highlight'>結果を読み戻して対応</span>。2体が自律で協働</span></li>
+        </ul>
+        <pre>$ herder pane split --right
+$ herder agent start reviewer --kind codex
+$ herder agent prompt reviewer "diffを審査して" --wait
+$ herder agent read reviewer</pre>
+    </div>
+    <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: #4338CA;"></i> いままではsend-keysと祈りで組み上げていた流れが、正規のAPIで書けるんだ!</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s infinite;"></i>
+        <h2>⑮動画主の実際の使い分け</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-scale-balanced"></i><span>大きめの企画は<span class='keyword-tag'>Verdant</span>へ、素早い端末作業は<span class='highlight'>Herderへ</span></span></li>
+<li><i class="fa-solid fa-diagram-project"></i><span>Verdantは計画→分割→<span class='highlight'>隔離sessionで並列実行</span>まで内蔵</span></li>
+<li><i class="fa-solid fa-comment-dots"></i><span>離席中は<span class='highlight'>SlackやTelegramから指示</span>。VSCodeやJetBrains拡張もあり</span></li>
+<li><i class="fa-solid fa-tower-observation"></i><span>Herder側は改修・審査・<span class='highlight'>試験とlogの監視</span>を並走させる</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-mug-saucer fa-lg" style="color: #059669;"></i> 「計画の委託はVerdant、即席はHerder」。二本柱で子守りから解放される構図だね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-server fa-5x" style="color: var(--accent-dark); animation: fa-beat 3s infinite;"></i>
+        <h2>⑯切れても消えない永続性</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-server"></i><span><span class='highlight'>client・server方式</span>。実態はserver側が握る</span></li>
+<li><i class="fa-solid fa-laptop"></i><span>detachして閉じても、<span class='highlight'>つなぎ直せば全部現役</span>。agentは止まらない</span></li>
+<li><i class="fa-solid fa-rotate-left"></i><span>server再起動時もspaces・タブ・枠・<span class='highlight'>作業folderを復元</span></span></li>
+<li><i class="fa-solid fa-comments"></i><span>agent側も<span class='highlight'>会話を自動で再開</span>(Claude Codeのresume活用、初期ON)</span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-battery-full fa-lg" style="color: #4338CA;"></i> 「再起動=文脈を失う」ではなくなった。長時間運用の安心感が全然違うよ</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-sliders fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s infinite;"></i>
+        <h2>⑰遠隔運用と好みの調整</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-globe"></i><span><span class='keyword-tag'>her --remote</span> でSSH先のserver上で実行。<span class='highlight'>鍵やthemeはlocalのまま</span></span></li>
+<li><i class="fa-solid fa-server"></i><span>強い開発機やVPSで群れを飼い、<span class='highlight'>どこからでも覗ける</span></span></li>
+<li><i class="fa-solid fa-palette"></i><span>設定は <span class='keyword-tag'>~/.config/herder</span>。prefix変更や再起動なしの反映も</span></li>
+<li><i class="fa-solid fa-puzzle-piece"></i><span>themeは<span class='keyword-tag'>catppuccin</span> <span class='keyword-tag'>nord</span> <span class='keyword-tag'>dracula</span> など。plugin市場も搭載</span></li>
+        </ul>
+        <pre>~/.config/herder/config.toml
+themes: catppuccin / groovebox / nord / dracula</pre>
+    </div>
+    <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-moon fa-lg" style="color: #059669;"></i> 一晩serverで走らせた群れを、朝どのマシンからでも点検できるのは気持ちいいね</span>
+    </div>
+</div><div class="card fade-in-scale">
+    <div class="mega-icon-container">
+        <i class="fas fa-flag-checkered fa-5x" style="color: var(--accent-dark); animation: fa-beat-fade 3s infinite;"></i>
+        <h2>⑱制限と総評</h2>
+    </div>
+    <div class="card-content">
+        <ul class="keyword-list"><li><i class="fa-solid fa-triangle-exclamation"></i><span><span class='keyword-tag'>pre-1.0</span>。版をまたぐ更新でserverが止まり、枠も落ちる</span></li>
+<li><i class="fa-solid fa-eye"></i><span>フックなしagentの状態は<span class='highlight'>画面照合による推定</span>どまり</span></li>
+<li><i class="fa-solid fa-window-minimize"></i><span>Windows対応は遅れ気味で、<span class='highlight'>遠隔先にもなれない</span></span></li>
+<li><i class="fa-solid fa-ban"></i><span>tmuxを入れ子にすると検出が壊れる。<span class='highlight'>Herderを親にする</span>のが正解</span></li>
+<li><i class="fa-solid fa-trophy"></i><span>無料・OSS。1体ならtmuxで十分、<span class='highlight'>3〜4体並行ならmission control</span></span></li>
+        </ul>
+    </div>
+    <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-crown fa-lg" style="color: #4338CA;"></i> 「追うのがしんどい」という本当の瓶首に答えた一本。並列派は試す価値あり!</span>
+    </div>
+</div>
+</div>
+<footer>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=6WU-7Tgacug" target="_blank" style="color: inherit;">AI Code King — Herdr (AI Agent Multiplexer): You're not a PRO AI Coder if you don't use THIS</a></p>
+    <p>📅 2026年8月29日公開 | 🐕 Herder: 無料・オープンソースのRust製agentマルチプレクサ</p>
+</footer>
+</div>
+</body>
+</html>

@@ -39,6 +39,21 @@ if os.path.exists(graph_file):
 else:
     graph_data = {"nodes": [], "links": []}
 
+# Derive month coverage from news nodes' source_location (YYYYMM)
+import re
+from datetime import date
+_months = sorted({str(n.get('source_location', '')) for n in graph_data['nodes']
+                  if re.fullmatch(r'\d{6}', str(n.get('source_location', '')))})
+if _months:
+    _first, _last = _months[0], _months[-1]
+    def _fmt(ym):
+        return f"{ym[:4]}年{int(ym[4:6])}月"
+    coverage = _fmt(_first) if _first == _last else f"{_fmt(_first)}〜{_fmt(_last)}"
+else:
+    coverage = ""
+TITLE_LABEL = f"Merged Graph {coverage}".strip()
+GEN_DATE = date.today().strftime('%Y年%m月%d日')
+
 cards = []
 
 for node in graph_data['nodes']:
@@ -77,7 +92,7 @@ html_content = f"""<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI News Infographic - Merged Graph 2026年6月</title>
+    <title>AI News Infographic - {TITLE_LABEL}</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -134,7 +149,7 @@ html_content = f"""<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <h1>🚀 AI News Infographic - 2026年6月マージグラフ</h1>
+        <h1>🚀 AI News Infographic - {coverage}マージグラフ</h1>
         
         <div class="stats">
             <h3>📊 グラフ統計</h3>
@@ -177,10 +192,10 @@ for card in cards:
 
 html_content += """        <div style="text-align: center; margin-top: 40px; padding: 20px; background: #1a1a1a; border-radius: 8px;">
             <p style="color: #4ecdc4; margin-bottom: 10px;">
-                <i class="fas fa-calendar"></i> 生成日時: 2026年7月1日
+                <i class="fas fa-calendar"></i> 生成日時: {GEN_DATE}
             </p>
             <p style="color: #888; font-size: 0.9em;">
-                AIニュースインフォグラフィック - 2026年6月のナレッジグラフ統合版
+                AIニュースインフォグラフィック - {coverage}のナレッジグラフ統合版
             </p>
         </div>
     </div>

@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>推論のフロンティア：100から10,000トークン/秒へ｜Cerebras CTO Sean Lie</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  /* この動画独自：半導体・ウエハースケールAIインフラ → 深紺×シリコンシルバー×エレクトリックシアン */
+  --ui-color-1: #0A1F44;   /* 深紺（メイン） */
+  --ui-color-2: #00B8D9;   /* エレクトリックシアン（アクセント） */
+  --ui-color-3: #E7EDF3;   /* シリコンシルバー（淡い背景） */
+  --ui-color-4: #0D1B2E;   /* 濃紺（文字色） */
+  --ui-color-5: #64748B;   /* スレートシルバー（サブ） */
+  --navy: #0A1F44;         /* 深紺 */
+  --navy-deep: #071630;    /* より深い紺 */
+  --cyan-glow: #22D3EE;    /* 明るいシアン */
+  --cyan-deep: #0891B2;    /* 深いシアン */
+  --silver: #AEBBC9;       /* シリコンシルバー */
+  --silver-soft: #F2F5F8;  /* 淡いシルバー背景 */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #FAFBFD;
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: #333333;
+  line-height: 1.5;
+}
+
+.canvas {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 40px 20px 30px;
+  margin-bottom: 25px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(34,211,238,0.14) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, rgba(10,31,68,0.10) 0%, transparent 45%),
+    linear-gradient(135deg, var(--silver-soft) 0%, #FAFBFD 50%, var(--ui-color-3) 100%);
+  border-radius: 24px;
+  border: 3px dashed var(--cyan-glow);
+  position: relative;
+  overflow: hidden;
+}
+
+.header .mega-icon {
+  font-size: 7em;
+  color: var(--ui-color-1);
+  animation: fa-beat 2s ease-in-out infinite;
+  display: block;
+  margin-bottom: 10px;
+  text-shadow: 0 0 22px rgba(34,211,238,0.55), 3px 3px 0 rgba(174,187,201,0.35);
+}
+
+.header h1 {
+  font-size: 36px;
+  color: var(--ui-color-4);
+  font-weight: bold;
+  margin: 10px 0 8px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: var(--cyan-deep);
+  margin: 0 0 12px;
+  font-weight: bold;
+}
+
+.header .meta {
+  font-size: 14px;
+  color: #777777;
+}
+
+.header .meta i { color: var(--ui-color-2); margin-right: 4px; }
+
+.header .tags { margin-top: 14px; }
+
+/* セクション見出し */
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 40px 10px 16px;
+}
+
+.section-header i {
+  font-size: 2.2em;
+  color: var(--cyan-deep);
+}
+
+.section-header h2 {
+  font-size: 26px;
+  color: var(--ui-color-1);
+  font-family: 'Kaisei Decol', serif;
+  margin: 0;
+  border-bottom: 3px solid var(--ui-color-3);
+  padding-bottom: 4px;
+  flex: 1;
+}
+
+.section-header .section-badge {
+  font-size: 14px;
+  color: #777777;
+  white-space: nowrap;
+}
+
+/* カードレイアウト（4カラム） */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(10,31,68,0.14);
+  border-top: 6px solid var(--ui-color-2);
+  position: relative;
+  overflow: hidden;
+  transition: background-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+  background-color: var(--silver-soft);
+  transform: translateY(-4px);
+  box-shadow: 8px 8px 22px rgba(8,145,178,0.25);
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-1); }
+.section-card:nth-child(3n) { border-top-color: var(--silver); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.mega-icon-container i.mega {
+  color: var(--ui-color-1);
+  text-shadow: 0 0 16px rgba(34,211,238,0.45);
+}
+
+.mega-icon-container h2 {
+  font-size: 22px;
+  color: var(--ui-color-4);
+  font-family: 'Kaisei Decol', serif;
+  margin: 10px 0 4px;
+}
+
+.mega-icon-container .card-sub {
+  font-size: 14px;
+  color: var(--cyan-deep);
+  font-weight: bold;
+}
+
+.card-content {
+  padding: 0 10px 10px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 16px;
+  margin-top: 4px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  border: 1px solid var(--silver);
+}
+
+.keyword-tag.cta {
+  background-color: var(--cyan-glow);
+  color: var(--navy-deep);
+  border-color: var(--cyan-deep);
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(10,31,68,0.14);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #E9FBFE;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #EEF1F6;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+}
+
+/* フェードインアニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: translateY(24px) scale(0.96);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* フッター */
+.footer {
+  margin-top: 45px;
+  padding: 25px 20px;
+  background: linear-gradient(135deg, var(--navy) 0%, var(--navy-deep) 100%);
+  border-radius: 20px;
+  text-align: center;
+  color: var(--silver-soft);
+  border: 2px solid var(--cyan-deep);
+}
+
+.footer a {
+  color: var(--cyan-glow);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+.footer .footer-icon {
+  font-size: 2.4em;
+  color: var(--cyan-glow);
+  margin-bottom: 8px;
+  animation: fa-beat-fade 2.4s ease-in-out infinite;
+}
+
+.footer p { margin: 6px 0; font-size: 15px; }
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+  .header h1 { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+<div class="canvas">
+
+  <!-- ヘッダー -->
+  <div class="header">
+    <i class="fa-solid fa-microchip mega-icon fa-7x" aria-hidden="true"></i>
+    <h1>推論のフロンティア：100から10,000トークン/秒へ</h1>
+    <p class="subtitle">〜 Cerebras 共同創業者兼CTO Sean Lie に聞く、wafer scale の現在と未来 〜</p>
+    <p class="meta">
+      <i class="fa-solid fa-podcast" aria-hidden="true"></i> Latent Space Podcast ／
+      <i class="fa-solid fa-microphone-lines" aria-hidden="true"></i> 聞き手: swyx &amp; Vibhu ／
+      <i class="fa-solid fa-calendar" aria-hidden="true"></i> 2026-09-02
+    </p>
+    <p class="tags">
+      <span class="keyword-tag cta">Cerebras</span>
+      <span class="keyword-tag cta">wafer scale</span>
+      <span class="keyword-tag">CS4 / CS5</span>
+      <span class="keyword-tag">Hot Chips</span>
+      <span class="keyword-tag">OpenAI</span>
+      <span class="keyword-tag">Jalapeño</span>
+      <span class="keyword-tag">Groq</span>
+      <span class="keyword-tag">NVIDIA</span>
+    </p>
+  </div>
+
+  <!-- セクション1: 黄金時代 -->
+  <div class="section-header">
+    <i class="fa-solid fa-star" aria-hidden="true"></i>
+    <h2>ハードウェアの黄金時代</h2>
+    <span class="section-badge">Card 1</span>
+  </div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-6x mega" style="animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>今が「黄金時代」</h2>
+        <p class="card-sub">半導体史上、例のない同時進行</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>10〜20年前の Hot Chips は、アーキテクトのオタクがスペックを語る場だった</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i><span>今や<span class="keyword-tag">業界を変えるハードウェア</span>が発表される場に変わった</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>チップ・相互接続・システム設計・ソフトウェア・光学・方法論・ツーリングの<span class="keyword-tag">すべての層</span>で同時にイノベーション</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>半導体の歴史で、これほどの同時進行は<span class="keyword-tag">前例がない</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+          すべての層が一気に動く——
+          <br>今こそ<span class="keyword-tag">ハードウェアの黄金時代</span>だ！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション2: CS4 / CS5 -->
+  <div class="section-header">
+    <i class="fa-solid fa-bolt" aria-hidden="true"></i>
+    <h2>CS4 / CS5 — ウエハースケールの加速</h2>
+    <span class="section-badge">Card 2-5</span>
+  </div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x mega" style="animation: fa-bounce 2s ease infinite;" aria-hidden="true"></i>
+        <h2>新プラットフォーム「Nexus」</h2>
+        <p class="card-sub">CS4 発表の中核</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>wafer scale を<span class="keyword-tag">メインストリーム</span>へ、さらにハイパースケールへ届ける新プラットフォーム</span></li>
+          <li><i class="fa-solid fa-cubes fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">モジュール型</span>の設計で柔軟に拡張</span></li>
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span>ウェハーへの給電が従来比 <span class="keyword-tag">2倍</span></span></li>
+          <li><i class="fa-solid fa-arrows-left-right fa-lg" aria-hidden="true"></i><span>相互接続の帯域も <span class="keyword-tag">2倍</span>、レイテンシは<span class="keyword-tag">半分</span></span></li>
+          <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>ラックへの高密度まとめで、性能も従来比 <span class="keyword-tag">2倍</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-gauge-high fa-lg" style="color: var(--cyan-deep);"></i>
+          給電2倍・帯域2倍・レイテンシ半分——
+          <br>全部ぜんぶ盛りの進化だ！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-6x mega" style="animation: fa-beat-fade 1.8s ease-in-out infinite; color: var(--cyan-deep);" aria-hidden="true"></i>
+        <h2>Hot Chips デモ</h2>
+        <p class="card-sub">GPT-OSS が 4,400 TPS 超</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>Hot Chips のデモで GPT-OSS を <span class="keyword-tag cta">4,400 TPS 超</span>で動かす</span></li>
+          <li><i class="fa-solid fa-face-surprise fa-lg" aria-hidden="true"></i><span>にわかに信じがたい数字——<span class="keyword-tag">「フェイクに見える」レベル</span></span></li>
+          <li><i class="fa-solid fa-repeat fa-lg" aria-hidden="true"></i><span>バッチ・オフラインだったアプリが<span class="keyword-tag">リアルタイム</span>に変わる</span></li>
+          <li><i class="fa-solid fa-robot fa-lg" aria-hidden="true"></i><span>エージェントのループをより多く回せる ＝ より多くの推論 ＝ <span class="keyword-tag">より知的なエージェント</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten">
+          <i class="fa-solid fa-rocket fa-lg" style="color: var(--ui-color-2);"></i>
+          ループを多く回せるほど、
+          <br>エージェントは賢くなる——
+          <br><span class="keyword-tag">速さはそのまま知性</span>になる！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-forward-fast fa-5x mega" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>CS5 プレビュー</h2>
+        <p class="card-sub">来年、さらに2倍へ</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>Nexus プラットフォームは<span class="keyword-tag">複数世代向け</span>に設計済み</span></li>
+          <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span>来年の次世代ウェハーチップで、さらに <span class="keyword-tag">2倍</span></span></li>
+          <li><i class="fa-solid fa-box fa-lg" aria-hidden="true"></i><span>中規模モデル（GPT-OSS・Gemma）は <span class="keyword-tag cta">10,000 TPS</span> へ</span></li>
+          <li><i class="fa-solid fa-crown fa-lg" aria-hidden="true"></i><span>フロンティアモデル（Kimi・DeepSeek・GPT-5.6 Sol）も <span class="keyword-tag cta">5,000 TPS</span> まで引き上げ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i>
+          中規模なら10,000 TPS、
+          <br>大型でも5,000 TPS——
+          <br>これは<span class="keyword-tag">ゲームチェンジャー</span>！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x mega" style="animation: fa-bounce 2.4s ease infinite; color: var(--cyan-deep);" aria-hidden="true"></i>
+        <h2>「作れるわけがない」から14倍へ</h2>
+        <p class="card-sub">wafer scale の実証は終わった</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-flask fa-lg" aria-hidden="true"></i><span>第1世代チップは<span class="keyword-tag">技術実証（PoC）</span>だった</span></li>
+          <li><i class="fa-solid fa-quote-left fa-lg" aria-hidden="true"></i><span>当時は<span class="keyword-tag">「そんなものは作れるわけがない、狂っている」</span>と言われた</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>実証は終わり、いまは<span class="keyword-tag">実際の問題解決</span>へ移行</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>OpenAI とのウルトラスファースト推論で、最大最強モデルを GPU 比 <span class="keyword-tag cta">14倍</span>の速度で実行</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">最も知的なモデル × ハードの速さ</span>の組み合わせが変革を起こす</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-heart fa-lg" style="color: var(--cyan-deep);"></i>
+          「狂ってる」と言われた挑戦が、
+          <br>いまや<span class="keyword-tag">14倍の速さ</span>になった。
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション3: OpenAI との関係 -->
+  <div class="section-header">
+    <i class="fa-solid fa-handshake" aria-hidden="true"></i>
+    <h2>OpenAI との関係</h2>
+    <span class="section-badge">Card 6-9</span>
+  </div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-fire-flame-curved fa-5x mega" style="animation: fa-beat-fade 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>完売状態と戦略配置</h2>
+        <p class="card-sub">すべてのメガワットを最適に</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i><span>現在、<span class="keyword-tag">作れるものはすべて売り切れ</span>の完売状態</span></li>
+          <li><i class="fa-solid fa-chess fa-lg" aria-hidden="true"></i><span>すべてのメガワットを<span class="keyword-tag">最も戦略的</span>に配備</span></li>
+          <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i><span>かなりの部分が <span class="keyword-tag">OpenAI へ</span></span></li>
+          <li><i class="fa-solid fa-handshake-angle fa-lg" aria-hidden="true"></i><span>OpenAI は単なる商業パートナーでなく、<span class="keyword-tag">共同設計（co-design）の精神</span>を共有する最大のパートナー</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+          売り切れ続出のうえ、
+          <br>容量は<span class="keyword-tag">戦略的</span>に振り分けられる。
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-stopwatch fa-5x mega" style="animation: fa-shake 3s ease infinite; color: var(--cyan-deep);" aria-hidden="true"></i>
+        <h2>速度が生死を分ける</h2>
+        <p class="card-sub">OpenAI の内部利用</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-tower-broadcast fa-lg" aria-hidden="true"></i><span>OpenAI はその容量を<span class="keyword-tag">内部利用</span>に充当</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">インシデント対応</span>——サービスが止まった時は<span class="keyword-tag cta">分秒が勝負</span></span></li>
+          <li><i class="fa-solid fa-flask-vial fa-lg" aria-hidden="true"></i><span>最重要の<span class="keyword-tag">研究アプリ</span>でも速度の価値を最大限に享受</span></li>
+          <li><i class="fa-solid fa-arrow-up-right-dots fa-lg" aria-hidden="true"></i><span>その後、<span class="keyword-tag">企業顧客</span>にも段階的に開放へ</span></li>
+          <li><i class="fa-solid fa-users fa-lg" aria-hidden="true"></i><span>将来はより広い層にウルトラスファーストを届ける<span class="keyword-tag">十分な容量</span>をコミット</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-clock fa-lg" style="color: var(--ui-color-5);"></i>
+          障害対応は秒単位の勝負。
+          <br>そこで<span class="keyword-tag">速さ</span>が効く！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-pepper-hot fa-6x mega" style="animation: fa-bounce 2s ease infinite; color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>OpenAI Jalapeño チップ</h2>
+        <p class="card-sub">Sean が最も興奮した発表</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i><span>Hot Chips で Sean が<span class="keyword-tag">一番興奮した</span>もの</span></li>
+          <li><i class="fa-solid fa-gauge-simple-high fa-lg" aria-hidden="true"></i><span>理由は性能そのものではなく<span class="keyword-tag cta">設計方法論</span></span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span>OpenAI は<span class="keyword-tag">「大幅に良いGPU」</span>を作った——それ自体が快挙</span></li>
+          <li><i class="fa-solid fa-brain fa-lg" aria-hidden="true"></i><span>本当に重要なのは、<span class="keyword-tag">AIファーストの方法論</span>でチップをより速く設計したこと</span></li>
+          <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">スループットとレイテンシの両方</span>の限界を押し上げ、伝統的 GPU では届かない領域へ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-pepper-hot fa-lg" style="color: var(--cyan-deep);"></i>
+          AIらしくチップを作る——
+          <br>これは<span class="keyword-tag">業界の未来そのもの</span>！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-puzzle-piece fa-5x mega" style="animation: fa-flip 3.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Jalapeño × CS5</h2>
+        <p class="card-sub">完全なファースト推論ポートフォリオ</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-calendar-check fa-lg" aria-hidden="true"></i><span>来年 Jalapeño が利用可能に——<span class="keyword-tag">CS5 と同時期</span></span></li>
+          <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i><span>両者を組み合わせれば <span class="keyword-tag cta">完全なファースト推論ポートフォリオ</span> が実現</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">prefill / decode 分離</span>など、統合の機会も多数</span></li>
+          <li><i class="fa-solid fa-gears fa-lg" aria-hidden="true"></i><span>Jalapeño は分離特化ではないが<span class="keyword-tag">スループット特化</span>——アーキテクトとしてできることはいろいろ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-handshake fa-lg" style="color: var(--ui-color-2);"></i>
+          競合ではなく<span class="keyword-tag">組み合わせ</span>で
+          <br>最強の推論基盤ができる！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション4: 競合分析 -->
+  <div class="section-header">
+    <i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i>
+    <h2>競合分析 — それぞれの立ち位置</h2>
+    <span class="section-badge">Card 10-13</span>
+  </div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x mega" style="animation: fa-beat-fade 2.6s ease-in-out infinite; color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>Groq への批判</h2>
+        <p class="card-sub">「非常に疑わしい」点</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i><span>SRAM 設計がメインストリームになるのは<span class="keyword-tag">素晴らしい</span>——NVIDIA さえ受け入れ、伝統的 GPU ではウルトラスファーストに届かないと認識</span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>しかし奇妙な点: なぜ <span class="keyword-tag">310億パラメータ</span>モデルでローンチ？</span></li>
+          <li><i class="fa-solid fa-scissors fa-lg" aria-hidden="true"></i><span>Jensen が GTC で30分かけて説明した <span class="keyword-tag">attention / FFN 分離（Ruben LPX）</span>に言及がなかった</span></li>
+          <li><i class="fa-solid fa-eye-slash fa-lg" aria-hidden="true"></i><span>フル生産中の製品で、非分離の31Bモデルの数字しか見せないのは <span class="keyword-tag cta">「非常に疑わしい」</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-meh fa-lg" style="color: var(--ui-color-5);"></i>
+          本気の数字なら、
+          <br>分離モデルでも見せてほしい——
+          <br>という鋭いツッコミ。
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-memory fa-5x mega" style="animation: fa-bounce 2.2s ease infinite;" aria-hidden="true"></i>
+        <h2>メモリの桁違い</h2>
+        <p class="card-sub">スケールで2桁の差が「無料」</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>非ウエハースケールの SRAM 設計では、<span class="keyword-tag">各チップのメモリが足りない</span>という課題が表れやすい</span></li>
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>数兆パラメータのフロンティアモデルには、<span class="keyword-tag">重みの保持だけで数千個の LPU</span> が必要</span></li>
+          <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>Cerebras の1チップは Groq の1チップの約 <span class="keyword-tag cta">100倍のメモリ</span></span></li>
+          <li><i class="fa-solid fa-arrow-down-short-wide fa-lg" aria-hidden="true"></i><span>スケールで <span class="keyword-tag">2桁の差が無料でつく</span></span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>Groq は今後<span class="keyword-tag">より小さいモデル</span>に集中していくはず。買収後も第一近似では変わらない</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-microchip fa-lg" style="color: var(--cyan-deep);"></i>
+          ウェハーごとまるごと1枚——
+          <br>だから<span class="keyword-tag">メモリで圧勝</span>できる。
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrow-trend-up fa-5x mega" style="animation: fa-beat 2.8s ease infinite; color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>NVIDIA・AMD・TPU・Trainium</h2>
+        <p class="card-sub">「新しいバッチモード」への警告</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>NVIDIA はみんなが予想した通りのことをしている——ドープではなく、<span class="keyword-tag">トークンをより安く・より多く</span>は現実のニーズ</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>ただし <span class="keyword-tag">100-200 TPS はすぐに「新しいバッチモード」</span>になる</span></li>
+          <li><i class="fa-solid fa-bars-staggered fa-lg" aria-hidden="true"></i><span>プロンプト処理や超並列ワークロードには適するが、<span class="keyword-tag">それだけでは不十分</span></span></li>
+          <li><i class="fa-solid fa-rotate fa-lg" aria-hidden="true"></i><span>従来型アーキテクチャは「より良い Ruben を作る」<span class="keyword-tag">トレッドミル</span>の上（良い意味で）。AMD・Trainium・ある程度 TPU も同様</span></li>
+          <li><i class="fa-solid fa-compass fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">別のベクトル</span>で限界を押し上げる価値もある——それが Cerebras の立ち位置</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-compass fa-lg" style="color: var(--ui-color-2);"></i>
+          安さを追う道と、
+          <br><span class="keyword-tag">速さで攻める道</span>。
+          <br>両方に価値がある。
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-question fa-5x mega" style="animation: fa-flip 4s ease-in-out infinite; color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>Etched について</h2>
+        <p class="card-sub">差別化が見えにくい</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-slash fa-lg" aria-hidden="true"></i><span>非常に多くは語らない——語ったことも<span class="keyword-tag">当初から大きく変わった</span>（彼ら自身も認める）</span></li>
+          <li><i class="fa-solid fa-palette fa-lg" aria-hidden="true"></i><span>Web サイトのグラフィックデザインは印象的……</span></li>
+          <li><i class="fa-solid fa-eye-slash fa-lg" aria-hidden="true"></i><span>しかし<span class="keyword-tag">伝統的 GPU より良いもの</span>を作ろうとしている以上のものが見えない</span></li>
+          <li><i class="fa-solid fa-circle-exclamation fa-lg" aria-hidden="true"></i><span>「分散型だから速い分散ストレージ」という主張は<span class="keyword-tag">理解できない</span></span></li>
+          <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>ラックを出していたので何かは作っているが、<span class="keyword-tag">差別化の位置が見えにくい</span></span></li>
+          <li><i class="fa-solid fa-star-half-stroke fa-lg" aria-hidden="true"></i><span>ベストケースに望むのは、<span class="keyword-tag">チップの外での革新的な統合</span>（ラック・ノード・パッケージ・相互接続・工場）の限界を押し上げること</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-thinking fa-lg" style="color: var(--ui-color-5);"></i>
+          次のフロンティアは
+          <br><span class="keyword-tag">単一チップの外</span>の統合——
+          <br>そこに挑んでほしい。
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション5: 次のフロンティア -->
+  <div class="section-header">
+    <i class="fa-solid fa-cubes-stacked" aria-hidden="true"></i>
+    <h2>次のフロンティア — チップの外の統合</h2>
+    <span class="section-badge">Card 14-17</span>
+  </div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-network-wired fa-5x mega" style="animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>異種分散エコシステム</h2>
+        <p class="card-sub">データセンター全体を1台のコンピュータに</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-globe fa-lg" aria-hidden="true"></i><span>市場は大きく、<span class="keyword-tag">さまざまなハードウェアに役割</span>がある</span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>推論はもはや単一のワークロードではない——<span class="keyword-tag">prefill・decode・KVキャッシュのロード・attention・エキスパートの分散とバランシング</span>など多数のサブワークロード</span></li>
+          <li><i class="fa-solid fa-microchip fa-lg" aria-hidden="true"></i><span>それぞれに<span class="keyword-tag">適したハードウェア</span>を使うべき</span></li>
+          <li><i class="fa-solid fa-battery-full fa-lg" aria-hidden="true"></i><span>小さいスケールでは意味がないが、<span class="keyword-tag">数百メガワット〜マルチギガワット</span>規模なら簡単に元が取れる</span></li>
+          <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i><span>その規模ではデータセンター全体を<span class="keyword-tag cta">「1台のコンピュータ」</span>のように考える——配分できる能力をコントロール</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--cyan-deep);"></i>
+          建物まるごと1台のPC——
+          <br>それは<span class="keyword-tag">コンピュータ・アーキテクトの夢</span>！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-handshake fa-5x mega" style="animation: fa-bounce 2.6s ease infinite; color: var(--cyan-deep);" aria-hidden="true"></i>
+        <h2>モデル × ハードの共同設計</h2>
+        <p class="card-sub">最も開拓されていない機会</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-map fa-lg" aria-hidden="true"></i><span>いま最も<span class="keyword-tag cta">開拓されていない機会</span></span></li>
+          <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>誰もが NVIDIA GPU 向け（特定の1機種——<span class="keyword-tag">B200・GB200・MBL72</span>）に設計されたモデルを動かしている</span></li>
+          <li><i class="fa-solid fa-bolt fa-lg" aria-hidden="true"></i><span>そのまま（別アーキテクチャで実行）でも <span class="keyword-tag">14倍速い</span>のに、モデルをわずかに調整するだけで<span class="keyword-tag">巨大なゲイン</span>が得られる</span></li>
+          <li><i class="fa-solid fa-infinity fa-lg" aria-hidden="true"></i><span>共同設計（co-design）を進めれば機会は<span class="keyword-tag">ほぼ無限</span></span></li>
+          <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">AIコード生成（カーネル生成）</span>は過小評価されている</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-code fa-lg" style="color: var(--ui-color-2);"></i>
+          モデルをちょっと直すだけで
+          <br><span class="keyword-tag">何倍も速くなる</span>——
+          <br>まだ誰も掘っていない鉱脈！
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug-circle-bolt fa-5x mega" style="animation: fa-beat 2s ease infinite;" aria-hidden="true"></i>
+        <h2>給電・冷却・信頼性</h2>
+        <p class="card-sub">本当の戦いはそこにあった</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i><span>ウエハースケールで最初に「難しい」とされたのは<span class="keyword-tag">ダイ間の接続と歩留まり</span></span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>実際に最大の課題だったのは <span class="keyword-tag cta">給電・冷却・スケールでの信頼性</span></span></li>
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>パワーポイントに描くのと、実際に給電・冷却して動かすのは<span class="keyword-tag">別物</span></span></li>
+          <li><i class="fa-solid fa-box-archive fa-lg" aria-hidden="true"></i><span>Cerebras の <span class="keyword-tag">backpack（給電）</span>は3Dパッケージに近い発想——電力をチップの表面に直接</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">歩留まりと3Dパッケージはすでに解決済み</span>——3D DRAM 技術も同じ道をたどる</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-snowflake fa-lg" style="color: var(--ui-color-5);"></i>
+            図面は誰でも描ける。
+          <br>動かして冷やすのが本番——
+          <br><span class="keyword-tag">経験の差</span>が出るところ。
+        </span>
+      </div>
+    </div>
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cubes fa-5x mega" style="animation: fa-flip 3.2s ease-in-out infinite; color: var(--cyan-deep);" aria-hidden="true"></i>
+        <h2>D-Matrix・Samsung・3D DRAM</h2>
+        <p class="card-sub">注目の統合アプローチ</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-up-to-line fa-lg" aria-hidden="true"></i><span>アプリ・問題・モデルは単一チップに収まらない大きさに——すべては<span class="keyword-tag">統合</span>に行き着く（計算・メモリ・相互接続をどうまとめるか、スケジューリング、パイプライニング）</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">計算・相互接続・メモリ</span>の3つが AI チップの構成要素</span></li>
+          <li><i class="fa-solid fa-gauge-simple fa-lg" aria-hidden="true"></i><span>低レイテンシ領域では<span class="keyword-tag cta">メモリ帯域が鍵</span></span></li>
+          <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span>Hot Chips で興味深かったのは <span class="keyword-tag">D-Matrix</span>（3D DRAM パッケージングに本気）と <span class="keyword-tag">Samsung の ZHBM</span></span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg" aria-hidden="true"></i><span>Cerebras も2年前から <span class="keyword-tag">DRAM スタッキング（3D積層）</span>プログラムを開始済み</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-cubes fa-lg" style="color: var(--cyan-deep);"></i>
+          次の勝負は
+          <br><span class="keyword-tag">チップの外</span>の統合——
+          <br>3D DRAM が主戦場に！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- セクション6: 業界と未来 -->
+  <div class="section-header">
+    <i class="fa-solid fa-globe" aria-hidden="true"></i>
+    <h2>業界の未来 — 競争と節目</h2>
+    <span class="section-badge">Card 18</span>
+  </div>
+  <div class="section-layout">
+
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag fa-5x mega" style="animation: fa-beat-fade 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>中国モデルと最大の IPO</h2>
+        <p class="card-sub">国レベルの課題と個人の節目</p>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-chart-pie fa-lg" aria-hidden="true"></i><span>オープンソースモデル市場は <span class="keyword-tag cta">95% が中国製</span>——高品質な大型オープンモデルの大半が中国のラボから</span></li>
+          <li><i class="fa-solid fa-handshake-angle fa-lg" aria-hidden="true"></i><span>共有が起きること自体はグローバルコミュニティに良い面もあるが、あの依存度は<span class="keyword-tag">戦略的に非常に難しい立場</span></span></li>
+          <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>これらのモデルを支えるハードウェアインフラも独自に構築されつつある（<span class="keyword-tag">Huawei</span> 等）</span></li>
+          <li><i class="fa-solid fa-landmark fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">国家利害レベルのイニシアチブ</span>で解決すべき問題——単一企業や単一ファブでは解けない。米国の主導を続ける取り組みを支持</span></li>
+          <li><i class="fa-solid fa-trophy fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">史上最大の半導体 IPO</span>——「今でも自分をつねって確認するレベル」。それでも<span class="keyword-tag">まだまだ初期</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-2);"></i>
+          歴史的な IPO を経ても
+          <br>「まだ序章」——
+          <br><span class="keyword-tag">この勢いは続く</span>！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <div class="footer">
+    <i class="fa-solid fa-microchip footer-icon" aria-hidden="true"></i>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=3uSI8q_RN-o" target="_blank" rel="noopener">Latent Space Podcast</a> — The Inference Frontier: from 100 to 10,000 tokens per second — Sean Lie, Cerebras CTO</p>
+    <p><i class="fa-solid fa-calendar" aria-hidden="true"></i> 2026-09-02 ／ <i class="fa-solid fa-user-group" aria-hidden="true"></i> 聞き手: swyx &amp; Vibhu ／ <i class="fa-solid fa-fire" aria-hidden="true"></i> Hot Chips 直前収録</p>
+    <p style="opacity: 0.75; font-size: 13px;">このインフォグラフィックは動画内容を日本語でまとめたものです。</p>
+  </div>
+
+</div>
+
+<script>
+// スクロールに連動したカードのフェードイン
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { observer.observe(c); });
+});
+</script>
+</body>
+</html>

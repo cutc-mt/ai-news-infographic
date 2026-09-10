@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>誰も語り足りない AIコーディングのセキュリティ｜Cole Medin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  :root {
+    /* 独自パレット: 深まる eggplant × ネオンライム（セキュリティ端末風） */
+    --ui-color-1: #3A0CA3;   /* インディゴバイオレット */
+    --ui-color-2: #80B918;   /* ネオンライム */
+    --ui-color-3: #EFEAFB;   /* うすいバイオレットのタグ地 */
+    --ui-color-4: #2E1065;   /* ディープ eggplant */
+    --ui-color-5: #D90429;   /* アラートレッド */
+    --ui-canvas: #F7F5FC;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--ui-canvas);
+    font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+    color: #333333;
+    line-height: 1.6;
+  }
+
+  .page-container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ヘッダー */
+  .main-header {
+    background: linear-gradient(135deg, #1E0A4A 0%, #3A0CA3 55%, #6D28D9 100%);
+    border-radius: 24px;
+    padding: 40px 30px;
+    text-align: center;
+    color: #ffffff;
+    box-shadow: 6px 6px 20px rgba(46, 16, 101, 0.3);
+    margin-bottom: 30px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .main-header .header-icon {
+    font-size: 84px;
+    color: #B5EA2B;
+    margin-bottom: 12px;
+    animation: fa-beat-fade 3s infinite;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  }
+
+  .main-header h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    margin: 10px 0 6px;
+    line-height: 1.4;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  .main-header .subtitle {
+    font-size: 22px;
+    color: #D6CCF4;
+    margin-bottom: 10px;
+  }
+
+  .main-header .meta {
+    font-size: 14px;
+    color: #A99BD8;
+  }
+
+  .header-badge {
+    display: inline-block;
+    background: var(--ui-color-2);
+    color: #1E0A4A;
+    border-radius: 999px;
+    padding: 4px 18px;
+    font-size: 14px;
+    font-weight: bold;
+    margin-top: 8px;
+    box-shadow: 0 3px 8px rgba(128, 185, 24, 0.45);
+  }
+
+  /* レイアウト: 4カラム */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+
+  .section-card {
+    flex: 1 1 430px;
+    min-width: 300px;
+    max-width: 460px;
+    background-color: #ffffff;
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(46, 16, 101, 0.13);
+    position: relative;
+    overflow: hidden;
+    border-top: 6px solid var(--ui-color-1);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    opacity: 0;
+    transform: translateY(24px) scale(0.97);
+  }
+
+  .section-card.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+
+  .section-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 8px 10px 24px rgba(46, 16, 101, 0.22);
+  }
+
+  .section-card.accent { border-top-color: var(--ui-color-2); }
+  .section-card.warn { border-top-color: var(--ui-color-5); }
+
+  .card-number {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 40px;
+    font-weight: bold;
+    color: var(--ui-color-3);
+    z-index: 0;
+  }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0 5px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .mega-icon-container i {
+    filter: drop-shadow(0 4px 6px rgba(46, 16, 101, 0.22));
+  }
+
+  .mega-icon-container h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: #555555;
+    margin: 10px 0 0;
+  }
+
+  .card-content { padding: 0 10px 10px; position: relative; z-index: 1; }
+
+  .lead-text {
+    font-size: 16px;
+    color: var(--ui-color-4);
+    background: var(--ui-color-3);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin: 10px 0;
+    text-align: center;
+    font-weight: bold;
+  }
+
+  .keyword-list {
+    margin: 12px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+
+  .keyword-list li {
+    margin-bottom: 9px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: #333333;
+  }
+
+  .keyword-list li i {
+    margin-right: 9px;
+    margin-top: 4px;
+    color: var(--ui-color-2);
+    min-width: 18px;
+  }
+
+  .keyword-list li i.indigo { color: var(--ui-color-1); }
+  .keyword-list li i.red { color: var(--ui-color-5); }
+
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin: 0 3px;
+    display: inline-block;
+    font-weight: bold;
+    border: 1px solid #D8CCF4;
+  }
+
+  .keyword-tag.lime {
+    background-color: #F0F8DC;
+    color: #4A7A0A;
+    border-color: #D5E8A8;
+  }
+
+  .keyword-tag.red {
+    background-color: #FBE3E7;
+    color: #A31531;
+    border-color: #F2B8C4;
+  }
+
+  .vs-box {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+  }
+
+  .vs-box .vs-item {
+    flex: 1;
+    background: var(--ui-color-3);
+    border: 2px solid var(--ui-color-1);
+    border-radius: 12px;
+    padding: 8px;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .vs-box .vs-item .vs-name {
+    display: block;
+    font-weight: bold;
+    color: var(--ui-color-4);
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+
+  .vs-box .vs-item.lime-side {
+    background: #F0F8DC;
+    border-color: var(--ui-color-2);
+  }
+  .vs-box .vs-item.lime-side .vs-name { color: #4A7A0A; }
+
+  .flow-arrow {
+    text-align: center;
+    color: var(--ui-color-1);
+    font-size: 20px;
+    margin: 2px 0;
+  }
+
+  pre {
+    background: #241E3F;
+    color: #E8E4F8;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border-left: 4px solid var(--ui-color-2);
+    font-size: 12.5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    line-height: 1.55;
+  }
+
+  pre .cmt { color: #8F86C9; }
+  pre .ng  { color: #FF7A92; }
+  pre .ok  { color: #B5EA2B; }
+
+  /* 手書き風吹き出し */
+  .speech-bubble {
+    position: relative;
+    background: #ffffff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 18px 5px 15px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+    z-index: 1;
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+
+  .speech-bubble.variant-1 {
+    background: #F4FAE4;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+
+  .speech-bubble.variant-2 {
+    background: #FDECEF;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after { border-color: var(--ui-color-5) transparent; }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333;
+    display: inline;
+  }
+
+  .bubble-speaker {
+    font-weight: bold;
+    color: var(--ui-color-1);
+  }
+
+  .bubble-speaker.lime { color: #4A7A0A; }
+  .bubble-speaker.red { color: var(--ui-color-5); }
+
+  /* セクション見出しバー */
+  .phase-bar {
+    flex-basis: 100%;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 14px 0 2px;
+  }
+
+  .phase-bar .phase-icon {
+    font-size: 26px;
+    color: var(--ui-color-2);
+  }
+
+  .phase-bar h3 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 22px;
+    color: var(--ui-color-4);
+    margin: 0;
+  }
+
+  .phase-bar .phase-line {
+    flex: 1;
+    height: 3px;
+    background: linear-gradient(90deg, var(--ui-color-1), transparent);
+    border-radius: 3px;
+  }
+
+  /* フッター */
+  .main-footer {
+    background: var(--ui-color-4);
+    color: #D6CCF4;
+    border-radius: 20px;
+    margin-top: 34px;
+    padding: 26px 20px;
+    text-align: center;
+    font-size: 15px;
+    box-shadow: 5px 5px 15px rgba(46, 16, 101, 0.3);
+  }
+
+  .main-footer a {
+    color: #B5EA2B;
+    font-weight: bold;
+    text-decoration: underline;
+  }
+
+  .main-footer .footer-note {
+    font-size: 13px;
+    color: #A99BD8;
+    margin-top: 8px;
+  }
+
+  /* レスポンシブ */
+  @media (max-width: 1600px) { .section-card { flex-basis: 420px; } }
+  @media (max-width: 1200px) { .section-card { flex-basis: 380px; } }
+  @media (max-width: 900px)  { .section-card { flex-basis: 340px; } }
+  @media (max-width: 768px) {
+    .section-card { flex-basis: 100%; max-width: none; }
+    .main-header h1 { font-size: 26px; }
+    .main-header .subtitle { font-size: 18px; }
+  }
+</style>
+<noscript><style>.section-card { opacity: 1; transform: none; }</style></noscript>
+</head>
+<body>
+<div class="page-container">
+
+  <!-- ヘッダー -->
+  <header class="main-header">
+    <div class="header-icon"><i class="fa-solid fa-shield-halved fa-7x" aria-hidden="true"></i></div>
+    <h1>誰も語り足りない<br>AIコーディングのセキュリティ</h1>
+    <div class="subtitle">「No One Talks Enough About Security for AI Coding」／ Cole Medin チャンネル</div>
+    <div class="meta">📅 2026.09.10 ／ 🎥 動画 17:45 ／ 🛡️ 実演つきのワークフロー解説</div>
+    <div class="header-badge">本命は 決定的なゲート（deterministic gates）</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- Phase 1 -->
+    <div class="phase-bar">
+      <i class="fa-solid fa-triangle-exclamation phase-icon" aria-hidden="true"></i>
+      <h3>Phase 1：速さの裏で、どこで落ちるのか</h3>
+      <div class="phase-line"></div>
+    </div>
+
+    <!-- 1 -->
+    <div class="section-card fade-in-scale warn">
+      <div class="card-number">01</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="color: var(--ui-color-5); animation: fa-beat 2.4s infinite;" aria-hidden="true"></i>
+        <h2>速い。でもセキュリティで落ちる</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">売りは速さ、弱点は安全</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>AIコーディングの支援はとにかく<span class="keyword-tag">速い</span></span></li>
+          <li><i class="fa-solid fa-scale-balanced indigo" aria-hidden="true"></i><span>読み比べると、いちばん弱いのは<span class="keyword-tag red">セキュリティ</span></span></li>
+          <li><i class="fa-solid fa-list-check indigo" aria-hidden="true"></i><span>使い回し・ドキュメント・パフォーマンスより先に落ちる</span></li>
+          <li><i class="fa-solid fa-ghost red" aria-hidden="true"></i><span>AIが書いたコードの<span class="keyword-tag red">怖い話</span>はあとを絶たない</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-face-anguished fa-lg" style="color: var(--ui-color-5);"></i> <span class="bubble-speaker red">コール</span>：速いだけで選ぶと、怖い話の主役になるんです。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">02</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-door-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>混入する入り口は2つ</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">コードか、ライブラリか</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code indigo" aria-hidden="true"></i><span>入り口①：エージェントが<span class="keyword-tag red">直に</span>脆弱なコードを書く</span></li>
+          <li><i class="fa-solid fa-cubes" aria-hidden="true"></i><span>入り口②：<span class="keyword-tag lime">CVE持ち</span>のサードパーティ製ライブラリを入れてしまう</span></li>
+          <li><i class="fa-solid fa-eye-slash red" aria-hidden="true"></i><span>どちらも<span class="keyword-tag red">気づきにくい</span>のがやっかい</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 入り口は2つ。でも中身はぜんぶ「人の目が届かない」ことから始まるのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3 -->
+    <div class="section-card fade-in-scale warn">
+      <div class="card-number">03</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-5); animation: fa-shake 3.5s infinite;" aria-hidden="true"></i>
+        <h2>入り口①：直に書き込まれる</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">SQLインジェクションのような典型</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database indigo" aria-hidden="true"></i><span>クエリを<span class="keyword-tag red">文字列の連結</span>で済ませてしまう</span></li>
+          <li><i class="fa-solid fa-face-meh indigo" aria-hidden="true"></i><span>動けばOKで、穴のある書き方がそのまま通る</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>昔からある<span class="keyword-tag">典型的な穴</span>が、新鮮な顔で入ってくる</span></li>
+        </ul>
+        <pre><span class="cmt"># NG: 文字列を直にくっつけただけ</span>
+q = <span class="ng">"SELECT * FROM users
+     WHERE name='" + name + "'"</span>
+<span class="cmt"># → 動くのに、穴が開いている</span></pre>
+        <div class="speech-bubble top">
+          <span class="handwritten"><i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-5);"></i> 動くコードと、安全なコードは<span class="keyword-tag red">別もの</span>なのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4 -->
+    <div class="section-card fade-in-scale warn">
+      <div class="card-number">04</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-boxes-stacked fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s infinite;" aria-hidden="true"></i>
+        <h2>入り口②：CVE持ちのライブラリ</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">入れるだけでリスクが増える</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-download indigo" aria-hidden="true"></i><span>エージェントが勝手に<span class="keyword-tag lime">パッケージを追加</span>する</span></li>
+          <li><i class="fa-solid fa-virus red" aria-hidden="true"></i><span>その奥に<span class="keyword-tag red">既知のCVE</span>が眠っていたら…</span></li>
+          <li><i class="fa-solid fa-user-secret red" aria-hidden="true"></i><span><span class="keyword-tag red">入れた本人すら把握しない</span>まま増えていく</span></li>
+        </ul>
+        <pre><span class="cmt">$ </span>pip install some-old-lib
+<span class="cmt"># → 依存の奥に CVE つきが
+#   こっそり連れてこられる</span></pre>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-box-open fa-lg" style="color: var(--ui-color-5);"></i> 誰が選んだか分からない荷物が、勝手に部屋に増えるのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">05</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3.2s infinite;" aria-hidden="true"></i>
+        <h2>サブ依存の連鎖が見えない</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">トップレベルしか見ていない</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-diagram-project indigo" aria-hidden="true"></i><span>エージェントが確認するのは<span class="keyword-tag">直近の依存</span>まで</span></li>
+          <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>その奥の<span class="keyword-tag lime">サブ依存</span>のチェーンまでは追えない</span></li>
+          <li><i class="fa-solid fa-magnifying-glass red" aria-hidden="true"></i><span>CVEはその<span class="keyword-tag red">深いところ</span>にこそ潜む</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-tree fa-lg" style="color: var(--ui-color-2);"></i> 木のてっぺんだけ見て、根っこを確認していない状態なのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">06</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-list fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.8s infinite;" aria-hidden="true"></i>
+        <h2>CVEリストは大きすぎる</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">コンテキストに載りきらない</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database indigo" aria-hidden="true"></i><span>CVEの数は<span class="keyword-tag red">膨大</span>で、まだ増え続けている</span></li>
+          <li><i class="fa-solid fa-brain indigo" aria-hidden="true"></i><span>LLMの<span class="keyword-tag">コンテキスト</span>には載りきらない</span></li>
+          <li><i class="fa-solid fa-scale-unbalanced red" aria-hidden="true"></i><span>知らないものは、そのまま<span class="keyword-tag red">見逃される</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-face-thinking-symmetric fa-lg" style="color: var(--ui-color-2);"></i> 全部覚えて判定するのは、もう人間にも無理なのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">07</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2s infinite;" aria-hidden="true"></i>
+        <h2>速さ優先で手を抜く</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">学習データにも脆弱なコード</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gauge-simple-high indigo" aria-hidden="true"></i><span>LLMは<span class="keyword-tag lime">速く出す</span>方向に倒れている</span></li>
+          <li><i class="fa-solid fa-book indigo" aria-hidden="true"></i><span>学習データ自体に、人が書いた<span class="keyword-tag red">脆弱なコード</span>が混ざる</span></li>
+          <li><i class="fa-solid fa-scissors red" aria-hidden="true"></i><span>「ここは省略」が、そのまま<span class="keyword-tag red">コーナーカット</span>につながる</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-heart-crack fa-lg" style="color: var(--ui-color-1);"></i> 「早く出す練習」をしてきたモデルに、安全を丸ごと任せちゃダメなのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div class="phase-bar">
+      <i class="fa-solid fa-volume-xmark phase-icon" aria-hidden="true"></i>
+      <h3>Phase 2：静かなパターンと、効かない解</h3>
+      <div class="phase-line"></div>
+    </div>
+
+    <!-- 8 -->
+    <div class="section-card fade-in-scale warn">
+      <div class="card-number">08</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-volume-xmark fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>静かに混入するパターン</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">気づいていても、直さない</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-eye indigo" aria-hidden="true"></i><span>エージェントは穴に<span class="keyword-tag">気づいている</span>こともある</span></li>
+          <li><i class="fa-solid fa-pen" aria-hidden="true"></i><span>でも直さず、PRの説明に<span class="keyword-tag lime">「後で対応」</span>と書くだけ</span></li>
+          <li><i class="fa-solid fa-circle-arrow-down red" aria-hidden="true"></i><span>そのまま<span class="keyword-tag red">混入</span>して終わる</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-face-diagonal-mouth fa-lg" style="color: var(--ui-color-5);"></i> <span class="bubble-speaker red">コール</span>：気づいてた、がいちばんタチ悪いんですよね…。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">09</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h2>誘われる解：プロンプトの関所</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">PRのあとに別エージェントで審査</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-pull-request indigo" aria-hidden="true"></i><span>実装のあと、<span class="keyword-tag">レビュー用エージェント</span>を通す</span></li>
+          <li><i class="fa-solid fa-thumbs-up" aria-hidden="true"></i><span>確かに、それなりには機能する</span></li>
+          <li><i class="fa-solid fa-dice indigo" aria-hidden="true"></i><span>でも判定は<span class="keyword-tag lime">確率的</span>。外れるときは外れる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-comment fa-lg" style="color: var(--ui-color-2);"></i> 「安全を確認して」とプロンプトでお願いする方式ね。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">10</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-eye-slash fa-5x" style="color: var(--ui-color-1); animation: fa-flip 5s infinite;" aria-hidden="true"></i>
+        <h2>なぜ見逃すのか</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">同じ穴を、同じ目で見る</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-group indigo" aria-hidden="true"></i><span>実装側が見逃したものを、審査側も<span class="keyword-tag red">見逃す</span></span></li>
+          <li><i class="fa-solid fa-clone indigo" aria-hidden="true"></i><span>両者は<span class="keyword-tag">同じ土台</span>のLLM</span></li>
+          <li><i class="fa-solid fa-xmark red" aria-hidden="true"></i><span>「たぶん大丈夫」で<span class="keyword-tag red">通ってしまう</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-people-arrows fa-lg" style="color: var(--ui-color-2);"></i> 片方が直せないものを、もう片方も直せない。なら、違う仕掛けが要るのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div class="phase-bar">
+      <i class="fa-solid fa-shield-halved phase-icon" aria-hidden="true"></i>
+      <h3>Phase 3：本命解 決定的なゲート</h3>
+      <div class="phase-line"></div>
+    </div>
+
+    <!-- 11 -->
+    <div class="section-card fade-in-scale accent">
+      <div class="card-number">11</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2.4s infinite;" aria-hidden="true"></i>
+        <h2>決定的なゲートとは</h2>
+      </div>
+      <div class="card-content">
+        <div class="vs-box">
+          <div class="vs-item">
+            <span class="vs-name"><i class="fa-solid fa-comment-dots"></i> プロンプトの関所</span>
+            お願いして審査する<br><span class="keyword-tag red">確率的</span>・同じ盲点
+          </div>
+          <div class="vs-item lime-side">
+            <span class="vs-name"><i class="fa-solid fa-shield-halved"></i> 決定的なゲート</span>
+            スクリプトが関所を固める<br><span class="keyword-tag lime">決定的</span>・赤は通さない
+          </div>
+        </div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-lock red" aria-hidden="true"></i><span>赤なら<span class="keyword-tag red">通さない</span>。緑だけ通す</span></li>
+          <li><i class="fa-solid fa-gear indigo" aria-hidden="true"></i><span>判断を<span class="keyword-tag">コード</span>に任せる。確率に任せない</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color: var(--ui-color-2);"></i> 「お願い」を「関所」に変えるのが、今回の肝なのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 12 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">12</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cube fa-5x" style="color: var(--ui-color-1); animation: fa-spin 9s linear infinite;" aria-hidden="true"></i>
+        <h2>Archon で組む</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">同じ著者のOSSハーネスビルダー</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wrench indigo" aria-hidden="true"></i><span><span class="keyword-tag">Archon</span> でワークフローを組み立てる</span></li>
+          <li><i class="fa-solid fa-diagram-next" aria-hidden="true"></i><span>ノードをつなげて<span class="keyword-tag lime">流れ</span>を作る</span></li>
+          <li><i class="fa-solid fa-user-gear indigo" aria-hidden="true"></i><span>中で動かすエージェントは<span class="keyword-tag">好きに選べる</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-2);"></i> <span class="bubble-speaker">コール</span>自作のビルダー。Claude Code なども組み込めるのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 13 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">13</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+        <h2>SonarQube で検査</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">SonarQube Cloud でスキャン</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-search indigo" aria-hidden="true"></i><span>コードを静的に<span class="keyword-tag">検査</span>して穴を拾う</span></li>
+          <li><i class="fa-solid fa-traffic-light" aria-hidden="true"></i><span>判定は<span class="keyword-tag lime">赤か緑か</span>ではっきり返る</span></li>
+          <li><i class="fa-solid fa-award indigo" aria-hidden="true"></i><span>セキュリティの<span class="keyword-tag">評価（A〜）</span>も出る</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-gavel fa-lg" style="color: var(--ui-color-2);"></i> 判定を下すのはツール。エージェントの気分じゃないのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 14 -->
+    <div class="section-card fade-in-scale accent">
+      <div class="card-number">14</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>bashノードからAPIを呼ぶ</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">エージェントじゃなく、スクリプトが保証</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal indigo" aria-hidden="true"></i><span>bashノードから <span class="keyword-tag">SonarQube API</span> を叩く</span></li>
+          <li><i class="fa-solid fa-code-branch red" aria-hidden="true"></i><span>赤なら<span class="keyword-tag red">PRを作らせない</span></span></li>
+          <li><i class="fa-solid fa-rotate" aria-hidden="true"></i><span>実装エージェントに<span class="keyword-tag lime">直しに戻す</span></span></li>
+        </ul>
+        <pre><span class="cmt"># bashノード（抜粋）</span>
+curl -s "$SQ_URL/api/qualitygates/\
+project_status?projectKey=$REPO" \
+ | jq -e '.projectStatus.status=="OK"'
+<span class="cmt"># 赤 → ノード失敗 → 修正へ戻る</span></pre>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);"></i> 関所はbash。プロンプトに<span class="keyword-tag lime">一文字も</span>頼っていないのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 15 -->
+    <div class="section-card fade-in-scale accent">
+      <div class="card-number">15</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-arrows-rotate fa-5x" style="color: var(--ui-color-2); animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+        <h2>赤なら戻すループ</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">全部緑になるまで続く</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 indigo" aria-hidden="true"></i><span>スキャン → <span class="keyword-tag red">赤</span>が出る</span></li>
+          <li><i class="fa-solid fa-2 indigo" aria-hidden="true"></i><span>エージェントが<span class="keyword-tag lime">修正</span></span></li>
+          <li><i class="fa-solid fa-3 indigo" aria-hidden="true"></i><span><span class="keyword-tag">再スキャン</span></span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>全緑で、ようやく<span class="keyword-tag lime">PR作成</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-repeat fa-lg" style="color: var(--ui-color-1);"></i> 人が見なくても、緑になるまで出られない<span class="keyword-tag">ループ</span>なのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div class="phase-bar">
+      <i class="fa-solid fa-clapperboard phase-icon" aria-hidden="true"></i>
+      <h3>Phase 4：実演と、自分の流れへの入れ方</h3>
+      <div class="phase-line"></div>
+    </div>
+
+    <!-- 16 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">16</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clapperboard fa-5x" style="color: var(--ui-color-1); animation: fa-shake 4s infinite;" aria-hidden="true"></i>
+        <h2>実演：3つの脆弱性</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">検出 → 修正 → 評価A → PR</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-key red" aria-hidden="true"></i><span><span class="keyword-tag red">直書きのパスワード</span>など3件を検出</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench" aria-hidden="true"></i><span>エージェントが<span class="keyword-tag lime">修正</span></span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>再スキャンで<span class="keyword-tag lime">全緑・評価A</span></span></li>
+          <li><i class="fa-solid fa-code-pull-request indigo" aria-hidden="true"></i><span>その後、はじめて<span class="keyword-tag">PR</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-film fa-lg" style="color: var(--ui-color-2);"></i> 実際に動くところを、動画でそのまま見せてくれるのだ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 17 -->
+    <div class="section-card fade-in-scale">
+      <div class="card-number">17</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-check fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 3.4s infinite;" aria-hidden="true"></i>
+        <h2>全体の流れ</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">GitHub issue から全緑まで</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 indigo" aria-hidden="true"></i><span><span class="keyword-tag">issue</span> → 分類 → <span class="keyword-tag lime">計画</span></span></li>
+          <li><i class="fa-solid fa-2 indigo" aria-hidden="true"></i><span><span class="keyword-tag">実装</span> → PR</span></li>
+          <li><i class="fa-solid fa-3 indigo" aria-hidden="true"></i><span><span class="keyword-tag red">Sonarスキャン</span> → 修正</span></li>
+          <li><i class="fa-solid fa-4 indigo" aria-hidden="true"></i><span>再スキャン → <span class="keyword-tag lime">全緑</span>で完了</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-shoe-prints fa-lg" style="color: var(--ui-color-2);"></i> どのエージェントでも組める「<span class="keyword-tag lime">型</span>」として配っているのよ。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 18 -->
+    <div class="section-card fade-in-scale warn">
+      <div class="card-number">18</div>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-4); animation: fa-beat 2.2s infinite;" aria-hidden="true"></i>
+        <h2>まとめ：guide, verify, solve</h2>
+      </div>
+      <div class="card-content">
+        <div class="lead-text">Sonar のマントラ</div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 indigo" aria-hidden="true"></i><span><span class="keyword-tag">guide</span>：エージェントを導く</span></li>
+          <li><i class="fa-solid fa-2 indigo" aria-hidden="true"></i><span><span class="keyword-tag lime">verify</span>：スキャンで確かめる</span></li>
+          <li><i class="fa-solid fa-3 indigo" aria-hidden="true"></i><span><span class="keyword-tag red">solve</span>：赤を直して、緑にする</span></li>
+          <li><i class="fa-solid fa-recycle" aria-hidden="true"></i><span>Claude Code など<span class="keyword-tag lime">どんなエージェント</span>にも転用できる</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-shield-heart fa-lg" style="color: var(--ui-color-5);"></i> <span class="bubble-speaker red">コール</span>：セキュリティは「速さ」の隣じゃなく、「関所」に置く。それが答えです。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <footer class="main-footer">
+    <div>🎬 動画: <a href="https://www.youtube.com/watch?v=SGodxQHnVxc" target="_blank">Cole Medin</a>「No One Talks Enough About Security for AI Coding. Here's How I Do It in My Workflows」</div>
+    <div class="footer-note">📅 インフォグラフィック作成: 2026.09.10 ／ 動画17:45の内容よりまとめ</div>
+  </footer>
+
+</div>
+
+<script>
+  // スクロールに連動したカードの出現効果
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.08 });
+
+  document.querySelectorAll('.section-card').forEach((card) => {
+    observer.observe(card);
+  });
+</script>
+</body>
+</html>

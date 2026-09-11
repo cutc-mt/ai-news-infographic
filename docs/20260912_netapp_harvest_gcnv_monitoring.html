@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Google Cloud Tech「Get Started with NetApp Harvest on Google Cloud NetApp Volumes」— NetApp Harvest で GCNV をリアルタイム監視する方法を18カードでまとめたインフォグラフィック">
+<title>監視は、1つの画面で。NetApp Harvest × GCNV | Google Cloud Tech インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  /* ============================================
+     「Midnight NOC × Terminal Green × Signal Amber」テーマ
+     監視コンソールをイメージした深夜の紺とモニター緑 2026-09-12 号
+     ============================================ */
+  :root {
+    --ui-color-1: #1F4E79;   /* ミッドナイトブルー（主軸） */
+    --ui-color-2: #FFB454;   /* シグナルアンバー（アクセント） */
+    --ui-color-3: #0D1F3C;   /* ネイビーインク（カード地） */
+    --ui-color-4: #D9E6F5;   /* ムーンライト（文字色） */
+    --ui-color-5: #3EE08F;   /* ターミナルグリーン（主役） */
+    --ui-color-6: #060D1F;   /* 深夜の空（背景） */
+    --ui-color-7: #5E8AC4;   /* ほたるブルー（サブ） */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+    background: var(--ui-color-6);
+    background-image:
+      radial-gradient(circle at 6% 3%, rgba(62,224,143,0.13) 0%, transparent 34%),
+      radial-gradient(circle at 94% 7%, rgba(255,180,84,0.09) 0%, transparent 30%),
+      radial-gradient(circle at 50% 100%, rgba(31,78,121,0.38) 0%, transparent 46%);
+    color: var(--ui-color-4);
+    line-height: 1.6;
+    font-size: 16px;
+  }
+
+  .container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ---------- ヘッダー ---------- */
+  header {
+    text-align: center;
+    padding: 44px 20px 26px;
+    position: relative;
+  }
+
+  header .header-icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 26px;
+    margin-bottom: 12px;
+  }
+
+  header .header-icons .main-icon {
+    font-size: 7em;
+    color: var(--ui-color-5);
+    filter: drop-shadow(0 0 18px rgba(62,224,143,0.55));
+    animation: fa-beat-fade 2.6s ease-in-out infinite;
+  }
+
+  header .header-icons .sub-icon {
+    font-size: 3.4em;
+    color: var(--ui-color-2);
+    filter: drop-shadow(0 0 12px rgba(255,180,84,0.5));
+    animation: fa-bounce 2.4s ease-in-out infinite;
+  }
+
+  header .header-icons .sub-icon2 {
+    font-size: 2.8em;
+    color: var(--ui-color-7);
+    filter: drop-shadow(0 0 10px rgba(94,138,196,0.6));
+    animation: fa-spin 9s linear infinite;
+  }
+
+  h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    font-weight: bold;
+    color: #EDF4FC;
+    margin: 8px 0;
+    text-shadow: 0 0 22px rgba(62,224,143,0.3);
+  }
+
+  h1 .accent { color: var(--ui-color-5); }
+  h1 .accent-l { color: var(--ui-color-2); }
+
+  .header-sub {
+    font-size: 17px;
+    color: #A3B8D6;
+    margin-top: 6px;
+  }
+
+  .header-date {
+    font-size: 14px;
+    color: #6F86A8;
+    margin-top: 8px;
+  }
+
+  .header-tags { margin-top: 14px; }
+  .header-tags .keyword-tag { margin: 3px; }
+
+  .watch-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 16px;
+    background: linear-gradient(120deg, var(--ui-color-5), var(--ui-color-7));
+    color: #06210F;
+    text-decoration: none;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 10px 28px;
+    border-radius: 30px;
+    box-shadow: 0 4px 18px rgba(62,224,143,0.35);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .watch-button:hover {
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 6px 24px rgba(62,224,143,0.5);
+  }
+
+  /* ---------- セクション見出し ---------- */
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 42px 8px 18px;
+  }
+
+  .section-title .st-icon {
+    font-size: 2.2em;
+    color: var(--ui-color-2);
+    animation: fa-shake 4s ease-in-out infinite;
+  }
+
+  .section-title h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 26px;
+    color: var(--ui-color-5);
+    white-space: nowrap;
+  }
+
+  .section-title .st-line {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(90deg, var(--ui-color-5), transparent);
+  }
+
+  .section-arrow {
+    text-align: center;
+    margin: 26px 0 6px;
+    color: var(--ui-color-5);
+  }
+
+  .section-arrow i {
+    font-size: 2em;
+    animation: fa-bounce 2s ease-in-out infinite;
+  }
+
+  /* ---------- カードレイアウト ---------- */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+
+  .section-card {
+    flex: 1;
+    min-width: 280px;
+    max-width: 450px;
+    background: linear-gradient(160deg, var(--ui-color-3), #081428);
+    border: 1px solid rgba(62,224,143,0.20);
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+
+  .section-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--ui-color-5), var(--ui-color-2));
+    opacity: 0.85;
+  }
+
+  .section-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,180,84,0.45);
+    box-shadow: 0 10px 26px rgba(62,224,143,0.22);
+  }
+
+  .card-number {
+    position: absolute;
+    top: 12px;
+    right: 16px;
+    font-family: 'Kaisei Decol', serif;
+    font-size: 15px;
+    font-weight: bold;
+    color: #241503;
+    background: var(--ui-color-2);
+    border-radius: 12px;
+    padding: 2px 11px;
+    box-shadow: 0 2px 8px rgba(255,180,84,0.4);
+  }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0;
+  }
+
+  .mega-icon {
+    display: inline-block;
+    font-size: 5em;
+    margin-bottom: 10px;
+    filter: drop-shadow(0 0 14px rgba(62,224,143,0.35));
+  }
+
+  .card-content {
+    padding: 0 10px 15px;
+  }
+
+  .section-card h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: #E4EFFA;
+    margin: 6px 0 4px;
+  }
+
+  .card-lead {
+    font-size: 16px;
+    color: var(--ui-color-2);
+    margin: 8px 0 12px;
+    padding-left: 10px;
+    border-left: 3px solid var(--ui-color-5);
+  }
+
+  .list-heading {
+    font-size: 18px;
+    color: #E4EFFA;
+    font-weight: bold;
+    margin: 12px 0 6px;
+  }
+
+  .keyword-list {
+    margin: 12px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+
+  .keyword-list li {
+    margin-bottom: 9px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: var(--ui-color-4);
+    line-height: 1.5;
+  }
+
+  .keyword-list li i {
+    margin-right: 9px;
+    color: var(--ui-color-5);
+    min-width: 18px;
+    margin-top: 4px;
+  }
+
+  .keyword-list li i.lime { color: var(--ui-color-2); }
+
+  .keyword-tag {
+    background-color: var(--ui-color-2);
+    color: #2A1B04;
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin: 0 3px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  .keyword-tag.ptag {
+    background-color: var(--ui-color-5);
+    color: #06210F;
+  }
+
+  /* ---------- ステップリスト ---------- */
+  .step-list {
+    margin: 12px 0;
+    padding: 0;
+    list-style-type: none;
+    counter-reset: step;
+  }
+
+  .step-list li {
+    counter-increment: step;
+    display: flex;
+    align-items: flex-start;
+    margin-bottom: 10px;
+    font-size: 15.5px;
+    color: var(--ui-color-4);
+    line-height: 1.5;
+  }
+
+  .step-list li::before {
+    content: counter(step);
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+    margin-right: 10px;
+    margin-top: 2px;
+    border-radius: 50%;
+    font-family: 'Kaisei Decol', serif;
+    font-weight: bold;
+    color: #06210F;
+    background: var(--ui-color-5);
+    box-shadow: 0 2px 8px rgba(62,224,143,0.4);
+  }
+
+  /* ---------- VS ボックス ---------- */
+  .vs-box {
+    display: flex;
+    gap: 10px;
+    margin: 14px 0 6px;
+    position: relative;
+  }
+
+  .vs-side {
+    flex: 1;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .vs-side.left {
+    background: rgba(255,107,107,0.10);
+    border: 1.5px dashed rgba(255,107,107,0.55);
+    color: #F2CDCD;
+  }
+
+  .vs-side.right {
+    background: rgba(62,224,143,0.10);
+    border: 1.5px solid rgba(62,224,143,0.5);
+    color: #CBF2DF;
+  }
+
+  .vs-title {
+    display: block;
+    font-family: 'Kaisei Decol', serif;
+    font-weight: bold;
+    font-size: 16px;
+    margin-bottom: 4px;
+  }
+
+  .vs-side.left .vs-title { color: #FF8A8A; }
+  .vs-side.right .vs-title { color: var(--ui-color-5); }
+
+  .vs-label {
+    text-align: center;
+    font-family: 'Kaisei Decol', serif;
+    font-weight: bold;
+    color: #241503;
+    background: var(--ui-color-2);
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    border-radius: 50%;
+    margin: -34px auto 8px;
+    box-shadow: 0 3px 10px rgba(255,180,84,0.4);
+    animation: fa-beat-fade 2.8s ease-in-out infinite;
+  }
+
+  /* ---------- 手書き風吹き出し ---------- */
+  .speech-bubble {
+    position: relative;
+    background: #F5FAF6;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 18px 5px 8px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.3);
+    transform: rotate(-1deg);
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+
+  .speech-bubble.variant-1 {
+    background: #FFF6E3;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after {
+    border-color: var(--ui-color-2) transparent;
+  }
+
+  .speech-bubble.variant-2 {
+    background: #E6F9EE;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after {
+    border-color: var(--ui-color-5) transparent;
+  }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #1C2B3A;
+  }
+
+  .speech-bubble i {
+    color: #1F4E79;
+    margin-right: 4px;
+  }
+
+  .speech-bubble.variant-1 i { color: #B37514; }
+  .speech-bubble.variant-2 i { color: #17915A; }
+
+  /* ---------- コードプレビュー ---------- */
+  pre {
+    background: #071528;
+    border: 1px solid rgba(62,224,143,0.35);
+    color: #B9E8D0;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin-top: 12px;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+
+  pre .c { color: #5E7E9E; }
+  pre .k { color: var(--ui-color-2); }
+
+  /* ---------- フッター ---------- */
+  footer {
+    text-align: center;
+    margin-top: 52px;
+    padding: 30px 20px 40px;
+    border-top: 2px solid rgba(62,224,143,0.25);
+  }
+
+  .footer-icon {
+    font-size: 3em;
+    color: var(--ui-color-5);
+    margin-bottom: 10px;
+    animation: fa-beat-fade 2.8s ease-in-out infinite;
+  }
+
+  footer p {
+    font-size: 15px;
+    color: #A3B8D6;
+    margin: 6px 0;
+  }
+
+  footer a {
+    color: var(--ui-color-2);
+    text-decoration: none;
+    font-weight: bold;
+  }
+
+  footer a:hover { text-decoration: underline; }
+
+  .footer-note {
+    font-size: 14px;
+    color: #6F86A8;
+    margin-top: 14px !important;
+  }
+
+  /* ---------- スクロールフェードイン ---------- */
+  .fade-in-scale {
+    opacity: 0;
+    transform: translateY(30px) scale(0.96);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+
+  .fade-in-scale.visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* ---------- レスポンシブ ---------- */
+  @media (max-width: 1600px) {
+    .section-card { min-width: 300px; }
+  }
+
+  @media (max-width: 1200px) {
+    .section-card { min-width: 330px; }
+  }
+
+  @media (max-width: 900px) {
+    .section-card { min-width: 380px; }
+  }
+
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; max-width: 100%; }
+    h1 { font-size: 28px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header>
+    <div class="header-icons">
+      <i class="fa-solid fa-hard-drive sub-icon" aria-hidden="true"></i>
+      <i class="fa-solid fa-satellite-dish main-icon" aria-hidden="true"></i>
+      <i class="fa-brands fa-google sub-icon2" aria-hidden="true"></i>
+    </div>
+    <h1>ストレージの監視を、<span class="accent">1つの画面</span>に。<br>その名は <span class="accent-l">NetApp Harvest</span>。</h1>
+    <p class="header-sub">GCNV のメトリクスを、リアルタイムに刈り取る。<br>Google Cloud Tech のハンズオン動画を、カード18枚にまとめました。</p>
+    <p class="header-date"><i class="fa-regular fa-calendar"></i> 2026-09-12 ／ <i class="fa-brands fa-youtube"></i> Google Cloud Tech ／ <i class="fa-solid fa-satellite-dish"></i> NetApp Harvest</p>
+    <div class="header-tags">
+      <span class="keyword-tag ptag">#NetAppHarvest</span>
+      <span class="keyword-tag">#GCNV</span>
+      <span class="keyword-tag ptag">#ONTAP</span>
+      <span class="keyword-tag">#オブザーバビリティ</span>
+      <span class="keyword-tag ptag">#Prometheus</span>
+      <span class="keyword-tag">#Grafana</span>
+      <span class="keyword-tag ptag">#OpenTelemetry</span>
+      <span class="keyword-tag">#Docker</span>
+      <span class="keyword-tag ptag">#リアルタイム監視</span>
+      <span class="keyword-tag">#オープンソース</span>
+    </div>
+    <a class="watch-button" href="https://www.youtube.com/watch?v=y9VExVZKkfk" target="_blank" rel="noopener">
+      <i class="fa-brands fa-youtube"></i> 動画を見る（YouTube）
+    </a>
+  </header>
+
+  <!-- ================= SECTION 1: なぜ Harvest か ================= -->
+  <div class="section-title">
+    <i class="fa-solid fa-circle-question st-icon" aria-hidden="true"></i>
+    <h2>SECTION 1｜なぜ、Harvest なのか</h2>
+    <div class="st-line"></div>
+  </div>
+  <div class="section-layout">
+
+  <!-- カード 01 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">01</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-network-wired mega-icon" style="color: var(--ui-color-2); animation: fa-shake 3.4s ease-in-out infinite; --fa-animation-iteration-count: infinite;" aria-hidden="true"></i>
+      <h2>監視の現場、あるある</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">ストレージは、あちこちに散らばっている。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-cloud" aria-hidden="true"></i><span>Google Cloud、<span class="keyword-tag">CVO</span>、オンプレのクラスタ…環境は複数。</span></li>
+        <li><i class="fa-solid fa-language" aria-hidden="true"></i><span>プラットフォームごとに、メトリクスの「言葉」がちがう。</span></li>
+        <li><i class="fa-solid fa-table-columns" aria-hidden="true"></i><span>ダッシュボードも別々。見るだけで一苦労。</span></li>
+        <li><i class="fa-solid fa-eye-slash" aria-hidden="true"></i><span>情報が<span class="keyword-tag">断片化</span>して、全体像が見えなくなる。</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-tired fa-lg"></i>
+          左の画面、右の画面…
+          <br>行ったり来たりで、目が回る！
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 02 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">02</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-satellite-dish mega-icon" style="color: var(--ui-color-5); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>NetApp Harvest とは</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">オープンソースの、メトリクス収集エンジン。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>マルチクラウドのストレージを、<span class="keyword-tag ptag">単一ダッシュボード</span>で監視。</span></li>
+        <li><i class="fa-solid fa-magnifying-glass-chart" aria-hidden="true"></i><span>性能・容量・ハードウェアの状態を、まとめて収集。</span></li>
+        <li><i class="fa-solid fa-handshake" aria-hidden="true"></i><span><span class="keyword-tag">GCNV</span> と組み合わせて、リアルタイム監視へ。</span></li>
+        <li><i class="fa-solid fa-code-branch" aria-hidden="true"></i><span>名前のとおり、メトリクスを「刈り取る」のがお仕事。</span></li>
+      </ul>
+      <div class="speech-bubble right">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb fa-lg"></i>
+          ばらばらの監視情報を
+          <br>1カ所に集める、それだけの力が強い。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 03 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">03</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-plug-circle-bolt mega-icon" style="color: var(--ui-color-2); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>つなぐだけで、はじまる</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">既存のインフラに、しれっと接続。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-plug" aria-hidden="true"></i><span>もうある環境に<span class="keyword-tag">シームレス接続</span>。再設計は不要。</span></li>
+        <li><i class="fa-solid fa-gauge" aria-hidden="true"></i><span>性能カウンタを、ぜんぶまとめて表示。</span></li>
+        <li><i class="fa-solid fa-chart-area" aria-hidden="true"></i><span>容量のトレンドも、同じ画面で追える。</span></li>
+        <li><i class="fa-solid fa-heart-pulse" aria-hidden="true"></i><span>ハードウェアの<span class="keyword-tag ptag">健全シグナル</span>も、取りこぼさない。</span></li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-arrow-rotate-left fa-lg"></i>
+          「移行するなら再構築でしょ…」
+          <br>いいえ、Harvest は上からかぶせるだけ。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 04 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">04</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-bolt-lightning mega-icon" style="color: var(--ui-color-5); animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>5分おきでは、遅い</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">レイテンシのスパイクは、一瞬で消える。</p>
+      <div class="vs-box">
+        <div class="vs-side left">
+          <span class="vs-title"><i class="fa-regular fa-clock"></i> 従来</span>
+          メトリクスエクスプローラは<br>
+          <b>5分ごとの更新</b>。<br>
+          一瞬のスパイクは見逃して、タイムアウトの原因がつかめない。
+        </div>
+        <div class="vs-side right">
+          <span class="vs-title"><i class="fa-solid fa-bolt"></i> Harvest</span>
+          <b>リアルタイム監視</b>。<br>
+          つかの間のボトルネックを、おきた瞬間にキャッチ。切り分けもはやい。
+        </div>
+      </div>
+      <div class="vs-label">VS</div>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-stopwatch" aria-hidden="true"></i><span>インシデントの<span class="keyword-tag">対応時間を短縮</span>できるのが最大の利点。</span></li>
+      </ul>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-handcuffs fa-lg"></i>
+          タイムアウトの犯人を
+          <br>現行犯で捕まえられる。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /section-layout -->
+
+  <div class="section-arrow"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></div>
+
+  <!-- ================= SECTION 2: しくみ ================= -->
+  <div class="section-title">
+    <i class="fa-solid fa-gears st-icon" aria-hidden="true"></i>
+    <h2>SECTION 2｜しくみを、ひもとく</h2>
+    <div class="st-line"></div>
+  </div>
+  <div class="section-layout">
+
+  <!-- カード 05 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">05</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-scale-balanced mega-icon" style="color: var(--ui-color-2); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>Apache 2.0 で、オープン</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">中身も、たくさんと公開されている。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-brands fa-github" aria-hidden="true"></i><span>ソースコードは <span class="keyword-tag">GitHub</span> で公開。コミュニティとともに進化。</span></li>
+        <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>ライセンスは <span class="keyword-tag ptag">Apache 2.0</span>。商用利用も落ち着いて進められる。</span></li>
+        <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>お金をかけずに、すぐ試せる。</span></li>
+        <li><i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>テンプレートを好きにいじれる、自由度の高さ。</span></li>
+      </ul>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-seedling fa-lg"></i>
+          「監視ツール、自作しなきゃ…」
+          <br>その悩み、Harvest が引き取ります。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 06 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">06</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-gears mega-icon" style="color: var(--ui-color-5); animation: fa-spin 8s linear infinite;" aria-hidden="true"></i>
+      <h2>3つの部品で動く</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">Poller・Collector・Exporter。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i><span><span class="keyword-tag">Poller</span> — 監視するクラスタごとに用意する単位。</span></li>
+        <li><i class="fa-solid fa-magnet" aria-hidden="true"></i><span><span class="keyword-tag ptag">Collector</span> — どんなメトリクスを集めるかを担当。</span></li>
+        <li><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i><span><span class="keyword-tag">Exporter</span> — 集めたデータの送り先を指定。</span></li>
+        <li><i class="fa-solid fa-file-pen" aria-hidden="true"></i><span>テンプレートを編集して、自分好みに調整できる。</span></li>
+      </ul>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-pen fa-lg"></i>
+          「誰が・何を・どこへ」を
+          <br>YAML に書くだけ。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 07 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">07</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-layer-group mega-icon" style="color: var(--ui-color-2); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>環境の差を、吸収する</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">ハイパースケーラーも、ONTAP のバージョンも。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-layer-group" aria-hidden="true"></i><span>クラウドの違いや ONTAP のバージョン差を、丸ごと<span class="keyword-tag ptag">抽象化</span>。</span></li>
+        <li><i class="fa-solid fa-server" aria-hidden="true"></i><span>それぞれのデプロイメントの横に、ローカルコレクターを配置。</span></li>
+        <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>えらんだ時系列 DB へ、<span class="keyword-tag">一貫したメトリクス</span>を送信。</span></li>
+        <li><i class="fa-solid fa-arrows-to-dot" aria-hidden="true"></i><span>書式がそろうから、集めてから困らない。</span></li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-language fa-lg"></i>
+          どんな環境で話しかけられても
+          <br>同じ様式に翻訳して届けてくれる、
+          <br>通訳のようなレイヤー。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 08 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">08</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-puzzle-piece mega-icon" style="color: var(--ui-color-5); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>エコシステムと、つながる</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">標準フォーマットで、シームレスに。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-fire" aria-hidden="true"></i><span><span class="keyword-tag">Prometheus</span> — 定番の時系列 DB へそのまま。</span></li>
+        <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span><span class="keyword-tag ptag">Grafana</span> — ダッシュボードの王道と組み合わせ。</span></li>
+        <li><i class="fa-brands fa-google" aria-hidden="true"></i><span><span class="keyword-tag">Cloud Monitoring</span> — Google Cloud 標準の監視にも。</span></li>
+        <li><i class="fa-solid fa-tower-broadcast" aria-hidden="true"></i><span><span class="keyword-tag ptag">OpenTelemetry</span> — コネクタ経由で接続。</span></li>
+      </ul>
+      <div class="speech-bubble top">
+        <span class="handwritten">
+          <i class="fa-solid fa-plug-circle-check fa-lg"></i>
+          もうある監視スタックに
+          <br>無理なく組み込めるのが嬉しい。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /section-layout -->
+
+  <div class="section-arrow"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></div>
+
+  <!-- ================= SECTION 3: セットアップ ================= -->
+  <div class="section-title">
+    <i class="fa-solid fa-screwdriver-wrench st-icon" aria-hidden="true"></i>
+    <h2>SECTION 3｜じっさいに、組んでみる</h2>
+    <div class="st-line"></div>
+  </div>
+  <div class="section-layout">
+
+  <!-- カード 09 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">09</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-cubes mega-icon" style="color: var(--ui-color-2); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>好きなかたちで、動く</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">Docker・Podman・ネイティブ実行。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-brands fa-docker" aria-hidden="true"></i><span><span class="keyword-tag">Docker</span> コンテナで、すぐに起動。</span></li>
+        <li><i class="fa-solid fa-cube" aria-hidden="true"></i><span><span class="keyword-tag ptag">Podman</span> でも、もちろん OK。</span></li>
+        <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>バイナリを直接動かす、ネイティブ実行にも対応。</span></li>
+        <li><i class="fa-solid fa-shuffle" aria-hidden="true"></i><span>環境に合わせて、えらび放題。</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-boxes-stacked fa-lg"></i>
+          コンテナ派も、素朴に動かす派も
+          <br>どちらも正解。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 10 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">10</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-toolbox mega-icon" style="color: var(--ui-color-5); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>まずは、下ごしらえ</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">用意するのは Go と Docker。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>実行環境に <span class="keyword-tag">Go</span> と <span class="keyword-tag ptag">Docker</span> を準備。</span></li>
+        <li><i class="fa-solid fa-database" aria-hidden="true"></i><span><span class="keyword-tag">Flex Unified</span> ストレージプールを用意。</span></li>
+        <li><i class="fa-solid fa-toggle-on" aria-hidden="true"></i><span><span class="keyword-tag ptag">ONTAP モード</span>を有効にしてプロビジョニング。</span></li>
+        <li><i class="fa-solid fa-list-check" aria-hidden="true"></i><span>ここまでで、下準備はおしまい。</span></li>
+      </ul>
+      <div class="speech-bubble right">
+        <span class="handwritten">
+          <i class="fa-solid fa-basket-shopping fa-lg"></i>
+          GCNV 側は ONTAP モードの
+          <br>プールを1つ用意するだけ。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 11 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">11</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-file-code mega-icon" style="color: var(--ui-color-2); animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>YAML に、書き出す</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">harvest.yml が、設定の中心。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i><span><span class="keyword-tag">Pollers</span> — 監視クラスタの数だけ定義。</span></li>
+        <li><i class="fa-solid fa-magnet" aria-hidden="true"></i><span><span class="keyword-tag ptag">Collectors</span> — 集めるメトリクスの種類を指定。</span></li>
+        <li><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i><span><span class="keyword-tag">Exporters</span> — Prometheus や InfluxDB を指定。</span></li>
+      </ul>
+      <pre><span class="c"># harvest.yml のイメージ</span>
+pollers:
+  gcnv-flex:
+    datacenter: tokyo
+    collectors:
+      - <span class="k">keyperf</span>
+      - <span class="k">volume</span>
+    exporters:
+      - <span class="k">prometheus</span>
+      - <span class="k">influxdb</span></pre>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-pen-nib fa-lg"></i>
+          監視したいクラスタの分だけ
+          <br>ポーラーを書き足していく。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 12 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">12</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-key mega-icon" style="color: var(--ui-color-5); animation: fa-shake 3.6s ease-in-out infinite; --fa-animation-iteration-count: infinite;" aria-hidden="true"></i>
+      <h2>鍵は、Bearer トークン</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">GCNV の ONTAP モードは、トークン認証。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-key" aria-hidden="true"></i><span>ONTAP モードの GCNV には <span class="keyword-tag">Bearer 認証トークン</span>が必要。</span></li>
+        <li><i class="fa-solid fa-terminal" aria-hidden="true"></i><span>用意された <span class="keyword-tag ptag">credentials スクリプト</span>で取得・設定。</span></li>
+        <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span>トークンは、あつかいに注意して安全に管理。</span></li>
+        <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>これで Harvest から GCNV へ、認証がとおる。</span></li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-user-secret fa-lg"></i>
+          入手と設定はスクリプトにおまかせ。
+          <br>手作業は最小限。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /section-layout -->
+
+  <div class="section-arrow"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></div>
+
+  <!-- ================= SECTION 4: みえる化 ================= -->
+  <div class="section-title">
+    <i class="fa-solid fa-chart-line st-icon" aria-hidden="true"></i>
+    <h2>SECTION 4｜数字を、みえる化する</h2>
+    <div class="st-line"></div>
+  </div>
+  <div class="section-layout">
+
+  <!-- カード 13 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">13</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-gauge-high mega-icon" style="color: var(--ui-color-5); animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>keyperf で、脈をみる</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">IOPS・スループット・レイテンシ。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span><span class="keyword-tag">keyperf</span> コレクターで、主要な指標をまとめて収集。</span></li>
+        <li><i class="fa-solid fa-stopwatch" aria-hidden="true"></i><span>収集間隔を <span class="keyword-tag ptag">10秒</span> に変更して、感度を上げる。</span></li>
+        <li><i class="fa-solid fa-wave-square" aria-hidden="true"></i><span>つかの間のスパイクも、波形ごとキャッチ。</span></li>
+        <li><i class="fa-solid fa-stethoscope" aria-hidden="true"></i><span>これが「おきた瞬間に気づく」の正体。</span></li>
+      </ul>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-heart-pulse fa-lg"></i>
+          間隔を 10秒にすれば
+          <br>息をのむ瞬間も、聞き逃さない。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 14 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">14</div>
+    <div class="mega-icon-container">
+      <i class="fa-brands fa-docker mega-icon" style="color: var(--ui-color-2); animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>Compose で、一撃起動</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">Prometheus + Grafana スタック。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-fire" aria-hidden="true"></i><span><span class="keyword-tag">Docker Compose</span> で、監視スタックをまるごと起動。</span></li>
+        <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span><span class="keyword-tag ptag">Grafana</span> も、同時に立ち上がる。</span></li>
+        <li><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>ホストの IP を、scrape ターゲットに設定。</span></li>
+      </ul>
+      <pre><span class="c"># Prometheus の scrape 設定のイメージ</span>
+scrape_configs:
+  - job_name: <span class="k">harvest</span>
+    static_configs:
+      - targets: [<span class="k">'192.168.x.x:12990'</span>]</pre>
+      <div class="speech-bubble top">
+        <span class="handwritten">
+          <i class="fa-solid fa-rocket fa-lg"></i>
+          docker compose up したら
+          <br>あとは、ちょっと待つだけ。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 15 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">15</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-chart-line mega-icon" style="color: var(--ui-color-5); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>Grafana に、流れ出す</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">ダッシュボードは、えらぶだけ。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-tags" aria-hidden="true"></i><span>Grafana の <span class="keyword-tag">GCNV ONTAP モード</span>のタグを開く。</span></li>
+        <li><i class="fa-solid fa-chart-column" aria-hidden="true"></i><span><span class="keyword-tag ptag">ボリュームダッシュボード</span>を選択。</span></li>
+        <li><i class="fa-solid fa-stream" aria-hidden="true"></i><span>データがリアルタイムに、ストリーミング。</span></li>
+        <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>IOPS もレイテンシも、生きた数字で見える。</span></li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-smile fa-lg"></i>
+          数字がぬるぬる動くのを
+          <br>見ているだけでも、ちょっと楽しい。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /section-layout -->
+
+  <div class="section-arrow"><i class="fa-solid fa-angles-down" aria-hidden="true"></i></div>
+
+  <!-- ================= SECTION 5: まとめ ================= -->
+  <div class="section-title">
+    <i class="fa-solid fa-flag-checkered st-icon" aria-hidden="true"></i>
+    <h2>SECTION 5｜おさらいと、そのさき</h2>
+    <div class="st-line"></div>
+  </div>
+  <div class="section-layout">
+
+  <!-- カード 16 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">16</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-route mega-icon" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>ながれを、おさらい</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">ハンズオンは、この 6ステップ。</p>
+      <ul class="step-list">
+        <li><span>Go と Docker を、実行環境に準備する。</span></li>
+        <li><span>Flex Unified プール（ONTAP モード）をプロビジョニング。</span></li>
+        <li><span>harvest.yml に Poller / Collector / Exporter を定義。</span></li>
+        <li><span>credentials スクリプトで、Bearer トークンを設定。</span></li>
+        <li><span>keyperf の収集間隔を 10秒に変更。</span></li>
+        <li><span>Compose で起動して、Grafana のダッシュボードを開く。</span></li>
+      </ul>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-file-pen fa-lg"></i>
+          書くべきは YAML が中心。
+          <br>思ったより、ずっと短い。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 17 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">17</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-wand-magic-sparkles mega-icon" style="color: var(--ui-color-5); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>次回は、AI の番</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">テレメトリに、AI の目を。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-brands fa-google" aria-hidden="true"></i><span><span class="keyword-tag">Google Cloud Monitoring</span> との連携を、別動画で解説予定。</span></li>
+        <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span><span class="keyword-tag ptag">MCP サーバー</span>で、テレメトリに AI インサイトを。</span></li>
+        <li><i class="fa-solid fa-circle-play" aria-hidden="true"></i><span>公開されたら、ぜひ続編もチェック。</span></li>
+      </ul>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-wand-magic-sparkles fa-lg"></i>
+          監視データを AI が読み解く
+          <br>次の話も、おたのしみに。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- カード 18 -->
+  <div class="section-card fade-in-scale">
+    <div class="card-number">18</div>
+    <div class="mega-icon-container">
+      <i class="fa-solid fa-flag-checkered mega-icon" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+      <h2>まとめ</h2>
+    </div>
+    <div class="card-content">
+      <p class="card-lead">1つの画面で、ぜんぶをみる。</p>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-satellite-dish" aria-hidden="true"></i><span>ばらばらだった監視を、<span class="keyword-tag">単一ダッシュボード</span>へ。</span></li>
+        <li><i class="fa-solid fa-bolt-lightning" aria-hidden="true"></i><span>リアルタイム性で、原因の切り分けがはやくなる。</span></li>
+        <li><i class="fa-solid fa-puzzle-piece" aria-hidden="true"></i><span>オープンソース＋標準ツールで、とりかかりも軽い。</span></li>
+        <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>まずは keyperf から、ぜひ触ってみて。</span></li>
+        <li><i class="fa-solid fa-play" aria-hidden="true"></i><span>手順のくわしさは、ぜひ本編の動画で。</span></li>
+      </ul>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-flag-checkered fa-lg"></i>
+          ストレージの健康状態、
+          <br>ひとめでわかる世界。
+          <br>それが NetApp Harvest × GCNV。
+        </span>
+      </div>
+    </div>
+  </div>
+
+  </div><!-- /section-layout -->
+
+  <!-- ================= フッター ================= -->
+  <footer>
+    <div class="footer-icon"><i class="fa-brands fa-youtube"></i></div>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=y9VExVZKkfk" target="_blank" rel="noopener">Google Cloud Tech</a></p>
+    <p>📺 「Get Started with NetApp Harvest on Google Cloud NetApp Volumes」</p>
+    <p>🔗 <a href="https://www.youtube.com/watch?v=y9VExVZKkfk" target="_blank" rel="noopener">https://www.youtube.com/watch?v=y9VExVZKkfk</a></p>
+    <p>📚 このインフォグラフィックの一覧: <a href="https://cutc-mt.github.io/ai-news-infographic/" target="_blank" rel="noopener">https://cutc-mt.github.io/ai-news-infographic/</a></p>
+    <p class="footer-note">このインフォグラフィックは、上記動画の内容をまとめたものです。くわしい手順はぜひ本編でご確認ください。</p>
+  </footer>
+
+</div>
+
+<script>
+  // スクロールに連動したフェードイン
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.fade-in-scale').forEach((el) => observer.observe(el));
+</script>
+</body>
+</html>

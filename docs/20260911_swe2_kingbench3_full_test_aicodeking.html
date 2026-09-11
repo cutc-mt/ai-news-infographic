@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWE-2 徹底検証 | KingBench 3 83.75% で DeepSeek V4.1 Flash を破る</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  /* ============================================
+     SWE-2 (Cognition) 専用テーマ
+     「Indigo Forge × Amber Spark」
+     （鍛え上げたインディゴ #4F46E5 + 琥珀の火花 #F59E0B）
+     ============================================ */
+  :root {
+    --ui-color-1: #4F46E5;   /* インディゴ（Cognitionの鍛冶場） */
+    --ui-color-2: #F59E0B;   /* アンバースパーク */
+    --ui-color-3: #EEF0FE;   /* 淡いインディゴ */
+    --ui-color-4: #1E1B4B;   /* 深夜のインディゴ */
+    --ui-color-5: #E11D48;   /* ローズレッド（弱点・警告） */
+    --ui-color-6: #10B981;   /* エメラルド（勝ち・満点） */
+    --ui-color-7: #FFF7E8;   /* アンバー極淡 */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+    background: #F8F7FE;
+    background-image:
+      radial-gradient(circle at 8% 4%, rgba(79,70,229,0.08) 0%, transparent 36%),
+      radial-gradient(circle at 92% 12%, rgba(245,158,11,0.09) 0%, transparent 34%),
+      radial-gradient(circle at 50% 96%, rgba(16,185,129,0.07) 0%, transparent 40%);
+    color: #333;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ---------- ヘッダー ---------- */
+  header {
+    text-align: center;
+    padding: 40px 20px 25px;
+    position: relative;
+  }
+
+  header .header-icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 25px;
+    margin-bottom: 12px;
+  }
+
+  header .header-icons .main-icon {
+    font-size: 7em;
+    color: var(--ui-color-1);
+    filter: drop-shadow(4px 5px 6px rgba(79,70,229,0.35));
+    animation: fa-bounce 2.6s ease-in-out infinite;
+  }
+
+  header .header-icons .sub-icon {
+    font-size: 3.2em;
+    color: var(--ui-color-2);
+    animation: fa-beat-fade 2.2s ease-in-out infinite;
+  }
+
+  header .header-icons .sub-icon2 {
+    font-size: 2.6em;
+    color: var(--ui-color-5);
+    animation: fa-shake 3.5s ease-in-out infinite;
+  }
+
+  h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    font-weight: bold;
+    color: #333;
+    margin: 8px 0;
+  }
+
+  h1 .accent { color: var(--ui-color-1); }
+
+  .header-sub {
+    font-size: 17px;
+    color: #555;
+    margin-top: 6px;
+  }
+
+  .header-date {
+    font-size: 14px;
+    color: #777;
+    margin-top: 8px;
+  }
+
+  .header-tags {
+    margin-top: 14px;
+  }
+
+  .header-tags .keyword-tag { margin: 3px; }
+
+  /* ハイライト帯 */
+  .highlight-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    max-width: 1600px;
+    margin: 22px auto 8px;
+  }
+
+  .highlight-chip {
+    background: white;
+    border: 2.5px solid var(--ui-color-1);
+    border-radius: 16px;
+    padding: 10px 18px;
+    text-align: center;
+    box-shadow: 4px 4px 12px rgba(79,70,229,0.18);
+    min-width: 180px;
+  }
+
+  .highlight-chip .chip-icon {
+    font-size: 1.7em;
+    color: var(--ui-color-2);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .highlight-chip .chip-label { font-size: 13px; color: #777; display: block; }
+  .highlight-chip .chip-value {
+    font-size: 22px;
+    font-weight: bold;
+    color: var(--ui-color-4);
+    font-family: 'Kaisei Decol', serif;
+  }
+
+  /* ---------- セクション区切り ---------- */
+  .section-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin: 38px 0 18px;
+  }
+
+  .section-divider .line {
+    flex: 1;
+    max-width: 320px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, var(--ui-color-2), transparent);
+  }
+
+  .section-divider h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: var(--ui-color-4);
+    white-space: nowrap;
+  }
+
+  .section-divider .sec-icon { color: var(--ui-color-5); font-size: 1.3em; }
+
+  /* ---------- カードレイアウト（4カラム） ---------- */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin-bottom: 10px;
+  }
+
+  .section-card {
+    flex: 1;
+    min-width: 220px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(30,27,75,0.12);
+    position: relative;
+    overflow: hidden;
+    border-top: 5px solid var(--ui-color-1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+  }
+
+  .section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+  .section-card:nth-child(3n) { border-top-color: var(--ui-color-6); }
+
+  .section-card:hover {
+    transform: translateY(-6px) rotate(-0.4deg);
+    box-shadow: 8px 10px 24px rgba(79,70,229,0.25);
+    background-color: #FDFDFF;
+  }
+
+  /* タスクカード用アクセント */
+  .section-card.scored { border-left: 5px solid var(--ui-color-6); }
+  .section-card.lost { border-left: 5px solid var(--ui-color-5); }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0;
+  }
+
+  .mega-icon-container i.fa-5x {
+    filter: drop-shadow(3px 4px 5px rgba(30,27,75,0.22));
+  }
+
+  .card-content { padding: 0 10px 15px; }
+
+  /* カードタイトル */
+  .mega-icon-container h2,
+  .card-title {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 24px;
+    color: #555;
+    margin-top: 10px;
+  }
+
+  .card-title-small {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 19px;
+    color: var(--ui-color-4);
+    text-align: center;
+    margin: 4px 0 2px;
+  }
+
+  .task-label {
+    display: inline-block;
+    background: var(--ui-color-1);
+    color: white;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 3px 14px;
+    border-radius: 20px;
+    margin-top: 4px;
+  }
+
+  /* スコア表示 */
+  .score-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--ui-color-3);
+    border: 2px solid var(--ui-color-2);
+    border-radius: 14px;
+    padding: 5px 14px;
+    font-family: 'Kaisei Decol', serif;
+    font-weight: bold;
+    color: var(--ui-color-4);
+    margin-top: 8px;
+  }
+
+  .score-pill .score-now { font-size: 22px; color: var(--ui-color-1); }
+  .score-pill .score-rival { font-size: 13px; color: #777; }
+  .score-pill.win { border-color: var(--ui-color-6); background: #E9FBF4; }
+  .score-pill.lose { border-color: var(--ui-color-5); background: #FDECef; }
+  .score-pill.lose .score-now { color: var(--ui-color-5); }
+
+  .score-bar-wrap {
+    background: #E9E9F6;
+    border-radius: 8px;
+    height: 12px;
+    margin: 10px 6px 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .score-bar {
+    height: 100%;
+    border-radius: 8px;
+    background: linear-gradient(90deg, var(--ui-color-2), var(--ui-color-1));
+    animation: grow-bar 1.4s ease-out forwards;
+    transform-origin: left;
+  }
+
+  .score-bar.rival {
+    background: linear-gradient(90deg, #C7CBD8, #8B90A6);
+    animation-delay: 0.25s;
+  }
+
+  @keyframes grow-bar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* キーワードリスト */
+  .keyword-list {
+    margin: 15px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+
+  .keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: #333;
+  }
+
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-2);
+    min-width: 16px;
+    margin-top: 4px;
+  }
+
+  .list-heading {
+    font-size: 18px;
+    color: #333;
+    font-weight: bold;
+    margin: 10px 0 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .list-heading i { color: var(--ui-color-5); }
+
+  /* キーワードタグ */
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  .keyword-tag.amber {
+    background-color: var(--ui-color-7);
+    color: #B45309;
+    border: 1px dashed var(--ui-color-2);
+  }
+
+  .keyword-tag.mint {
+    background-color: #E4FBF2;
+    color: #0E8A76;
+    border: 1px dashed var(--ui-color-6);
+  }
+
+  .keyword-tag.rose {
+    background-color: #FDECEF;
+    color: var(--ui-color-5);
+    border: 1px dashed var(--ui-color-5);
+  }
+
+  /* コードプレビュー */
+  pre {
+    background: #171536;
+    color: #DDE0F5;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-family: "SFMono-Regular", Consolas, "Courier New", monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    border-left: 4px solid var(--ui-color-2);
+  }
+
+  pre .c { color: #8E93C4; }
+  pre .k { color: #FBBF24; }
+  pre .s { color: #6EE7B7; }
+
+  /* 手書き風吹き出し */
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+
+  .speech-bubble.variant-1 {
+    background: #FFFBEE;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after { border-color: var(--ui-color-2) transparent; }
+
+  .speech-bubble.variant-2 {
+    background: #EDFBF5;
+    border-color: var(--ui-color-6);
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after { border-color: var(--ui-color-6) transparent; }
+
+  .speech-bubble.variant-3 {
+    background: #FDEEF1;
+    border-color: var(--ui-color-5);
+    transform: rotate(1.2deg);
+  }
+
+  .speech-bubble.variant-3::after { border-color: var(--ui-color-5) transparent; }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #333;
+  }
+
+  .handwritten i { color: var(--ui-color-2); margin-right: 4px; }
+  .speech-bubble.variant-2 .handwritten i { color: #0E8A76; }
+  .speech-bubble.variant-3 .handwritten i { color: var(--ui-color-5); }
+
+  /* ミニ表 */
+  .mini-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+    font-size: 14px;
+  }
+
+  .mini-table th, .mini-table td {
+    border: 1px solid #D8DAF0;
+    padding: 5px 8px;
+    text-align: left;
+  }
+
+  .mini-table th {
+    background: var(--ui-color-3);
+    color: var(--ui-color-4);
+    font-family: 'Kaisei Decol', serif;
+  }
+
+  .mini-table tr:nth-child(even) td { background: #F6F7FD; }
+  .mini-table .win { color: var(--ui-color-1); font-weight: bold; }
+  .mini-table .lose { color: var(--ui-color-5); font-weight: bold; }
+  .mini-table .tie { color: #0E8A76; font-weight: bold; }
+
+  /* 出現アニメーション */
+  .fade-in-scale {
+    opacity: 0;
+    transform: scale(0.92) translateY(24px);
+    transition: opacity 0.65s ease, transform 0.65s ease;
+  }
+
+  .fade-in-scale.visible { opacity: 1; transform: scale(1) translateY(0); }
+
+  /* キーワードのハイライト */
+  .hl {
+    animation: hl-pulse 2.4s ease-in-out infinite;
+    border-radius: 4px;
+    padding: 0 3px;
+  }
+
+  @keyframes hl-pulse {
+    0%, 100% { background: rgba(245,158,11,0); }
+    50% { background: rgba(245,158,11,0.30); }
+  }
+
+  /* フッター */
+  footer {
+    text-align: center;
+    padding: 34px 20px 26px;
+    margin-top: 30px;
+    border-top: 3px dashed var(--ui-color-2);
+    font-size: 15px;
+    color: #555;
+  }
+
+  footer a { color: var(--ui-color-1); text-decoration: underline; }
+
+  footer .footer-note {
+    font-family: 'Yomogi', cursive;
+    margin-top: 8px;
+    color: #777;
+    font-size: 14px;
+  }
+
+  /* レスポンシブ対応 */
+  @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+  @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+  @media (max-width: 900px)  { .section-card { min-width: 380px; } }
+
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; align-items: center; }
+    .section-card { width: 100%; min-width: auto; max-width: 480px; }
+    h1 { font-size: 28px; }
+    header .header-icons .main-icon { font-size: 5em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header>
+    <div class="header-icons">
+      <i class="fa-solid fa-fire-flame-curved sub-icon2" aria-hidden="true"></i>
+      <i class="fa-solid fa-hammer main-icon" aria-hidden="true"></i>
+      <i class="fa-solid fa-code sub-icon" aria-hidden="true"></i>
+    </div>
+    <h1><span class="accent">SWE-2</span> 徹底検証</h1>
+    <div class="header-sub">KingBench 3 で <strong>83.75%</strong>。DeepSeek V4.1 Flash を僅差で破り、<strong>リーダーボード5位</strong>に浮上！</div>
+    <div class="header-date"><i class="fa-regular fa-calendar"></i> 2026年9月11日 ｜ チャンネル: AI Code King ｜ 動画 9:37</div>
+    <div class="header-tags">
+      <span class="keyword-tag">SWE-2</span>
+      <span class="keyword-tag mint">KingBench 3</span>
+      <span class="keyword-tag amber">Cognition</span>
+      <span class="keyword-tag">Kimi K3 ベース</span>
+      <span class="keyword-tag rose">質問が多い？</span>
+    </div>
+    <div class="highlight-strip">
+      <div class="highlight-chip">
+        <i class="fa-solid fa-trophy chip-icon" aria-hidden="true"></i>
+        <span class="chip-label">KingBench 3 スコア</span>
+        <span class="chip-value">83.75%（67/80）</span>
+      </div>
+      <div class="highlight-chip">
+        <i class="fa-solid fa-ranking-star chip-icon" aria-hidden="true"></i>
+        <span class="chip-label">リーダーボード順位</span>
+        <span class="chip-value">5位</span>
+      </div>
+      <div class="highlight-chip">
+        <i class="fa-solid fa-scale-balanced chip-icon" aria-hidden="true"></i>
+        <span class="chip-label">DeepSeek V4.1 Flash との差</span>
+        <span class="chip-value">+2.5ポイント</span>
+      </div>
+      <div class="highlight-chip">
+        <i class="fa-solid fa-tags chip-icon" aria-hidden="true"></i>
+        <span class="chip-label">Devin Pro 同梱（期限付き）</span>
+        <span class="chip-value">$20／2026-10-10まで</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= セクションA: SWE-2とは何か ================= -->
+  <div class="section-divider">
+    <div class="line"></div>
+    <i class="fa-solid fa-rocket sec-icon" aria-hidden="true"></i>
+    <h2>SWE-2 とは何か</h2>
+    <i class="fa-solid fa-rocket sec-icon" aria-hidden="true"></i>
+    <div class="line"></div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード1: 登場 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Cognition が SWE-2 を公開</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i>
+            <span>Devin で知られる <span class="keyword-tag">Cognition</span> が新型コーディングモデルをリリース</span></li>
+          <li><i class="fa-solid fa-flask fa-lg" aria-hidden="true"></i>
+            <span>検証者の第一印象は<span class="hl">「本当に、本当に良い」</span></span></li>
+          <li><i class="fa-solid fa-clipboard-check fa-lg" aria-hidden="true"></i>
+            <span>自己ベンチ <span class="keyword-tag mint">KingBench 3</span> で <span class="keyword-tag">83.75%</span> を記録</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i>
+            <span>長めのタスクでも好成績という印象</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-lightbulb" aria-hidden="true"></i>
+          気になる点はひとつだけ：<br>
+          <span class="keyword-tag rose">質問が多すぎる</span>こと。
+          <br>これは後でじっくり掘り下げます！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード2: ポストトレーニング -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>Kimi K3 を強化学習で鍛える</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-dumbbell fa-lg" aria-hidden="true"></i>
+            <span>SWE-2 は <span class="keyword-tag">Kimi K3</span> からポストトレーニングされたモデル</span></li>
+          <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i>
+            <span><span class="keyword-tag amber">強化学習（RL）</span>でコーディング性能を向上</span></li>
+          <li><i class="fa-solid fa-coins fa-lg" aria-hidden="true"></i>
+            <span>学習時は課題を<span class="hl">完了するコスト</span>も報酬に含めて計算</span></li>
+          <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i>
+            <span>reasoning effort の<span class="keyword-tag mint">各レベルを一緒に訓練</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-star" aria-hidden="true"></i>
+          「どれだけ速く・安く
+          仕上げるか」まで
+          <br>鍛えられてるのがポイント！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード3: 公式ベンチ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-column fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>公式ベンチの成果</h2>
+      </div>
+      <div class="card-content">
+        <table class="mini-table">
+          <tr><th>ベンチマーク</th><th>Kimi K3</th><th>SWE-2</th></tr>
+          <tr><td>Frontier Code（main）</td><td>44.2%</td><td class="win">50%</td></tr>
+          <tr><td>Terminal Bench 2.1</td><td>88.3%</td><td class="win">92.8%</td></tr>
+          <tr><td>Terminal Bench 4</td><td>—</td><td class="lose">27.3%</td></tr>
+        </table>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i>
+            <span>上の数値は <span class="keyword-tag">Cognition の公表値</span></span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i>
+            <span>Terminal Bench 4 では <span class="keyword-tag rose">GPT-6 Astra が 57.9%</span> と大差をつけられる</span></li>
+          <li><i class="fa-solid fa-chart-line fa-lg" aria-hidden="true"></i>
+            <span>ベンチによって<span class="hl">得意・不得意の差が大きい</span>モデル</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          どこでも首位、ではない。
+          <br>だからこそ自前テストが大事！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード4: Kimi K3 超えの意味 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-dumbbell fa-5x" style="color: var(--ui-color-6); animation: fa-beat 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>「Kimi K3 超え」の重み</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-crown fa-lg" aria-hidden="true"></i>
+            <span>Kimi K3 は<span class="hl">もともと本当に優秀</span>なモデル</span></li>
+          <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i>
+            <span>その出発点からさらに上を取るのは<span class="keyword-tag mint">意味のある進歩</span></span></li>
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i>
+            <span>今回の自前テストでも SWE-2 が Kimi K3 を<span class="keyword-tag">上回る</span>結果に</span></li>
+          <li><i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i>
+            <span>「Cognition は筋力を見せてきた」と評価</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-hand-fist" aria-hidden="true"></i>
+          良い土台を外注しないで
+          自社で鍛え直した、
+          <br>っていう姿勢が伝わる！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションB: 価格 ================= -->
+  <div class="section-divider">
+    <div class="line"></div>
+    <i class="fa-solid fa-tags sec-icon" aria-hidden="true"></i>
+    <h2>価格とお得な限定オファー</h2>
+    <i class="fa-solid fa-tags sec-icon" aria-hidden="true"></i>
+    <div class="line"></div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード5: Devin Pro 同梱 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gift fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>$20 プランに追加料金なし</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-credit-card fa-lg" aria-hidden="true"></i>
+            <span><span class="keyword-tag">Devin Pro</span> は月額 <span class="keyword-tag amber">$20</span></span></li>
+          <li><i class="fa-solid fa-desktop fa-lg" aria-hidden="true"></i>
+            <span>SWE-2 が <span class="keyword-tag mint">Devin Desktop と CLI</span> で<span class="hl">追加料金ゼロ</span>で使える</span></li>
+          <li><i class="fa-solid fa-calendar-day fa-lg" aria-hidden="true"></i>
+            <span>公式の価格ページによると <span class="keyword-tag rose">2026年10月10日</span> までのオファー</span></li>
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i>
+            <span>期間内はサブスク代だけで<span class="hl">使い放題</span>という扱い</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-piggy-bank" aria-hidden="true"></i>
+          $20でSWE-2が使い放題？
+          <br><span class="keyword-tag amber">今は大盤振る舞い</span>の期間だね！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード6: 今試す理由 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lightbulb fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>今すぐ試すべき理由</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-thumbs-up fa-lg" aria-hidden="true"></i>
+            <span>すでに Pro 加入なら<span class="hl">追加費用ゼロ</span>で試せる</span></li>
+          <li><i class="fa-solid fa-briefcase fa-lg" aria-hidden="true"></i>
+            <span>実際の仕事で SWE-2 を試す<span class="keyword-tag mint">絶好の機会</span></span></li>
+          <li><i class="fa-solid fa-calendar-check fa-lg" aria-hidden="true"></i>
+            <span>プランを選ぶときは <span class="keyword-tag rose">10月10日</span> を必ず意識して</span></li>
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i>
+            <span>「今のところは<span class="hl">非常にお得</span>」というのが検証者の結論</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          期限さえ押さえれば
+          <span class="keyword-tag">お試し枠</span>として
+          <br>かなり有力な選択肢！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションC: KingBench 3 の8タスク ================= -->
+  <div class="section-divider">
+    <div class="line"></div>
+    <i class="fa-solid fa-gamepad sec-icon" aria-hidden="true"></i>
+    <h2>KingBench 3 の8タスク 〜 SWE-2 vs DeepSeek V4.1 Flash</h2>
+    <i class="fa-solid fa-gamepad sec-icon" aria-hidden="true"></i>
+    <div class="line"></div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード7: Task 1 エレベーター -->
+    <div class="section-card scored fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 1</span><br>
+        <i class="fa-solid fa-elevator fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">エレベーターのシミュ</h2>
+        <div class="score-pill">
+          <i class="fa-solid fa-equals" aria-hidden="true"></i>
+          <span class="score-now">8/10</span>
+          <span class="score-rival">DS V4.1: 8（引き分け）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width: 80%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-building fa-lg" aria-hidden="true"></i>
+            <span><span class="keyword-tag">3基</span>のエレベーター、各フロアで乗客を発生させる</span></li>
+          <li><i class="fa-solid fa-user fa-lg" aria-hidden="true"></i>
+            <span>1基につき<span class="hl">一度に1人だけ</span>乗車のルール</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i>
+            <span>先のエレベーターが満員なら<span class="keyword-tag mint">待機</span>する論理も必要</span></li>
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i>
+            <span>乗客にカーソルを合わせると<span class="keyword-tag amber">行き先の吹き出し</span>を表示</span></li>
+          <li><i class="fa-solid fa-flag-checkered fa-lg" aria-hidden="true"></i>
+            <span>アニメ＋乗車の判断＋順番待ち。両モデルとも<span class="hl">同点スタート</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-equals" aria-hidden="true"></i>
+          細かいルールが多い課題。
+          <br>まずは<span class="keyword-tag">8点同士</span>のタイ！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード8: Task 2 コンタクトレンズケース -->
+    <div class="section-card scored fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 2</span><br>
+        <i class="fa-solid fa-eye-dropper fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">3Dコンタクトレンズケース</h2>
+        <div class="score-pill win">
+          <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+          <span class="score-now">8/10</span>
+          <span class="score-rival">DS V4.1: 7（勝ち）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width: 80%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i>
+            <span><span class="keyword-tag">Three.js</span> で作る3Dのレンズケース</span></li>
+          <li><i class="fa-solid fa-l fa-lg" aria-hidden="true"></i>
+            <span>左右の<span class="hl">L / R の表示</span>をはっきりさせる</span></li>
+          <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i>
+            <span>フタを<span class="keyword-tag amber">クリックで開けられる</span>相互作用も必須</span></li>
+          <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i>
+            <span>物体のかたち＋3Dで筋の通った動きの<span class="keyword-tag mint">二段構え</span></span></li>
+          <li><i class="fa-solid fa-arrow-trend-up fa-lg" aria-hidden="true"></i>
+            <span>ここで SWE-2 が<span class="hl">1点リード</span>を奪取</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          見た目と操作の両方を
+          <br>問われる3D課題で先へ！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード9: Task 3 折りたたみテーブル -->
+    <div class="section-card scored fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 3</span><br>
+        <i class="fa-solid fa-arrows-left-right fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">折りたたみテーブル</h2>
+        <div class="score-pill win">
+          <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+          <span class="score-now">8/10</span>
+          <span class="score-rival">DS V4.1: 6（勝ち）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width: 80%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sliders fa-lg" aria-hidden="true"></i>
+            <span>スライダーを<span class="hl">右へ動かすと開き、左へ戻すと閉じる</span></span></li>
+          <li><i class="fa-solid fa-wave-square fa-lg" aria-hidden="true"></i>
+            <span>動きは<span class="keyword-tag amber">連続的</span>であること</span></li>
+          <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i>
+            <span>全開と全閉の<span class="keyword-tag mint">中間の姿勢</span>も正しく再現</span></li>
+          <li><i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i>
+            <span>SWE-2 はここまで<span class="hl">3問連続の8点</span>。安定感抜群</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-fire" aria-hidden="true"></i>
+          DSが6点に対して
+          <span class="keyword-tag">8点</span>。
+          <br>差が開き始めたよ！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード10: Task 4 SVGパンダ -->
+    <div class="section-card scored fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 4</span><br>
+        <i class="fa-solid fa-paw fa-5x" style="color: var(--ui-color-6); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">SVGでパンダのバーガー</h2>
+        <div class="score-pill win">
+          <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+          <span class="score-now">8/10</span>
+          <span class="score-rival">DS V4.1: 6（勝ち）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width: 80%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-code fa-lg" aria-hidden="true"></i>
+            <span>お題は<span class="hl">シンプル</span>：「バーガーを食べるパンダのSVG」</span></li>
+          <li><i class="fa-solid fa-shapes fa-lg" aria-hidden="true"></i>
+            <span>3Dやゲームとは<span class="keyword-tag amber">違う種類の出力</span>を評価できる課題</span></li>
+          <li><i class="fa-solid fa-star fa-lg" aria-hidden="true"></i>
+            <span>SWE-2 は<span class="hl">4問連続の8点</span>をマーク</span></li>
+          <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i>
+            <span>DS V4.1 は6点。この課題でも<span class="keyword-tag mint">2点差</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten">
+          <i class="fa-solid fa-image" aria-hidden="true"></i>
+          静的な絵を描く課題でも
+          <span class="keyword-tag">着実に点を取る</span>！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード11: Task 5 弓矢ゲーム -->
+    <div class="section-card lost fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 5</span><br>
+        <i class="fa-solid fa-bullseye fa-5x" style="color: var(--ui-color-5); animation: fa-shake 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">弓と矢の的あてゲーム</h2>
+        <div class="score-pill lose">
+          <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+          <span class="score-now">7/10</span>
+          <span class="score-rival">DS V4.1: 8（負け）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar rival" style="width: 70%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gamepad fa-lg" aria-hidden="true"></i>
+            <span>的は<span class="keyword-tag">4つ</span>。ゲーム性が本体の課題</span></li>
+          <li><i class="fa-solid fa-stopwatch fa-lg" aria-hidden="true"></i>
+            <span>最短タイムで的を射抜くと<span class="keyword-tag amber">順位が上がる</span>仕組み</span></li>
+          <li><i class="fa-solid fa-list-ol fa-lg" aria-hidden="true"></i>
+            <span>見た目に加えて<span class="hl">遊び・計測・記録</span>まで求められる</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i>
+            <span>この7点が SWE-2 の<span class="keyword-tag rose">今回の最低スコア</span></span></li>
+          <li><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i>
+            <span>DS V4.1 が8点。ゲーム課題では<span class="hl">一歩譲る</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-frown" aria-hidden="true"></i>
+          ゲームだけは DS に軍配。
+          <br>それでも<span class="keyword-tag rose">7点</span>は取る！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード12: Task 6 数学 -->
+    <div class="section-card scored fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 6</span><br>
+        <i class="fa-solid fa-square-root-variable fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">数学：順列の問題</h2>
+        <div class="score-pill win">
+          <i class="fa-solid fa-star" aria-hidden="true"></i>
+          <span class="score-now">10/10</span>
+          <span class="score-rival">DS V4.1: 10（満点同士）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width: 100%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-calculator fa-lg" aria-hidden="true"></i>
+            <span>順列の問題。正答は <span class="keyword-tag amber">20,460</span></span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg" aria-hidden="true"></i>
+            <span>SWE-2 は<span class="hl">満点の10点</span>を獲得</span></li>
+          <li><i class="fa-solid fa-equals fa-lg" aria-hidden="true"></i>
+            <span>DS V4.1 も10点。<span class="keyword-tag mint">両者満点</span>の勝負なし</span></li>
+          <li><i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i>
+            <span>正確な計算力は<span class="hl">トップクラス</span>と確認できた一問</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-award" aria-hidden="true"></i>
+          数字で勝負する課題は
+          <br><span class="keyword-tag mint">完璧</span>だね！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード13: Task 7 ファインチューニング -->
+    <div class="section-card scored fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 7</span><br>
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-6); animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">ファインチューニング＋Webアプリ</h2>
+        <div class="score-pill win">
+          <i class="fa-solid fa-star" aria-hidden="true"></i>
+          <span class="score-now">10/10</span>
+          <span class="score-rival">DS V4.1: 10（満点同士）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar" style="width: 100%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i>
+            <span>パンダの豆知識の<span class="keyword-tag">データセット</span>を自分で生成</span></li>
+          <li><i class="fa-solid fa-microchip fa-lg" aria-hidden="true"></i>
+            <span><span class="keyword-tag amber">Gemma 2B</span> をそのデータでファインチューニング</span></li>
+          <li><i class="fa-solid fa-window-restore fa-lg" aria-hidden="true"></i>
+            <span>ローカルの <span class="keyword-tag mint">Web UI</span> で、更新のたびに豆知識を1つ表示</span></li>
+          <li><i class="fa-solid fa-link fa-lg" aria-hidden="true"></i>
+            <span>準備→学習→アプリまで<span class="hl">全部つなげる長い課題</span>。一つのミスが全体を壊す</span></li>
+          <li><i class="fa-solid fa-crown fa-lg" aria-hidden="true"></i>
+            <span>この満点を検証者は<span class="hl">特に高く評価</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten">
+          <i class="fa-solid fa-heart" aria-hidden="true"></i>
+          エージェントに任せたい
+          <span class="keyword-tag amber">長くて連続した仕事</span>に
+          <br>近い課題で満点！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード14: Task 8 3D腕時計 -->
+    <div class="section-card lost fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="task-label">Task 8</span><br>
+        <i class="fa-solid fa-stopwatch fa-5x" style="color: var(--ui-color-2); animation: fa-spin 5s linear infinite;" aria-hidden="true"></i>
+        <h2 class="card-title-small">3Dの腕時計</h2>
+        <div class="score-pill lose">
+          <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+          <span class="score-now">8/10</span>
+          <span class="score-rival">DS V4.1: 10（負け）</span>
+        </div>
+        <div class="score-bar-wrap"><div class="score-bar rival" style="width: 80%;"></div></div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i>
+            <span><span class="hl">今の実際の時刻</span>を3Dの文字盤に表示</span></li>
+          <li><i class="fa-solid fa-gauge fa-lg" aria-hidden="true"></i>
+            <span>秒・分・時の針は<span class="keyword-tag amber">滑らかに動く</span>こと</span></li>
+          <li><i class="fa-solid fa-calendar-day fa-lg" aria-hidden="true"></i>
+            <span>日付・曜日に加えて<span class="keyword-tag mint">2つのタイムゾーン</span>も要求</span></li>
+          <li><i class="fa-solid fa-arrow-down fa-lg" aria-hidden="true"></i>
+            <span>DS V4.1 は<span class="hl">満点の10点</span>。最終課題は2点差で敗北</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3">
+        <span class="handwritten">
+          <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+          時計の複雑さは鬼門？
+          <br>DSが<span class="keyword-tag rose">見事満点</span>で締めた！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクションD: 総合結果と考察 ================= -->
+  <div class="section-divider">
+    <div class="line"></div>
+    <i class="fa-solid fa-trophy sec-icon" aria-hidden="true"></i>
+    <h2>総合結果と検証者の本音</h2>
+    <i class="fa-solid fa-trophy sec-icon" aria-hidden="true"></i>
+    <div class="line"></div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード15: 最終スコア -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>最終スコアは僅差</h2>
+      </div>
+      <div class="card-content">
+        <table class="mini-table">
+          <tr><th>モデル</th><th>得点</th><th>率</th></tr>
+          <tr><td><i class="fa-solid fa-hammer fa-lg" style="color: var(--ui-color-1);"></i> SWE-2</td><td class="win">67 / 80</td><td class="win">83.75%</td></tr>
+          <tr><td><i class="fa-solid fa-fish fa-lg" style="color: #999;"></i> DS V4.1 Flash</td><td>65 / 80</td><td>81.25%</td></tr>
+        </table>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i>
+            <span>差は<span class="hl">2点＝2.5ポイント</span>の接戦</span></li>
+          <li><i class="fa-solid fa-chart-pie fa-lg" aria-hidden="true"></i>
+            <span>内訳は <span class="keyword-tag mint">3勝</span>・<span class="keyword-tag rose">2敗</span>・<span class="keyword-tag">3分</span></span></li>
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i>
+            <span>課題の種類によって<span class="hl">得意不得意が分かれる</span>ので一問ずつ見るのが大事</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          率だけ見れば僅差。
+          <br>でも<span class="keyword-tag">全問7点以上</span>の
+          <br>底の堅さが光る！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード16: リーダーボード -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-ranking-star fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>リーダーボード5位</h2>
+      </div>
+      <div class="card-content">
+        <table class="mini-table">
+          <tr><th>モデル</th><th>KingBench 3</th></tr>
+          <tr><td>SWE-2</td><td class="win">83.75%（5位）</td></tr>
+          <tr><td>Fable 5</td><td>82.5%</td></tr>
+          <tr><td>Kimi K3</td><td>77.5%</td></tr>
+          <tr><td>Opus 5</td><td>77.5%</td></tr>
+        </table>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-up fa-lg" aria-hidden="true"></i>
+            <span><span class="keyword-tag mint">Fable 5・Kimi K3・Opus 5</span> を上回る</span></li>
+          <li><i class="fa-solid fa-plus fa-lg" aria-hidden="true"></i>
+            <span>元となった Kimi K3 には<span class="hl">+6.25ポイント</span>の差</span></li>
+          <li><i class="fa-solid fa-crown fa-lg" aria-hidden="true"></i>
+            <span>上位は Qwen 3.8 Max・GPT-6 Astra・GLM 5.3・Fable 5.1 など</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i>
+            <span>8問すべてで<span class="keyword-tag">7点未満なし</span>。ぶれの少なさが特徴</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-medal" aria-hidden="true"></i>
+          派手さより
+          <span class="keyword-tag amber">一貫性</span>で
+          <br>5位に滑り込んだ形！
+        </span>
+      </div>
+    </div>
+
+    <!-- カード17: 長いタスクで好調 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clapperboard fa-5x" style="color: var(--ui-color-6); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>長いタスクで本領発揮</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-film fa-lg" aria-hidden="true"></i>
+            <span>追加検証：<span class="keyword-tag">TMDB API</span> で映画トラッカーアプリをターミナルに構築</span></li>
+          <li><i class="fa-solid fa-crown fa-lg" aria-hidden="true"></i>
+            <span>検証者評：<span class="hl">「今までで最高クラスの出来」</span></span></li>
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i>
+            <span>この課題は Astra が苦手。Fable は良かったが、SWE-2 は<span class="keyword-tag mint">それを上回る</span></span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i>
+            <span>一覧・詳細・検索・評価が<span class="hl">全部シームレスに動作</span></span></li>
+          <li><i class="fa-solid fa-wand-magic-sparkles fa-lg" aria-hidden="true"></i>
+            <span>ターミナルの<span class="keyword-tag amber">チラつきも一切なし</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten">
+          <i class="fa-solid fa-thumbs-up" aria-hidden="true"></i>
+          途中で目標を見失わず
+          <span class="keyword-tag">最後までやり切る</span>！
+          <br>エージェント向きの性格だね
+        </span>
+      </div>
+    </div>
+
+    <!-- カード18: 弱点 -->
+    <div class="section-card lost fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-question fa-5x" style="color: var(--ui-color-5); animation: fa-beat 1.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>最大の弱点：質問が多すぎる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots fa-lg" aria-hidden="true"></i>
+            <span>作業前に <span class="keyword-tag rose">clarification（確認の質問）</span>を何度も投げてくる</span></li>
+          <li><i class="fa-solid fa-hand fa-lg" aria-hidden="true"></i>
+            <span>検証者の許容ライン：<span class="hl">1つ目はOK、2つ目までが限界</span></span></li>
+          <li><i class="fa-solid fa-clipboard-list fa-lg" aria-hidden="true"></i>
+            <span>普通の選択は<span class="keyword-tag mint">妥当な仮定を置いて進めて</span>ほしい</span></li>
+          <li><i class="fa-solid fa-gear fa-lg" aria-hidden="true"></i>
+            <span>システム指示での改善に期待（検証者の対処案は下記）</span></li>
+        </ul>
+        <pre><span class="c">// 検証者が提案する緩和策（効果は未保証）</span>
+ask at most <span class="k">one</span> clarification
+unless truly blocked.
+make reasonable assumptions,
+continue to a complete result.
+if needed, put questions in <span class="s">one concise message</span>.</pre>
+      </div>
+      <div class="speech-bubble variant-3 right">
+        <span class="handwritten">
+          <i class="fa-solid fa-face-smile" aria-hidden="true"></i>
+          質問を<span class="keyword-tag rose">1通にまとめて</span>、
+          <br>あとは任せてほしいね。
+          <br>能力が高いから<span class="hl">許せる範囲</span>！
+        </span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= まとめの帯 ================= -->
+  <div class="section-divider">
+    <div class="line"></div>
+    <i class="fa-solid fa-face-smile sec-icon" aria-hidden="true"></i>
+    <h2>総括</h2>
+    <i class="fa-solid fa-face-smile sec-icon" aria-hidden="true"></i>
+    <div class="line"></div>
+  </div>
+
+  <div class="highlight-strip">
+    <div class="highlight-chip">
+      <i class="fa-solid fa-trophy chip-icon" aria-hidden="true"></i>
+      <span class="chip-label">KingBench 3</span>
+      <span class="chip-value">83.75%・5位</span>
+    </div>
+    <div class="highlight-chip">
+      <i class="fa-solid fa-diagram-project chip-icon" aria-hidden="true"></i>
+      <span class="chip-label">特に好成績</span>
+      <span class="chip-value">長い連続タスク</span>
+    </div>
+    <div class="highlight-chip">
+      <i class="fa-solid fa-circle-question chip-icon" aria-hidden="true"></i>
+      <span class="chip-label">残る不満</span>
+      <span class="chip-value">確認の質問過多</span>
+    </div>
+    <div class="highlight-chip">
+      <i class="fa-solid fa-thumbs-up chip-icon" aria-hidden="true"></i>
+      <span class="chip-label">検証者の結論</span>
+      <span class="chip-value">試す価値アリ</span>
+    </div>
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer>
+    <div>
+      🎬 動画: <a href="https://www.youtube.com/watch?v=V_sH3TDixQk" target="_blank" rel="noopener">SWE-2 (Fully Tested): WHAT? IT ACTUALLY BEATS ASTRA... — AI Code King</a>
+    </div>
+    <div class="footer-note">
+      <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+      このインフォグラフィックは上の動画の内容をまとめたものです ／ KingBench 3 は同チャンネル独自のコーディングベンチ ／ 動画内で「Cognition から検証用に max プラン6ヶ月分とクレジット提供を受けた」と開示されています
+    </div>
+  </footer>
+
+</div>
+
+<script>
+  // スクロールに合わせてカードを出現させる
+  document.addEventListener('DOMContentLoaded', function () {
+    var targets = document.querySelectorAll('.fade-in-scale');
+    if ('IntersectionObserver' in window) {
+      var obs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            obs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      targets.forEach(function (t) { obs.observe(t); });
+    } else {
+      targets.forEach(function (t) { t.classList.add('visible'); });
+    }
+  });
+</script>
+</body>
+</html>

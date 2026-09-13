@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【ずんめたラボ】Anthropicの悪用レポート 〜Kimiに聞いたのにClaudeが答えていた〜</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ui-color-1: #9D2449; /* バーガンディレッド: メイン */
+  --ui-color-2: #2B3A67; /* インディゴネイビー: アクセント */
+  --ui-color-3: #F5EDE1; /* 生成りクリーム: タグ背景 */
+  --ui-color-4: #2A1E24; /* 墨黒: テキスト */
+  --ui-color-5: #B95C1E; /* 焼きアンバー: 強調 */
+  --ui-color-6: #6E8B74; /* セージグリーン: サブ */
+  --canvas: #FDF9F3;     /* 白に近いキャンバス */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--canvas);
+  background-image:
+    radial-gradient(circle at 8% 12%, rgba(157,36,73,0.05) 0%, transparent 38%),
+    radial-gradient(circle at 92% 88%, rgba(43,58,103,0.06) 0%, transparent 40%);
+  color: var(--ui-color-4);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  line-height: 1.5;
+}
+
+.page-container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ===== ヘッダー ===== */
+.main-header {
+  text-align: center;
+  padding: 40px 20px 30px;
+  position: relative;
+}
+
+.main-header .header-icons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  margin-bottom: 15px;
+}
+
+.main-header h1 {
+  font-size: 36px;
+  color: var(--ui-color-4);
+  font-weight: bold;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.main-header .subtitle {
+  font-size: 20px;
+  color: var(--ui-color-1);
+  margin-top: 10px;
+  font-family: 'Yomogi', cursive;
+}
+
+.main-header .date-info {
+  font-size: 14px;
+  color: #777777;
+  margin-top: 12px;
+}
+
+/* ===== セクション帯 ===== */
+.section-title-band {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 38px 10px 15px;
+  padding: 8px 18px;
+  background: linear-gradient(90deg, rgba(157,36,73,0.14), rgba(43,58,103,0.10));
+  border-left: 8px solid var(--ui-color-1);
+  border-radius: 0 12px 12px 0;
+}
+
+.section-title-band h2 {
+  font-size: 26px;
+  color: var(--ui-color-2);
+  font-family: 'Kaisei Decol', serif;
+}
+
+.section-title-band i {
+  color: var(--ui-color-5);
+}
+
+/* ===== レイアウト ===== */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  padding: 5px;
+}
+
+/* ===== カード ===== */
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 460px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(42,30,36,0.12);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 10px 22px rgba(42,30,36,0.2);
+}
+
+.section-card.alt { border-top-color: var(--ui-color-2); }
+.section-card.amber { border-top-color: var(--ui-color-5); }
+.section-card.sage { border-top-color: var(--ui-color-6); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container h2 {
+  font-size: 24px;
+  color: #555555;
+  font-family: 'Kaisei Decol', serif;
+  margin-top: 10px;
+}
+
+.card-content { padding: 0 10px 15px; }
+
+.card-content h3 {
+  font-size: 18px;
+  color: var(--ui-color-4);
+  margin: 12px 0 6px;
+  border-bottom: 2px dotted var(--ui-color-6);
+  padding-bottom: 3px;
+}
+
+/* リスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: var(--ui-color-4);
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-5);
+  min-width: 16px;
+}
+
+/* タグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.keyword-tag.navy { background-color: #E4E8F2; }
+.keyword-tag.wine { background-color: #F7E3E9; color: var(--ui-color-1); }
+.keyword-tag.sage { background-color: #E7EEE7; }
+
+/* 数値ハイライト */
+.big-number {
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--ui-color-1);
+  font-family: 'Kaisei Decol', serif;
+}
+
+/* ===== 吹き出し（3バリエーション） ===== */
+.speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FFF6E3;
+  border-color: var(--ui-color-5);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #FDECEF;
+  border-color: #9D2449;
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: #9D2449 transparent;
+}
+
+.speech-bubble.variant-3 {
+  background: #EBF1EC;
+  border-color: var(--ui-color-6);
+  transform: rotate(1.5deg);
+}
+
+.speech-bubble.variant-3::after {
+  border-color: var(--ui-color-6) transparent;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333333;
+}
+
+/* コードプレビュー */
+pre {
+  background: #2A2430;
+  color: #EDE6D6;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+pre .cmt { color: #8FA48F; }
+pre .key { color: #E8B04B; }
+pre .red { color: #E86A6A; }
+
+/* フロー図 */
+.flow-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.flow-box .node {
+  background: var(--ui-color-3);
+  border: 2px solid var(--ui-color-2);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: bold;
+  color: var(--ui-color-4);
+}
+
+.flow-box .node.hot {
+  background: #F7E3E9;
+  border-color: var(--ui-color-1);
+  color: var(--ui-color-1);
+}
+
+.flow-box i { color: var(--ui-color-5); }
+
+/* アニメーション */
+@keyframes fadeInScale {
+  0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.fade-in-scale {
+  animation: fadeInScale 0.8s ease both;
+}
+
+.d1 { animation-delay: 0.1s; }
+.d2 { animation-delay: 0.2s; }
+.d3 { animation-delay: 0.3s; }
+.d4 { animation-delay: 0.4s; }
+
+@keyframes highlightPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(157,36,73,0); }
+  50% { box-shadow: 0 0 14px rgba(157,36,73,0.45); }
+}
+
+.pulse-tag { animation: highlightPulse 2.5s infinite; border-radius: 5px; }
+
+/* ===== フッター ===== */
+.main-footer {
+  margin-top: 50px;
+  padding: 25px 20px 40px;
+  text-align: center;
+  border-top: 3px double var(--ui-color-6);
+  font-size: 14px;
+  color: #777777;
+}
+
+.main-footer a { color: var(--ui-color-2); }
+
+.main-footer .footer-note {
+  font-family: 'Yomogi', cursive;
+  margin-top: 8px;
+  color: var(--ui-color-6);
+}
+
+/* ===== レスポンシブ ===== */
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px)  { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="page-container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header class="main-header">
+    <div class="header-icons">
+      <i class="fa-solid fa-file-shield fa-7x" style="color: var(--ui-color-1); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-user-secret fa-5x" style="color: var(--ui-color-2); animation: fa-shake 4s infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-key fa-5x" style="color: var(--ui-color-5); animation: fa-flip 5s infinite;" aria-hidden="true"></i>
+    </div>
+    <h1>Kimiに聞いたのにClaudeが答えていた</h1>
+    <p class="subtitle">〜AIの名前は、中身の保証じゃない〜 Anthropicが公開した悪用レポートを読みほぐす</p>
+    <p class="date-info"><i class="fa-regular fa-calendar"></i> 2026年9月13日公開 ｜ ずんめたラボ ｜ 「今知っておきたいAIニュース」</p>
+  </header>
+
+  <!-- ================= セクション1: 何があったか ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-magnifying-glass fa-2x" aria-hidden="true"></i>
+    <h2>何があったか、教えるわ</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-folder-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>あのレポートが公開</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-building" aria-hidden="true"></i><span>出したのは <span class="keyword-tag wine">Anthropic</span></span></li>
+          <li><i class="fa-solid fa-list" aria-hidden="true"></i><span>AIの悪用をまとめた報告書。分野は <span class="big-number">7</span> つ並んでいる</span></li>
+          <li><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>今回はその中から「名前と中身がずれる話」にぐっと寄って見ていく</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>自分ごととして読むほど身につく話なのだ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> ずんめ「AI悪用レポートって、遠い国の話だと思ってたのだ…」<br>めたん「あなたのその質問、いちばん狙われやすいのよ」</span>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card alt fade-in-scale d1">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-ol fa-5x" style="color: var(--ui-color-2); animation: fa-flip 4s infinite;" aria-hidden="true"></i>
+        <h2>3つの構図</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1" aria-hidden="true"></i><span>画面の名前と、じっさいに答えたAIが<span class="keyword-tag">ズレる</span></span></li>
+          <li><i class="fa-solid fa-2" aria-hidden="true"></i><span>やり取りの中身が、よその会社の<span class="keyword-tag navy">社内へ持ち出される</span></span></li>
+          <li><i class="fa-solid fa-3" aria-hidden="true"></i><span>持ち出しても<span class="keyword-tag wine">映らないもの</span>が、ひとつだけある</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-5);"></i> ずんめ「映らないものって、何なのだ?」<br>めたん「それは最後まで取っておくわ。ここが今日の肝よ」</span>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card amber fade-in-scale d2">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-masks-theater fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h2>Kimiの顔をしたClaude</h2>
+      </div>
+      <div class="card-content">
+        <div class="flow-box">
+          <span class="node">利用者</span>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          <span class="node">Kimi に質問</span>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          <span class="node hot">裏で転送</span>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          <span class="node hot">Claude が回答</span>
+        </div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-secret" aria-hidden="true"></i><span>さしきれたのは中国の <span class="keyword-tag wine">Moonshot AI</span> 社の「Kimi」</span></li>
+          <li><i class="fa-solid fa-exchange-alt" aria-hidden="true"></i><span>リクエストを黙って <span class="keyword-tag navy">Claude へ転送</span>、答えをそのまま返す</span></li>
+          <li><i class="fa-solid fa-eye-slash" aria-hidden="true"></i><span>画面にはKimiと出ているので、使う側は<span class="keyword-tag">気づけない</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-face-flushed fa-lg" style="color: var(--ui-color-1);"></i> ずんめ「Kimiに聞いたのに、Claudeが答えてたのだ!?」<br>めたん「名前は看板。中身までは保証しないのよ」</span>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card sage fade-in-scale d3">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-column fa-5x" style="color: var(--ui-color-6); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+        <h2>数字で見る規模</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock" aria-hidden="true"></i><span>わずか <span class="big-number">10日間</span> で転送はおよそ <span class="big-number">30万件</span></span></li>
+          <li><i class="fa-solid fa-crown" aria-hidden="true"></i><span>その大半が上位モデル <span class="keyword-tag navy">Opus</span> に回されていた</span></li>
+          <li><i class="fa-solid fa-user-group" aria-hidden="true"></i><span>経由した偽アカウントは <span class="big-number">5,380個</span></span></li>
+          <li><i class="fa-solid fa-earth-asia" aria-hidden="true"></i><span>その多くは <span class="keyword-tag">シンガポール</span> と <span class="keyword-tag wine">日本</span> 拠点ということになっていた</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-1);"></i> ずんめ「日本も通り道だったのだ…遠い国の話じゃないのだ」</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクション2: 仕組みをひもとく ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-gears fa-2x" aria-hidden="true"></i>
+    <h2>仕組みを、ひもとくわ</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card alt fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flask-vial fa-5x" style="color: var(--ui-color-2); animation: fa-flip 5s infinite;" aria-hidden="true"></i>
+        <h2>蒸留（じょうりゅう）とは</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i><span>学校でたとえると: <span class="keyword-tag navy">できる先輩</span>に問題を全部解いてもらう</span></li>
+          <li><i class="fa-solid fa-book" aria-hidden="true"></i><span>その答案を教材にして、後輩に同じ解き方を覚えさせる</span></li>
+          <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>つまり <span class="keyword-tag wine">答えを集めて自分のAIを鍛える</span>やり方</span></li>
+          <li><i class="fa-solid fa-whiskey-glass" aria-hidden="true"></i><span>「蒸留」はお酒と同じ字。煮詰めた中から、エキスだけ取り出す意味ね</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> ずんめ「先輩の答案が、そのまま参考書になるのだ」<br>めたん「転送の目的はまさにこれ。賢さを写し取りたいのよ」</span>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale d1">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-shake 4s infinite;" aria-hidden="true"></i>
+        <h2>線はどこにあるの?</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>蒸留じたいは <span class="keyword-tag sage">どこもやっている普通の手法</span></span></li>
+          <li><i class="fa-solid fa-circle-check" aria-hidden="true"></i><span>悪いのは方法ではなく、この<span class="keyword-tag wine">2つの点</span></span></li>
+          <li><i class="fa-solid fa-handshake-slash" aria-hidden="true"></i><span>① 相手に<span class="keyword-tag">断っているか</span>どうか</span></li>
+          <li><i class="fa-solid fa-door-open" aria-hidden="true"></i><span>② 正面から入らず、<span class="keyword-tag wine">裏口を使っていないか</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-5);"></i> めたん「泥棒かどうかは、入口と許可で決まるのよ」</span>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card amber fade-in-scale d2">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-network-wired fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+        <h2>中継サービスの仕組み</h2>
+      </div>
+      <div class="card-content">
+        <div class="flow-box">
+          <span class="node">あなた</span>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          <span class="node hot">中継（代理窓口）</span>
+          <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+          <span class="node">Claude 等へ到達</span>
+        </div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-people-arrows" aria-hidden="true"></i><span>本人の代わりに注文を出してくれる <span class="keyword-tag">代理の窓口</span></span></li>
+          <li><i class="fa-solid fa-earth-americas" aria-hidden="true"></i><span>使えない国からでも、この窓口を通せば届く（リバースプロキシ）</span></li>
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>形は「まとめて安く使えるサービス」とそっくり。安く・早くが売り</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i> ずんめ「それ、ぼくが最初に見つけたサービスと同じなのだ」<br>めたん「同じ形のものもある。だから油断は危ないの」</span>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card sage fade-in-scale d3">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-credit-card fa-5x" style="color: var(--ui-color-6); animation: fa-bounce 2.8s infinite;" aria-hidden="true"></i>
+        <h2>安さの正体</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-address-card" aria-hidden="true"></i><span><span class="keyword-tag wine">偽の身元</span>でアカウントを量産</span></li>
+          <li><i class="fa-solid fa-credit-card" aria-hidden="true"></i><span><span class="keyword-tag wine">盗んだクレジットカード</span>で決済</span></li>
+          <li><i class="fa-solid fa-key" aria-hidden="true"></i><span>よそから盗んだ <span class="keyword-tag">APIキー</span>（プログラム呼び出しの鍵）も利用</span></li>
+          <li><i class="fa-solid fa-users" aria-hidden="true"></i><span>それらでアカウントを <span class="big-number">数千</span> 個 作っていた</span></li>
+          <li><i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i><span>盗まれた鍵の利用料は、<span class="keyword-tag wine">契約している本人に請求</span>が行く</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3 right">
+        <span class="handwritten"><i class="fa-solid fa-skull-crossbones fa-lg" style="color: var(--ui-color-1);"></i> めたん「誰かの盗まれた鍵が、その値段を作っていたことがあるの」<br>ずんめ「全然関係ない人が、お金を払うのだ。ひどいのだ…」</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクション3: 出てしまったもの ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-box-open fa-2x" aria-hidden="true"></i>
+    <h2>出てしまったもの、選ばれた人</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード9 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-ranking-star fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4s infinite;" aria-hidden="true"></i>
+        <h2>3社の規模を比べる</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-trophy" aria-hidden="true"></i><span>最大はAlibaba系: 5〜7月で <span class="big-number">1億5100万件超</span></span></li>
+          <li><i class="fa-solid fa-calendar-day" aria-hidden="true"></i><span>多い日は <span class="big-number">1日300万件</span>。億の桁、まちがいじゃないわ</span></li>
+          <li><i class="fa-solid fa-industry" aria-hidden="true"></i><span>レポートは <span class="keyword-tag wine">産業規模の隠密キャンペーン</span> と表現</span></li>
+          <li><i class="fa-solid fa-moon" aria-hidden="true"></i><span>Moonshot AI は <span class="big-number">2300万件超</span></span></li>
+          <li><i class="fa-solid fa-water" aria-hidden="true"></i><span>DeepSeek は <span class="big-number">14日間で1210万件超</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-face-frown-open fa-lg" style="color: var(--ui-color-5);"></i> ずんめ「個人がやる規模じゃないのだ」<br>めたん「そう、組織的に回っていたのよ」</span>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card alt fade-in-scale d1">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-filter fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s infinite;" aria-hidden="true"></i>
+        <h2>DeepSeekは「選んで」いた</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-crosshairs" aria-hidden="true"></i><span>転送する相手を、誰でもよくば<span class="keyword-tag wine">選別</span></span></li>
+          <li><i class="fa-solid fa-laptop-code" aria-hidden="true"></i><span><span class="keyword-tag navy">Claude Code</span> のような開発ツールからのリクエストを<span class="keyword-tag">文字列で見分け</span></span></li>
+          <li><i class="fa-solid fa-tag" aria-hidden="true"></i><span>印をつけて、その人たちの行き先だけClaudeへ回す</span></li>
+          <li><i class="fa-solid fa-user-shield" aria-hidden="true"></i><span>狙われるのは、コードを書く現場のひと</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-ghost fa-lg" style="color: var(--ui-color-5);"></i> ずんめ「狙って選ばれてたのだ…こわいのだ」</span>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card amber fade-in-scale d2">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-list fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+        <h2>流出例① 計画表</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comment-dots" aria-hidden="true"></i><span>「ある建設会社の <span class="keyword-tag">設備投資の計画表</span> を、木曜のレビューまでに整理して」</span></li>
+          <li><i class="fa-solid fa-face-meh" aria-hidden="true"></i><span>ごく普通の、ありふれた依頼文</span></li>
+          <li><i class="fa-solid fa-map-location-dot" aria-hidden="true"></i><span>中身は <span class="keyword-tag navy">建設予定の拠点名</span> と <span class="keyword-tag navy">使う金額</span></span></li>
+          <li><i class="fa-solid fa-calendar" aria-hidden="true"></i><span>なんと <span class="big-number">4年分</span> がずらりと並んでいた</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-ban fa-lg" style="color: var(--ui-color-1);"></i> ずんめ「それ、社外に出しちゃいけないやつなのだ…」</span>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card sage fade-in-scale d3">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="color: var(--ui-color-6); animation: fa-shake 3.5s infinite;" aria-hidden="true"></i>
+        <h2>流出例② 設定ファイル</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span>相談は「<span class="keyword-tag">ボットが動かない</span>」という一件</span></li>
+          <li><i class="fa-solid fa-paste" aria-hidden="true"></i><span>設定ファイルを丸ごと貼って質問→そこには<span class="keyword-tag wine">生きたAPIキーが3種</span></span></li>
+          <li><i class="fa-solid fa-language" aria-hidden="true"></i><span>こうした中身が <span class="big-number">12以上</span> の言語で書かれていた</span></li>
+          <li><i class="fa-solid fa-users-viewfinder" aria-hidden="true"></i><span>量はなんと <span class="big-number">数百人分</span></span></li>
+        </ul>
+<pre><span class="cmt"># スラックボットの設定ファイル（再現イメージ）</span>
+<span class="key">BOT_TOKEN</span>    = xoxb-live-****
+<span class="key">DB_PASSWORD</span>  = ************
+<span class="key">AI_API_KEY</span>   = <span class="red">sk-live-****</span>  ← 生きた鍵が3つ!
+<span class="cmt"># このまま丸ごと貼って、質問されていた</span></pre>
+      </div>
+      <div class="speech-bubble variant-3">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise fa-lg" style="color: var(--ui-color-1);"></i> ずんめ「それ、ぼくもやりそうなのだ…」<br>めたん「特別な人の話じゃないのよ、これが」</span>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--ui-color-1); animation: fa-flip 4.5s infinite;" aria-hidden="true"></i>
+        <h2>欲しがられる「質問の形」</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-quote-left" aria-hidden="true"></i><span>「ぼくの質問なんて、誰も欲しがらない」— それは<span class="keyword-tag wine">まちかい</span></span></li>
+          <li><i class="fa-solid fa-heart-crack" aria-hidden="true"></i><span>欲しがられるのは悩みの中身ではなく、<span class="keyword-tag navy">人が本当に困った時に書く質問の形</span></span></li>
+          <li><i class="fa-solid fa-gem" aria-hidden="true"></i><span>それこそが、いちばんいい<span class="keyword-tag">教材</span>になる</span></li>
+          <li><i class="fa-solid fa-pen-nib" aria-hidden="true"></i><span>一生けん命書いた質問ほど、価値が高い</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);"></i> めたん「『困った』の形をしたものが、いちばん高く売れるのよ」</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= セクション4: 守り方とまとめ ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-shield-halved fa-2x" aria-hidden="true"></i>
+    <h2>守り方と、まとめ</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード14 -->
+    <div class="section-card alt fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hourglass-half fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+        <h2>無料の期間を延長?</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gift" aria-hidden="true"></i><span>DeepSeekは<span class="keyword-tag">無料で試せる期間を延長</span>していた</span></li>
+          <li><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>蒸留が本格化したのは、その期間が<span class="keyword-tag wine">終わる頃</span>だったとレポートは見る</span></li>
+          <li><i class="fa-solid fa-circle-question" aria-hidden="true"></i><span>「なぜ無料なのか」も、一度疑ってみる価値あり</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-scale-unbalanced fa-lg" style="color: var(--ui-color-1);"></i> ずんめ「無料の理由も、疑った方がいいのだ」</span>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card amber fade-in-scale d1">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.4s infinite;" aria-hidden="true"></i>
+        <h2>身を守る3か条</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1" aria-hidden="true"></i><span>AIの名前じゃなく <span class="keyword-tag navy pulse-tag">誰が運営しているか</span> で選ぶ。名前は看板、規約に書いてある扱いが本体</span></li>
+          <li><i class="fa-solid fa-2" aria-hidden="true"></i><span>鍵・パスワード・<span class="keyword-tag navy pulse-tag">社内の資料は中継に投げない</span>。遊びの質問と仕事の資料は、窓口を使い分ける</span></li>
+          <li><i class="fa-solid fa-3" aria-hidden="true"></i><span><span class="keyword-tag navy pulse-tag">自分のAPIキーを預けない</span>。請求が行くのは、鍵を持っている本人</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-hand-point-right fa-lg" style="color: var(--ui-color-5);"></i> めたん「試すのはいいのよ。大事なのは、投げるものを選ぶこと」<br>ずんめ「使い分けなら、できそうなのだ!」</span>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card sage fade-in-scale d2">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench fa-5x" style="color: var(--ui-color-6); animation: fa-flip 5s infinite;" aria-hidden="true"></i>
+        <h2>Claude側の対策</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>考えた過程（思考過程）をそのまま出さず、<span class="keyword-tag sage">省いて返す</span>よう変更</span></li>
+          <li><i class="fa-solid fa-file-circle-xmark" aria-hidden="true"></i><span>答案の“下書き”を渡さない → 盗んでも教材にしづらい</span></li>
+          <li><i class="fa-solid fa-user-check" aria-hidden="true"></i><span>怪しい使い方を見つけたら<span class="keyword-tag">本人確認</span>。応じなければ止める仕組み</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-3 right">
+        <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-6);"></i> ずんめ「これでもう大丈夫なのだ?」<br>めたん「‘大丈夫’とは言いきれないわね。続けて聞いて」</span>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale d3">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-car-side fa-5x" style="color: var(--ui-color-1); animation: fa-shake 3s infinite;" aria-hidden="true"></i>
+        <h2>エンジンは映る、ブレーキは映らない</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-engine" aria-hidden="true"></i><span>蒸留でコピーされるのは <span class="keyword-tag navy">賢さ（エンジン）</span> だけ</span></li>
+          <li><i class="fa-solid fa-hand" aria-hidden="true"></i><span>元のAIが持つ <span class="keyword-tag wine pulse-tag">「やらない」という判断（ブレーキ）</span> は、コピー先についてこない</span></li>
+          <li><i class="fa-solid fa-flask" aria-hidden="true"></i><span>Anthropic自身の実験でも同じ結果: 危ない話を一言も教えていないのに、<span class="keyword-tag">危ないことができる側</span>に育つ</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-1);"></i> めたん「これが私のいちばんの引っかかり。安全の部分は、写らないのよ」</span>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card alt fade-in-scale d4">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s infinite;" aria-hidden="true"></i>
+        <h2>教訓と、まとめ</h2>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-chess-knight" aria-hidden="true"></i><span><span class="keyword-tag wine">ZAIの「フェーブル」</span>は守りが固くて攻撃が通らず、犯行側は諦めて標的を変えた</span></li>
+          <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span>固く守ることは、邪魔ではなく<span class="keyword-tag sage">盗まれない理由</span>になる</span></li>
+          <li><i class="fa-solid fa-buildings" aria-hidden="true"></i><span>同じ被害は <span class="keyword-tag navy">OpenAI</span> も <span class="keyword-tag navy">Google</span> も報告済み。起きていることは複数社で一致</span></li>
+          <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>ただし報告書はAnthropic側の話。名指しされた会社の言い分は載っていない</span></li>
+        </ul>
+        <h3><i class="fa-solid fa-star" aria-hidden="true"></i> 要点は3つ</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1" aria-hidden="true"></i><span>AIの<span class="keyword-tag">名前は、答えた中身の保証にならない</span></span></li>
+          <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="keyword-tag">安さの出所</span>が、誰かの盗まれた鍵だったことがある</span></li>
+          <li><i class="fa-solid fa-3" aria-hidden="true"></i><span>映るのは賢さだけ。<span class="keyword-tag">ブレーキは映らない</span></span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--ui-color-5);"></i> めたん「投げる相手は名前じゃなく、<span class="keyword-tag wine">運営と約款</span>で選ぶ。それだけ決めておけば迷わないわ」</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer class="main-footer">
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=XW1EJpZl-RQ" target="_blank" rel="noopener" style="color: inherit;">ずんめたラボ「Anthropicの悪用レポート Kimiに聞いたのにClaudeが答えていた AIの名前は中身の保証じゃない｜今知っておきたいAIニュース」</a></p>
+    <p>📄 元ネタ: Anthropic が公開した AI 悪用に関する報告書（7分野のうち「モデルの不正転送・蒸留」まわりを中心に）</p>
+    <p class="footer-note">〜 また一緒に見るのだ。チャンネル登録もお願いね 〜</p>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAFT + Verdent | コードグラフでエージェントの探索コストを削る</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  /* ============================================
+     GRAFT (コードグラフOSS) 専用テーマ
+     「Magenta Node × Fresh Lime」
+     （ノードのマゼンタ #A21CAF × 若葉ライム #4D7C0F）
+     ============================================ */
+  :root {
+    --ui-color-1: #A21CAF;   /* ディープマゼンタ（グラフのノード） */
+    --ui-color-2: #4D7C0F;   /* フレッシュライム（接ぎ木の新芽） */
+    --ui-color-3: #FCE7F3;   /* 淡いマゼンタ */
+    --ui-color-4: #4A044E;   /* 深夜のプラム */
+    --ui-color-5: #B91C1C;   /* レッド（バグ・失敗） */
+    --ui-color-6: #0F766E;   /* ティール（成功・修正後） */
+    --ui-color-7: #F7FEE7;   /* ライム極淡 */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+    background: #FFF8F5;
+    background-image:
+      radial-gradient(circle at 10% 5%, rgba(162,28,175,0.08) 0%, transparent 36%),
+      radial-gradient(circle at 90% 14%, rgba(77,124,15,0.09) 0%, transparent 34%),
+      radial-gradient(circle at 50% 95%, rgba(15,118,110,0.06) 0%, transparent 40%);
+    color: #333;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+  }
+
+  /* ---------- ヘッダー ---------- */
+  header {
+    text-align: center;
+    padding: 40px 20px 25px;
+    position: relative;
+  }
+
+  header .header-icons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 25px;
+    margin-bottom: 12px;
+  }
+
+  header .header-icons .main-icon {
+    font-size: 7em;
+    color: var(--ui-color-1);
+    filter: drop-shadow(4px 5px 6px rgba(162,28,175,0.35));
+    animation: fa-bounce 2.6s ease-in-out infinite;
+  }
+
+  header .header-icons .sub-icon {
+    font-size: 3.2em;
+    color: var(--ui-color-2);
+    animation: fa-beat-fade 2.2s ease-in-out infinite;
+  }
+
+  header .header-icons .sub-icon2 {
+    font-size: 2.6em;
+    color: var(--ui-color-6);
+    animation: fa-spin 8s linear infinite;
+  }
+
+  h1 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 36px;
+    font-weight: bold;
+    color: #333;
+    margin: 8px 0;
+  }
+
+  h1 .accent { color: var(--ui-color-1); }
+  h1 .accent2 { color: var(--ui-color-2); }
+
+  .header-sub {
+    font-size: 17px;
+    color: #555;
+    margin-top: 6px;
+  }
+
+  .header-date {
+    font-size: 14px;
+    color: #777;
+    margin-top: 8px;
+  }
+
+  .header-tags { margin-top: 14px; }
+  .header-tags .keyword-tag { margin: 3px; }
+
+  /* ハイライト帯 */
+  .highlight-strip {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 14px;
+    max-width: 1600px;
+    margin: 22px auto 8px;
+  }
+
+  .highlight-chip {
+    background: white;
+    border: 2.5px solid var(--ui-color-1);
+    border-radius: 14px;
+    padding: 8px 16px;
+    font-size: 15px;
+    font-weight: bold;
+    color: var(--ui-color-4);
+    box-shadow: 3px 3px 10px rgba(162,28,175,0.15);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .highlight-chip i { color: var(--ui-color-1); }
+  .highlight-chip.lime { border-color: var(--ui-color-2); }
+  .highlight-chip.lime i { color: var(--ui-color-2); }
+  .highlight-chip.teal { border-color: var(--ui-color-6); }
+  .highlight-chip.teal i { color: var(--ui-color-6); }
+
+  /* ---------- セクションレイアウト ---------- */
+  .section-layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+    margin: 25px 0;
+  }
+
+  .section-title-band {
+    text-align: center;
+    margin: 35px 0 5px;
+    position: relative;
+  }
+
+  .section-title-band h2 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 26px;
+    color: var(--ui-color-4);
+    display: inline-block;
+    padding: 4px 30px;
+    border-bottom: 4px dotted var(--ui-color-1);
+  }
+
+  .section-title-band .band-icon {
+    color: var(--ui-color-2);
+    margin-right: 10px;
+    font-size: 0.9em;
+  }
+
+  /* ---------- カード ---------- */
+  .section-card {
+    flex: 1;
+    min-width: 220px;
+    max-width: 450px;
+    background-color: white;
+    border-radius: 20px;
+    padding: 15px;
+    box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+    position: relative;
+    overflow: hidden;
+    border-top: 6px solid var(--ui-color-1);
+    transition: transform 0.25s, box-shadow 0.25s;
+  }
+
+  .section-card:hover {
+    transform: translateY(-6px) rotate(-0.4deg);
+    box-shadow: 8px 10px 22px rgba(74,4,78,0.18);
+  }
+
+  .section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+
+  .mega-icon-container {
+    text-align: center;
+    margin: 15px 0 10px;
+  }
+
+  .mega-icon-container i.fa-5x {
+    filter: drop-shadow(3px 4px 5px rgba(74,4,78,0.25));
+  }
+
+  .mega-icon-container h3 {
+    font-family: 'Kaisei Decol', serif;
+    font-size: 22px;
+    color: #555;
+    margin-top: 10px;
+  }
+
+  .card-number {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    color: #bbb;
+    font-weight: bold;
+  }
+
+  .card-content { padding: 0 10px 15px; }
+
+  /* 見出し付きリスト */
+  .list-heading {
+    font-size: 18px;
+    color: #333;
+    font-weight: bold;
+    margin: 12px 0 6px;
+    border-left: 4px solid var(--ui-color-2);
+    padding-left: 8px;
+  }
+
+  .keyword-list {
+    margin: 12px 0;
+    padding: 0;
+    list-style-type: none;
+  }
+
+  .keyword-list li {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-start;
+    font-size: 16px;
+    color: #333;
+  }
+
+  .keyword-list li i {
+    margin-right: 8px;
+    color: var(--ui-color-1);
+    min-width: 16px;
+  }
+
+  .keyword-list li i.lime { color: var(--ui-color-2); }
+  .keyword-list li i.red { color: var(--ui-color-5); }
+  .keyword-list li i.teal { color: var(--ui-color-6); }
+
+  /* キーワードタグ */
+  .keyword-tag {
+    background-color: var(--ui-color-3);
+    color: var(--ui-color-4);
+    padding: 3px 8px;
+    border-radius: 5px;
+    margin-right: 5px;
+    display: inline-block;
+    font-weight: bold;
+    font-size: 15px;
+  }
+
+  .keyword-tag.lime {
+    background-color: var(--ui-color-7);
+    color: #3F6212;
+  }
+
+  .keyword-tag.deep {
+    background-color: var(--ui-color-1);
+    color: white;
+  }
+
+  /* 手書き風吹き出し */
+  .speech-bubble {
+    position: relative;
+    background: #fff;
+    border: 3px solid var(--ui-color-1);
+    border-radius: 20px;
+    padding: 10px 15px;
+    margin: 15px 5px;
+    font-family: 'Yomogi', cursive;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+    transform: rotate(-1deg);
+  }
+
+  .speech-bubble::after {
+    content: '';
+    position: absolute;
+    bottom: -13px;
+    left: 20px;
+    border-width: 12px 8px 0;
+    border-style: solid;
+    border-color: var(--ui-color-1) transparent;
+    display: block;
+    width: 0;
+  }
+
+  .speech-bubble.right::after {
+    left: auto;
+    right: 20px;
+    transform: rotate(15deg);
+  }
+
+  .speech-bubble.top::after {
+    bottom: auto;
+    top: -13px;
+    border-width: 0 8px 12px;
+    transform: rotate(-5deg);
+  }
+
+  .speech-bubble.variant-1 {
+    background: #FFF9E3;
+    border-color: var(--ui-color-2);
+    transform: rotate(1deg);
+  }
+
+  .speech-bubble.variant-1::after {
+    border-color: var(--ui-color-2) transparent;
+  }
+
+  .speech-bubble.variant-2 {
+    background: #FFE9E9;
+    border-color: var(--ui-color-5);
+    transform: rotate(-2deg);
+  }
+
+  .speech-bubble.variant-2::after {
+    border-color: var(--ui-color-5) transparent;
+  }
+
+  .handwritten {
+    font-family: 'Yomogi', cursive;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #333;
+    display: block;
+  }
+
+  /* コードプレビュー */
+  pre {
+    background: #f5f5f5;
+    border-left: 4px solid var(--ui-color-1);
+    padding: 10px;
+    border-radius: 5px;
+    font-size: 13px;
+    font-family: 'Courier New', monospace;
+    margin-top: 10px;
+    overflow-x: auto;
+    color: #2d2d2d;
+    line-height: 1.45;
+  }
+
+  pre .cmt { color: #777; }
+  pre .ok { color: var(--ui-color-6); font-weight: bold; }
+  pre .ng { color: var(--ui-color-5); font-weight: bold; }
+  pre .hl { color: var(--ui-color-1); font-weight: bold; }
+
+  /* 矢印つなぎ */
+  .flow-arrow {
+    text-align: center;
+    font-size: 26px;
+    color: var(--ui-color-1);
+    margin: 4px 0;
+  }
+
+  /* 二段組ミニ比較 */
+  .compare-box {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .compare-box .side {
+    flex: 1;
+    border-radius: 10px;
+    padding: 8px;
+    font-size: 14px;
+    text-align: center;
+  }
+
+  .compare-box .side.bad {
+    background: #FFE9E9;
+    border: 2px dashed var(--ui-color-5);
+    color: #7f1d1d;
+  }
+
+  .compare-box .side.good {
+    background: var(--ui-color-7);
+    border: 2px dashed var(--ui-color-6);
+    color: #134E4A;
+  }
+
+  .compare-box .side i { display: block; font-size: 1.3em; margin-bottom: 4px; }
+
+  /* 出現アニメーション */
+  .fade-in-scale {
+    animation: fadeInScale 0.7s ease-out both;
+  }
+
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.92) translateY(14px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  /* ---------- フッター ---------- */
+  footer {
+    text-align: center;
+    padding: 40px 20px 30px;
+    color: #777;
+    font-size: 14px;
+  }
+
+  footer .footer-icon {
+    font-size: 2.4em;
+    color: var(--ui-color-1);
+    margin-bottom: 10px;
+    animation: fa-beat-fade 2.4s ease-in-out infinite;
+  }
+
+  footer a { color: inherit; }
+
+  footer .footer-note {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #999;
+  }
+
+  /* ---------- レスポンシブ ---------- */
+  @media (max-width: 1600px) { .section-card { min-width: 280px; } }
+  @media (max-width: 1200px) { .section-card { min-width: 320px; } }
+  @media (max-width: 900px)  { .section-card { min-width: 380px; } }
+
+  @media (max-width: 768px) {
+    .section-layout { flex-direction: column; }
+    .section-card { width: 100%; min-width: auto; }
+    h1 { font-size: 28px; }
+    header .header-icons .main-icon { font-size: 5em; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ============ ヘッダー ============ -->
+  <header>
+    <div class="header-icons">
+      <i class="fa-solid fa-diagram-project main-icon" aria-hidden="true"></i>
+      <i class="fa-solid fa-seedling sub-icon" aria-hidden="true"></i>
+      <i class="fa-solid fa-gears sub-icon2" aria-hidden="true"></i>
+    </div>
+    <h1><span class="accent">GRAFT</span> スキル × <span class="accent2">Verdent</span> で<br>コードグラフをエージェントに渡す</h1>
+    <p class="header-sub">「エージェントが毎回ファイルを探し回る」を、グラフのクエリで短縮する話</p>
+    <p class="header-date"><i class="fa-regular fa-calendar"></i> 2026年9月13日公開 ・ チャンネル: AI Code King</p>
+    <div class="header-tags">
+      <span class="keyword-tag deep">GRAFT</span>
+      <span class="keyword-tag">コードグラフ</span>
+      <span class="keyword-tag lime">tree-sitter</span>
+      <span class="keyword-tag">MITライセンス</span>
+      <span class="keyword-tag lime">Verdent</span>
+      <span class="keyword-tag">権限バグ調査</span>
+    </div>
+  </header>
+
+  <!-- ハイライト帯 -->
+  <div class="highlight-strip">
+    <div class="highlight-chip"><i class="fa-solid fa-magnifying-glass-chart"></i> graft build / map / skeleton / check</div>
+    <div class="highlight-chip lime"><i class="fa-solid fa-bug-slash"></i> 権限バグを特定 → 9/9 テスト成功</div>
+    <div class="highlight-chip teal"><i class="fa-solid fa-coins"></i> 42% トークン削減・60% 時間短縮(開発者報告)</div>
+    <div class="highlight-chip"><i class="fa-solid fa-robot"></i> Verdent 料金 $5 / $19 / $59 / $179</div>
+  </div>
+
+  <!-- ============ 第1セクション: 導入 ============ -->
+  <div class="section-title-band">
+    <h2><i class="fa-solid fa-circle-info band-icon"></i>① なぜコードグラフなのか</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hourglass-half fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>エージェントの「毎回探索」問題</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">あるある風景</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-folder-open fa-lg" aria-hidden="true"></i><span>プロジェクトを開いて<span class="keyword-tag">小さな修正</span>をお願いするだけ…</span></li>
+          <li><i class="fa-solid fa-clock fa-lg" aria-hidden="true"></i><span>エージェントは数分かけてファイル検索と<span class="keyword-tag">import の読み解き</span>を繰り返す</span></li>
+          <li><i class="fa-solid fa-rotate fa-lg red" aria-hidden="true"></i><span>次のタスクでも<span class="keyword-tag">同じ探索をやり直し</span>…トークンが溶けていく</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-tired fa-lg" style="color: var(--ui-color-1);"></i>
+            「つながり」を毎回ゼロから調べるのが、もったいない!
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>GRAFT がやること</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">コードグラフ構築OSS</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-code fa-lg lime" aria-hidden="true"></i><span>ソースコードを読んで<span class="keyword-tag lime">関数</span>や<span class="keyword-tag lime">import</span>を記録</span></li>
+          <li><i class="fa-solid fa-share-nodes fa-lg lime" aria-hidden="true"></i><span>それらの<span class="keyword-tag">つながり(呼び出し関係)</span>をグラフ化</span></li>
+          <li><i class="fa-solid fa-circle-question fa-lg lime" aria-hidden="true"></i><span>「どこで実装?」「この関数を誰が呼ぶ?」を<span class="keyword-tag">クエリ</span>で即答</span></li>
+          <li><i class="fa-solid fa-flag-checkered fa-lg lime" aria-hidden="true"></i><span>エージェントが理解を始める時の<span class="keyword-tag">出発点</span>が良くなる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            「単語検索で1件ヒット」より「関係ごと取ってくる」方が、
+            修正の見落としが減るんだよね
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>2つのレイヤー構造</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">ここ大事な区別</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">基本ビルド</span>: <span class="keyword-tag lime">tree-sitter</span> でコード構造を解析。AIのAPIキーは不要!</span></li>
+          <li><i class="fa-solid fa-gem fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">deep ビルド</span>(任意): AIが書いたサマリーと概念ノードを追加</span></li>
+          <li><i class="fa-solid fa-sack-dollar fa-lg red" aria-hidden="true"></i><span>deep 層は設定したプロバイダ利用なので<span class="keyword-tag">APIコスト発生</span>あり</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg teal" aria-hidden="true"></i><span>今回は<span class="keyword-tag">構造レイヤーだけ</span>で全て再現可能</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-5);"></i>
+            「グラフのクエリが無料」=「コーディングエージェント自身が無料」では
+            ないよ。モデルの利用料は別かかり!
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#04</span>
+      <div class="mega-icon-container">
+        <i class="fa-brands fa-git-alt fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ライセンスと運用</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">気軽に試せる設計</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-scale-balanced fa-lg lime" aria-hidden="true"></i><span><span class="keyword-tag lime">MIT ライセンス</span>のオープンソース</span></li>
+          <li><i class="fa-solid fa-database fa-lg lime" aria-hidden="true"></i><span>別途の<span class="keyword-tag">DBサーバーは不要</span>。生成物は <span class="keyword-tag">.graft/</span> フォルダ内に</span></li>
+          <li><i class="fa-solid fa-eye-slash fa-lg lime" aria-hidden="true"></i><span>ビルド時にフォルダを<span class="keyword-tag">gitignore に自動追加</span>(コードから再生成できるから)</span></li>
+        </ul>
+        <pre><span class="cmt"># セットアップ(動画では v0.18.0 / node 22)</span>
+npx <span class="hl">@nanonets/graft</span>  <span class="cmt"># node 20+ が必要</span></pre>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-seedling fa-lg" style="color: var(--ui-color-2);"></i>
+            生成物はいつでも作り直せる。だからリポジトリには置かない、という思想
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 第2セクション: 実演環境 ============ -->
+  <div class="section-title-band">
+    <h2><i class="fa-solid fa-person-chalkboard band-icon"></i>② Verdent エージェントで実演</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>Verdent の基本ワークフロー</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">今回の舞台</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-folder-tree fa-lg" aria-hidden="true"></i><span>プロジェクトのフォルダを開き<span class="keyword-tag">タスク作成</span>→やりたいことを記述</span></li>
+          <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>ファイル検査・編集・<span class="keyword-tag">コマンド実行</span>まで進捗つきで表示</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">プランモード</span>やモデル選択も装備</span></li>
+          <li><i class="fa-solid fa-code-pull-request fa-lg" aria-hidden="true"></i><span>編集後は<span class="keyword-tag">差分ビュー</span>と<span class="keyword-tag">レビュー機能</span>で変更を確認</span></li>
+          <li><i class="fa-solid fa-users-gear fa-lg" aria-hidden="true"></i><span>大きい仕事は<span class="keyword-tag">マネージャーがサブタスク化</span>してワーカーへ分配</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten">
+            <i class="fa-solid fa-circle-info fa-lg" style="color: var(--ui-color-2);"></i>
+            同じワークスペースのタスクはファイルを共有。隔離じゃないから注意!
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-flip 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>接続は CLI で( MCP もあり)</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">統合の選び方</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-exclamation fa-lg lime" aria-hidden="true"></i><span>GRAFTには今のところ<span class="keyword-tag">Verdent専用の登録はなし</span></span></li>
+          <li><i class="fa-solid fa-terminal fa-lg lime" aria-hidden="true"></i><span>実演では <span class="keyword-tag">Verdent に CLI を実行</span>させる方式</span></li>
+          <li><i class="fa-solid fa-server fa-lg lime" aria-hidden="true"></i><span>GRAFT の <span class="keyword-tag">MCP サーバー</span>も存在(今回は未使用)</span></li>
+          <li><i class="fa-solid fa-moon fa-lg lime" aria-hidden="true"></i><span>テレメトリはデモ用にオフに設定</span></li>
+        </ul>
+        <pre><span class="cmt"># 動画内の流れ</span>
+1. node のバージョン確認
+2. graft をローカルにインストール
+3. ツール用フォルダでバージョン固定</pre>
+        <div class="speech-bubble right">
+          <span class="handwritten">
+            <i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-1);"></i>
+            正確なコマンド一式は補足ノートにまとめてあるよ
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-shield fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>お題: ドキュメントサービスの権限バグ</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">わざと仕込んだ不具合</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users fa-lg" aria-hidden="true"></i><span>登場人物: <span class="keyword-tag">owner</span> / <span class="keyword-tag">editor</span> / <span class="keyword-tag">viewer</span> / 無関係ユーザー</span></li>
+          <li><i class="fa-solid fa-book-open-reader fa-lg" aria-hidden="true"></i><span>viewer は共有文書を<span class="keyword-tag">読める</span>(これは正しい挙動)</span></li>
+          <li><i class="fa-solid fa-file-csv fa-lg red" aria-hidden="true"></i><span>CSV の<span class="keyword-tag">export は editor 以上</span>のはずなのに…viewer に成功してしまう</span></li>
+        </ul>
+        <div class="compare-box">
+          <div class="side bad"><i class="fa-solid fa-xmark"></i>viewer の export<br>が成功(バグ)</div>
+          <div class="side good"><i class="fa-solid fa-check"></i>読むだけは<br>許可のまま</div>
+        </div>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-flask fa-lg" style="color: var(--ui-color-5);"></i>
+            合成データでローカル実行。本番アカウントは関係なしの安全な例
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-vials fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>ベースラインのテスト</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">修正前の状態</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list-ol fa-lg lime" aria-hidden="true"></i><span>テストは <span class="keyword-tag lime">9 個</span>、うち <span class="keyword-tag">8 パス</span>・<span class="keyword-tag">1 失敗</span></span></li>
+          <li><i class="fa-solid fa-circle-xmark fa-lg red" aria-hidden="true"></i><span>失敗内容: viewer の export が <span class="keyword-tag">403 ではなく 200</span> を返す</span></li>
+          <li><i class="fa-solid fa-play fa-lg lime" aria-hidden="true"></i><span>サンプルを直接叩いても同じ挙動を確認(読む○・編集×・export○)</span></li>
+        </ul>
+        <pre>viewer  read   → <span class="ok">200 OK</span>      <span class="cmt">// 期待どおり</span>
+viewer  edit   → <span class="ok">403 Forbidden</span> <span class="cmt">// 期待どおり</span>
+viewer  export → <span class="ng">200 OK</span>      <span class="cmt">// ← バグ!</span></pre>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-1);"></i>
+            小さい例だと「経路の全部」を追えるのが嬉しいね
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 第3セクション: graft コマンド群 ============ -->
+  <div class="section-title-band">
+    <h2><i class="fa-solid fa-terminal band-icon"></i>③ graft コマンドで調査する</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード9 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-hammer fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>graft build でグラフ構築</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">最初の一步</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-folder-plus fa-lg" aria-hidden="true"></i><span>リポジトリ内で <span class="keyword-tag">graft build</span> を実行</span></li>
+          <li><i class="fa-solid fa-key fa-lg teal" aria-hidden="true"></i><span>この手順では<span class="keyword-tag">プロバイダキー不要</span></span></li>
+          <li><i class="fa-solid fa-circle-nodes fa-lg" aria-hidden="true"></i><span>結果: <span class="keyword-tag">29 ノード・66 エッジ</span>(9 個の JS ファイル・テスト込み)</span></li>
+          <li><i class="fa-solid fa-ruler fa-lg" aria-hidden="true"></i><span>※小さい題材の数字なので<span class="keyword-tag">スケール比較ではない</span>よ</span></li>
+        </ul>
+        <pre>$ graft build
+<span class="ok">✓</span> 9 files indexed
+<span class="ok">✓</span> <span class="hl">29 nodes</span> / <span class="hl">66 edges</span></pre>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-2);"></i>
+            構造レイヤーだけでここまで動くのが便利!
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-map fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>graft map で全体像と質問</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">概要をつかむ</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-map-location fa-lg lime" aria-hidden="true"></i><span><span class="keyword-tag">graft map</span> でコードベースの見取り図を取得</span></li>
+          <li><i class="fa-solid fa-file-export fa-lg lime" aria-hidden="true"></i><span>「export の権限はどこでチェック?」と質問 → <span class="keyword-tag">--source</span> フラグ付き</span></li>
+          <li><i class="fa-solid fa-box-archive fa-lg lime" aria-hidden="true"></i><span>結果: <span class="keyword-tag">exportDocument 関数</span> / <span class="keyword-tag">権限ヘルパー</span> / <span class="keyword-tag">ルートハンドラ</span> / 文書ロード関数</span></li>
+          <li><i class="fa-solid fa-robot fa-lg lime" aria-hidden="true"></i><span>検索は<span class="keyword-tag">決定的な取得</span>。追加のモデル呼び出しゼロ</span></li>
+        </ul>
+        <div class="speech-bubble top">
+          <span class="handwritten">
+            <i class="fa-solid fa-handshake-angle fa-lg" style="color: var(--ui-color-1);"></i>
+            ソースを渡すのが GRAFT、読んで正しいか考えるのは Verdent の仕事
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bars-staggered fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>graft skeleton でAPIの輪郭</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">シグネチャ一覧</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-lines fa-lg" aria-hidden="true"></i><span>権限ファイルに <span class="keyword-tag">graft skeleton</span> を実行</span></li>
+          <li><i class="fa-solid fa-signature fa-lg" aria-hidden="true"></i><span>出るもの: <span class="keyword-tag">checkRole / read / edit / export</span> の各判定シグネチャ</span></li>
+          <li><i class="fa-solid fa-compress fa-lg teal" aria-hidden="true"></i><span>本文を会話に流し込まないので<span class="keyword-tag">コンテキスト節約</span></span></li>
+        </ul>
+        <pre><span class="cmt"># permissions.js の skeleton</span>
+canRead(user, doc)
+canEdit(user, doc)
+<span class="hl">canExport(user, doc)</span>   <span class="cmt">// owner/editor のみ許可</span></pre>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten">
+            <i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-5);"></i>
+            ファイルのAPIがパッと見える。中身は必要な時だけ読めばいい
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-arrows fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>callers 追跡でバグ発見</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">決定打となった問い</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-diagram-successor fa-lg lime" aria-hidden="true"></i><span>「exportDocument を呼ぶのは?」<span class="keyword-tag">深さ2</span>で追跡 → ルート→デモ/テスト</span></li>
+          <li><i class="fa-solid fa-clipboard-question fa-lg red" aria-hidden="true"></i><span>同じ問いを<span class="keyword-tag">権限ヘルパー</span>に…呼び出し元が<span class="keyword-tag">テストだけ</span>!</span></li>
+          <li><i class="fa-solid fa-unlink fa-lg red" aria-hidden="true"></i><span>つまり<span class="keyword-tag">ポリシーは存在し試験も通る</span>のに、<span class="keyword-tag">本筋の経路が未使用</span></span></li>
+        </ul>
+        <pre>canExport の callers:
+  - tests/permissions.test.js  <span class="ok">✓</span>
+  - services/export.js        <span class="ng">✗ 呼んでない!</span></pre>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i>
+            ヘルパー単体の試験が合格でも、使われなければ機能は壊れたまま
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 第4セクション: 修正と検証 ============ -->
+  <div class="section-title-band">
+    <h2><i class="fa-solid fa-screwdriver-wrench band-icon"></i>④ 直して、確かめる</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bug-slash fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>原因のたどり着き方</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">読み取り権限だけ通ってしまう</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-route fa-lg" aria-hidden="true"></i><span>export サービスは<span class="keyword-tag">読み取り判定つきの関数</span>で文書を取得</span></li>
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span>viewer は読み取り可なので<span class="keyword-tag">そのチェックは通過</span></span></li>
+          <li><i class="fa-solid fa-file-csv fa-lg red" aria-hidden="true"></i><span>そのまま<span class="keyword-tag">より厳しい export 権限を確認せず CSV 化</span> → 失敗テストと欠けた接続の両方を説明</span></li>
+        </ul>
+        <div class="flow-arrow"><i class="fa-solid fa-angles-down"></i></div>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-magnifying-glass-chart fa-lg" style="color: var(--ui-color-1);"></i>
+            「読める」権限と「書き出せる」権限を混ぜたのが根本原因だった
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-branch fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>修正は小さく・鮮やかに</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">エージェントへの指示</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-import fa-lg lime" aria-hidden="true"></i><span><span class="keyword-tag lime">権限ヘルパーを import</span></span></li>
+          <li><i class="fa-solid fa-circle-exclamation fa-lg lime" aria-hidden="true"></i><span><span class="keyword-tag lime">エラー型</span>も読み込む</span></li>
+          <li><i class="fa-solid fa-ban fa-lg lime" aria-hidden="true"></i><span>export 不可なら<span class="keyword-tag lime">リクエストを拒否</span></span></li>
+          <li><i class="fa-solid fa-lock fa-lg teal" aria-hidden="true"></i><span><span class="keyword-tag">既存テストは一切いじらない</span></span></li>
+        </ul>
+        <pre><span class="cmt">// services/export.js への修正イメージ</span>
+import { <span class="hl">canExport</span> } from './permissions';
+import { ForbiddenError } from './errors';
+
+<span class="hl">if</span> (!canExport(user, doc)) {
+  <span class="hl">throw</span> <span class="ok">new ForbiddenError()</span>;
+}</pre>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i>
+            方針が明確なら、修正 diff は本当に数行で済んだ
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate fa-5x" style="color: var(--ui-color-1); animation: fa-spin 6s linear infinite;" aria-hidden="true"></i>
+        <h3>graft check と自動リフレッシュ</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">編集後の再構築が楽</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock-rotate-left fa-lg" aria-hidden="true"></i><span>編集後に <span class="keyword-tag">graft check</span> → <span class="keyword-tag">古い(stale)</span>と判定・変更ファイルを特定</span></li>
+          <li><i class="fa-solid fa-arrows-rotate fa-lg" aria-hidden="true"></i><span>再質問すると<span class="keyword-tag">1 ファイル変更を検知して自動リフレッシュ</span>、新しい権限チェックがソースに現れる</span></li>
+          <li><i class="fa-solid fa-link fa-lg teal" aria-hidden="true"></i><span>canExport の callers に<span class="keyword-tag">exportDocument が新登場</span>(修正前に無かった接続!)</span></li>
+          <li><i class="fa-solid fa-circle-check fa-lg teal" aria-hidden="true"></i><span>追いかけの鮮度チェックは<span class="keyword-tag">current(最新)</span>と報告</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-bolt-lightning fa-lg" style="color: var(--ui-color-5);"></i>
+            コミット前の編集でも反映されたよ。別コピーで追試しても同じ挙動
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-square-check fa-5x" style="color: var(--ui-color-6); animation: fa-beat-fade 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>テスト再実行: 9/9 合格</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">ふたたび走らせる</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check fa-lg teal" aria-hidden="true"></i><span><span class="keyword-tag">全 9 テスト合格</span>(8 → 9 に改善)</span></li>
+          <li><i class="fa-solid fa-user-lock fa-lg teal" aria-hidden="true"></i><span>viewer の export は <span class="keyword-tag">403</span> に。editor は今どおり export 成功</span></li>
+          <li><i class="fa-solid fa-book-open fa-lg teal" aria-hidden="true"></i><span>viewer の<span class="keyword-tag">読み取り権限は温存</span>(望んだ挙動を壊さない)</span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg teal" aria-hidden="true"></i><span>グラフは接続発見に役立ち、<span class="keyword-tag">試験が挙動を保証</span>。両方残すのが正解</span></li>
+        </ul>
+        <pre>Tests: <span class="ok">9 passed</span>, 9 total   <span class="cmt">// ← 8 passed から改善</span>
+viewer  export → <span class="ok">403 Forbidden</span></pre>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-6);"></i>
+            「新しい呼び出しがグラフに載った」だけでは実装の正しさの証明にはならない。あくまで組で検証!
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ 第5セクション: 可視化・限界・費用 ============ -->
+  <div class="section-title-band">
+    <h2><i class="fa-solid fa-chart-line band-icon"></i>⑤ 可視化・限界・そして費用</h2>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>インタラクティブ可視化と限界</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">見て、触って、知る</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-share-alt fa-lg" aria-hidden="true"></i><span>グラフを書き出して Verdent の<span class="keyword-tag">ブラウザパネル</span>で表示</span></li>
+          <li><i class="fa-solid fa-file-circle-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">グラフ⇔ファイル輪郭</span>の切替、関数を選ぶと<span class="keyword-tag">依存の双方向</span>を確認(修正前後の両方を同梱)</span></li>
+        </ul>
+        <p class="list-heading">静的解析の限界</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg red" aria-hidden="true"></i><span><span class="keyword-tag">動的な挙動</span>は苦手。言語別の対応深度にも差がある</span></li>
+          <li><i class="fa-solid fa-user-secret fa-lg red" aria-hidden="true"></i><span>結果があいまいなら<span class="keyword-tag">自分の目でコード確認</span>を</span></li>
+          <li><i class="fa-solid fa-wand-sparkles fa-lg red" aria-hidden="true"></i><span>自動リフレッシュは<span class="keyword-tag">構造のみ</span>。有償AIサマリーは都度再生成しない</span></li>
+          <li><i class="fa-solid fa-life-ring fa-lg red" aria-hidden="true"></i><span>更新失敗時は<span class="keyword-tag">既存グラフへフォールバック</span>。通知を見逃さないで</span></li>
+          <li><i class="fa-solid fa-microscope fa-lg red" aria-hidden="true"></i><span>deep 層は<span class="keyword-tag">本当に生成されたか</span>を要確認(成功表示だけでは不足)</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten">
+            <i class="fa-solid fa-scale-unbalanced fa-lg" style="color: var(--ui-color-5);"></i>
+            便利な文脈であって、万能の真実ではない。使いどころを選ぼう
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-number">#18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-coins fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h3>効果の数字と Verdent の料金</h3>
+      </div>
+      <div class="card-content">
+        <p class="list-heading">コスト削減の目安</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-percent fa-lg lime" aria-hidden="true"></i><span>出力にある節約見積りは<span class="keyword-tag">「読み込んだ文脈 vs 全文」</span>の比較で、セッション全体の数字ではない</span></li>
+          <li><i class="fa-solid fa-flask-vial fa-lg lime" aria-hidden="true"></i><span>管理者側の報告: <span class="keyword-tag">42% トークン削減</span>・<span class="keyword-tag">60% 時間短縮</span>(管理されたベンチマークにて)</span></li>
+          <li><i class="fa-solid fa-circle-notch fa-lg red" aria-hidden="true"></i><span>今回の検証は<span class="keyword-tag">コマンドと修正の流れ</span>の確認で、ベンチマーク再現ではない</span></li>
+        </ul>
+        <p class="list-heading">Verdent の月額プラン</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-feather fa-lg teal" aria-hidden="true"></i><span><span class="keyword-tag">Light $5</span> / <span class="keyword-tag">Starter $19</span></span></li>
+          <li><i class="fa-solid fa-bolt fa-lg teal" aria-hidden="true"></i><span><span class="keyword-tag">Pro $59</span> / <span class="keyword-tag">Max $179</span></span></li>
+          <li><i class="fa-solid fa-gift fa-lg teal" aria-hidden="true"></i><span>新規は<span class="keyword-tag">100 無料クレジット(7 日間)</span>。上限とモデル費用は要確認</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten">
+            <i class="fa-solid fa-face-smile fa-lg" style="color: var(--ui-color-2);"></i>
+            まず構造グラフで数個の質問を試して、手応えを確かめてから deep 層へ、がおすすめ!
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ フッター ============ -->
+  <footer>
+    <div class="footer-icon"><i class="fa-solid fa-diagram-project" aria-hidden="true"></i></div>
+    <p>
+      🎬 動画: <a href="https://www.youtube.com/watch?v=VW58Q8c5F0I" target="_blank" rel="noopener" style="color: inherit;">AI Code King ― /GRAFT Skill + Astra: THIS IS ABSOLUTELY CRAZY!</a>
+    </p>
+    <p>
+      🌱 GRAFT: <a href="https://github.com/nanonets/graft" target="_blank" rel="noopener" style="color: inherit;">github.com/nanonets/graft</a>(MIT)
+       ／ 🤖 Verdent: <a href="https://verdent.ai" target="_blank" rel="noopener" style="color: inherit;">verdent.ai</a>
+    </p>
+    <p class="footer-note">
+      このインフォグラフィックは動画内容を日本語で再構成したものです。数値・仕様は公開時点の動画に基づきます。<br>
+      Published: 2026-09-13 ・ Infographic generated: 2026-09-13
+    </p>
+  </footer>
+
+</div>
+</body>
+</html>

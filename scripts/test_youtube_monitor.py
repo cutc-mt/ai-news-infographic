@@ -161,5 +161,6 @@ class TestYouTubeMonitor:
                             mock_dt.now = lambda tz=None: real_dt(2026, 8, 5, 12, 0, 0, tzinfo=real_tz.utc)
                             mock_dt.fromisoformat = real_dt.fromisoformat
                             result = monitor.check_all_channels()
-                            assert len(result) == 1
-                            assert result[0]['video_id'] == 'vid1'
+                            assert len(result['videos']) == 1
+                            assert result['videos'][0]['video_id'] == 'vid1'
+                            assert result['unresolved'] == []

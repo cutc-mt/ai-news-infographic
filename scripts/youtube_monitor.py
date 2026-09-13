@@ -330,16 +330,21 @@ class YouTubeMonitor:
                 pass
         return known
 
-    def check_all_channels(self, max_per_channel: int = 5, max_days: int = 2, min_duration_seconds: int = 300) -> list:
+    def check_all_channels(self, max_per_channel: int = 5, max_days: int = 2, min_duration_seconds: int = 300) -> dict:
         """全チャンネルをチェックして新着動画を返す
 
         Args:
             max_per_channel: チャンネルあたり最大取得数
             max_days: 監視時点から遡って何日以内の動画を対象とするか
             min_duration_seconds: この長さ（秒）未満の動画は対象外（デフォルト5分）
+
+        Returns:
+            {'videos': [...], 'unresolved': [{'handle': ..., 'name': ...}]}
+            unresolved はhandleが解決できなかった（変更・削除済み）チャンネル
         """
         known_ids = self.get_known_video_ids()
         new_videos = []
+        unresolved = []
 
         for ch in self.channels:
             handle = ch['handle']
@@ -348,6 +353,7 @@ class YouTubeMonitor:
             channel_id = self.get_channel_id(handle)
             if not channel_id:
                 print(f"⚠️ Channel ID not found for {handle} ({name})")
+                unresolved.append({'handle': handle, 'name': name})
                 continue
 
             videos = self.get_latest_videos(channel_id, max_per_channel)
@@ -376,7 +382,7 @@ class YouTubeMonitor:
             else:
                 print(f"✅ {name}: No new videos")
 
-        return new_videos
+        return {'videos': new_videos, 'unresolved': unresolved}
 
 
 # --- CLI エントリーポイント ---
@@ -388,7 +394,13 @@ if __name__ == '__main__':
         exit(1)
 
     monitor = YouTubeMonitor(api_key)
-    new_videos = monitor.check_all_channels()
+    result = monitor.check_all_channels()
+    new_videos = result['videos']
+
+    if result['unresolved']:
+        print(f"\n🚨 未解決チャンネル: {len(result['unresolved'])}件")
+        for u in result['unresolved']:
+            print(f"  ❓ {u['handle']}（{u['name']}）")
 
     if new_videos:
         print(f"\n🎉 Found {len(new_videos)} new video(s)!")

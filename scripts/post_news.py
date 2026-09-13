@@ -116,7 +116,16 @@ if __name__ == '__main__':
     # 1. 新着動画を検知
     print("=== YouTube チャンネル監視 ===")
     monitor = YouTubeMonitor(api_key)
-    new_videos = monitor.check_all_channels()
+    result = monitor.check_all_channels()
+    new_videos = result['videos']
+    unresolved = result['unresolved']
+
+    # 未解決チャンネル（handle変更・削除）をレポート
+    # → monitor.shのstdout経由でcronジョブのレポートに乗る
+    if unresolved:
+        print(f"\n🚨 未解決チャンネル（handle変更・削除の可能性）: {len(unresolved)}件")
+        for u in unresolved:
+            print(f"  ❓ {u['handle']}（{u['name']}）→ channels.yamlのhandle確認が必要")
 
     if not new_videos:
         print("\n✅ 新着動画なし")

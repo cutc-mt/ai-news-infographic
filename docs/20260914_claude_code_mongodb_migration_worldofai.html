@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude Codeに実DB制御を委任 | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: バーガンディ × ダークスチール */
+  --ui-color-1: #6B1E3C;   /* バーガンディ（メイン） */
+  --ui-color-2: #26323F;   /* ダークスチール（アクセント） */
+  --ui-color-3: #F7EDF2;   /* ローズミスト（タグの下地） */
+  --ui-color-4: #4A1528;   /* ワインレッドブラック（濃い文字） */
+  --ui-color-5: #0F5257;   /* ディープペルージャ（差し色） */
+  --bg-canvas: #FBF9FA;    /* キャンバス */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  font-family: 'Kaisei Decol', 'Zen Kurenaido', serif;
+  color: #333333;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  margin-bottom: 25px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 5px 5px 20px rgba(107, 30, 60, 0.14);
+  position: relative;
+  overflow: hidden;
+}
+
+.header .fa-7x {
+  color: var(--ui-color-1);
+  animation: fa-bounce 3s ease-in-out infinite;
+}
+
+.header h1 {
+  font-size: 36px;
+  font-weight: bold;
+  color: #333333;
+  margin: 10px 0 5px;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #777777;
+  margin-top: 8px;
+}
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.1);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(-0.5deg);
+  box-shadow: 8px 12px 25px rgba(74, 21, 40, 0.24);
+  background-color: #FDFAFB;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+.section-card:nth-child(3n) { border-top-color: var(--ui-color-5); }
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--ui-color-1);
+}
+
+.mega-icon-container h2 {
+  font-size: 24px;
+  color: #555555;
+  margin: 10px 0 0;
+  font-weight: bold;
+}
+
+.timestamp {
+  font-size: 14px;
+  color: #777777;
+  margin-top: 4px;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #333333;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 16px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.keyword-tag.accent {
+  background-color: rgba(38, 50, 63, 0.15);
+  color: #334155;
+}
+
+.keyword-tag.alert {
+  background-color: rgba(15, 82, 87, 0.13);
+  color: #0F5257;
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FEF3C7;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #F7EDF2;
+  border-color: var(--ui-color-1);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-1) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #333;
+  display: inline-block;
+}
+
+/* コードプレビュー */
+pre {
+  background: #F7EDF2;
+  border-left: 4px solid var(--ui-color-2);
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  color: var(--ui-color-4);
+}
+
+code.inline {
+  background: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 流れの矢印 */
+.flow-arrow {
+  text-align: center;
+  font-size: 14px;
+  color: var(--ui-color-1);
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.flow-arrow i {
+  color: var(--ui-color-2);
+  margin: 0 4px;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(38, 50, 63, 0); }
+  50% { text-shadow: 1px 1px 0 rgba(38, 50, 63, 0.5); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 30px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 5px 5px 15px rgba(0,0,0,0.08);
+  font-size: 14px;
+  color: #555;
+}
+
+.footer a {
+  color: var(--ui-color-1);
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <i class="fa-solid fa-database fa-7x" aria-hidden="true"></i>
+    <h1>Claude Codeに実DB制御を委任</h1>
+    <div class="subtitle">I Gave Claude Code Control...（MongoDB Agent Skills × MCP Server）</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026-08-28 ／ WorldofAI ／ 13分17秒</div>
+  </header>
+
+  <!-- ==================== セクション1: 課題と仕組み ==================== -->
+  <div class="section-layout">
+
+    <!-- カード 1: イントロ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① 実データベースへの委任</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 序盤: イントロ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users"></i><span>数万件の顧客レコードを抱える<span class="keyword-tag accent">稼働中アプリ</span>の制御をClaude Codeに委任 — ルールは<span class="keyword-tag">「何も壊すな」の1つだけ</span></span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>既存システムの理解、データ設計のやり直し、全顧客の移行、アプリ更新、<span class="keyword-tag accent">喪失ゼロの証明</span>まで一気通貫で実行</span></li>
+          <li><i class="fa-solid fa-hand-holding-hand"></i><span>MongoDB提供の<span class="keyword-tag">Agent Skills</span>と<span class="keyword-tag">MCP Server</span>でワークフローを2段階アップグレード（MongoDBスポンサー動画）</span></li>
+        </ul>
+        <div class="flow-arrow">理解 <i class="fa-solid fa-arrow-right"></i> 再設計 <i class="fa-solid fa-arrow-right"></i> 移行 <i class="fa-solid fa-arrow-right"></i> 証明</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-1);"></i> 本番さながらのDBをAIに任せてしまうんだ…！こわいけどワクワクする挑戦！</span>
+      </div>
+    </div>
+
+    <!-- カード 2: SkillsとMCP -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open-reader fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② スキルとMCPの役割分担</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 序盤: 2つのアップグレード</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clipboard-list"></i><span><span class="keyword-tag accent">MongoDB Agent Skills</span> — MongoDB専門のエンジニアリング指針を与える「プレイブック」</span></li>
+          <li><i class="fa-solid fa-eye"></i><span><span class="keyword-tag accent">MongoDB MCP Server</span> — デプロイを検査・操作する制御付きアクセス、いわば「目と手」</span></li>
+          <li><i class="fa-solid fa-user-check"></i><span>Claudeがワークフローを調整する構図はそのまま、<span class="keyword-tag">重要ステップは人間が承認</span></span></li>
+        </ul>
+        <div class="flow-arrow">スキル＝知識 <i class="fa-solid fa-plus"></i> MCP＝実操作 <i class="fa-solid fa-arrow-right"></i> 安全な委任</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 「プレイブック」と「目と手」の分担、なるほどって感じ！頭と体が分かれてる！</span>
+      </div>
+    </div>
+
+    <!-- カード 3: Northstar -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cart-shopping fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ Northstarのシナリオ</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 序盤: 課題設定</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-building"></i><span>大規模ECマーケットプレイスの<span class="keyword-tag accent">プラットフォームチーム</span>を想定 — 製品の進化で顧客データがコレクション間に分散</span></li>
+          <li><i class="fa-solid fa-file-import"></i><span>インポートによる<span class="keyword-tag">名前・メールの不整合</span>、古いビジネスルールが残した<span class="keyword-tag">非対応ステータス</span>が蓄積</span></li>
+          <li><i class="fa-solid fa-flask"></i><span>Northstarがその状況を<span class="keyword-tag accent">合成データで再現</span> — 顧客モデル移行・問題解決・アプリ継続動作を要求</span></li>
+        </ul>
+        <div class="flow-arrow">データ分散 <i class="fa-solid fa-plus"></i> 不整合 <i class="fa-solid fa-arrow-right"></i> 移行課題</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-robot fa-lg" style="color: var(--ui-color-5);"></i> 実際の現場で起こりそうなデータのぐちゃぐちゃ感、よく再現してるなあ！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: レガシーモデル -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ レガシー顧客モデルの問題</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 序盤: 現状分析</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-id-card"></i><span>顧客プロファイルには<span class="keyword-tag accent">本人情報・住所・連絡設定・注文サマリー</span>が常にまとめて必要</span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span>レガシー版はこの一体のデータを<span class="keyword-tag">3つの顧客コレクション</span>に分散 — アプリは注文コレクションも参照</span></li>
+          <li><i class="fa-solid fa-bullseye"></i><span>目指すは<span class="keyword-tag accent">Customer 360</span> — よりクリーンな統合顧客体験への再設計</span></li>
+        </ul>
+        <div class="flow-arrow">3コレクション分散 <i class="fa-solid fa-arrow-right"></i> 統合ドキュメントへ</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-1);"></i> 一緒に読むことが多いデータは、一緒に置くべき…設計の基本だね！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== セクション2: セットアップと分析 ==================== -->
+  <div class="section-layout">
+
+    <!-- カード 5: 24のエッジケース -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ 24個のエッジケース</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 序盤: 合格条件</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-shuffle"></i><span>移行には<span class="keyword-tag accent">意図的に仕込まれた24件のエッジケース</span>が待ち受ける — 不規則な名前の空白、大文字メールアドレス</span></li>
+          <li><i class="fa-solid fa-crown"></i><span>新モデルが認識しない古い<span class="keyword-tag">VIPステータス</span>も混入</span></li>
+          <li><i class="fa-solid fa-clipboard-check"></i><span>合格条件は<span class="keyword-tag accent">移行元と先の一致</span>・全ドキュメントのルール準拠・<span class="keyword-tag">アプリの継続動作</span></span></li>
+        </ul>
+        <div class="flow-arrow">一致 <i class="fa-solid fa-plus"></i> 準拠 <i class="fa-solid fa-plus"></i> 動作 <i class="fa-solid fa-arrow-right"></i> 合格</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-user-shield fa-lg" style="color: var(--ui-color-2);"></i> わざと罠を仕込んでるのが良いテストになってる！単純な移植じゃ勝てない…！</span>
+      </div>
+    </div>
+
+    <!-- カード 6: セットアップ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-screwdriver-wrench fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ セットアップ手順</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 序盤〜中盤: 導入</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug"></i><span>Claude Code内の<span class="keyword-tag accent">/pluginコマンド</span>またはNPXスキルコマンドでMongoDB Agent Skillsをインストール</span></li>
+          <li><i class="fa-solid fa-key"></i><span>MCP設定ファイルに<span class="keyword-tag">MongoDB接続文字列</span>を貼り付け、MCP Serverを追加</span></li>
+          <li><i class="fa-solid fa-cloud"></i><span>動画ではローカルMCPを使用も、<span class="keyword-tag accent">AtlasマネージドMCP</span>（リモート完全ホスト型）も登場 — サーバー運用不要でAtlasに接続</span></li>
+        </ul>
+        <pre>/plugin または NPX skillコマンド
+→ MongoDB Agent Skills導入
+MCP設定に接続文字列を追記</pre>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wrench fa-lg" style="color: var(--ui-color-5);"></i> 導入自体はコマンドひとつで済むんだ！ハードル低くていいなあ。</span>
+      </div>
+    </div>
+
+    <!-- カード 7: 読み取り専用モード -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-lock fa-5x" style="animation: fa-bounce 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ 読み取り専用での偵察</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤: 安全策</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug-circle-check"></i><span>まず<span class="keyword-tag accent">MCP接続の有効性</span>と公式スキルの認識を確認</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>この段階のMCPサーバーは<span class="keyword-tag accent">意図的に読み取り専用モード</span> — スキーマ・インデックス・件数・ドキュメントの検査のみ可能</span></li>
+          <li><i class="fa-solid fa-ban"></i><span><span class="keyword-tag">書き込みツールはまだ登録すらされていない</span> — 段階的な権限昇格の設計</span></li>
+        </ul>
+        <div class="flow-arrow">接続確認 <i class="fa-solid fa-arrow-right"></i> 読み取り専用偵察 <i class="fa-solid fa-arrow-right"></i> 後から書き込み許可</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color: var(--ui-color-1);"></i> 最初から全部の権限を渡さない設計がこのワークフローの肝だね！</span>
+      </div>
+    </div>
+
+    <!-- カード 8: スキーマ分析 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="animation: fa-beat 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ スキーマ設計スキルで分析</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤: 問題の両面を調査</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database"></i><span><span class="keyword-tag accent">スキーマ設計スキル</span>で問題の両面を分析 — 「MongoDBに何が入っているか」と「アプリがどう読むか」</span></li>
+          <li><i class="fa-solid fa-repeat"></i><span>後者が重要: コレクション名だけではモデルを決められず、<span class="keyword-tag accent">実アクセスパターン</span>にスキーマを合わせるべき</span></li>
+          <li><i class="fa-solid fa-microscope"></i><span>発見: <span class="keyword-tag">1万件の住所</span>・<span class="keyword-tag">1万件の設定</span>・<span class="keyword-tag">約5万件の注文</span> — 住所と設定は常に顧客と一緒に読まれ、注文履歴は無限に成長</span></li>
+        </ul>
+        <div class="flow-arrow">格納データ <i class="fa-solid fa-plus"></i> 読み取り方 <i class="fa-solid fa-arrow-right"></i> 最適モデル</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 「どう保存するか」より「どう読むか」から決めるの、DB設計の王道だね！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== セクション3: 移行計画と実行 ==================== -->
+  <div class="section-layout">
+
+    <!-- カード 9: 設計方針 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-schema fa-5x" style="animation: fa-flip 3.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ 埋め込みと参照の推奨</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤: 推奨アーキテクチャ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-object-group"></i><span>重要な推奨: <span class="keyword-tag accent">全部を1つの巨大ドキュメントに入れない</span>こと</span></li>
+          <li><i class="fa-solid fa-box-archive"></i><span>一緒に読むことが多い有界な情報は<span class="keyword-tag">埋め込み（Embed）</span>、成長し続ける注文履歴は<span class="keyword-tag">参照で保持</span></span></li>
+          <li><i class="fa-solid fa-warehouse"></i><span><span class="keyword-tag accent">不整合なレガシーフィールド</span>と、新アクセスパターンが必要とする<span class="keyword-tag">インデックス</span>も検出</span></li>
+        </ul>
+        <div class="flow-arrow">埋め込み＝いつも読むもの <i class="fa-solid fa-code-branch"></i> 参照＝伸び続けるもの</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-5);"></i> 巨大ドキュメント地獄を避ける判断、エージェントがちゃんとできてる！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: 移行計画 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-list fa-5x" style="animation: fa-bounce 2.9s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ レビュー用の移行計画</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤: 計画フェーズ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-pen"></i><span>書き込みを実行する前に、まず<span class="keyword-tag accent">レビュー可能な移行計画</span>を作成 — 元のIDを保持し<span class="keyword-tag">明示的なスキーマバージョン</span>を追加</span></li>
+          <li><i class="fa-solid fa-address-card"></i><span>氏名と連絡先を明確なオブジェクトに分離、<span class="keyword-tag accent">住所と設定を埋め込み</span>、<span class="keyword-tag">注文集計を保存</span> — 元の注文は専用コレクションに残置</span></li>
+          <li><i class="fa-solid fa-ruler-combined"></i><span>検証ルールも計画に定義: <span class="keyword-tag accent">ID一致・件数・重複なし・許可ステータスのみ・メール正規化・24警告の保全</span>・インデックス</span></li>
+        </ul>
+        <div class="flow-arrow">計画を作る <i class="fa-solid fa-arrow-right"></i> 人間がレビュー <i class="fa-solid fa-arrow-right"></i> 実行へ</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-pen-to-square fa-lg" style="color: var(--ui-color-1);"></i> いきなり動かさず計画書を先に出させるの、エージェント運用の鉄則！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: ロールバック -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate-left fa-5x" style="animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ 元コレクション無変更</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤: 安全設計</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-shield"></i><span>重要な設計: <span class="keyword-tag accent">古いコレクションは一切変更しない</span> — 移行先は新しい<span class="keyword-tag">customers_v2</span>コレクションのみ</span></li>
+          <li><i class="fa-solid fa-arrow-rotate-left"></i><span>カットオーバーはアプリ側の変更なので、<span class="keyword-tag accent">ロールバックはレガシーモードに戻すだけ</span></span></li>
+          <li><i class="fa-solid fa-circle-question"></i><span>作成された詳細計画を確認し「妥当」と判断してから次の段階へ</span></li>
+        </ul>
+        <div class="flow-arrow">元を温存 <i class="fa-solid fa-arrow-right"></i> 新コレクションへ移行 <i class="fa-solid fa-arrow-right"></i> 駄目なら差し戻し</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-door-open fa-lg" style="color: var(--ui-color-2);"></i> 元データが無事ならいつでも引き返せる！安心設計は大事…！</span>
+      </div>
+    </div>
+
+    <!-- カード 12: 権限の段階解放 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-lock fa-5x" style="animation: fa-flip 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ 書き込み権限の段階的付与</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤: 可視の安全キー</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-key"></i><span>これは本番データではなく<span class="keyword-tag accent">分離デモへの書き込みのみ許可</span> — 可視の安全キーとして段階的に解放</span></li>
+          <li><i class="fa-solid fa-toggle-on"></i><span><span class="keyword-tag">作成・更新操作のみ有効化</span>し、<span class="keyword-tag accent">MCP削除カテゴリとAtlas管理ツールは無効のまま</span></span></li>
+          <li><i class="fa-solid fa-user-pen"></i><span>権限を得ても指示により<span class="keyword-tag">操作ごとに正確な説明と承認待ち</span>が必須</span></li>
+          <li><i class="fa-solid fa-server"></i><span>実際のオンライン移行なら<span class="keyword-tag accent">バックアップ・デュアルライト・CDC・ローリングカットオーバー・監視</span>も必要と明示</span></li>
+        </ul>
+        <div class="flow-arrow">読み取り専用 <i class="fa-solid fa-arrow-right"></i> 作成・更新のみ <i class="fa-solid fa-arrow-right"></i> 承認付き実行</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color: var(--ui-color-5);"></i> 削除ツールは最後まで渡さない！権限の渡し方って本当に設計なんだね。</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== セクション4: 移行実行と検証 ==================== -->
+  <div class="section-layout">
+
+    <!-- カード 13: サーバーサイド集計 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gears fa-5x" style="animation: fa-bounce 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ サーバーサイド集計で移行</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 中盤〜後半: 実行フェーズ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain"></i><span>数万件のドキュメントをモデルに読み込んで1件ずつ書き換えるのではなく、<span class="keyword-tag accent">サーバーサイド集計パイプライン</span>を構築</span></li>
+          <li><i class="fa-solid fa-server"></i><span><span class="keyword-tag">MongoDBが配置内で結合と変換</span>を実行し、結果を<span class="keyword-tag">customers_v2へマージ書き込み</span></span></li>
+          <li><i class="fa-solid fa-code-branch"></i><span>役割分担が重要: <span class="keyword-tag accent">LLMは計画と指揮</span>、<span class="keyword-tag accent">MongoDBがバルク処理</span> — 期待件数10,000件を確認しレガシーコレクションは無変更</span></li>
+        </ul>
+        <div class="flow-arrow">LLM＝設計・指揮 <i class="fa-solid fa-plus"></i> DB＝バルク実行 <i class="fa-solid fa-arrow-right"></i> 高速移行</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-1);"></i> モデルが1件ずつ書き換える想像してたけど、賢い！得意なことにだけ集中させる！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: エッジケース発見 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ MCPが暴く24件の警告</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 後半: データの真実</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-exclamation"></i><span>件数一致だけでは移行の正しさは証明されない — MCPサーバーで<span class="keyword-tag accent">きれいなデモが隠していた情報</span>を表示</span></li>
+          <li><i class="fa-solid fa-envelope"></i><span>24件の移行元レコードに<span class="keyword-tag">大文字メールアドレス</span>・<span class="keyword-tag">不整合な空白</span>・<span class="keyword-tag">VIP customerステータス</span>を発見</span></li>
+          <li><i class="fa-solid fa-trash-can"></i><span>安易にドロップすればターゲットはきれいになるが<span class="keyword-tag accent">実情報を喪失</span> — 他のデータは非エッジケースと同一のまま保全</span></li>
+        </ul>
+        <div class="flow-arrow">件数一致 <i class="fa-solid fa-xmark"></i> 完璧の証明 <i class="fa-solid fa-arrow-right"></i> 中身の検証が必要</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-2);"></i> 見た目きれいでも中身が欠けてたら意味ないもんね…！MCPの目、頼りになる！</span>
+      </div>
+    </div>
+
+    <!-- カード 15: アプリリファクタ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ アプリ側のリファクタリング</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 後半: DB移行は半分</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen-ruler"></i><span>DB移行は仕事の半分 — アプリは旧モデルのままなので<span class="keyword-tag accent">顧客リポジトリをリファクタ</span>へ</span></li>
+          <li><i class="fa-solid fa-file-code"></i><span>意味のある変更は小さい: リクエスト時に都度結合していたのを<span class="keyword-tag">v2顧客ドキュメントを読む方式</span>に変更 — <span class="keyword-tag accent">ダッシュボードAPI契約は無変更</span></span></li>
+          <li><i class="fa-solid fa-rotate"></i><span>アプリを再読み込みすると<span class="keyword-tag">スキーマv2で稼働</span> — 10,000件の顧客を表示し、24件の警告は<span class="keyword-tag accent">消されるのではなくレビュー対象として保全</span></span></li>
+        </ul>
+        <div class="flow-arrow">旧モデル参照 <i class="fa-solid fa-arrow-right"></i> v2参照へ <i class="fa-solid fa-arrow-right"></i> APIはそのまま</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-code-branch fa-lg" style="color: var(--ui-color-5);"></i> API契約を変えずに中身だけ入れ替えるの、プロの仕事っぽい…！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: 独立検証 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-check fa-5x" style="animation: fa-bounce 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ 独立検証で全合格</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 後半: 検証フェーズ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-compare"></i><span>移行とは別に<span class="keyword-tag accent">独立した検証</span>を実行 — 移行元と先の件数比較、欠落IDの検索</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>全不変条件で合格: <span class="keyword-tag">10,000対10,000</span>・<span class="keyword-tag accent">欠落IDゼロ</span>・<span class="keyword-tag accent">重複顧客番号ゼロ</span>・全警告保全・アプリ稼働中</span></li>
+          <li><i class="fa-solid fa-trophy"></i><span>Claudeは見事にミッションを完遂 — 「何も壊さない」ルールを守り切った</span></li>
+        </ul>
+        <div class="flow-arrow">件数 <i class="fa-solid fa-equals"></i> 欠落0 <i class="fa-solid fa-plus"></i> 重複0 <i class="fa-solid fa-arrow-right"></i> 合格</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-medal fa-lg" style="color: var(--ui-color-1);"></i> 欠落も重複もゼロって、地味だけど一番嬉しい結果！お見事！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ==================== セクション5: 最適化と総括 ==================== -->
+  <div class="section-layout">
+
+    <!-- カード 17: クエリ最適化 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="animation: fa-beat 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ 実測ベースの最適化検証</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 後半: パフォーマンス</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-tachograph-digital"></i><span><span class="keyword-tag accent">実測された最適化エビデンス</span>を使用 — 公式<span class="keyword-tag">クエリオプティマイザースキル</span>とMCPを活用</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-plus"></i><span>新しい<span class="keyword-tag">連絡先メールインデックス</span>に対する実際の検索を確認 — 出力から<span class="keyword-tag accent">インデックス使用を確認</span></span></li>
+          <li><i class="fa-solid fa-square-root-variable"></i><span><span class="keyword-tag accent">劇的な高速化倍率を捏造せず</span>、実証を出す誠実な姿勢 — 新インデックス不要と判明し、<span class="keyword-tag">レガシー経路より速いとは主張しない</span>理由も説明</span></li>
+        </ul>
+        <div class="flow-arrow">実測エビデンス <i class="fa-solid fa-arrow-right"></i> 誇張しない結論</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-flask fa-lg" style="color: var(--ui-color-2);"></i> 「〇倍速い！」って盛らない誠実さ、信頼できる検証だね！</span>
+      </div>
+    </div>
+
+    <!-- カード 18: 総括 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-graduation-cap fa-5x" style="animation: fa-bounce 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ なぜ成功したのか</h2>
+        <div class="timestamp"><i class="fa-regular fa-folder-open"></i> 結末: まとめ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-unlock"></i><span>無制限の制御を渡したわけではなく、<span class="keyword-tag accent">制約付きの段階的委任</span>だったからこそ成功 — 調査・設計・移行・リファクタ・検証をDBありきで管理</span></li>
+          <li><i class="fa-solid fa-diamond"></i><span><span class="keyword-tag">移行元は不変</span>を維持し、アクセス権は複数段階で切り替え、書き込みには承認を要求、最終結果は独立検証</span></li>
+          <li><i class="fa-solid fa-link"></i><span><span class="keyword-tag accent">スキル＝専門プレイブック</span>でスキーマ・クエリ判断を改善し、<span class="keyword-tag accent">MCP＝推論と実配置の接続</span>で助言から制御可能な行動へ</span></li>
+          <li><i class="fa-solid fa-handshake"></i><span>動画主の結論: エージェントに文脈とツールを渡しつつ、<span class="keyword-tag accent">承認と検証のステップは自分の手に</span> — GitHubスターも推奨</span></li>
+        </ul>
+        <div class="flow-arrow">専門知識 <i class="fa-solid fa-plus"></i> 実操作権 <i class="fa-solid fa-plus"></i> 人間の承認 <i class="fa-solid fa-arrow-right"></i> 信頼の委任</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> 権限の設計と最後の確認だけは人間が持つ…AIに任せる時代でも同じだね！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div>🎬 動画: <a href="https://www.youtube.com/watch?v=uqi5n3xqjqo" target="_blank" rel="noopener">WorldofAI</a>（<a href="https://www.youtube.com/@intheworldofai" target="_blank" rel="noopener">@intheworldofai</a>） — 「I Gave Claude Code Control...」</div>
+    <div style="margin-top: 6px;"><i class="fa-solid fa-circle-info"></i> このインフォグラフィックは動画の内容をグラフィックレコーディング風にまとめたものです。</div>
+    <div style="margin-top: 4px;"><i class="fa-solid fa-circle-exclamation"></i> 本内容は動画公開時点（2026年8月28日）の情報です。機能仕様や利用条件は公式ドキュメントをご確認ください。</div>
+  </footer>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale:not(.visible)');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { observer.observe(c); });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【Latent Space】302ニューロンの線虫が導いたアーキテクチャ — Liquid AI ラミン・ハサニ インタビュー</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Yomogi&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: オーガニック ライム 〜 アースリーングリーン（線虫という生物モチーフに合わせた有機的配色） */
+  --ui-color-1: #3F6212;   /* lime-800（メイン・深いライムグリーン） */
+  --ui-color-2: #365314;   /* lime-900（差し色・引き締めダーク） */
+  --ui-color-3: #ECFCCB;   /* lime-100（タグの下地） */
+  --ui-color-4: #1A2E05;   /* lime-950（締め色・最暗） */
+  --ui-color-5: #65A30D;   /* lime-600（サブ差し色・明るいグリーン） */
+  --ui-color-6: #BEF264;   /* lime-300（淡いアクセント） */
+  --bg-canvas: #F7FEE7;    /* lime-50（キャンバス・淡い若草色） */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  font-family: 'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif;
+  color: #333333;
+  line-height: 1.55;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ===== ヘッダー ===== */
+.header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  margin-bottom: 18px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 5px 5px 20px rgba(26, 46, 5, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.header .fa-8x {
+  color: var(--ui-color-1);
+  animation: fa-bounce 3s ease-in-out infinite;
+}
+
+.header h1 {
+  font-size: 33px;
+  font-weight: bold;
+  color: var(--ui-color-4);
+  margin: 10px 0 5px;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+}
+
+.header .channel {
+  font-size: 16px;
+  color: var(--ui-color-5);
+  font-weight: bold;
+  margin-top: 6px;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #777777;
+  margin-top: 8px;
+}
+
+.header-badges {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.header-badges .badge {
+  background: var(--ui-color-3);
+  border: 1.5px solid var(--ui-color-1);
+  color: var(--ui-color-4);
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.header-badges .badge.lime {
+  background: #F1FBDA;
+  border-color: var(--ui-color-5);
+  color: var(--ui-color-4);
+}
+
+/* 注記ボックス */
+.notice {
+  background: #F3FBE2;
+  border: 2px dashed var(--ui-color-1);
+  border-radius: 14px;
+  padding: 10px 18px;
+  margin: 0 auto 25px;
+  max-width: 1100px;
+  font-size: 14px;
+  color: var(--ui-color-4);
+  text-align: center;
+}
+
+/* ===== 章見出しの帯 ===== */
+.section-title-band {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 40px 10px 18px;
+  padding: 10px 20px;
+  background: linear-gradient(90deg, rgba(63, 98, 18, 0.16), rgba(101, 163, 13, 0.08) 70%);
+  border-left: 8px solid var(--ui-color-1);
+  border-radius: 0 14px 14px 0;
+}
+
+.section-title-band h2 {
+  font-size: 25px;
+  color: var(--ui-color-4);
+  font-weight: bold;
+  margin: 0;
+}
+
+.section-title-band i { color: var(--ui-color-1); }
+
+.section-title-band .band-step {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+  letter-spacing: 0.12em;
+}
+
+/* ===== グリッドレイアウト ===== */
+.section-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  padding: 5px;
+}
+
+/* ===== カード ===== */
+.section-card {
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(26, 46, 5, 0.10);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(-0.5deg);
+  box-shadow: 8px 12px 25px rgba(26, 46, 5, 0.26);
+  background-color: #FCFFF2;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+.section-card:nth-child(3n) { border-top-color: var(--ui-color-5); }
+
+/* カード番号 */
+.card-no {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  font-size: 30px;
+  font-weight: 900;
+  color: rgba(26, 46, 5, 0.10);
+}
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--ui-color-1);
+}
+
+.mega-icon-container h2 {
+  font-size: 21px;
+  color: var(--ui-color-4);
+  margin: 10px 0 0;
+  font-weight: bold;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+.card-content h3 {
+  font-size: 16.5px;
+  color: var(--ui-color-4);
+  margin: 14px 0 6px;
+  border-bottom: 2px dashed var(--ui-color-6);
+  padding-bottom: 3px;
+  font-weight: bold;
+}
+
+.card-content h3 i { color: var(--ui-color-1); margin-right: 6px; }
+
+/* リスト */
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15.5px;
+  color: #333333;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 16px;
+  margin-top: 4px;
+}
+
+/* 強調タグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 2px 8px;
+  border-radius: 5px;
+  margin-right: 4px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 14.5px;
+}
+
+.keyword-tag.dark { background-color: var(--ui-color-2); color: #ffffff; }
+.keyword-tag.soft { background-color: #F1FBDA; color: var(--ui-color-2); }
+
+/* highlight（最重要ポイント） */
+.highlight {
+  background: linear-gradient(transparent 62%, rgba(101, 163, 13, 0.30) 62%);
+  font-weight: bold;
+  color: var(--ui-color-4);
+  padding: 0 2px;
+}
+
+/* 吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #F8FEE8;
+  border: 2px solid var(--ui-color-5);
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin: 14px 5px 8px;
+  font-size: 14.5px;
+  color: var(--ui-color-4);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 28px;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 10px solid var(--ui-color-5);
+}
+
+.speech-bubble i.fa-lg { color: var(--ui-color-1); }
+
+.speech-bubble .handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ===== フッター ===== */
+.main-footer {
+  text-align: center;
+  margin-top: 45px;
+  padding: 24px 20px 18px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 5px 5px 20px rgba(26, 46, 5, 0.14);
+  font-size: 15px;
+  color: #444444;
+}
+
+.main-footer a { color: var(--ui-color-2); font-weight: bold; }
+
+.main-footer .footer-note {
+  margin-top: 10px;
+  font-size: 15px;
+  color: var(--ui-color-5);
+  font-weight: bold;
+}
+
+/* ===== レスポンシブ ===== */
+@media (max-width: 700px) {
+  .header h1 { font-size: 25px; }
+  .section-title-band h2 { font-size: 20px; }
+  .section-layout { grid-template-columns: 1fr; }
+  .section-card { min-width: 0; }
+  .keyword-list li { font-size: 14.5px; }
+}
+
+@media (max-width: 420px) {
+  body { padding: 10px; }
+  .header h1 { font-size: 21px; }
+  .header .subtitle { font-size: 15px; }
+  .mega-icon-container h2 { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header class="header">
+    <i class="fa-solid fa-worm fa-8x" aria-hidden="true"></i>
+    <h1>【Latent Space】302ニューロンの線虫が導いたアーキテクチャ</h1>
+    <p class="subtitle">液体ニューラルネットからLFM2.5、車載AI・デバイスAIへ — Liquid AI CEO ラミン・ハサニが語る「効率と適応の知能」</p>
+    <p class="channel">📹 チャンネル: Latent Space Podcast</p>
+    <p class="date">📅 2026年9月18日公開のインタビュー動画より作成</p>
+    <div class="header-badges">
+      <span class="badge"><i class="fa-solid fa-worm"></i> C.エレガンス 302ニューロン</span>
+      <span class="badge lime"><i class="fa-solid fa-water"></i> 液体ニューラルネット</span>
+      <span class="badge"><i class="fa-solid fa-car"></i> メルセデス・ベンツ車載AI</span>
+      <span class="badge lime"><i class="fa-solid fa-laptop"></i> AMD AI PC展開</span>
+      <span class="badge"><i class="fa-solid fa-download"></i> OSS 4,000万DL超</span>
+    </div>
+  </header>
+
+  <div class="notice">
+    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+    このインフォグラフィックは動画内の対談内容に基づくまとめです。数値・事実関係はすべて話者の発言に基づいており、最新の製品仕様や提携状況はLiquid AI公式発表をご確認ください。
+  </div>
+
+  <!-- ================= 第1章: 原点 ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-dna fa-2x" aria-hidden="true"></i>
+    <h2>第1章: 原点 — 302ニューロンの線虫との出会い</h2>
+    <span class="band-step">CHAPTER 01</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card">
+      <span class="card-no">01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flask fa-5x" style="animation: fa-beat-fade 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>①12年前の問い — 「脳の仕組みを機械学習に持ち込めるか」</h2>
+      </div>
+      <div class="card-content">
+        <p> Liquid AIの研究は<span class="keyword-tag dark">約12年前</span>、ウィーン工科大学（TU Wien）から始まりました。現在のCEOである<span class="keyword-tag">ラミン・ハサニ</span>は当時博士課程の学生、共同創業者の<span class="keyword-tag">マティアス</span>は同じ大学の修士課程の学生でした。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brain" aria-hidden="true"></i><span>出発点は「脳から機械学習へのインスピレーション持ち込み」という純粋な研究の問い</span></li>
+          <li><i class="fa-solid fa-square-root-variable" aria-hidden="true"></i><span>狙いは機械学習システムに<span class="highlight">連続時間の数学</span>を導入すること</span></li>
+          <li><i class="fa-solid fa-diagram-project" aria-hidden="true"></i><span>ニューロン間の情報交換は<span class="keyword-tag">シンプルな一次微分方程式</span>で支配されていると着目</span></li>
+        </ul>
+        <p>しかし当最初の人間の脳アプローチは頓挫します。人間の脳は<span class="keyword-tag soft">スパイクニューロンを持ち、計算がどう行われているか未だ解明されていない</span>ためです。ショウジョウバエの脳の方がよほど理解が進んでいるという状況でした。</p>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card">
+      <span class="card-no">02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-worm fa-5x" style="animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>②モデル生物C.エレガンス — スパイクしない302個の脳</h2>
+      </div>
+      <div class="card-content">
+        <p>第一原理から取り組んだ結果、たどり着いたのが体長わずか<span class="keyword-tag dark">2mm、神経細胞302個</span>だけの線虫<span class="keyword-tag">C.エレガンス</span>でした。「Liquidは線虫のDNAにインスパイアされている」という噂は比喩ではなく、<span class="highlight">文字通りの研究の出発点</span>です。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wave-square" aria-hidden="true"></i><span>この虫のニューロンは<span class="highlight">スパイクしない</span> — 神経科学でいう「電気緊張的（electrotonic）」な段階的応答を示す</span></li>
+          <li><i class="fa-solid fa-equals" aria-hidden="true"></i><span>その挙動が<span class="keyword-tag">人工ニューロンと非常に似ている</span>ことに行き当たった</span></li>
+          <li><i class="fa-solid fa-infinity" aria-hidden="true"></i><span>この脳に学べば<span class="keyword-tag">連続時間で動く微分可能なシステム</span>が構築でき、バックプロパゲーション等の手法をそのまま適用できる</span></li>
+        </ul>
+        <p>非スパイク＝連続的な応答特性こそが、のちの<span class="keyword-tag soft">液体ニューラルネット</span>の数学的な核になります。</p>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card">
+      <span class="card-no">03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microscope fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③途方もない小さな脳 — 95個の筋細胞を完璧に制御</h2>
+      </div>
+      <div class="card-content">
+        <p>2016〜2017年当時、ラミンらが最も衝撃を受けた事実は<span class="keyword-tag dark">302個のニューロンで95個の筋細胞を、地球上のどんなロボットシステムよりも上手に制御している</span>ということでした。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>進化の系統樹上、ヒトとこの虫が分岐したのは<span class="keyword-tag">約6億年前</span></span></li>
+          <li><i class="fa-solid fa-dna" aria-hidden="true"></i><span>ヒトゲノムと<span class="keyword-tag">78%の類似</span> — この虫の神経科学的知見はある程度ヒトにも転用可能</span></li>
+          <li><i class="fa-solid fa-award" aria-hidden="true"></i><span>この虫の研究は人類に<span class="keyword-tag">ノーベル賞を4件</span>もたらした人気のモデル生物</span></li>
+        </ul>
+        <p>ロボットには搭載できる計算資源がほとんどない — だからこそ<span class="highlight">最小の計算単位に知能を詰め込む「計算効率」</span>が、以来ずっとラボの研究テーマになったのです。</p>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-lightbulb fa-lg" aria-hidden="true"></i>
+            神経科学者たち自身との共同研究も始め、
+            <br>
+            「2つのニューロンが情報を交換する仕組み」を数学的にモデル化しました。
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 第2章: 液体NNとMIT ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-water fa-2x" aria-hidden="true"></i>
+    <h2>第2章: 液体ニューラルネットの誕生とMIT時代</h2>
+    <span class="band-step">CHAPTER 02</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード4 -->
+    <div class="section-card">
+      <span class="card-no">04</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-water fa-5x" style="animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④Liquid Neural Networksの誕生 — 微分方程式で書かれたネットワーク</h2>
+      </div>
+      <div class="card-content">
+        <p>線虫の脳から得た数学を機械学習に持ち込んだ成果が<span class="keyword-tag dark">液体時間定数ニューラルネット（Liquid Time-Constant Networks）</span>です。「Liquid」は<span class="keyword-tag">柔軟性</span>を表す命名でした。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-square-root-variable" aria-hidden="true"></i><span>フォワードパスが<span class="highlight">微分方程式に支配される高度に非線形なシステム</span></span></li>
+          <li><i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i><span>微分可能なので<span class="keyword-tag">バックプロパゲーションで学習可能</span>。多重のフィードバック構造を持つ</span></li>
+          <li><i class="fa-solid fa-sitemap" aria-hidden="true"></i><span><span class="keyword-tag">優れた表現学習器</span> — データから良い表現を学べる</span></li>
+          <li><i class="fa-solid fa-robot" aria-hidden="true"></i><span><span class="highlight">数十〜数百ニューロンという小さなサブネット</span>でロボット制御を実現</span></li>
+        </ul>
+        <p>線虫自身がやっているのと同じような制御を、極小のネットワークで再現できたのです。</p>
+      </div>
+    </div>
+
+    <!-- カード5 -->
+    <div class="section-card">
+      <span class="card-no">05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-graduation-cap fa-5x" style="animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤2017年、MITへ — 4人の共同創業者が揃う</h2>
+      </div>
+      <div class="card-content">
+        <p>転機は2017年。<span class="keyword-tag dark">ダニエラ・ルース教授</span>（MIT、「いわばロボティクスの母」）がこの研究を知り、ウィーンの指導教員に直接連絡を取ったのです。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plane-departure" aria-hidden="true"></i><span>「MITに来て、車やドローンなど実世界でこの技術を応用しないか」— ラミンとマティアスはMITへ</span></li>
+          <li><i class="fa-solid fa-user-plus" aria-hidden="true"></i><span>当時MIT博士課程だった<span class="keyword-tag">アレクサンダー・アミニ</span>と出会い、4人での共同研究が始まる</span></li>
+          <li><i class="fa-solid fa-globe" aria-hidden="true"></i><span>同時期、トロント大学の<span class="keyword-tag">ヨシュア・ベンジョ研究室・デイビッド・デュヴノー研究室</span>やStanfordなども連続時間力学系に参入し分野が急拡大</span></li>
+        </ul>
+        <p>Neural ODEや状態空間モデル（SSM）といった「同じ直感の別の名前」が世界中で生まれ、<span class="highlight">連続時間系・シーケンスモデリング</span>が一つの研究领域として確立していきました。</p>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card">
+      <span class="card-no">06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clock fa-5x" style="animation: fa-flip 3.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥連続時間の直感 — 「イベントの間」を計算する</h2>
+      </div>
+      <div class="card-content">
+        <p>RNN（リカレントニューラルネット）は離散化された力学系で、<span class="keyword-tag soft">1ステップずつ逐次計算し、ステップ間の時間差はほぼ変わりません</span>。対して連続時間力学系には決定的な違いがあります。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-stopwatch" aria-hidden="true"></i><span>離散的なイベントが起きるタイミングの制御に加え、<span class="highlight">イベントとイベントの「間の時間」も考慮</span>できる</span></li>
+          <li><i class="fa-solid fa-arrows-left-right-to-line" aria-hidden="true"></i><span>継続的に進化するシーケンスに対し、<span class="keyword-tag">時間次元の適応性</span>がはるかに高い</span></li>
+          <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>2017〜2020年はOpenAIが強化学習・ロボティクス（OpenAI Gym等）で活発だった時代。<span class="keyword-tag">小さくても分布外汎化に強い学習系</span>で対抗した</span></li>
+        </ul>
+        <p>「再帰とフィードバックの計算」という直感を機械学習に持ち込んだことが、MIT時代の大きな貢献でした。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 第3章: 壁とLiquid AIの答え ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-diagram-project fa-2x" aria-hidden="true"></i>
+    <h2>第3章: スケールの壁とLiquid AIの答え</h2>
+    <span class="band-step">CHAPTER 03</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード7 -->
+    <div class="section-card">
+      <span class="card-no">07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-mountain fa-5x" style="animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦スケーリングの壁 — 非線形な再帰は並列化できない</h2>
+      </div>
+      <div class="card-content">
+        <p>2020年頃、業界全体がスケーリング一色になる中、連続時間系・再帰的な非線形ループをスケールしようとした瞬間、<span class="keyword-tag soft">計算が途方もなく困難になる</span>現実に突き当たります。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microchip" aria-hidden="true"></i><span>GPUは<span class="keyword-tag">並列行列演算</span>に最適化されており、非線形なリカレント演算子の並列化は極めて困難</span></li>
+          <li><i class="fa-solid fa-cubes" aria-hidden="true"></i><span>Transformerの美点は<span class="highlight">バイアスがなく行列積そのもの</span>なのでスケールできる — いわば「ハードウェア宝くじ」に当たった構造</span></li>
+          <li><i class="fa-solid fa-scale-unbalanced-flip" aria-hidden="true"></i><span>attentionには<span class="keyword-tag">二次コスト</span>の問題がある一方、再帰は理論上<span class="keyword-tag">線形〜サブ二次</span>で済む — しかし並列化できなければ理論上の効率は絵に描いた餅</span></li>
+        </ul>
+        <p>効率の良い演算を、実際にスケール可能な形で実装する方法が求められました。</p>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card">
+      <span class="card-no">08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wave-square fa-5x" style="animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧線形化（SSM）とその代償 — 表現力を失うトレードオフ</h2>
+      </div>
+      <div class="card-content">
+        <p>一つの解決策は<span class="keyword-tag dark">力学系の線形化</span>。システムの非線形性を動的に減らし、線形代数のトリックを適用できるようにするものです。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span><span class="keyword-tag">状態空間モデル（SSM）はRNNの線形版</span>。並列scanなど新しい演算形式を並列実行でき、スケール可能に</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>しかしコンピュータ科学に<span class="highlight">タダ飯はない</span> — 複雑な力学を線形化すると<span class="keyword-tag">表現力を失う</span></span></li>
+          <li><i class="fa-solid fa-language" aria-hidden="true"></i><span>実際、言語タスクでは<span class="keyword-tag soft">長文脈の依存関係の学習が苦手</span>で、表現力は常にTransformerに及ばなかった</span></li>
+        </ul>
+        <p>計算効率と表現力。この2つの板挟みが、次の「Liquid AIならではの答え」を生みます。</p>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card">
+      <span class="card-no">09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨「代替アーキテクチャのアベンジャーズ」結集</h2>
+      </div>
+      <div class="card-content">
+        <p>約3年前のLiquid AI設立時、とった決断は「自分たちのアーキテクチャこそ聖杯だ」と賭けることではありませんでした。その逆です。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-handshake" aria-hidden="true"></i><span><span class="keyword-tag">Hyena Hierarchy</span>（Stanford）、<span class="keyword-tag">SSM</span>（StanfordのJimmy Smithら）、<span class="keyword-tag">液体ニューラルネット</span>（自ら）など、代替アーキテクチャの発明者たちを一つの場所に結集</span></li>
+          <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span>演算子空間を探索する<span class="highlight">メタAIシステム</span>を構築 — デプロイ環境（GPU・NPU・CPU）を前提に最適なハイブリッド構成を探索</span></li>
+          <li><i class="fa-solid fa-recycle" aria-hidden="true"></i><span>新しいアーキテクチャの発明があれば探索対象に追加できる<span class="keyword-tag">再帰的に自己改善するシステム</span></span></li>
+        </ul>
+        <p>単一アーキテクチャへの偏向を排し、「目的とハードウェアごとに最適な構成を機械的に見つける」という姿勢がLiquid AIの根幹になっています。</p>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card">
+      <span class="card-no">10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-5x" style="animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩STARとLFMの世代進化 — 探索が生むファウンデーションモデル</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-star" aria-hidden="true"></i>STAR: アーキテクチャ探索の科学</h3>
+        <p>この探索システムの科学は論文<span class="keyword-tag dark">STAR</span>（Synthetic design of Tailored ARchitectures）として公開。探索は4つの基準を最適化します: <span class="highlight">①純Transformer比で品質を犠牲にしない ②メモリ消費の最小化 ③レイテンシの最小化 ④計算速度の最大化</span>。</p>
+        <h3><i class="fa-solid fa-layer-group" aria-hidden="true"></i>LFMの世代</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1" aria-hidden="true"></i><span><span class="keyword-tag">LFM1</span>: 探索が生んだ初世代。畳み込み・attention・liquid要素の「全部入り」</span></li>
+          <li><i class="fa-solid fa-2" aria-hidden="true"></i><span><span class="keyword-tag">LFM2</span>: CPU動作に特化して最適化。約8割が<span class="highlight">ゲート付き1次元畳み込み</span>、残り約2割がgroup query attentionという、極めてシンプルでエレガントな構成</span></li>
+          <li><i class="fa-solid fa-3" aria-hidden="true"></i><span>現在は<span class="keyword-tag">LFM2.5</span>、次世代<span class="keyword-tag">LFM3</span>は品質・安定性・レイテンシ制御をさらに強化</span></li>
+        </ul>
+        <p>スケーリング則は<span class="keyword-tag">数千万パラメータから700億パラメータ</span>の範囲で実施。すべてをスクラッチから構築するファウンデーションモデルラボです。</p>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card">
+      <span class="card-no">11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud-arrow-down fa-5x" style="animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪オープンソース戦線 — 週150万ダウンロードのLFM</h2>
+      </div>
+      <div class="card-content">
+        <p>Liquid AIはファウンデーションモデルをコミュニティに本当にオープンソースとして公開しており、モデルは今や非常に人気を集めています。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-download" aria-hidden="true"></i><span>累計<span class="keyword-tag dark">4,000万ダウンロード超</span>、<span class="highlight">週あたり約150万ダウンロード</span></span></li>
+          <li><i class="fa-solid fa-database" aria-hidden="true"></i><span>公開済みパラメータ範囲は<span class="keyword-tag">1億〜240億</span>（大型はMixture of Experts構成）</span></li>
+          <li><i class="fa-solid fa-photo-film" aria-hidden="true"></i><span>マルチモーダル対応: <span class="keyword-tag">音声・画像・テキストを同時入力</span>し、音声とテキストを生成</span></li>
+        </ul>
+        <p>多くの開発者がこれらを本番環境に組み込んでおり、代替アーキテクチャ陣営の中でも特に実績のあるポートフォリオになっています。</p>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-fire fa-lg" aria-hidden="true"></i>
+            探索から得た学訓: モデルは大きくするほど
+            <span class="keyword-tag">アンバイアス（無偏向）</span>に、
+            小さいうちは<span class="keyword-tag">フィードバックループ等のバイアス</span>を増やして表現力を稼ぐ — これが大小それぞれの最適戦略。
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 第4章: エッジで動く本番AI ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-industry fa-2x" aria-hidden="true"></i>
+    <h2>第4章: エッジで動く本番AI — 企業展開の最前線</h2>
+    <span class="band-step">CHAPTER 04</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード12 -->
+    <div class="section-card">
+      <span class="card-no">12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-store fa-5x" style="animation: fa-beat-fade 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫Shopify — 月10億リクエスト超をさばくLFM</h2>
+      </div>
+      <div class="card-content">
+        <p>Shopifyのミケルはラミンのメンターの一人で、<span class="keyword-tag">「No BS（冗談抜き）」型</span>の業界の大物。「技術を持ってこれば、うちのチームがテストして良いか悪いかを告げる」という姿勢で臨みました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-vial-circle-check" aria-hidden="true"></i><span>初回テストでモデルの<span class="keyword-tag">品質と効率の両方</span>にポジティブな驚き</span></li>
+          <li><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><span><span class="highlight">Shop Appで検索を打つと、その裏でLFMが応答</span> — 店舗向け・顧客向け製品のスタック全体で稼働</span></li>
+          <li><i class="fa-solid fa-server" aria-hidden="true"></i><span>プライベート環境（自社データセンター内）へのデプロイで、<span class="keyword-tag">レイテンシと品質</span>を重視</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up" aria-hidden="true"></i><span>利用統計は指数関数的に成長し、<span class="keyword-tag dark">月10億リクエスト超</span>（Shopifyのみの数字）</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card">
+      <span class="card-no">13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-car fa-5x" style="animation: fa-bounce 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬メルセデス・ベンツ — 約600MBの車載AIを全車へ</h2>
+      </div>
+      <div class="card-content">
+        <p>2025年4月に提携を発表した<span class="keyword-tag dark">メルセデス・ベンツ</span>では、車内知能（in-car intelligence）を提供します。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>「Hey Mercedes」での対話、<span class="keyword-tag">カメラ接続</span>、音声やりとり、テキストモデルによる推論を1つのマルチモーダルモデルで実現</span></li>
+          <li><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i><span>モデルサイズは<span class="highlight">約600MB</span> — 全車への<span class="keyword-tag">OTA（無線更新）</span>が可能になる</span></li>
+          <li><i class="fa-solid fa-earth-americas" aria-hidden="true"></i><span>2026年内に<span class="keyword-tag">北米の第3世代メルセデス・ベンツ全車</span>へ展開予定 = 車内AI初の大規模本番デプロイ</span></li>
+          <li><i class="fa-solid fa-microchip" aria-hidden="true"></i><span>搭載チップのコストは<span class="highlight">約100ドル</span> — 効率化の果てに初めて到達できるプロダクショングレード</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card">
+      <span class="card-no">14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-laptop fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭AMD AI PC — 「データセンターの外」へ知能を運ぶ</h2>
+      </div>
+      <div class="card-content">
+        <p>AI PCは毎年<span class="keyword-tag">3〜4億台</span>が生まれる市場で、うち<span class="keyword-tag">約1億台</span>がAMDコア。AMDとの協業では、ラップトップ上で直接LFMを動かすローカル展開を進めています。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-shield-halved" aria-hidden="true"></i><span><span class="keyword-tag">スマートガードレール</span>: ChatGPTやClaude Code等のエージェントへ送信前に、機微情報だけを賢く shielding するフィルタ</span></li>
+          <li><i class="fa-solid fa-user-gear" aria-hidden="true"></i><span>デバイス上で直接動く<span class="keyword-tag">プロアクティブなエージェント</span> — ノートPC内の情報にアクセスして分析を提示</span></li>
+          <li><i class="fa-solid fa-plane-up-slash" aria-hidden="true"></i><span><span class="keyword-tag">オフライン・エアギャップ動作</span>も可能に</span></li>
+        </ul>
+        <p>現在のApple IntelligenceやGalaxy AIは<span class="highlight">リクエストの約9割がクラウドへ</span>流れています。数億台に無料の知能を提供するコストは雲天文的であり、デバイス側に寄せればその分マージンを生む — これが企業がデバイスAIを求める第一の理由です。</p>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card">
+      <span class="card-no">15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="animation: fa-beat-fade 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮本番品質のリアル — ベンチマークのその先</h2>
+      </div>
+      <div class="card-content">
+        <p>「オープンソースのモデルをダウンロードしてデバイスに載せれば成功」ではありません。デバイス向けモデルを<span class="keyword-tag dark">プロダクション品質</span>に上げるのは極めて困難です。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-temperature-half" aria-hidden="true"></i><span><span class="keyword-tag">サーマル（熱）制御</span>への対処</span></li>
+          <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span><span class="keyword-tag">長文脈で挙動が変わる</span>問題と、それに耐える信頼性の担保</span></li>
+          <li><i class="fa-solid fa-building" aria-hidden="true"></i><span>Fortune 500の<span class="keyword-tag">約200社</span>と協業して見えた実態 — 企業の自前AI構築の<span class="highlight">約8割は本番に到達できずクラウドへ回帰</span></span></li>
+          <li><i class="fa-solid fa-code" aria-hidden="true"></i><span>開発者の「トークン最大化（vibe coding）」ブームも、価値を測ると<span class="keyword-tag soft">9割のトークンは無駄</span>という分析</span></li>
+        </ul>
+        <p>Liquid AIは2年半で何度も本番サイクルを経験。<span class="highlight">プロダクションAIは品質ベンチマークの遥か先にある</span>のが現実です。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 第5章: ビジネスモデルとロボティクス ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-handshake fa-2x" aria-hidden="true"></i>
+    <h2>第5章: ビジネスモデル、Leapプラットフォームとロボティクス</h2>
+    <span class="band-step">CHAPTER 05</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード16 -->
+    <div class="section-card">
+      <span class="card-no">16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="animation: fa-bounce 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯Leapと「カスタマイズ・トークン」への波</h2>
+      </div>
+      <div class="card-content">
+        <p>収益モデルは早期の<span class="keyword-tag">デザインパートナー契約</span>（応用MLチームを組成し期間で課金）→ 構築後は<span class="keyword-tag">デバイス単位の年間ライセンス</span>。同じ業種の2社目以降は構築コストが下がる「ソリューション再利用」構造です。</p>
+        <h3><i class="fa-solid fa-book-open" aria-hidden="true"></i>Leap: 開発者プラットフォーム</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sliders" aria-hidden="true"></i><span>ファインチューニングや、<span class="keyword-tag">llama.cpp対応GGUFバンドルの抽出</span>（CPUデプロイ直行）を支援。Cookbookは「人間のために書かれた」マニュアル</span></li>
+          <li><i class="fa-solid fa-link" aria-hidden="true"></i><span>Hugging Faceの<span class="keyword-tag">TRL</span>、SGLang、Ollama等とも連携。「<span class="highlight">エコシステムは常に勝つ</span>」— llama.cppは極限まで最適化されたC++カーネルで、汎用ラッパーのほとんどは本来より劣る（Modular/Mojoについても同旨の見解）</span></li>
+        </ul>
+        <h3><i class="fa-solid fa-rotate" aria-hidden="true"></i>セルフサーブ化とソブリンAI</h3>
+        <p>現在はモデル開発の<span class="keyword-tag dark">セルフサーブ・プラットフォームをβ開発中</span>。Claude CodeのようなエージェントハーネスにLiquidのツールを渡せば、対話しながら本番品質のモデル構築をstep-by-stepで実行できます（ワンクリックauto modeも可だが品質は対話型に劣る）。市場は推論トークン（約9割）から<span class="keyword-tag">カスタマイズ・トークン</span>へ — 事前学習〜事後学習〜データ生成〜強化学習まで含む深いカスタマイズをエージェントが再帰的に回し、<span class="highlight">顧客が自らの知能を所有する「ソブリンAI」</span>を目指します。Thinking Machines LabやJeff Deanの新ラボなど、この波から次のデカコーンが出るとの見立てです。</p>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-circle-question fa-lg" aria-hidden="true"></i>
+            「良いevalがあるなら自動でいいでは?」への答え: 本番では分布がシフトし
+            <span class="keyword-tag">静的なevalsは必ず陳腐化する</span>。
+            継続的に進化するシステムが必要になる。
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card">
+      <span class="card-no">17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-robot fa-5x" style="animation: fa-beat-fade 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ロボティクス — 意図的なポーズを解く、いま</h2>
+      </div>
+      <div class="card-content">
+        <p>起業当初、ロボティクスは<span class="keyword-tag dark">意図的に保留</span>してきました。本番のロボットは検証・認証・規制の深い穴に落ちるため、まずOEM向けの<span class="keyword-tag">水平レイヤーの知能</span>を築く戦略でした。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>ビジョン言語モデル（VLM）で<span class="keyword-tag">vision-action問題</span>を解決 — ロボットが見たものに基づいて行動</span></li>
+          <li><i class="fa-solid fa-industry" aria-hidden="true"></i><span>工場内カメラでの工程監視、<span class="keyword-tag">Robotec.aiとのAMD協業デモ</span>、イタリアのモジュラーロボット企業での指示追従など実績</span></li>
+          <li><i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i><span>モデルが成熟しデータ・事後学習の制御が効くようになった今、<span class="highlight">ロボティクス垂直領域を本格再開</span>する好機</span></li>
+        </ul>
+        <p>「アクションモデルや世界モデルは根本的に別物なのか?」という問いには — 革新は<span class="keyword-tag">モデルアーキテクチャ・アルゴリズム・データ処理</span>の3層に分類でき、<span class="highlight">世界モデルはアーキテクチャではなくアルゴリズム側の革新</span>。だからLFMアーキテクチャも世界モデリングのパイプラインにそのまま使える、という整理が示されました。ロボットのChatGPT瞬間を開くのがどの学習アルゴリズムかは、まだ大きな疑問符です。</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 第6章: 研究の最前線と未来 ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-rocket fa-2x" aria-hidden="true"></i>
+    <h2>第6章: 研究の最前線と「Attention Is All You Need?」</h2>
+    <span class="band-step">CHAPTER 06</span>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード18 -->
+    <div class="section-card">
+      <span class="card-no">18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-infinity fa-5x" style="animation: fa-flip 4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱研究アジェンダと未来 — 基質、適応、そしてattention</h2>
+      </div>
+      <div class="card-content">
+        <h3><i class="fa-solid fa-flask-vial" aria-hidden="true"></i>現在の研究アジェンダ</h3>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-photo-film" aria-hidden="true"></i><span><span class="keyword-tag">全データモダリティを同時に学習</span>する大規模マルチモーダルシステム、長時間地平の推論</span></li>
+          <li><i class="fa-solid fa-dna" aria-hidden="true"></i><span>非ヒトデータへも展開: <span class="highlight">DNAファウンデーションモデル</span> — 語彙はわずか4文字だが超長文脈のシーケンス</span></li>
+          <li><i class="fa-solid fa-arrows-split-up-and-left" aria-hidden="true"></i><span><span class="keyword-tag">フォワードパスとバックワードパスを同時に</span>行う適応的知能が次世代アーキテクチャ — SSIも同系の研究という噂。全フロンティアラボが代替アーキテクチャチームを持つ</span></li>
+          <li><i class="fa-solid fa-music" aria-hidden="true"></i><span>モダリティの学訓: <span class="keyword-tag">音声はSSM・連続時間系と相性抜群</span>（音声は常に連続的に推論しているようなもの=状態が少ない）、テキストではSSMは苦手。約200億パラメータ以下では再帰が特に有効</span></li>
+        </ul>
+        <h3><i class="fa-solid fa-atom" aria-hidden="true"></i>次の基質: フォトニクスと量子</h3>
+        <p>現在のGPUは並列行列演算に最適化された基質です。しかし<span class="keyword-tag">フォトニクス（光演算）</span>が光の速さでの逐次計算を可能にすれば、<span class="highlight">並列化できなかった非線形演算子が解き放たれ</span>、次世代アーキテクチャへの道が開くと期待。量子コンピュータが大きく変えるのは<span class="keyword-tag">探索</span> — 勾配降下は「大規模探索を行う唯一の知られた方法」でしかないからです。神経科学者クリストフ・コッホの「<span class="keyword-tag soft">知能は炭素の性質である</span>」という言葉を引き、知能を載せる<span class="keyword-tag">基質（substrate）</span>自体がアーキテクチャを規定するという視点が示されました。</p>
+        <h3><i class="fa-solid fa-star" aria-hidden="true"></i>「Attention Is All You Need?」</h3>
+        <p>来年はTransformer発表10周年。問いへの答えは — <span class="keyword-tag dark">attentionは確かに必要な要素の一つ</span>であり、attentionベースのシステムとは長く付き合う。ただし人間の視覚すら「目は絶えず動き、脳が2つのフレームの差分を合成して見ている」ように、attentionは一部の構成要素にすぎません。データセンターの外で社会に展開される知能には<span class="highlight">身体性（embodiment）</span>（仮想エージェントにも当てはまる）と、<span class="highlight">継続的に進化し続ける適応的知能</span>が必要になる — それがLiquid AIの描く未来像です。</p>
+        <div class="speech-bubble">
+          <span class="handwritten">
+            <i class="fa-solid fa-seedling fa-lg" aria-hidden="true"></i>
+            最後に起業家への一言: 「問題が難しいほど魅力的。簡単な問題は誰もが解決しに行く」—
+            線虫から始まった12年の旅は、まだ途中です。
+          </span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer class="main-footer">
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=V_9TCu_21SE" target="_blank" style="color: inherit;">A Worm With 302 Neurons Inspired Their Architecture — Ramin Hasani, Liquid AI</a>（Latent Space Podcast） | 📅 2026年9月18日</p>
+    <p class="footer-note">302ニューロンの線虫C.エレガンスから液体ニューラルネット、LFM2.5、車載・デバイスAIまで — 効率と適応の知能を追うLiquid AIの全貌</p>
+  </footer>
+
+</div>
+</body>
+</html>

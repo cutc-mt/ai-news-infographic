@@ -276,6 +276,18 @@ def get_video_durations(video_ids: list, api_key: str) -> dict:
     return durations
 
 
+def filter_by_keywords(videos: list, require_keywords) -> list:
+    """タイトルに指定キーワードのいずれかを含む動画のみ通過する。
+
+    Args:
+        videos: 動画リスト（各要素は title を持つ dict）
+        require_keywords: 必須キーワードのリスト。None/空リストなら全通過（フィルタ無効）
+    """
+    if not require_keywords:
+        return videos
+    return [v for v in videos if any(kw in v.get('title', '') for kw in require_keywords)]
+
+
 def filter_by_duration(videos: list, durations: dict, min_seconds: int = 300) -> list:
     """指定秒数未満の動画を除外する。長さ不明（API失敗等）の動画は誤除外を防ぐため残す"""
     result = []
@@ -359,6 +371,10 @@ class YouTubeMonitor:
             videos = self.get_latest_videos(channel_id, max_per_channel)
             videos = filter_shorts(videos)
             videos = filter_by_date(videos, max_days=max_days)
+
+            # チャンネル個別の必須キーワードフィルタ（例: PIVOTはAI関連語必須）
+            require_keywords = ch.get('require_keywords')
+            videos = filter_by_keywords(videos, require_keywords)
             fresh = filter_new_videos(videos, known_ids)
 
             # 5分未満の動画を除外（長さはまとめて一括取得）

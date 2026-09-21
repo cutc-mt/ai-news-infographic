@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【ローカル画像モデル】Qwen-Image-2.1徹底解説 〜軽くて日本語対応・Macで動く画像生成AI〜</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  /* 独自テーマ: エメラルドグリーン 〜深緑の森で育つローカル画像生成〜 */
+  --ui-color-1: #059669;   /* エメラルド: メイン */
+  --ui-color-2: #064E3B;   /* 深緑: 最暗 */
+  --ui-color-3: #D1FAE5;   /* 淡緑: タグ背景 */
+  --ui-color-4: #065F46;   /* 森のインク: テキスト */
+  --ui-color-5: #10B981;   /* 明るいエメラルド: 強調 */
+  --ui-color-6: #34D399;   /* 若葉: サブ */
+  --bg-canvas: #ECFDF5;    /* ミントキャンバス */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(circle at 12% 6%, rgba(5,150,105,0.10) 0%, transparent 44%),
+    radial-gradient(circle at 88% 94%, rgba(6,78,59,0.09) 0%, transparent 46%);
+  color: var(--ui-color-4);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  line-height: 1.6;
+}
+
+.page-container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ===== ヘッダー ===== */
+.main-header {
+  text-align: center;
+  padding: 42px 20px 30px;
+  position: relative;
+}
+
+.main-header .header-icons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 34px;
+  margin-bottom: 15px;
+}
+
+.main-header h1 {
+  font-size: 36px;
+  color: var(--ui-color-4);
+  font-weight: bold;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.main-header .subtitle {
+  font-size: 19px;
+  color: var(--ui-color-5);
+  margin-top: 10px;
+  font-family: 'Yomogi', cursive;
+}
+
+.main-header .date-info {
+  font-size: 14px;
+  color: #4F8A6E;
+  margin-top: 12px;
+}
+
+/* ===== セクション帯 ===== */
+.section-title-band {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 38px 10px 15px;
+  padding: 8px 18px;
+  background: linear-gradient(90deg, rgba(5,150,105,0.16), rgba(6,78,59,0.10));
+  border-left: 8px solid var(--ui-color-1);
+  border-radius: 0 12px 12px 0;
+  flex-wrap: wrap;
+}
+
+.section-title-band h2 {
+  font-size: 26px;
+  color: var(--ui-color-4);
+  font-family: 'Kaisei Decol', serif;
+}
+
+.section-title-band i {
+  color: var(--ui-color-6);
+}
+
+.section-title-band .band-step {
+  margin-left: auto;
+  background: var(--ui-color-2);
+  color: #D1FAE5;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-family: 'Zen Kurenaido', sans-serif;
+}
+
+/* ===== レイアウト ===== */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  padding: 5px;
+}
+
+/* ===== カード ===== */
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 460px;
+  background-color: #ffffff;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(6,78,59,0.14);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 10px 22px rgba(6,78,59,0.22);
+}
+
+.section-card.alt { border-top-color: var(--ui-color-6); }
+.section-card.cy { border-top-color: var(--ui-color-5); }
+.section-card.soft { border-top-color: var(--ui-color-2); }
+
+.section-card .card-no {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  font-size: 34px;
+  font-weight: bold;
+  color: var(--ui-color-3);
+  font-family: 'Zen Kurenaido', sans-serif;
+  z-index: 0;
+}
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.mega-icon-container h2 {
+  font-size: 22px;
+  color: var(--ui-color-4);
+  font-family: 'Kaisei Decol', serif;
+  margin-top: 10px;
+}
+
+.card-content { padding: 0 10px 15px; position: relative; z-index: 1; }
+
+.card-content h3 {
+  font-size: 18px;
+  color: var(--ui-color-4);
+  margin: 12px 0 6px;
+  border-bottom: 2px dotted var(--ui-color-6);
+  padding-bottom: 3px;
+}
+
+/* バッジ */
+.tool-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, var(--ui-color-1), var(--ui-color-2));
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 15px;
+  font-weight: bold;
+  margin: 2px 4px 8px 0;
+  box-shadow: 2px 2px 6px rgba(6,78,59,0.28);
+}
+
+.tool-badge.solo { background: linear-gradient(135deg, var(--ui-color-6), var(--ui-color-1)); }
+.tool-badge.duo  { background: linear-gradient(135deg, var(--ui-color-5), var(--ui-color-2)); }
+
+/* リスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: var(--ui-color-4);
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-1);
+  min-width: 16px;
+  margin-top: 4px;
+}
+
+/* タグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.keyword-tag.char { background-color: #A7F3D0; color: #065F46; }
+.keyword-tag.lite { background-color: #D1FAE5; color: #065F46; }
+.keyword-tag.gray { background-color: #EFFCF5; color: #065F46; }
+.keyword-tag.dark { background-color: var(--ui-color-2); color: #D1FAE5; }
+
+/* 強調（マーカー風） */
+.highlight {
+  background: linear-gradient(transparent 55%, rgba(110,231,183,0.70) 55%);
+  font-weight: bold;
+  padding: 0 2px;
+}
+
+/* 数値・固有名ハイライト */
+.big-point {
+  font-size: 26px;
+  font-weight: bold;
+  color: var(--ui-color-5);
+  font-family: 'Kaisei Decol', serif;
+}
+
+/* フロー図 */
+.tree-flow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+
+.tree-flow .node {
+  background: var(--ui-color-3);
+  border: 2px solid var(--ui-color-4);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-weight: bold;
+  color: var(--ui-color-4);
+}
+
+.tree-flow .node.hot {
+  background: #A7F3D0;
+  border-color: var(--ui-color-1);
+  color: var(--ui-color-2);
+}
+
+.tree-flow i { color: var(--ui-color-1); }
+
+/* ===== 吹き出し ===== */
+.speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.1);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #D9FBEA;
+  border-color: var(--ui-color-5);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after { border-color: var(--ui-color-5) transparent; }
+
+.speech-bubble.variant-2 {
+  background: #B9F5DC;
+  border-color: var(--ui-color-2);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after { border-color: var(--ui-color-2) transparent; }
+
+.speech-bubble.variant-3 {
+  background: #E4FBF1;
+  border-color: var(--ui-color-6);
+  transform: rotate(1.5deg);
+}
+
+.speech-bubble.variant-3::after { border-color: var(--ui-color-6) transparent; }
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #065F46;
+}
+
+/* コードプレビュー */
+pre {
+  background: #064E3B;
+  color: #D1FAE5;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: ui-monospace, 'M PLUS Rounded 1c', monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+pre .c { color: #6EE7B7; }
+pre .h { color: #A7F3D0; font-weight: bold; }
+
+/* ===== アニメーション ===== */
+@keyframes fadeInScale {
+  0% { opacity: 0; transform: scale(0.9) translateY(20px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.fade-in-scale { animation: fadeInScale 0.8s ease both; }
+
+.d1 { animation-delay: 0.1s; }
+.d2 { animation-delay: 0.2s; }
+.d3 { animation-delay: 0.3s; }
+.d4 { animation-delay: 0.4s; }
+
+@keyframes highlightPulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(16,185,129,0); }
+  50% { box-shadow: 0 0 14px rgba(16,185,129,0.55); }
+}
+
+.pulse-tag { animation: highlightPulse 2.5s infinite; border-radius: 5px; }
+
+/* ===== フッター ===== */
+.main-footer {
+  margin-top: 50px;
+  padding: 25px 20px 40px;
+  text-align: center;
+  border-top: 3px double var(--ui-color-6);
+  font-size: 14px;
+  color: #4F8A6E;
+}
+
+.main-footer a { color: var(--ui-color-1); }
+
+.main-footer .footer-note {
+  font-family: 'Yomogi', cursive;
+  margin-top: 8px;
+  color: var(--ui-color-5);
+}
+
+/* ===== レスポンシブ ===== */
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px)  { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100% !important; min-width: auto; max-width: none; }
+  .main-header h1 { font-size: 26px; }
+  .section-title-band h2 { font-size: 20px; }
+  .mega-icon-container h2 { font-size: 19px; }
+}
+</style>
+</head>
+<body>
+<div class="page-container">
+
+  <!-- ================= ヘッダー ================= -->
+  <header class="main-header">
+    <div class="header-icons">
+      <i class="fa-solid fa-seedling fa-7x" style="color: var(--ui-color-1); animation: fa-beat 3s infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-computer fa-5x" style="color: var(--ui-color-6); animation: fa-flip 6s infinite;" aria-hidden="true"></i>
+    </div>
+    <h1>ローカル画像モデル「Qwen-Image-2.1」徹底解説</h1>
+    <p class="subtitle">〜軽くて日本語も対応・自分のMacで動く画像生成AI。7Bへの小型化と実機ベンチマーク、日本語出力の真実まで〜</p>
+    <p class="date-info"><i class="fa-regular fa-calendar"></i> 2026年9月21日公開 ｜ まさおAIじっくり解説ch ｜ <a href="https://www.youtube.com/watch?v=weT_XmfhbWc" target="_blank" rel="noopener" style="color: var(--ui-color-1);">元動画を見る</a></p>
+  </header>
+
+  <!-- ================= モデル概要 ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-leaf fa-2x" aria-hidden="true"></i>
+    <h2>Qwen-Image-2.1とは何か</h2>
+    <span class="band-step">OVERVIEW</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-no">01</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-seedling fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s infinite;" aria-hidden="true"></i>
+        <h2>①ローカルで動く画像生成AI登場</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">Qwen-Image-2.1</span><span class="tool-badge solo">ローカル実行</span><span class="tool-badge duo">画像生成AI</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>2026年9月20日に公開された<span class="highlight">自分のローカルマシンで動く画像生成AI</span>。アリババのQwenチームが開発しました</li>
+          <li><i class="fa-solid fa-fire"></i>公開直後から大きな注目を集め、解説者自身も実際にMacで動かして<span class="highlight">使い勝手を検証</span></li>
+          <li><i class="fa-solid fa-scale-balanced"></i>GPTイメージ2.5のような最強級のクラウドモデルには及ばないものの、<b>ローカルで動く＋一定のクオリティ</b>という組み合わせが強力</li>
+          <li><i class="fa-solid fa-comment-dots"></i>使い心地は少し前の<span class="keyword-tag char">ナノバナナ</span>くらいのノリで使っていけそう、というのが第一印象</li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <p class="handwritten">ローカルでこれだけできたら十分。環境によってはクラウドが使えない場面もあるので、手元で動くのはやっぱり強い！</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card alt fade-in-scale d1">
+      <span class="card-no">02</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-compress fa-5x" style="color: var(--ui-color-6);" aria-hidden="true"></i>
+        <h2>②20B→7Bへの劇的小型化</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">パラメータ1/3</span><span class="tool-badge duo">ファイルも軽量化</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-down-wide-short"></i>パラメータ数が従来の<span class="big-point">20B</span>から<span class="big-point">7B</span>へ。<span class="highlight">ちょうど1/3のサイズ</span>になりました</li>
+          <li><i class="fa-solid fa-file-arrow-down"></i>ファイルサイズも<span class="keyword-tag char">約40GB</span>から<span class="keyword-tag char">約14.2GB</span>に縮小。ダウンロードと保管のハードルが大きく下がりました</li>
+          <li><i class="fa-solid fa-arrow-trend-up"></i>小さくなったにもかかわらず<b>性能はむしろ伸びている</b>のがポイント。通常は小型化と品質はトレードオフになりがちです</li>
+          <li><i class="fa-solid fa-house-computer"></i>7Bなら<span class="highlight">普段使いのパソコンでも動かせる</span>サイズ感で、ローカル運用の現実味が一気に高まりました</li>
+        </ul>
+        <div class="tree-flow">
+          <span class="node">20B / 約40GB</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="node hot">7B / 約14.2GB</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="node">性能は向上</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card cy fade-in-scale d1">
+      <span class="card-no">03</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>③1つのモデルで「作る」と「直す」</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">生成＋編集</span><span class="tool-badge solo">参照画像10枚</span><span class="tool-badge duo">背景透過OK</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i><span class="highlight">単一モデルで画像生成も画像編集もこなす</span>のが大きな特徴です</li>
+          <li><i class="fa-solid fa-keyboard"></i>文章からの生成（テキストから画像）はもちろん、画像を渡して「ここを直して」と指示する編集にも対応</li>
+          <li><i class="fa-solid fa-images"></i>参照画像は<span class="big-point">10</span>枚まで同時に渡せます。キャラクターの一致や複数素材の合成に使えます</li>
+          <li><i class="fa-solid fa-layer-group"></i><b>背景を透かした画像をそのまま出力</b>できるのも特徴。素材作成がそのままできてしまいます</li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <p class="handwritten">生成・編集・参照・透過出力が1つのモデルに凝縮。ローカルでこれだけできるのは本当に強力です。</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= できること ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-image fa-2x" aria-hidden="true"></i>
+    <h2>実際にできること</h2>
+    <span class="band-step">CAPABILITIES</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード4 -->
+    <div class="section-card soft fade-in-scale">
+      <span class="card-no">04</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-object-group fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>④背景透過画像をそのまま出力</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">透明背景</span><span class="tool-badge duo">素材直叩き</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>公式から<span class="highlight">背景が透けた画像のサンプル</span>が共有されており、出力品質を確認できます</li>
+          <li><i class="fa-solid fa-scissors"></i>透過画像は<b>そのまま制作素材として使える</b>クオリティ。切り抜き作業が不要になります</li>
+          <li><i class="fa-solid fa-lightbulb"></i>クラウドの最先端モデルで当たり前になりつつある機能が、<b>ローカルモデルでも使える</b>ようになった意味は大きい</li>
+          <li><i class="fa-solid fa-thumbs-up"></i>解説者も「これは素材に使えそう」と即断。実用性の高さを評価しています</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale d1">
+      <span class="card-no">05</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comment-pen fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>⑤言葉で指示して画像を編集</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">画像＋文章指示</span><span class="tool-badge solo">実演あり</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>画像を渡して文章で修正を指示すると、その通りに編集してくれます</li>
+          <li><i class="fa-solid fa-mug-hot"></i>実演例：<span class="highlight">「背景を木の机と朝の光に変えて」</span>と頼むと、雰囲気ごと差し替えた画像を生成</li>
+          <li><i class="fa-solid fa-user-pen"></i>この編集サンプルは解説者自身のMacでの生成物。世代感は少し古いものの<b>そこそこのクオリティ</b>を出せます</li>
+          <li><i class="fa-solid fa-scale-unbalanced"></i>GPTイメージ2.5と比べると見劣りする場面はあるものの、<span class="keyword-tag lite">ローカル完結</span>を考えれば十分な水準</li>
+        </ul>
+        <div class="tree-flow">
+          <span class="node">元画像</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="node hot">「木の机と朝の光に」</span>
+          <i class="fa-solid fa-arrow-right"></i>
+          <span class="node">編集後画像</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card alt fade-in-scale d1">
+      <span class="card-no">06</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-couch fa-5x" style="color: var(--ui-color-6);" aria-hidden="true"></i>
+        <h2>⑥複数参照を1枚に合成</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">複数キャラ参照</span><span class="tool-badge duo">家具→部屋</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-people-arrows"></i>複数のキャラクターや人物を参照画像として渡し、<span class="highlight">1枚の画像にまとめる</span>ことができます</li>
+          <li><i class="fa-solid fa-chair"></i>家具の画像を<b>10枚ほど準備して1つの部屋に配置する</b>といった使い方も可能</li>
+          <li><i class="fa-solid fa-clock-rotate-left"></i>他の画像生成AIでも昔からある手法ですが、ローカルモデルでここまでできるようになりました</li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i>注意点：解説者が3〜4枚渡した検証では、<b>後ろの参照画像の影響で人物の色味や顔が別人になってしまう</b>ケースもありました</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card cy fade-in-scale d1">
+      <span class="card-no">07</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brush fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>⑦囲んで直す・塗って足す部分編集</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">範囲指定編集</span><span class="tool-badge duo">マスク指示</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-highlighter"></i>公式の見本では、<span class="highlight">直したい場所を囲んで指示すると上手く直る</span>使い方が示されています</li>
+          <li><i class="fa-solid fa-person-circle-plus"></i><b>「塗った場所にキャラクターを足して」</b>のような指示でも、指定領域に要素を追加できます</li>
+          <li><i class="fa-solid fa-list-ol"></i>画像は<span class="big-point">40</span>ステップに分けて少しずつ仕上げていく仕組み。このステップ数が後述の生成時間の前提になります</li>
+          <li><i class="fa-solid fa-gauge"></i>ステップを減らすと<b>早くなる代わりに仕上がりが荒くなる</b>ため、速度と品質のバランスで調整できます</li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <p class="handwritten">「囲んで直す」「塗って足す」ができると修正の粒度が細かくなる。実作業に近い編集の進め方ができるのが嬉しい！</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 実機ベンチマーク ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-microchip fa-2x" aria-hidden="true"></i>
+    <h2>Mac実機ベンチマーク</h2>
+    <span class="band-step">REAL MACHINE TEST</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-no">08</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-desktop fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>⑧M4 Max Studio 128GBで検証</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">Mac Studio</span><span class="tool-badge solo">M4 Max / 128GB</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-stopwatch"></i>1枚あたり<span class="big-point">約3分</span>で生成。実用的な速度で画像を作り続けられました</li>
+          <li><i class="fa-solid fa-memory"></i>生成中のメモリ使用量のピークは<span class="keyword-tag char">30〜38GB</span>。統合メモリに収まらないと動かないため、参考数値として重要</li>
+          <li><i class="fa-solid fa-toolbox"></i>Mac向けのMLX系ツール経由で動かして検証。環境さえ整えば<span class="highlight">手元のMacで完結</span>します</li>
+          <li><i class="fa-solid fa-circle-check"></i>この速度なら複数枚のパターン検討も現実的で、<b>実作業に組み込める水準</b>と言えます</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card alt fade-in-scale d1">
+      <span class="card-no">09</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-computer fa-5x" style="color: var(--ui-color-6);" aria-hidden="true"></i>
+        <h2>⑨M4 Mac mini 32GBでも動く</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">Mac mini</span><span class="tool-badge duo">M4 / 32GB</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>32GBのM4でも動作自体は成功。<span class="highlight">一般的なスペックのマシンでも起動できる</span>ことが分かりました</li>
+          <li><i class="fa-solid fa-hourglass-half"></i>ただし1枚あたり<span class="big-point">約14分半</span>と非常に時間がかかります</li>
+          <li><i class="fa-solid fa-memory"></i>メモリのピークは<b>19.6GB</b>。ギリギリ収まっている状態で、余裕のあるスペックが求められます</li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i>何枚も連発する用途には使いにくい速度。<b>乱発・量産するなら上位スペックかクラウド</b>が現実的です</li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <p class="handwritten">「動く」と「快適」の間には大きな差がある。32GBでも動いたけど、本気で使うなら空きメモリの余裕が欲しいところ。</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card soft fade-in-scale d1">
+      <span class="card-no">10</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-unbalanced-flip fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>⑩量子化：メモリ削減の代償</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">8bit / 4bit</span><span class="tool-badge duo">画質トレードオフ</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>量子化によりメモリ峰值を削減できます。<span class="keyword-tag char">8bit: 約24GB</span><span class="keyword-tag lite">4bit: 約20GB</span></li>
+          <li><i class="fa-solid fa-stopwatch-20"></i>メモリは減らせても<b>生成時間はほとんど変わりません</b>。速度目的の量子化は効果が薄いです</li>
+          <li><i class="fa-solid fa-image-polaroid"></i>一方で<span class="highlight">画質はやはり落ちる</span>。4bitでは文字が崩れるなど、品質低下が顕著に出ました</li>
+          <li><i class="fa-solid fa-filter"></i>使い分けの指針：<span class="keyword-tag gray">品質重視→圧縮なし</span><span class="keyword-tag gray">量産用途→4bitもあり</span>。こだわるコンテンツなら素のモデルかGPTイメージ2.5級を</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card cy fade-in-scale d1">
+      <span class="card-no">11</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-list-ol fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>⑪生成時間の前提「40ステップ」</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">拡散ステップ</span><span class="tool-badge solo">速度調整可</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>「1枚3分」という数値の前提は、<span class="highlight">デフォルトの40ステップ</span>で仕上げる設定です</li>
+          <li><i class="fa-solid fa-forward-fast"></i>ステップ数を減らすと<b>生成は早くなる</b>ものの、仕上がりが荒くなりやすい</li>
+          <li><i class="fa-solid fa-font"></i>特に<span class="keyword-tag char">文字が崩れやすい</span>傾向があり、画像内テキストを重視するならステップ数は削りすぎない方が安全</li>
+          <li><i class="fa-solid fa-sliders"></i>速度と品質を状況に応じて調整できる柔軟性は、<b>ローカルならではの利点</b>とも言えます</li>
+        </ul>
+        <pre><span class="c"># イメージ: ステップ数と速度・品質の関係</span>
+<span class="h">40ステップ</span> → 約3分/枚 ／ 仕上がり: 丁寧
+<span class="h">ステップ削減</span> → 高速化  ／ 仕上がり: 荒め・文字崩れリスク</pre>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 出力品質 ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-star fa-2x" aria-hidden="true"></i>
+    <h2>ジャンル別・出力品質の実態</h2>
+    <span class="band-step">QUALITY CHECK</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-no">12</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-camera-retro fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>⑫写真系はかなり強い</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">写真・実写系</span><span class="tool-badge duo">手も安定</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>写真っぽい表現は<span class="highlight">かなり強い</span>というのが実機検証の結論です</li>
+          <li><i class="fa-solid fa-user"></i>人物・商品・料理の生成は<b>普通に良い</b>水準。実務にも十分耐えられるクオリティ</li>
+          <li><i class="fa-solid fa-handshake"></i>崩れやすいとされる<span class="keyword-tag char">手の描写</span>も崩れず、<b>握手の構図を自然に</b>生成できました</li>
+          <li><i class="fa-solid fa-thumbs-up"></i>解説者評価は「写真みたいなのちょっと強いなと思いました」と、<span class="highlight">手放しで高評価</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card alt fade-in-scale d1">
+      <span class="card-no">13</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-palette fa-5x" style="color: var(--ui-color-6);" aria-hidden="true"></i>
+        <h2>⑬イラスト系も良好</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">イラスト</span><span class="tool-badge solo">ステッカー</span><span class="tool-badge duo">ピクセルアート</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>イラストも<span class="highlight">いい感じに作れている</span>との評価。アニメ調の表現もちゃんと成立します</li>
+          <li><i class="fa-solid fa-stamp"></i><b>ステッカー</b>や<b>ピクセルアート</b>も良い感じに生成できました</li>
+          <li><i class="fa-solid fa-magnifying-glass-plus"></i>ただし本気でこだわろうとすると限界もあり、<span class="keyword-tag lite">突き詰め系は世代の古さ</span>を感じる場面も</li>
+          <li><i class="fa-solid fa-eye"></i>素人の目線なら<span class="highlight">全く問題ない品質</span>。SNS素材や簡易イラストなら十分戦力になります</li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <p class="handwritten">写真・イラスト・ステッカー・ピクセルアートと守備範囲が広い。ジャンルを問わず「それなり以上」に出てくるのが7Bとは思えない！</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card cy fade-in-scale d1">
+      <span class="card-no">14</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-language fa-5x" style="color: var(--ui-color-5);" aria-hidden="true"></i>
+        <h2>⑭日本語出力：漢字と数字は強い</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">漢字OK</span><span class="tool-badge solo">数字・タイマーOK</span><span class="tool-badge duo">説明画像OK</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i><span class="highlight">漢字も書けますし、日本語にも結構対応</span>しています</li>
+          <li><i class="fa-solid fa-temperature-three-quarters"></i>実検証では<b>「お湯は92°」「30秒蒸す」</b>といった数字・温度の指示まで正しく描画できました</li>
+          <li><i class="fa-solid fa-book-open"></i><span class="keyword-tag char">説明画像</span>のような実用系の画像も、数字込みでちゃんと指示通りに生成可能</li>
+          <li><i class="fa-solid fa-comment"></i>漫画内の<b>短いセリフ</b>なら日本語でも上手くいきました。英語の短い文字列はほぼ完璧です</li>
+        </ul>
+        <div class="tree-flow">
+          <span class="node">漢字・数字</span>
+          <i class="fa-solid fa-thumbs-up"></i>
+          <span class="node hot">短いセリフ</span>
+          <i class="fa-solid fa-thumbs-up"></i>
+          <span class="node">長文・ひらがな</span>
+          <i class="fa-solid fa-triangle-exclamation"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード15 -->
+    <div class="section-card soft fade-in-scale d1">
+      <span class="card-no">15</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-font fa-5x" style="color: var(--ui-color-2);" aria-hidden="true"></i>
+        <h2>⑮文字の弱点：長文と詳細部</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">ひらがな化け</span><span class="tool-badge duo">看板・詳細文字</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span class="highlight">長い日本語は崩れがち</span>。ひらがなが少し化けることがありました</li>
+          <li><i class="fa-solid fa-sign-hanging"></i>看板のような<span class="keyword-tag lite">画像内の細かい文字</span>が入ると、完璧さはやや落ちます</li>
+          <li><i class="fa-solid fa-globe"></i>公式サンプルでも中国語の図鑑や英語のアプリ画面の一部が<b>崩れて表示</b>されていました</li>
+          <li><i class="fa-solid fa-ghost"></i><b>頼んでいない文字が湧いてしまう</b>現象も。「2C」「SC」など意味不明な文字列が発生することも</li>
+          <li><i class="fa-solid fa-diagram-project"></i>それらしい図は作ってくれるものの、<span class="highlight">メモリ容量など数値の中身が合っていない</span>ことがある点は要注意</li>
+        </ul>
+        <div class="speech-bubble variant-3">
+          <p class="handwritten">細部までこだわるなら GPTイメージ2.5 の力を借りたい。ほどほどの品質でローカル完結なら Qwen-Image-2.1、という使い分けが現実的。</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= 評価と展望 ================= -->
+  <div class="section-title-band">
+    <i class="fa-solid fa-chart-line fa-2x" aria-hidden="true"></i>
+    <h2>評価・ライセンス・今後の展望</h2>
+    <span class="band-step">EVALUATION</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <span class="card-no">16</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-contract fa-5x" style="color: var(--ui-color-1);" aria-hidden="true"></i>
+        <h2>⑯ライセンスと利用のルール</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">研究・評価は無償</span><span class="tool-badge duo">商用は別契約</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-flask"></i><span class="highlight">研究と評価目的の利用は無償</span>で行えます</li>
+          <li><i class="fa-solid fa-briefcase"></i><b>商用利用には別途契約が必要</b>。事業で使う場合はライセンス条件を必ず確認しましょう</li>
+          <li><i class="fa-solid fa-shield-halved"></i>ローカルで動くため<b>違反を止める技術的な仕組みはない</b>と明言されています</li>
+          <li><i class="fa-solid fa-user-shield"></i>Redditなどでもやり取りがあり、<span class="highlight">利用は自己責任</span>で運用する方針が示されています</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card alt fade-in-scale d1">
+      <span class="card-no">17</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-ranking-star fa-5x" style="color: var(--ui-color-6);" aria-hidden="true"></i>
+        <h2>⑰ベンチマーク上の立ち位置</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">海外の比較図</span><span class="tool-badge duo">クローズド超え</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-up"></i>Qwen自身が公開した採点テスト比較図では、<span class="highlight">ナノバナナ2やGPTイメージ1.5より少し上</span>の成績</li>
+          <li><i class="fa-solid fa-arrow-down"></i>Grok Imagen級の最上位グループと比べると<b>やや下</b>という位置づけです</li>
+          <li><i class="fa-solid fa-crown"></i>GPTイメージ2.5は<span class="keyword-tag dark">別格に強い</span>との評価。2の時点で既に高クオリティでした</li>
+          <li><i class="fa-solid fa-medal"></i>それでも<span class="highlight">大半のクローズドモデルを上回っており</span>、7Bとしては上位の成績。Redditでは「7Bでこれは上出来」と辛口評価の中にも好意的な声も</li>
+        </ul>
+        <div class="tree-flow">
+          <span class="node hot">GPTイメージ2.5 / Grok系</span>
+          <i class="fa-solid fa-arrow-down"></i>
+          <span class="node">Qwen-Image-2.1</span>
+          <i class="fa-solid fa-arrow-down"></i>
+          <span class="node">ナノバナナ2 / GPTイメージ1.5</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card cy fade-in-scale d2">
+      <span class="card-no">18</span>
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-seedling fa-5x" style="color: var(--ui-color-5); animation: fa-beat 3s infinite;" aria-hidden="true"></i>
+        <h2>⑱まとめ：ローカル勢の台頭</h2>
+      </div>
+      <div class="card-content">
+        <span class="tool-badge">ローカル完結</span><span class="tool-badge solo">次バージョンに期待</span>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i>今後の<span class="highlight">Qwen-Image-2.3や2.5がGPTイメージ2級に到達したら</span>、個人的な品質ラインを満たす見通し</li>
+          <li><i class="fa-solid fa-photo-film-music"></i>MiniMaxなども含め、<b>動画・画像・音声の各分野でローカル動作モデルが登場</b>。ローカル完結のコンテンツ制作が増えています</li>
+          <li><i class="fa-solid fa-cloud-arrow-down"></i>クラウドが使えない環境・ライセンス上の制約がある場面で、<span class="highlight">ローカルはいよいよ実戦力に</span></li>
+          <li><i class="fa-solid fa-rocket"></i>24時間動かせる環境が揃う時代。<b>ローカルで実験したい人には試す価値大</b>。ローカルは今後も勢いがある、と総括でした</li>
+        </ul>
+        <div class="speech-bubble right variant-2">
+          <p class="handwritten">「ほどほどの品質＋ローカルで動く」が強力な武器になる。量産系は4bit量子化、こだわり系はクラウドと使い分けるのが今の最適解！</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================= フッター ================= -->
+  <footer class="main-footer">
+    <p><i class="fa-brands fa-youtube"></i> 出典: <a href="https://www.youtube.com/watch?v=weT_XmfhbWc" target="_blank" rel="noopener">【これは良い】ローカル画像モデル『Qwen-Image-2.1』が軽くて日本語も対応してて質が高いので解説します！</a>（まさおAIじっくり解説ch）</p>
+    <p>このインフォグラフィックは動画内容を要約・整理したものです。モデルの仕様・ライセンス条件は公式の発表をご参照ください。</p>
+    <p class="footer-note">2026年9月21日作成 ｜ Qwen-Image-2.1 ローカル画像モデル解説</p>
+  </footer>
+
+</div>
+</body>
+</html>

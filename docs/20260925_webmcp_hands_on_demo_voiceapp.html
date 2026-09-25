@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【実演あり】WebMCPを触ってみた。AIが表示中のWebページと直接通信 要約</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  /* 独自テーマ: フォレストグリーン × ライムイエロー 〜深い森に差し込む若葉の光〜 */
+  --ui-color-1: #2D6A4F;   /* フォレストグリーン: メイン */
+  --ui-color-2: #1B4332;   /* ディープフォレスト: 見出し・濃色 */
+  --ui-color-3: #E4F2C9;   /* ライムイエロー淡: タグ背景 */
+  --ui-color-4: #14301F;   /* 森のインク: テキスト */
+  --ui-color-5: #559A2E;   /* 若葉ライムグリーン: 強調 */
+  --ui-color-6: #95D5B2;   /* ミントリーフ: サブ */
+  --lime-bright: #C6E838;  /* ライムイエロー: ハイライト */
+  --lime-soft: #F2F8DE;    /* ライムクリーム: 吹き出し背景 */
+  --mint-soft: #E6F4EA;    /* ミントホワイト: 吹き出し背景2 */
+  --bg-canvas: #F7FBF1;    /* 森あふれる白緑キャンバス */
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(circle at 10% 4%, rgba(45,106,79,0.12) 0%, transparent 42%),
+    radial-gradient(circle at 90% 96%, rgba(198,232,56,0.16) 0%, transparent 44%),
+    radial-gradient(circle at 50% 50%, rgba(149,213,178,0.07) 0%, transparent 50%);
+  color: var(--ui-color-4);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  line-height: 1.6;
+}
+
+.page-container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ===== ヘッダー ===== */
+.main-header {
+  text-align: center;
+  padding: 44px 20px 30px;
+  position: relative;
+}
+
+.main-header .header-icons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 34px;
+  margin-bottom: 15px;
+}
+
+.main-header h1 {
+  font-size: 36px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.main-header .subtitle {
+  font-size: 19px;
+  color: var(--ui-color-5);
+  margin-top: 10px;
+  font-family: 'Yomogi', cursive;
+}
+
+.main-header .date-info {
+  font-size: 14px;
+  color: #6F8F6B;
+  margin-top: 12px;
+}
+
+/* ===== セクション帯 ===== */
+.section-title-band {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 38px 10px 15px;
+  padding: 8px 18px;
+  background: linear-gradient(90deg, rgba(45,106,79,0.18), rgba(198,232,56,0.22));
+  border-left: 8px solid var(--ui-color-1);
+  border-radius: 0 12px 12px 0;
+  flex-wrap: wrap;
+}
+
+.section-title-band h2 {
+  font-size: 26px;
+  color: var(--ui-color-2);
+  font-family: 'Kaisei Decol', serif;
+}
+
+.section-title-band i {
+  color: var(--ui-color-5);
+}
+
+.section-title-band .band-step {
+  margin-left: auto;
+  background: var(--ui-color-2);
+  color: var(--lime-bright);
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 2px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-family: 'Zen Kurenaido', sans-serif;
+}
+
+/* ===== レイアウト ===== */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  padding: 5px;
+}
+
+/* ===== カード ===== */
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: #FFFFFF;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(27,67,50,0.14);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, background-color 0.25s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-5px) rotate(-0.4deg);
+  box-shadow: 8px 10px 22px rgba(27,67,50,0.22);
+  background-color: #FCFEF8;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-5); }
+.section-card:nth-child(3n) { border-top-color: var(--lime-bright); }
+
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 8px;
+}
+
+.mega-icon-container h3 {
+  font-size: 24px;
+  color: var(--ui-color-2);
+  margin-top: 10px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.mega-icon-container .card-badge {
+  display: inline-block;
+  background: var(--ui-color-2);
+  color: var(--lime-bright);
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  margin-bottom: 8px;
+  font-family: 'Zen Kurenaido', sans-serif;
+}
+
+.card-content { padding: 0 10px 15px; }
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-5);
+  min-width: 16px;
+}
+
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 15px;
+}
+
+.keyword-tag.lime {
+  background-color: var(--lime-bright);
+  color: var(--ui-color-2);
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #FFFFFF;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(27,67,50,0.15);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: var(--lime-soft);
+  border-color: var(--ui-color-5);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: var(--mint-soft);
+  border-color: var(--ui-color-2);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--ui-color-4);
+}
+
+/* コードプレビュー */
+pre {
+  background: #F0F6E4;
+  border-left: 5px solid var(--ui-color-5);
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  color: var(--ui-color-2);
+  line-height: 1.45;
+}
+
+code.inline {
+  background: var(--ui-color-3);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 14px;
+  font-family: ui-monospace, Consolas, monospace;
+  color: var(--ui-color-2);
+}
+
+/* 区切り矢印 */
+.flow-arrow {
+  text-align: center;
+  color: var(--ui-color-5);
+  font-size: 28px;
+  margin: 6px 0;
+}
+
+/* アニメーション */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9) translateY(18px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.fade-in-scale { animation: fadeInScale 0.6s ease-out both; }
+
+.card-content i.fa-beat { animation: fa-beat 2.5s infinite; }
+
+/* フッター */
+.main-footer {
+  margin: 46px auto 20px;
+  padding: 22px 26px;
+  background: linear-gradient(135deg, rgba(45,106,79,0.12), rgba(198,232,56,0.18));
+  border: 3px dashed var(--ui-color-1);
+  border-radius: 20px;
+  text-align: center;
+  font-size: 15px;
+  color: var(--ui-color-4);
+}
+
+.main-footer .footer-title {
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--ui-color-2);
+  margin-bottom: 10px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+.main-footer a { color: var(--ui-color-1); font-weight: bold; }
+.main-footer .footer-sub { font-size: 13px; color: #6F8F6B; margin-top: 8px; }
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px)  { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+  .main-header h1 { font-size: 28px; }
+}
+</style>
+</head>
+<body>
+<div class="page-container">
+
+  <!-- ===== ヘッダー ===== -->
+  <header class="main-header">
+    <div class="header-icons">
+      <i class="fa-solid fa-globe fa-4x" style="color: var(--ui-color-1); animation: fa-spin 14s linear infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-robot fa-6x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+      <i class="fa-solid fa-plug-circle-bolt fa-4x" style="color: var(--ui-color-5); animation: fa-beat-fade 3s infinite;" aria-hidden="true"></i>
+    </div>
+    <h1>【実演あり】WebMCPを触ってみた。<br>AIが表示中のWebページと直接通信</h1>
+    <p class="subtitle">〜WebサイトがAIエージェントに機能を「公開」する新時代〜</p>
+    <p class="date-info"><i class="fa-regular fa-calendar-check fa-lg" aria-hidden="true"></i> 2026年9月25日公開 &nbsp;|&nbsp; ギリギリ開発会議 by ボイスアップラボ</p>
+  </header>
+
+  <!-- ===== セクション1: WebMCPの世界へ ===== -->
+  <div class="section-title-band fade-in-scale">
+    <i class="fa-solid fa-seedling fa-2x" aria-hidden="true"></i>
+    <h2>セクション1: WebMCPの世界へ</h2>
+    <span class="band-step">カード 1-5</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">OVERVIEW</span>
+        <i class="fa-solid fa-play fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.4s infinite;" aria-hidden="true"></i>
+        <h3>動画概要: WebMCPを実際に動かす</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info fa-lg" aria-hidden="true"></i><span>テーマ: WebサイトがAIエージェントに機能を公開する <span class="keyword-tag lime">WebMCP</span></span></li>
+          <li><i class="fa-solid fa-person-running fa-lg" aria-hidden="true"></i><span>座学ではなく <span class="keyword-tag">実際に動かす実演</span> 中心の構成</span></li>
+          <li><i class="fa-solid fa-microphone-lines fa-lg" aria-hidden="true"></i><span>チャンネル: ギリギリ開発会議 by ボイスアップラボ</span></li>
+          <li><i class="fa-solid fa-tags fa-lg" aria-hidden="true"></i><span>タグ: #WebMCP #MCP #AIエージェント #ChatGPT #ブラウザ #Web開発</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 「触ってみた」系動画なので、<br>仕様の解説だけでなく <span class="keyword-tag">動かしている様子</span> が見どころ!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">CONCEPT</span>
+        <i class="fa-solid fa-globe fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3.2s infinite;" aria-hidden="true"></i>
+        <h3>WebMCPとは何か</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-book-open fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Web + MCP</span> を組み合わせた造語的な概念</span></li>
+          <li><i class="fa-solid fa-server fa-lg" aria-hidden="true"></i><span>Webサイトそのものが <span class="keyword-tag lime">MCPサーバー</span> として振る舞う</span></li>
+          <li><i class="fa-solid fa-bullhorn fa-lg" aria-hidden="true"></i><span>サイトが自らの機能をAIに「公開」する発想の転換</span></li>
+          <li><i class="fa-solid fa-wrench fa-lg" aria-hidden="true"></i><span>公開するもの: 検索・操作・データ取得などの <span class="keyword-tag">サイト機能</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1 right">
+          <span class="handwritten"><i class="fa-solid fa-arrows-rotate fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 従来は「AIがサイトを使う」だったが、<br>WebMCPでは「サイトがAIに奉仕する」…ではなく<br><span class="keyword-tag">対等なインターフェース</span>を提供する!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">BEFORE</span>
+        <i class="fa-solid fa-computer-mouse fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.8s infinite;" aria-hidden="true"></i>
+        <h3>従来の常識: AIは画面を「操作」する</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hand-pointer fa-lg" aria-hidden="true"></i><span>AIエージェントは <span class="keyword-tag">UI自動操作</span> でクリック・入力を代行</span></li>
+          <li><i class="fa-solid fa-camera fa-lg" aria-hidden="true"></i><span>スクリーンショット認識や <span class="keyword-tag">DOM読み取り</span> で画面を推測</span></li>
+          <li><i class="fa-solid fa-hourglass-half fa-lg" aria-hidden="true"></i><span>課題: 操作が <span class="keyword-tag">遅い</span> ・デザイン変更で <span class="keyword-tag">壊れやすい</span></span></li>
+          <li><i class="fa-solid fa-eye-slash fa-lg" aria-hidden="true"></i><span>人間向けUIを経由するため <span class="keyword-tag">無駄なコスト</span> が発生</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten"><i class="fa-solid fa-triangle-exclamation fa-lg" style="color: var(--ui-color-2);" aria-hidden="true"></i> 「ボタンを探してクリック」の繰り返し…<br>AIにとっては <span class="keyword-tag">遠回りな通信</span> だった!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">SHIFT</span>
+        <i class="fa-solid fa-bolt fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2s infinite;" aria-hidden="true"></i>
+        <h3>パラダイム転換: 直接呼び出し</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-right fa-lg" aria-hidden="true"></i><span>画面操作 <span class="keyword-tag">経由</span> → 機能を <span class="keyword-tag lime">直接call</span></span></li>
+          <li><i class="fa-solid fa-window-maximize fa-lg" aria-hidden="true"></i><span>対象は <span class="keyword-tag">表示中のWebページ</span> — その場で完結</span></li>
+          <li><i class="fa-solid fa-gauge-high fa-lg" aria-hidden="true"></i><span>UI描画を待たないので <span class="keyword-tag">高速</span> かつ <span class="keyword-tag">安定</span></span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg" aria-hidden="true"></i><span>Webページが <span class="keyword-tag">AI向けAPI</span> を内蔵する形に進化</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 人間用UIとAI用IFの <span class="keyword-tag">二重化</span>!<br>ページが「喋る」時代の幕開け⚡</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">BASE</span>
+        <i class="fa-solid fa-sitemap fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.6s infinite;" aria-hidden="true"></i>
+        <h3>前提知識: MCPとは</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Model Context Protocol</span> の略</span></li>
+          <li><i class="fa-solid fa-handshake fa-lg" aria-hidden="true"></i><span>AIと外部ツールを繋ぐ <span class="keyword-tag lime">共通プロトコル</span></span></li>
+          <li><i class="fa-solid fa-cubes fa-lg" aria-hidden="true"></i><span>主な公開対象: <span class="keyword-tag">Tools</span> <span class="keyword-tag">Resources</span> <span class="keyword-tag">Prompts</span></span></li>
+          <li><i class="fa-solid fa-desktop fa-lg" aria-hidden="true"></i><span>従来のMCPサーバーはローカルアプリやAPI側に設置</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-circle-question fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> このMCPを <span class="keyword-tag">Webブラウザ内</span> に持ち込むのがWebMCP!<br>USBケーブルではなくWeb標準で接続するイメージ🔌</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"><i class="fa-solid fa-angles-down fa-beat" aria-hidden="true"></i></div>
+
+  <!-- ===== セクション2: 仕組みを分解 ===== -->
+  <div class="section-title-band fade-in-scale">
+    <i class="fa-solid fa-gears fa-2x" aria-hidden="true"></i>
+    <h2>セクション2: 仕組みを分解</h2>
+    <span class="band-step">カード 6-10</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">CORE TECH</span>
+        <i class="fa-solid fa-envelope-circle-check fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.2s infinite;" aria-hidden="true"></i>
+        <h3>中核技術: MCP over window.postMessage</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code fa-lg" aria-hidden="true"></i><span>WebMCP提案の核心は <span class="keyword-tag lime">postMessage</span> によるMCP通信</span></li>
+          <li><i class="fa-solid fa-window-restore fa-lg" aria-hidden="true"></i><span>ブラウザ標準APIのみで実現 — <span class="keyword-tag">特別な拡張不要</span></span></li>
+          <li><i class="fa-solid fa-route fa-lg" aria-hidden="true"></i><span>AIクライアント ↔ iframe内サーバー間で <span class="keyword-tag">双方向メッセージ</span></span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg" aria-hidden="true"></i><span>既存のオリジン分離モデルを <span class="keyword-tag">そのまま活用</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);" aria-hidden="true"></i> 新しい通信路を作らず、<br><span class="keyword-tag">30年物のWebの土台</span>の上に築くのがミソ!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">PROTOCOL</span>
+        <i class="fa-solid fa-file-code fa-5x" style="color: var(--ui-color-1); animation: fa-beat 3s infinite;" aria-hidden="true"></i>
+        <h3>メッセージ形式: JSON-RPC 2.0</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-brackets-curly fa-lg" aria-hidden="true"></i><span>MCPのメッセージは <span class="keyword-tag">JSON-RPC 2.0</span> 形式</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg" aria-hidden="true"></i><span>主要メソッド: <code class="inline">initialize</code> → <code class="inline">tools/list</code> → <code class="inline">tools/call</code></span></li>
+          <li><i class="fa-solid fa-arrows-left-right fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">Request</span> / <span class="keyword-tag">Response</span> / <span class="keyword-tag">Notification</span> の3種</span></li>
+        </ul>
+<pre>{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "searchProducts",
+    "arguments": { "query": "..." }
+  }
+}</pre>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> まず <span class="keyword-tag">initialize</span> で握手してから<br>ツール一覧を取得 → 呼び出し、という流れ🤝</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">SERVER SIDE</span>
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-5); animation: fa-flip 2.8s infinite;" aria-hidden="true"></i>
+        <h3>WebMCPサーバー: iframeで埋め込む</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-window-restore fa-lg" aria-hidden="true"></i><span>サイトはWebMCPサーバー実装ページを <span class="keyword-tag lime">非表示iframe</span> で読み込む</span></li>
+          <li><i class="fa-solid fa-store fa-lg" aria-hidden="true"></i><span>サーバーはツール群を定義して <span class="keyword-tag">待機</span></span></li>
+          <li><i class="fa-solid fa-inbox fa-lg" aria-hidden="true"></i><span>親ページ側は <span class="keyword-tag">WebMCPクライアント</span> を設置</span></li>
+          <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>配布形態: <span class="keyword-tag">スクリプト埋め込み</span> で既存サイトに追加可能</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten"><i class="fa-solid fa-eye-slash fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> iframeは <span class="keyword-tag">見えないところ</span> で待機。<br>人間の画面は今まで通り、裏でAI用の窓口が開く🚪</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">CLIENT SIDE</span>
+        <i class="fa-solid fa-robot fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.4s infinite;" aria-hidden="true"></i>
+        <h3>AIエージェント側: クライアントの役割</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass fa-lg" aria-hidden="true"></i><span>ページ訪問時に <span class="keyword-tag">ツール一覧を発見</span></span></li>
+          <li><i class="fa-solid fa-language fa-lg" aria-hidden="true"></i><span>ツール名・説明文を読んで <span class="keyword-tag">使い方を推論</span></span></li>
+          <li><i class="fa-solid fa-paper-plane fa-lg" aria-hidden="true"></i><span>必要になったら <span class="keyword-tag lime">tools/call</span> で直接実行</span></li>
+          <li><i class="fa-solid fa-comments fa-lg" aria-hidden="true"></i><span>結果を受け取り、会話やタスクに <span class="keyword-tag">即反映</span></span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> AIから見るとWeb全体が<br><span class="keyword-tag">巨大な工具箱</span>に見える未来🧰</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">SECURITY</span>
+        <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3.1s infinite;" aria-hidden="true"></i>
+        <h3>セキュリティ: 権限と同意</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-shield fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">ユーザーの同意</span> なく勝手にツールは実行されない設計</span></li>
+          <li><i class="fa-solid fa-fingerprint fa-lg" aria-hidden="true"></i><span>postMessageの <span class="keyword-tag">オリジン検証</span> が第一防御線</span></li>
+          <li><i class="fa-solid fa-scale-balanced fa-lg" aria-hidden="true"></i><span>iframeの <span class="keyword-tag">サンドボックス</span> 権限設計と併用</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation fa-lg" aria-hidden="true"></i><span>悪意あるツール公開・なりすまし対策が <span class="keyword-tag">標準化の論点</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);" aria-hidden="true"></i> 「AIが勝手に課金ボタンを押す」を防ぐには<br><span class="keyword-tag">同意フローの設計</span>が鍵🔑</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"><i class="fa-solid fa-angles-down fa-beat" aria-hidden="true"></i></div>
+
+  <!-- ===== セクション3: 実演と最新動向 ===== -->
+  <div class="section-title-band fade-in-scale">
+    <i class="fa-solid fa-tower-broadcast fa-2x" aria-hidden="true"></i>
+    <h2>セクション3: 実演と最新動向</h2>
+    <span class="band-step">カード 11-14</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード11 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">DEMO</span>
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-5); animation: fa-beat-fade 2.2s infinite;" aria-hidden="true"></i>
+        <h3>実演: 画面操作なしで機能が動く</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-eye fa-lg" aria-hidden="true"></i><span>説明欄によれば <span class="keyword-tag">画面を操作せず</span> AIがサイトの機能を直接呼ぶ様子を実演</span></li>
+          <li><i class="fa-solid fa-hand fa-lg" aria-hidden="true"></i><span>クリックや入力の代わりに <span class="keyword-tag lime">ツール呼び出し</span> で完結</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>「頼んだら勝手に処理が進む」<span class="keyword-tag">エージェント体験</span></span></li>
+          <li><i class="fa-solid fa-vial fa-lg" aria-hidden="true"></i><span>触ってみて分かる <span class="keyword-tag">リアルな所感</span> も動画の見どころと報じられています</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-clapperboard fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 実演シーンはぜひ <span class="keyword-tag">動画本体</span> で!<br>文字で伝えにくい「動く様子」が核心🎬</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">TIMELINE</span>
+        <i class="fa-solid fa-flag-checkered fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h3>衝撃: Googleより先にOpenAIが対応</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt-lightning fa-lg" aria-hidden="true"></i><span>説明欄: <span class="keyword-tag">策定中のGoogleより先にOpenAIが対応</span> した現状を解説</span></li>
+          <li><i class="fa-solid fa-trophy fa-lg" aria-hidden="true"></i><span>標準化を主導する側より <span class="keyword-tag lime">実装が先行</span> という逆転現象</span></li>
+          <li><i class="fa-solid fa-gauge-simple-high fa-lg" aria-hidden="true"></i><span>AI業界の <span class="keyword-tag">対応スピード</span> を象徴するエピソード</span></li>
+          <li><i class="fa-solid fa-chess fa-lg" aria-hidden="true"></i><span>ブラウザ覇権争いにおける <span class="keyword-tag">AI機能</span> の重要性</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 right">
+          <span class="handwritten"><i class="fa-solid fa-circle-exclamation fa-lg" style="color: var(--ui-color-2);" aria-hidden="true"></i> 仕様策定を待たず実装してしまう…<br>この <span class="keyword-tag">先行競争</span> が今のAI界の空気🏆</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">OPENAI</span>
+        <i class="fa-solid fa-compass-drafting fa-5x" style="color: var(--ui-color-5); animation: fa-flip 3.4s infinite;" aria-hidden="true"></i>
+        <h3>OpenAI陣営: ブラウザでの実装</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-rocket fa-lg" aria-hidden="true"></i><span>OpenAIは自社ブラウザ <span class="keyword-tag">ChatGPT Atlas</span> でWebMCP対応を先行リリース</span></li>
+          <li><i class="fa-solid fa-puzzle-piece fa-lg" aria-hidden="true"></i><span>AIアシスタントとブラウザが <span class="keyword-tag lime">一体</span> の体験</span></li>
+          <li><i class="fa-solid fa-terminal fa-lg" aria-hidden="true"></i><span>開発者は設定から <span class="keyword-tag">WebMCPを有効化</span> して試験可能</span></li>
+          <li><i class="fa-solid fa-users-viewfinder fa-lg" aria-hidden="true"></i><span>「AIネイティブブラウザ」の <span class="keyword-tag">主導権</span> を狙う動き</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-globe fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 検索からエージェントへ…<br>ブラウザの在り方そのものが変わるかも🌐</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">GOOGLE</span>
+        <i class="fa-brands fa-chrome fa-5x" style="color: var(--ui-color-1); animation: fa-spin 8s linear infinite;" aria-hidden="true"></i>
+        <h3>Google陣営: 標準化の行方</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gavel fa-lg" aria-hidden="true"></i><span>WebMCPは <span class="keyword-tag">WICG</span>(Web Incubator CG)で議論中の提案</span></li>
+          <li><i class="fa-solid fa-flask-vial fa-lg" aria-hidden="true"></i><span>Chromeでは <span class="keyword-tag lime">DevToolsでの実験</span> として先行トライアルが提供</span></li>
+          <li><i class="fa-solid fa-book fa-lg" aria-hidden="true"></i><span>仕様は <span class="keyword-tag">github.com/WICG/web-mcp</span> で公開</span></li>
+          <li><i class="fa-solid fa-road fa-lg" aria-hidden="true"></i><span>実装 → フィードバック → <span class="keyword-tag">標準化</span> の段階的アプローチ</span></li>
+        </ul>
+        <div class="speech-bubble variant-1 top">
+          <span class="handwritten"><i class="fa-solid fa-code-branch fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 「Incubation(孵化中)」の段階。<br>Web標準になるか、世界が注目しています🥚</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flow-arrow"><i class="fa-solid fa-angles-down fa-beat" aria-hidden="true"></i></div>
+
+  <!-- ===== セクション4: 実践と展望 ===== -->
+  <div class="section-title-band fade-in-scale">
+    <i class="fa-solid fa-trees fa-2x" aria-hidden="true"></i>
+    <h2>セクション4: 実践と展望</h2>
+    <span class="band-step">カード 15-18</span>
+  </div>
+  <div class="section-layout">
+
+    <!-- カード15 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">HANDS-ON</span>
+        <i class="fa-solid fa-laptop-code fa-5x" style="color: var(--ui-color-5); animation: fa-beat 2.7s infinite;" aria-hidden="true"></i>
+        <h3>開発者向け: 実装の要点</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-1 fa-lg" aria-hidden="true"></i><span>WebMCPサーバーページを用意し <span class="keyword-tag">iframe</span> で読み込む</span></li>
+          <li><i class="fa-solid fa-2 fa-lg" aria-hidden="true"></i><span><code class="inline">message</code> イベントでJSON-RPCを受けて応答</span></li>
+          <li><i class="fa-solid fa-3 fa-lg" aria-hidden="true"></i><span>ツール定義には <span class="keyword-tag lime">説明文</span> が超重要 — AIが読んで判断</span></li>
+        </ul>
+<pre>// iframe内サーバーの骨子イメージ
+window.addEventListener('message', (e) => {
+  const msg = e.data; // JSON-RPC 2.0
+  if (msg.method === 'tools/list') {
+    e.source.postMessage({
+      jsonrpc: '2.0', id: msg.id,
+      result: { tools: [/* ... */] }
+    }, e.origin);
+  }
+});</pre>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-pen-nib fa-lg" style="color: var(--ui-color-2);" aria-hidden="true"></i> ツールの説明文は <span class="keyword-tag">AI向けUXライティング</span>!<br>雑に書くとAIが誤動作します✍️</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">USE CASES</span>
+        <i class="fa-solid fa-lightbulb fa-5x" style="color: var(--lime-bright); animation: fa-beat-fade 2.1s infinite; text-shadow: 0 0 14px rgba(198,232,56,0.8);" aria-hidden="true"></i>
+        <h3>ユースケース: 何ができる?</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cart-shopping fa-lg" aria-hidden="true"></i><span>EC: 検索・絞り込み・<span class="keyword-tag">カート追加</span> を会話で完結</span></li>
+          <li><i class="fa-solid fa-calendar-check fa-lg" aria-hidden="true"></i><span>予約: 空き状況確認と <span class="keyword-tag lime">予約確定</span> を直接実行</span></li>
+          <li><i class="fa-solid fa-file-invoice fa-lg" aria-hidden="true"></i><span>フォーム: 面倒な入力を <span class="keyword-tag">AIが代行</span></span></li>
+          <li><i class="fa-solid fa-database fa-lg" aria-hidden="true"></i><span>情報サイト: 記事検索・<span class="keyword-tag">構造化データ提供</span></span></li>
+          <li><i class="fa-solid fa-briefcase fa-lg" aria-hidden="true"></i><span>社内ツール: ブラウザ業務の <span class="keyword-tag">自動化</span></span></li>
+        </ul>
+        <div class="speech-bubble right">
+          <span class="handwritten"><i class="fa-solid fa-comments fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 「この予約取っといて」の一言で済む世界。<br><span class="keyword-tag">音声×WebMCP</span>との相性も抜群🎙️</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">CHALLENGES</span>
+        <i class="fa-solid fa-mountain-city fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+        <h3>課題: 解決すべき山</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-check fa-lg" aria-hidden="true"></i><span><span class="keyword-tag">同意UI</span> の標準化 — どこで・どう許可を取るか</span></li>
+          <li><i class="fa-solid fa-money-bill-trend-up fa-lg" aria-hidden="true"></i><span>決済など <span class="keyword-tag lime">高リスク操作</span> の保護レベル</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg" aria-hidden="true"></i><span>仕様が流動的 — <span class="keyword-tag">破壊的変更</span> の可能性</span></li>
+          <li><i class="fa-solid fa-bullseye fa-lg" aria-hidden="true"></i><span>普及の鶏卵問題: <span class="keyword-tag">対応サイト</span> が増えるか</span></li>
+          <li><i class="fa-solid fa-bug fa-lg" aria-hidden="true"></i><span>ツールの品質 — 説明文誤りによる <span class="keyword-tag">AIの誤用</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-person-hiking fa-lg" style="color: var(--ui-color-5);" aria-hidden="true"></i> 今はまだ <span class="keyword-tag">登山口</span> の段階。<br>早く登り始めた者が地図を描く⛰️</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-badge">SUMMARY</span>
+        <i class="fa-solid fa-rocket fa-5x" style="color: var(--ui-color-5); animation: fa-bounce 2.3s infinite;" aria-hidden="true"></i>
+        <h3>まとめ: Webの次の形</h3>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>WebMCP = WebサイトがAIに <span class="keyword-tag lime">機能を直接公開</span> する仕組み</span></li>
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>基盤は <span class="keyword-tag">postMessage + JSON-RPC</span> というWeb標準の組み合わせ</span></li>
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>Google標準化より先に <span class="keyword-tag">OpenAIが実装</span> という先行競争の現状</span></li>
+          <li><i class="fa-solid fa-check fa-lg" aria-hidden="true"></i><span>Webページが <span class="keyword-tag">人間用UI + AI用IF</span> を兼ねる時代へ</span></li>
+          <li><i class="fa-solid fa-flag fa-lg" aria-hidden="true"></i><span>開発者は今のうちに <span class="keyword-tag">触って体験</span> しておく価値あり</span></li>
+        </ul>
+        <div class="speech-bubble variant-2 top">
+          <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--ui-color-2);" aria-hidden="true"></i> 「Webサイト=AIの道具」<br>この捉え方の転換が、次の10年を決める🌟</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== フッター ===== -->
+  <footer class="main-footer">
+    <p class="footer-title"><i class="fa-solid fa-film fa-lg" aria-hidden="true"></i> 出典・参考文献</p>
+    <p>🎬 動画: <a href="https://www.youtube.com/watch?v=grlExtMAfY4" target="_blank" rel="noopener">ギリギリ開発会議 by ボイスアップラボ</a> — 「【実演あり】WebMCPを触ってみた。AIが表示中のWebページと直接通信」</p>
+    <p>🏢 企業サイト: <a href="https://voiceapp-lab.com" target="_blank" rel="noopener">ボイスアップラボ株式会社</a></p>
+    <p>📜 WebMCP仕様(WICG): <a href="https://github.com/WICG/web-mcp" target="_blank" rel="noopener">github.com/WICG/web-mcp</a></p>
+    <p class="footer-sub">※ 本インフォグラフィックは動画説明欄とWebMCP公開仕様に基づく要約です。実演の詳細は動画本体をご覧ください。</p>
+  </footer>
+
+</div>
+</body>
+</html>

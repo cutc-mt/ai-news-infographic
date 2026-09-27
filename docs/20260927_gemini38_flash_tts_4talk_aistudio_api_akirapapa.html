@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【あきらパパ】AIの声だけで番組は作れる？Gemini 3.8 Flash TTSを4人トークで検証 | インフォグラフィック</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --navy: #1D3557;          /* 主色: ミッドナイトネイビー（深夜ラジオのスタジオ） */
+  --ocean: #457B9D;         /* サブ: ダスティオーシャンブルー */
+  --powder: #A8DADC;        /* パウダーブルー */
+  --powder-pale: #E4F2F3;   /* うすいパウダーブルー */
+  --apricot: #F4A261;       /* アクセント: アプリコット */
+  --apricot-pale: #FDEBD7;  /* うすいアプリコット */
+  --bg-canvas: #F4F8FA;     /* 背景: つめたくないブルーグレー */
+  --ink: #1C2E4A;           /* 文字の基本色 */
+  --text-sub: #5A7184;      /* 副文字色 */
+  --paper: #FFFFFF;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0; padding: 0;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(circle at 12% 4%, rgba(168, 218, 220, 0.35) 0%, transparent 30%),
+    radial-gradient(circle at 88% 92%, rgba(244, 162, 97, 0.16) 0%, transparent 28%),
+    radial-gradient(circle at 50% 50%, rgba(244, 248, 250, 0.9) 0%, transparent 70%);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: var(--ink);
+  line-height: 1.75;
+}
+
+.container { max-width: 2000px; margin: 0 auto; padding: 20px; }
+
+.header { text-align: center; padding: 46px 20px 30px; }
+.header .main-icon {
+  font-size: 6.2em; color: var(--navy);
+  text-shadow: 5px 5px 0px rgba(168, 218, 220, 0.75);
+  animation: fa-bounce 3.2s ease-in-out infinite;
+}
+.header h1 {
+  font-size: 38px; color: var(--navy); font-weight: bold;
+  margin: 18px 0 10px; font-family: 'Kaisei Decol', serif;
+  text-shadow: 2px 2px 0px rgba(168, 218, 220, 0.7);
+}
+.header .subtitle { font-size: 20px; color: var(--ocean); font-weight: bold; margin-bottom: 10px; }
+.header .date-info { font-size: 14px; color: var(--text-sub); margin: 4px 0; }
+.header .channel-badge {
+  display: inline-block; background: var(--navy); color: #F4F8FA;
+  padding: 7px 20px; border-radius: 30px; font-size: 15px; font-weight: bold;
+  margin: 14px 4px 0; box-shadow: 3px 3px 10px rgba(29, 53, 87, 0.3);
+}
+.header .event-badge {
+  display: inline-block; background: var(--apricot); color: #5A3820;
+  padding: 7px 20px; border-radius: 30px; font-size: 15px; font-weight: bold;
+  margin: 14px 4px 0; box-shadow: 3px 3px 10px rgba(244, 162, 97, 0.35);
+}
+.header .video-link {
+  display: inline-block; margin-top: 16px; font-size: 14px; color: var(--ocean);
+  text-decoration: none; border-bottom: 1px dashed var(--apricot); word-break: break-all;
+}
+
+.section-title { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 46px 0 22px; text-align: center; }
+.section-title h2 {
+  font-size: 28px; color: var(--navy); font-family: 'Kaisei Decol', serif;
+  margin: 0; padding: 0 20px;
+  background: linear-gradient(transparent 65%, rgba(168, 218, 220, 0.85) 65%);
+}
+.section-title i { font-size: 2em; color: var(--apricot); }
+.section-title .num {
+  font-size: 14px; color: #F4F8FA; background: var(--ocean); border-radius: 50%;
+  width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center;
+  font-weight: bold;
+}
+
+.section-layout { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-bottom: 30px; }
+.section-card {
+  flex: 1; min-width: 280px; max-width: 460px;
+  background: var(--paper);
+  border-radius: 20px; padding: 18px; position: relative; overflow: hidden;
+  box-shadow: 5px 5px 15px rgba(29, 53, 87, 0.14);
+  border-top: 4px solid var(--ocean);
+  opacity: 0; transform: translateY(25px);
+  transition: opacity 0.7s ease, transform 0.7s ease, box-shadow 0.3s ease;
+}
+.section-card.visible { opacity: 1; transform: translateY(0); }
+.section-card:hover { box-shadow: 0 0 22px rgba(69, 123, 157, 0.35); }
+
+.card-icon { text-align: center; margin: 12px 0 6px; }
+.card-icon i { font-size: 5em; color: var(--navy); }
+.card-icon h3 {
+  font-size: 21px; color: var(--ink); margin: 10px 0 4px;
+  font-family: 'Kaisei Decol', serif;
+}
+.card-num {
+  position: absolute; top: 12px; left: 14px; font-size: 13px; color: var(--navy);
+  background: var(--powder); border-radius: 12px; padding: 1px 10px; font-weight: bold;
+}
+.judge {
+  position: absolute; top: 12px; right: 14px; font-size: 12px; color: #7A4A1E;
+  background: var(--apricot-pale); border: 1px solid var(--apricot);
+  border-radius: 12px; padding: 1px 10px; font-weight: bold;
+}
+
+.card-content { padding: 0 6px 8px; }
+
+.keyword-list { margin: 10px 0; padding: 0; list-style-type: none; }
+.keyword-list li { margin-bottom: 9px; display: flex; align-items: flex-start; font-size: 15px; }
+.keyword-list li i { margin-right: 9px; color: var(--ocean); min-width: 18px; margin-top: 4px; }
+.keyword-list li b { color: var(--navy); }
+
+.keyword-tag {
+  background: var(--powder-pale); color: var(--navy);
+  border: 1px solid var(--powder);
+  padding: 1px 8px; border-radius: 6px; margin: 0 2px;
+  display: inline-block; font-weight: bold; font-size: 14px;
+}
+.keyword-tag.warm { background: var(--apricot-pale); border-color: var(--apricot); color: #7A4A1E; }
+
+.highlight {
+  background: linear-gradient(transparent 55%, rgba(168, 218, 220, 0.95) 55%);
+  font-weight: bold; padding: 0 2px;
+}
+.highlight.warm {
+  background: linear-gradient(transparent 55%, rgba(244, 162, 97, 0.5) 55%);
+}
+
+.speech-bubble {
+  position: relative; background: #F5FAFB; border: 3px solid var(--ocean);
+  border-radius: 18px; padding: 10px 14px; margin: 14px 4px 8px;
+  font-family: 'Yomogi', cursive; box-shadow: 3px 3px 10px rgba(29, 53, 87, 0.14);
+  transform: rotate(-1deg); font-size: 14px;
+}
+.speech-bubble::after {
+  content: ''; position: absolute; bottom: -13px; left: 20px;
+  border-width: 12px 8px 0; border-style: solid; border-color: var(--ocean) transparent;
+  display: block; width: 0;
+}
+.speech-bubble.right::after { left: auto; right: 20px; }
+.speech-bubble.top::after {
+  bottom: auto; top: -13px; border-width: 0 8px 12px;
+}
+.speech-bubble.variant-1 { background: #FDF7F0; border-color: var(--apricot); transform: rotate(1deg); }
+.speech-bubble.variant-1::after { border-color: var(--apricot) transparent; }
+.speech-bubble.variant-2 { background: #EFF6F7; border-color: var(--navy); transform: rotate(-2deg); }
+.speech-bubble.variant-2::after { border-color: var(--navy) transparent; }
+
+.handwritten { font-family: 'Yomogi', cursive; font-size: 14px; line-height: 1.6; color: var(--ink); }
+
+pre {
+  background: #EDF4F5; border: 1px solid rgba(69, 123, 157, 0.4); color: var(--ink);
+  padding: 10px; border-radius: 8px; font-size: 12.5px;
+  margin-top: 10px; overflow-x: auto; line-height: 1.5;
+}
+code.inline {
+  background: var(--powder-pale); border-radius: 5px; padding: 0 6px;
+  font-size: 13px; color: var(--navy);
+}
+
+.footer {
+  text-align: center; padding: 30px 20px 46px; color: var(--text-sub); font-size: 14px;
+  border-top: 2px dashed var(--powder); margin-top: 30px;
+}
+.footer .footer-icons i {
+  font-size: 1.6em; color: var(--ocean); margin: 0 10px;
+}
+.footer a { color: var(--navy); }
+
+@media (max-width: 1600px) { .section-card { min-width: 300px; } }
+@media (max-width: 1200px) { .section-card { min-width: 340px; } }
+@media (max-width: 900px)  { .section-card { min-width: 400px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header class="header">
+  <i class="fa-solid fa-podcast main-icon" aria-hidden="true"></i>
+  <h1>AIの声だけで番組は作れる？</h1>
+  <div class="subtitle">Gemini 3.8 Flash TTSを「AI Studio・API・4人トーク」で総合検証</div>
+  <div class="date-info">📅 2026年9月27日公開 / 18カード構成</div>
+  <div class="channel-badge"><i class="fa-solid fa-microphone-lines"></i> あきらパパのAI活用学習部屋</div>
+  <div class="event-badge"><i class="fa-solid fa-headset"></i> 深夜ラジオはAIの声で</div>
+  <div class="video-link">▶ https://www.youtube.com/watch?v=mXN2TQh3l18</div>
+</header>
+
+<!-- ===================== 序章: 種明かしと今日の問い ===================== -->
+<div class="section-title">
+  <span class="num">0</span>
+  <i class="fa-solid fa-masks-theater"></i>
+  <h2>序章: 冒頭の4人トークはどう作った？</h2>
+</div>
+<div class="section-layout">
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">①</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-users fa-5x" style="animation: fa-bounce 2.8s ease-in-out infinite;"></i>
+      <h3>オンライン打ち合わせの正体</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-user-tie"></i><span><b>水野さん</b>: 進行と司会を担当する頼れるまとめ役</span></li>
+        <li><i class="fa-solid fa-user-gear"></i><span><b>田中君（AD）</b>: 冒頭でミュート解除を忘れるおっちょこちょい</span></li>
+        <li><i class="fa-solid fa-user-graduate"></i><span><b>坂口さん</b>: 「今日は何でも突っ込ませてもらいます」というツッコミ担当</span></li>
+        <li><i class="fa-solid fa-circle-exclamation"></i><span>実はこの3人の声、<span class="highlight">すべてAIが生成した声</span>でした</span></li>
+      </ul>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb" style="color: var(--apricot);"></i> あきらパパさんの「本物の声」を含めて4人。ミュート忘れだけはAIのせいじゃない!? と種明かしで笑いに。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">②</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ocean); animation: fa-beat 2.4s ease-in-out infinite;"></i>
+      <h3>3人の声は「文字」から作った</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-font"></i><span>使ったのは<span class="keyword-tag">Gemini 3.8 Flash TTS</span>。テキストから音声を生成するモデルです</span></li>
+        <li><i class="fa-solid fa-arrow-right"></i><span>キャラ設定の文章を渡すだけで、<span class="highlight">しゃべり方まで含めて声が完成</span></span></li>
+        <li><i class="fa-solid fa-list-check"></i><span>この打ち合わせを「作った順番どおり」に動画内で全工程が解説されます</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-quote-left" style="color: var(--navy);"></i> 例: 「大阪出身・40代のお笑い芸人。ネイティブの大阪弁を早口のツッコミで話す」→ これだけで坂口さんの声に！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">③</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-circle-question fa-5x" style="animation: fa-flip 3.5s ease-in-out infinite;"></i>
+      <h3>今日の問いと5つの検証</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-bullseye"></i><span>問い1: <span class="highlight">AIの声だけで番組は作れるのか？</span></span></li>
+        <li><i class="fa-solid fa-user-pen"></i><span>問い2: そのとき自分は何をすればいいのか？</span></li>
+      </ul>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag">検証1</span> コードなしで作れるか（AI Studio）</span></li>
+        <li><i class="fa-solid fa-2"></i><span><span class="keyword-tag">検証2</span> 前のモデルと何が違うか</span></li>
+        <li><i class="fa-solid fa-3"></i><span><span class="keyword-tag">検証3</span> 自分のアプリに組み込めるか（API）</span></li>
+        <li><i class="fa-solid fa-4"></i><span><span class="keyword-tag">検証4</span> 4人はどう繋いだか</span></li>
+        <li><i class="fa-solid fa-5"></i><span><span class="keyword-tag">検証5</span> 仕事で使えるか</span></li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-clipboard-check" style="color: var(--ocean);"></i> 1つずつ「判定」を付けながら進めるのが、この動画の痛快なところです。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">④</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-arrow-trend-up fa-5x" style="color: var(--apricot); animation: fa-beat-fade 2.6s ease-in-out infinite;"></i>
+      <h3>最大の変化は「声の在庫」</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-boxes-stacked"></i><span>前のモデル: 用意された<span class="keyword-tag warm">30の声</span>から選ぶだけ</span></li>
+        <li><i class="fa-solid fa-microphone-lines"></i><span>今回: ライブラリの声が<span class="keyword-tag">2,000以上</span>に増加</span></li>
+        <li><i class="fa-solid fa-comment-dots"></i><span>欲しい声がなければ、<span class="highlight">言葉で注文して新しく作れる</span>時代に</span></li>
+        <li><i class="fa-solid fa-stopwatch"></i><span>声のデザイン（発注）は<span class="highlight warm">約1分</span>で足ります</span></li>
+      </ul>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-cart-shopping" style="color: var(--apricot);"></i> 「声を選ぶ」から「声を発注する」へ。ここがGemini 3.8 Flash TTSの最大の目玉です。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== 検証1: AI Studioでコードなし ===================== -->
+<div class="section-title">
+  <span class="num">1</span>
+  <i class="fa-solid fa-window-restore"></i>
+  <h2>検証1: コードなしで作れるか（AI Studio）</h2>
+</div>
+<div class="section-layout">
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑤</div>
+    <div class="judge">判定 ◎</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-window-maximize fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;"></i>
+      <h3>AI Studioの画面の流れ</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-play"></i><span><b>Google AI Studio</b>を開き、左メニューから<span class="keyword-tag">プレイグラウンド</span>へ</span></li>
+        <li><i class="fa-solid fa-file-circle-plus"></i><span>「文章を自然な声に」の画面で<span class="keyword-tag">Create new dialog</span>を押す</span></li>
+        <li><i class="fa-solid fa-pen-to-square"></i><span>セリフ枠に台本を入力（まだただの文章の状態）</span></li>
+        <li><i class="fa-solid fa-sliders"></i><span>隣の<span class="keyword-tag">スタイル</span>で「明るく少し早口で」など話し方を指定</span></li>
+        <li><i class="fa-solid fa-face-laugh-squint"></i><span><span class="keyword-tag">エクスプレッション</span>で笑いやため息の合図を文の途中に挿入</span></li>
+        <li><i class="fa-solid fa-plus"></i><span><span class="keyword-tag">Add speech block</span>で2人目のブロックを追加（色はオレンジに変化）</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-hand-sparkles" style="color: var(--apricot);"></i> スタイルの選択肢には「ささやき」「フレンドリー」「ナレーション」「プロモーション」「ポッドキャスト」などが並びます。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑥</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-magnifying-glass fa-5x" style="color: var(--ocean); animation: fa-flip 3.2s ease-in-out infinite;"></i>
+      <h3>スピーカー設定と声の検索</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-user-gear"></i><span>声を変えたいときは<span class="keyword-tag">スピーカー1のボタン</span>→ 右側のスピーカー設定へ</span></li>
+        <li><i class="fa-solid fa-list"></i><span>検索窓には<span class="highlight">2,000以上の声</span>が表示され、言語や用途で絞り込める</span></li>
+        <li><i class="fa-solid fa-lightbulb"></i><span>既存の声から選んでもよし、なければ<span class="highlight warm">新しい声を作る</span>ことも可能</span></li>
+      </ul>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-filter" style="color: var(--ocean);"></i> 「日本語」「ポッドキャスト向き」などで絞れるので、2,000声の海で迷わずに済みます。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑦</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-headset fa-5x" style="color: var(--apricot); animation: fa-beat 2.2s ease-in-out infinite;"></i>
+      <h3>実演: 「ラジオDJヒカ」を作る</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-circle-plus"></i><span>右上の<span class="keyword-tag">New voice</span> → <span class="keyword-tag">Voice design</span>を選択</span></li>
+        <li><i class="fa-solid fa-signature"></i><span>名前: <b>ラジオDJヒカ</b>（説明は日本語でOK）</span></li>
+        <li><i class="fa-solid fa-file-lines"></i><span>説明文: 「<span class="highlight">深夜ラジオの人気DJ・30代の女性。明るく少しハスキーな声でテンポよく語りかける</span>」</span></li>
+        <li><i class="fa-solid fa-gears"></i><span><span class="keyword-tag">Generate voice</span>を押すと約30秒で<span class="highlight">候補が3つ</span>並ぶ</span></li>
+        <li><i class="fa-solid fa-circle-check"></i><span>聞き比べて一番近いものを選び、Continue → <span class="keyword-tag">Use voice</span>で確定</span></li>
+      </ul>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-robot" style="color: var(--navy);"></i> 最後に右下のRun command（Enterでも可）で数秒待てば、下にプレイヤーが出て完成です。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑧</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-code fa-5x" style="animation: fa-shake 3.8s ease-in-out infinite;"></i>
+      <h3>Get Code と1つの伏線</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-file-export"></i><span>右上の<span class="keyword-tag">Get code</span>で、今の設定がPythonコードとして出力される</span></li>
+        <li><i class="fa-solid fa-check"></i><span>セリフと<span class="highlight">声の名前</span>はコードに含まれている</span></li>
+        <li><i class="fa-solid fa-triangle-exclamation"></i><span>ただし<span class="highlight warm">スタイルに書いた話し方はコードに出てこない</span>…！</span></li>
+        <li><i class="fa-solid fa-bookmark"></i><span>この伏線は<span class="keyword-tag warm">検証3（API）</span>で回収されます</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-surprise" style="color: var(--apricot);"></i> 「え、画面で効いてた演出がコードにない！？」──このギャップがAPI解説への見事な引きになっています。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== 検証2: 前のモデルとの違い ===================== -->
+<div class="section-title">
+  <span class="num">2</span>
+  <i class="fa-solid fa-scale-balanced"></i>
+  <h2>検証2: 前のモデルと何が違うか</h2>
+</div>
+<div class="section-layout">
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑨</div>
+    <div class="judge">判定 ◎</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-masks-theater fa-5x" style="color: var(--ocean); animation: fa-flip 3s ease-in-out infinite;"></i>
+      <h3>違うのは「演技」の3点セット</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-clapperboard"></i><span><span class="keyword-tag">演技の細かさ</span>: 笑いや間（ま）の演技が本物っぽくなった</span></li>
+        <li><i class="fa-solid fa-music"></i><span><span class="keyword-tag">声の高さの選び方</span>: キャラに合う高さを細かく指定できる</span></li>
+        <li><i class="fa-solid fa-hand-holding-heart"></i><span><span class="keyword-tag">気遣い</span>: 相手に合わせた話しぶりの余裕が出た</span></li>
+        <li><i class="fa-solid fa-ban"></i><span>これらは<span class="highlight">前のモデルにはなかったもの</span></span></li>
+      </ul>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-comment" style="color: var(--ocean);"></i> 検証トークでは「3.8のはぁ〜は本物やったな。俺より生き生きとうまいやん」とAI同士で褒め合う一幕も。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== 検証3: APIでアプリに組み込む ===================== -->
+<div class="section-title">
+  <span class="num">3</span>
+  <i class="fa-solid fa-terminal"></i>
+  <h2>検証3: 自分のアプリに組み込めるか（API）</h2>
+</div>
+<div class="section-layout">
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑩</div>
+    <div class="judge">判定 ◎</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-terminal fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;"></i>
+      <h3>準備は2ステップ</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-download"></i><span>ターミナルで <code class="inline">pip install google-genai</code></span></li>
+        <li><i class="fa-solid fa-key"></i><span>APIキーは<span class="keyword-tag">AI Studio右上の鍵アイコン</span>から作成し、<span class="highlight">環境変数</span>に入れる</span></li>
+        <li><i class="fa-solid fa-file-code"></i><span>VS Codeで作った <code class="inline">hello_tts.py</code> は<span class="highlight warm">30行もない</span>コンパクトさ</span></li>
+      </ul>
+      <pre>pip install google-genai
+export GEMINI_API_KEY="（AI Studio右上の鍵から作成）"
+python hello_tts.py</pre>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-feather" style="color: var(--apricot);"></i> コードを書かない方は画面の流れだけ見ればOK、という優しい導入です。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑪</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--apricot); animation: fa-beat-fade 2.5s ease-in-out infinite;"></i>
+      <h3>話し方はセリフの「外」へ書く</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-triangle-exclamation"></i><span>本文の頭に「明るく言って」と書いて送ると…<span class="highlight warm">そのまま読み上げてしまう</span></span></li>
+        <li><i class="fa-solid fa-volume-high"></i><span>「<b>明るく言って、こんにちは。あらパパです。明るく言いました</b>」という残念な結果に</span></li>
+        <li><i class="fa-solid fa-note-sticky"></i><span>解決策: 話し方は<span class="keyword-tag">スピーチメタデータ</span>という<span class="highlight">セリフとは別の欄</span>に書く</span></li>
+        <li><i class="fa-solid fa-lightbulb"></i><span>ここさえ守れば迷わない: <span class="highlight">本文には読ませたい言葉だけ</span></span></li>
+      </ul>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-pen-nib" style="color: var(--navy);"></i> AI StudioのGet codeに出なかった「話し方」の正体が、ここで回収されました。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑫</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-comments fa-5x" style="color: var(--ocean); animation: fa-flip 3.4s ease-in-out infinite;"></i>
+      <h3>2人の会話モード</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-users"></i><span><span class="keyword-tag">speakers</span>にセリフと話し方を添えて会話を作れる</span></li>
+        <li><i class="fa-solid fa-reply"></i><span>会話モードは<span class="keyword-tag">conversational</span>、声は<span class="keyword-tag">Kore</span>と<span class="keyword-tag">Charon</span>を指定</span></li>
+        <li><i class="fa-solid fa-lock"></i><span>1回のリクエストで話せるのは<span class="highlight warm">2人まで</span>（ここが後の検証4の壁に）</span></li>
+      </ul>
+      <pre>resp = client.models.generate_content(
+  model="gemini-3.8-flash-preview-tts",
+  contents=[role_a_line, role_b_line],   # 2人のセリフ
+  config={
+    "response_modalities": ["AUDIO"],
+    "speech_metadata": {"style":
+      "明るくワクワクした調子で"},       # 話し方はセリフの外へ
+  })</pre>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-headphones" style="color: var(--ocean);"></i> 実行すると「蒼太さん、新しい声のモデルもう試しました?」「試しましたよ。正直びっくりしました」というトーク音声が完成します。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑬</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-fingerprint fa-5x" style="animation: fa-beat 2.8s ease-in-out infinite;"></i>
+      <h3>声のデザインもコードから</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-square-plus"></i><span><code class="inline">voices.create</code> に説明文を渡すだけでOK</span></li>
+        <li><i class="fa-solid fa-id-badge"></i><span>返ってくるのは<span class="keyword-tag">声のID</span>と<span class="keyword-tag">サンプル音声</span></span></li>
+        <li><i class="fa-solid fa-file-audio"></i><span>音声は<span class="highlight">WAV形式</span>なので、そのまま保存して再生できる</span></li>
+        <li><i class="fa-solid fa-stopwatch"></i><span>結果: <span class="highlight warm">30秒で組み込めた</span></span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-circle-check" style="color: var(--apricot);"></i> 1人分・2人分の声なら、このレシピだけで作れる──検証3の判定は◎でした。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== 検証4: 4人はどう繋いだか ===================== -->
+<div class="section-title">
+  <span class="num">4</span>
+  <i class="fa-solid fa-puzzle-piece"></i>
+  <h2>検証4: 4人はどう繋いだか</h2>
+</div>
+<div class="section-layout">
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑭</div>
+    <div class="judge">判定 ◎</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-puzzle-piece fa-5x" style="color: var(--ocean); animation: fa-spin 6s linear infinite; animation-duration: 6s;"></i>
+      <h3>「2人まで」の壁を破る</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-person-walking-arrow-right"></i><span>AI Studioで3人目のブロックを足そうとすると、<span class="highlight warm">スピーカー1に戻ってしまう</span></span></li>
+        <li><i class="fa-solid fa-ban"></i><span>4人を1度のリクエストでは呼べない</span></li>
+        <li><i class="fa-solid fa-scissors"></i><span>解決策: <span class="keyword-tag">台本を2者の組み合わせで分ける</span></span></li>
+        <li><i class="fa-solid fa-people-arrows"></i><span>2人が続けて話すところは<span class="highlight">2人分のリクエスト</span>、1人の部分は1人分のリクエスト</span></li>
+      </ul>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb" style="color: var(--ocean);"></i> 冒頭の打ち合わせは「私の実声 + AIの声3人」の4人。部分部分を作って最後に組み立てます。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑮</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-user-shield fa-5x" style="color: var(--apricot); animation: fa-beat-fade 3s ease-in-out infinite;"></i>
+      <h3>自分の声を入れる2つの道</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-clone"></i><span>Geminiでも自分の声を複製できる（<span class="keyword-tag">ボイスレプリケーション</span>）</span></li>
+        <li><i class="fa-solid fa-microphone"></i><span>見本の声は<span class="keyword-tag">10〜30秒</span>＋声の持ち主が<span class="highlight">同意を読み上げた録音</span>が必要</span></li>
+        <li><i class="fa-solid fa-stamp"></i><span>作った声には<span class="highlight warm">透かしが入る</span>＝誰かの声を勝手には作れない設計</span></li>
+        <li><i class="fa-solid fa-fish"></i><span>今回は<span class="keyword-tag">fish audio</span>という別の音声AIで、自分の声から作成</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-shield-halved" style="color: var(--apricot);"></i> 同意録音と透かし──声の権利を守る仕組みが標準で入っているのは大事なポイントです。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑯</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-wave-square fa-5x" style="animation: fa-shake 2.4s ease-in-out infinite;"></i>
+      <h3>FFmpegで「間」まで設計する</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-tools"></i><span>部品は<span class="keyword-tag">FFMPEG</span>（無料の音声編集ツール）でつなぐ</span></li>
+        <li><i class="fa-solid fa-hourglass-half"></i><span>返事の間は<span class="keyword-tag">0.2〜0.4秒</span>を基準に設計</span></li>
+        <li><i class="fa-solid fa-volume-xmark"></i><span>田中君のミュート沈黙は<span class="highlight warm">2秒の演出</span>だった！</span></li>
+        <li><i class="fa-solid fa-rotate"></i><span>一行直せば<span class="highlight">その部分だけ作り直して再接続</span>できる</span></li>
+      </ul>
+      <pre># 部品をつなぎ、間（ま）も添えて
+ffmpeg -i a.wav -i b.wav -filter_complex \
+ "[0:a]apad=pad_dur=0.3[a0];[1:a][a0]concat=n=2:v=0:a=1"
+ out.wav</pre>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-highlighter" style="color: var(--navy);"></i> 台本と間（ま）──ここが作り手の腕の見せどころ。判定は「作れる・繋げる」で◎です。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ===================== 検証5: 仕事で使えるか ===================== -->
+<div class="section-title">
+  <span class="num">5</span>
+  <i class="fa-solid fa-briefcase"></i>
+  <h2>検証5: 仕事で使えるか</h2>
+</div>
+<div class="section-layout">
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑰</div>
+    <div class="judge">判定 ◎</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-briefcase fa-5x" style="color: var(--ocean); animation: fa-bounce 3s ease-in-out infinite;"></i>
+      <h3>料金と5つの実務ユースケース</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-coins"></i><span>10分の音声で<span class="keyword-tag">約0.135ドル</span>、<span class="keyword-tag warm">Flash-Liteなら約0.09ドル</span></span></li>
+        <li><i class="fa-solid fa-calculator"></i><span>計算: 600秒 ÷ 10秒 × 10秒あたりの単価</span></li>
+        <li><i class="fa-solid fa-triangle-exclamation"></i><span><span class="highlight warm">2027年1月から単価は2倍</span>予定 → 今年のうちが試しやすい</span></li>
+      </ul>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-1"></i><span><b>マニュアル動画の多言語版</b>: 英語原稿を渡せば同じ声の調子で<span class="keyword-tag">130言語</span>対応</span></li>
+        <li><i class="fa-solid fa-2"></i><span><b>ブログ記事を2人の対談に</b>: 台本化して聞き役・話し役へ。通勤中に聞ける番組に</span></li>
+        <li><i class="fa-solid fa-3"></i><span><b>子供向けの読み聞かせ</b>: おばあちゃんと小さな竜など、登場人物ごとに声をデザイン</span></li>
+        <li><i class="fa-solid fa-4"></i><span><b>お店の電話受付</b>: 営業時間と空き状況を落ち着いた声で。聞き取りやすさ重視ならLiteで十分</span></li>
+        <li><i class="fa-solid fa-5"></i><span><b>語学の会話練習</b>: 同じ一文をアメリカ／イギリスのアクセントで。<span class="highlight">アクセントまで言葉で指定</span>できるのが今回の強み</span></li>
+      </ul>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-globe" style="color: var(--apricot);"></i> 「経費精算は月末までに申請してください / Please submit expenses…」日本語も英語も同じ1人の声で読むので、マニュアルの雰囲気が揃ったまま。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card fade-in-scale">
+    <div class="card-num">⑱</div>
+    <div class="card-icon">
+      <i class="fa-solid fa-clapperboard fa-5x" style="color: var(--apricot); animation: fa-beat 2.6s ease-in-out infinite;"></i>
+      <h3>結論: あなたの仕事は「演出家」</h3>
+    </div>
+    <div class="card-content">
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-circle-check"></i><span>検証1: <span class="highlight">コードなしで作れた</span>（AI Studio）</span></li>
+        <li><i class="fa-solid fa-circle-check"></i><span>検証2: 違うのは<span class="highlight">演技の細かさ</span>だった</span></li>
+        <li><i class="fa-solid fa-circle-check"></i><span>検証3: <span class="highlight">30行で組み込めた</span>（話し方はメタデータへ）</span></li>
+        <li><i class="fa-solid fa-circle-check"></i><span>検証4: <span class="highlight">2人ずつ作って自分で繋いだ</span></span></li>
+        <li><i class="fa-solid fa-circle-check"></i><span>検証5: <span class="highlight">仕事にも使える</span>（5例とも今日の道具だけで可）</span></li>
+      </ul>
+      <ul class="keyword-list">
+        <li><i class="fa-solid fa-bullhorn"></i><span>共通の教訓: <span class="keyword-tag">台本は自分、声はAI</span></span></li>
+        <li><i class="fa-solid fa-person-chalkboard"></i><span>自分は<span class="highlight warm">演出家</span>になる: 何を言わせるか・どう言わせるか・どこで間を取るか</span></li>
+        <li><i class="fa-solid fa-flag-checkered"></i><span>それを決めた瞬間、<span class="highlight">AIの声はあなたの番組になります</span></span></li>
+      </ul>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-rocket" style="color: var(--navy);"></i> 新しい道具が出るたびに全部試さなくて大丈夫。まず1人、声を作ってみるのが1番早い理解です。…そして田中君、最後はちゃんとミュート外れてました。</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<footer class="footer">
+  <div class="footer-icons">
+    <i class="fa-solid fa-podcast"></i><i class="fa-solid fa-microphone-lines"></i><i class="fa-solid fa-wand-magic-sparkles"></i>
+  </div>
+  <p>🎬 動画: <a href="https://youtu.be/mXN2TQh3l18" target="_blank">あきらパパ</a> | 📅 2026年9月27日</p>
+  <p class="sources">
+    関連リンク:
+    <a href="https://aistudio.google.com/" target="_blank">Google AI Studio</a> /
+    <a href="https://ai.google.dev/gemini-api/docs/speech-generation" target="_blank">Gemini API 音声生成ガイド</a> /
+    <a href="https://ai.google.dev/gemini-api/docs/voice-design" target="_blank">Voice design</a> /
+    <a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank">API料金</a> /
+    <a href="https://ffmpeg.org/" target="_blank">FFmpeg</a> /
+    <a href="https://fish.audio/" target="_blank">fish audio</a>
+  </p>
+  <p>本インフォグラフィックは、動画と説明欄の情報をグラフィックレコーディング風にまとめたものです。</p>
+</footer>
+
+</div><!-- /container -->
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var cards = document.querySelectorAll('.section-card');
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1 });
+  cards.forEach(function(card) { observer.observe(card); });
+});
+</script>
+</body>
+</html>

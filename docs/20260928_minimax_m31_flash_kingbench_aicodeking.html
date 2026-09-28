@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniMax M3.1 Flash徹底検証：KingBench 3で31%→66%の大躍進 | インフォグラフィック</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Zen+Kurenaido&family=Yomogi&display=swap');
+@import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css');
+
+:root {
+  --ink: #0E1512;             /* ダークチャコール: キャンバス背景 */
+  --ink-card: #17211C;        /* カード背景 */
+  --ink-card2: #1B2721;       /* カード背景(濃) */
+  --emerald: #10B981;         /* エメラルドグリーン: 主色 */
+  --emerald-deep: #047857;    /* ディープエメラルド */
+  --mint: #6EE7B7;            /* ミント: 第二アクセント */
+  --amber: #FBBF24;           /* アンバー: 注意・警告 */
+  --rose: #FB7185;            /* ローズ: 低スコア・弱点 */
+  --paper: #ECFDF5;           /* 淡いミントホワイト: 明るいテキスト */
+  --text-main: #E7F4EE;       /* 本文テキスト */
+  --text-sub: #8FB3A5;        /* 補足テキスト */
+  --tag-bg: rgba(16, 185, 129, 0.12);
+  --tag-border: rgba(16, 185, 129, 0.35);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(160deg, #0E1512 0%, #121B17 55%, #0E1512 100%);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: var(--text-main);
+  line-height: 1.75;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* ヘッダー */
+header {
+  text-align: center;
+  padding: 44px 20px 32px;
+}
+
+.header-icon i {
+  font-size: 6.5em;
+  color: var(--emerald);
+  text-shadow: 0 0 24px rgba(16, 185, 129, 0.55), 0 0 60px rgba(16, 185, 129, 0.25);
+  animation: fa-bounce 3s ease-in-out infinite;
+}
+
+header h1 {
+  font-size: 36px;
+  color: var(--paper);
+  font-weight: bold;
+  margin: 18px 0 10px;
+  font-family: 'Kaisei Decol', serif;
+  text-shadow: 0 0 18px rgba(16, 185, 129, 0.35);
+}
+
+.header-sub {
+  font-size: 20px;
+  color: var(--mint);
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.header-date {
+  font-size: 14px;
+  color: var(--text-sub);
+}
+
+/* セクションレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+/* カード */
+.section-card {
+  flex: 1;
+  min-width: 300px;
+  max-width: 450px;
+  background-color: var(--ink-card);
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.15), 6px 6px 20px rgba(0, 0, 0, 0.45);
+  border-top: 4px solid var(--emerald);
+  position: relative;
+  overflow: hidden;
+}
+
+.section-card:nth-child(even) {
+  border-top-color: var(--mint);
+  background-color: var(--ink-card2);
+}
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 10px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--emerald);
+  text-shadow: 0 0 16px rgba(16, 185, 129, 0.45);
+}
+
+.section-card:nth-child(even) .mega-icon-container i.fa-5x {
+  color: var(--mint);
+  text-shadow: 0 0 16px rgba(110, 231, 183, 0.4);
+}
+
+.section-card h2 {
+  font-size: 21px;
+  color: var(--paper);
+  font-weight: bold;
+  margin: 10px 0 5px;
+  font-family: 'Kaisei Decol', serif;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 10px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  margin-top: 6px;
+  color: var(--emerald);
+  flex-shrink: 0;
+}
+
+.section-card:nth-child(even) .keyword-list li i {
+  color: var(--mint);
+}
+
+.keyword-list li i.fa-circle-exclamation { color: var(--amber); }
+.keyword-list li i.fa-triangle-exclamation,
+.keyword-list li i.fa-xmark { color: var(--rose); }
+
+/* キーワードタグ */
+.keyword-tag {
+  display: inline-block;
+  background-color: var(--tag-bg);
+  border: 1px solid var(--tag-border);
+  border-radius: 8px;
+  padding: 0 8px;
+  margin: 0 2px;
+  font-weight: bold;
+  color: var(--mint);
+}
+
+/* ハイライト */
+.highlight {
+  background: linear-gradient(transparent 65%, rgba(16, 185, 129, 0.35) 65%);
+  font-weight: bold;
+}
+
+/* 吹き出し */
+.speech-bubble {
+  position: relative;
+  background-color: rgba(4, 120, 87, 0.18);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-top: 14px;
+}
+
+.speech-bubble::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 28px;
+  width: 16px;
+  height: 16px;
+  background-color: rgba(4, 120, 87, 0.18);
+  border-left: 1.5px solid rgba(16, 185, 129, 0.4);
+  border-top: 1.5px solid rgba(16, 185, 129, 0.4);
+  transform: rotate(45deg);
+}
+
+.speech-bubble.variant-1::before {
+  left: auto;
+  right: 28px;
+}
+
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  color: var(--mint);
+}
+
+/* フッター */
+footer {
+  text-align: center;
+  padding: 30px 20px;
+  color: var(--text-sub);
+  font-size: 14px;
+  border-top: 2px dashed rgba(16, 185, 129, 0.35);
+  margin-top: 20px;
+}
+
+footer a {
+  color: var(--emerald);
+  font-weight: bold;
+  text-decoration: none;
+}
+
+footer a:hover {
+  text-decoration: underline;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <div class="header-icon"><i class="fa-solid fa-bolt fa-6x" aria-hidden="true"></i></div>
+  <h1>MiniMax M3.1 Flash徹底検証 — KingBench 3で31%から66%への大躍進</h1>
+  <div class="header-sub">8種タスクの実生成物を全チェック: 強い結果と残る初歩ミスの全貌 | AI Code King</div>
+  <div class="header-date"><i class="fa-regular fa-calendar"></i> 2026年9月28日</div>
+</header>
+
+<div class="section-layout">
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-rocket fa-5x" style="animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>①MiniMax M3.1 Flashとは: 9月27日に発表された新モデル</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-calendar-day"></i><span><span class="keyword-tag">9月27日</span>、MiniMaxは<span class="keyword-tag">MiniMax Code</span>向けに「M3.1 Flash preview」を発表。</span></li>
+      <li><i class="fa-solid fa-code"></i><span>バグ修正から機能の丸ごと実装まで、<span class="highlight">日常的な開発用途に向けたテキストモデル</span>としての位置づけ。</span></li>
+      <li><i class="fa-solid fa-sliders"></i><span>公式発表には<span class="keyword-tag">low〜maxの5段階の推論（reasoning）設定</span>が示されている。</span></li>
+      <li><i class="fa-solid fa-flask"></i><span>本動画では<span class="highlight">KingBench 3の8タスク</span>を実際に生成・操作して検証。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg"></i> まだプレビュー段階のモデルを、ベンチの点数だけでなく中身まで徹底チェックするスタイルがこのチャンネルの真骨頂だよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-arrow-trend-up fa-5x" style="animation: fa-bounce 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>②スコアは31.25%→66.25%: 前世代から35ポイント急上昇</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-chart-line"></i><span>M3.1 FlashはKingBench 3で<span class="keyword-tag">66.25%</span>（53/80点）を記録。</span></li>
+      <li><i class="fa-solid fa-code-compare"></i><span>旧来の<span class="keyword-tag">MiniMax M3は31.25%</span>だったため、<span class="highlight">実に35ポイントの跳ね上がり</span>。</span></li>
+      <li><i class="fa-solid fa-magnifying-glass"></i><span>ただし実際の生成物を開くと<span class="highlight">評価はより複雑</span>になる——見事な成果物と壊れた成果物が混在。</span></li>
+      <li><i class="fa-solid fa-star-half-stroke"></i><span>折りたたみテーブルは最高水準、コンタクトレンズケースも良好。一方でエレベーターはボタン押下でクラッシュ。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg"></i> 点数の改善は本物でも、タスクによって出来ばえのばらつきがかなり大きいんだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-circle-info fa-5x" style="animation: fa-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>③注意: 公開情報はまだ限定的 — 旧M3のスペックを転用しない</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>数値ベンチマーク表・公開API価格・ダウンロード可能な重みは<span class="highlight">まだ確認できない</span>。</span></li>
+      <li><i class="fa-solid fa-book"></i><span>公開APIドキュメントには旧来の<span class="keyword-tag">M3</span>のみが載っており、M3.1 Flashへの言及なし。</span></li>
+      <li><i class="fa-solid fa-ban"></i><span>M3のコンテキストウィンドウ・マルチモーダル機能・ベンチスコアを<span class="highlight">M3.1 Flashにそのまま当てはめないこと</span>。</span></li>
+      <li><i class="fa-solid fa-circle-question"></i><span>KingBenchの成績表も、どの推論設定で実行されたかは<span class="keyword-tag">未記載</span>。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg"></i> 「プレビュー版の情報は日々変わる」——旧モデルの情報を鵜呑みにしないのが大事だよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-tags fa-5x" style="animation: fa-flip 4.5s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>④料金の参考値: プラットフォーム購読は3プラン</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-crown"></i><span>MiniMaxのトークンプランページでは<span class="keyword-tag">Plus: 月$20</span>・<span class="keyword-tag">Max: 月$50</span>・<span class="keyword-tag">Ultra: 月$120</span>。</span></li>
+      <li><i class="fa-solid fa-circle-exclamation"></i><span>これらは<span class="highlight">プラットフォーム全体の購読価格</span>で、このモデル自体のトークン単価やアクセス条件は別物。</span></li>
+      <li><i class="fa-solid fa-wallet"></i><span>支払い前に<span class="keyword-tag">自分のアカウントで利用可能なモデル</span>を必ず確認しよう。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-coins fa-lg"></i> 「名前にFlashと付くから安い」はまだ保証されていない、というのが正直なところだよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-clipboard-check fa-5x" style="animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑤KingBench 3の仕組み: 8タスク×10点、合計80点</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-list-ol"></i><span>8つのタスクを各<span class="keyword-tag">10点満点</span>で採点し、合計80点満点。</span></li>
+      <li><i class="fa-solid fa-shapes"></i><span>課題は<span class="keyword-tag">インタラクティブシミュレーション・3Dオブジェクト・SVGイラスト・ゲーム・数学・ローカルモデル学習</span>。</span></li>
+      <li><i class="fa-solid fa-star-half-stroke"></i><span>パーセンテージは獲得点の割合で、<span class="highlight">部分点も多いため「タスクの66%を完全解決」を意味しない</span>。</span></li>
+      <li><i class="fa-solid fa-floppy-disk"></i><span>検証は保存済みコードとプレビューの確認によるもので、<span class="keyword-tag">生成に要した試行回数は不明</span>。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-magnifying-glass-chart fa-lg"></i> 「何点取れたか」と同じくらい「どこで点を落としたか」を見るのがこのベンチの醍醐味だよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-elevator fa-5x" style="animation: fa-shake 4s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑥テスト1: エレベーターシミュレーション — 3/10</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>課題は<span class="keyword-tag">3基のエレベーター</span>で各1人のみ搬送。乗客は階ごとに発生し、ホバーで目的地を表示。</span></li>
+      <li><i class="fa-solid fa-palette"></i><span>見た目は良好: ダークなUIに3本のシャフトと8階層、人数・速度スライダー、待ち・乗車・配送カウンター。</span></li>
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>しかし<span class="highlight">「Spawn People」ボタンを押すと何も起きず</span>、カウンターはゼロのままブラウザがエラーを報告。</span></li>
+      <li><i class="fa-solid fa-bug"></i><span>原因はコード内で<span class="keyword-tag">数値を関数のように呼び出している</span>バグ。エレベーター描画もシャフト下端でクリップ。</span></li>
+      <li><i class="fa-solid fa-code-compare"></i><span>参考: SWE 2とOpus 5.5は8点、Grok 4.7とGPT-6 Soulは7点。<span class="highlight">今回のセットで最弱の結果</span>。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-xmark fa-lg"></i> UIと制御は揃っているのに、核となるインタラクションが一発で動かない——もったいないパターンだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-glasses fa-5x" style="animation: fa-beat 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑦テスト2: コンタクトレンズケース — 8/10</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>課題は左右の区別があるケースで、<span class="keyword-tag">フタのクリックで開閉</span>すること。</span></li>
+      <li><i class="fa-solid fa-palette"></i><span>白い丸型ケースに左が<span class="keyword-tag">オレンジ</span>・右が<span class="keyword-tag">ブルー</span>のアクセント、大きなL/R表記。 lighting・影も自然な製品レンダー風。</span></li>
+      <li><i class="fa-solid fa-hand-pointer"></i><span>左フタを直接クリックすると開き、状態表示も更新。<span class="keyword-tag">両方ボタン</span>も検証済みで両フタが開く。</span></li>
+      <li><i class="fa-solid fa-circle-exclamation"></i><span>弱点は開けた内側が<span class="highlight">窪んだ収容部ではなく白い固形面</span>に見えること。本体が中空でなく、レンズ形状が不透明面の下に埋まっている。</span></li>
+      <li><i class="fa-solid fa-code-compare"></i><span>8点はSWE 2と同点。GPT-6 Soulの6点を上回り、Grok 4.7（9点）・Opus 5.5（10点）に次ぐ。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-thumbs-up fa-lg"></i> 見た目とインタラクションの両方できている。内側の造形だけ詰めればさらに上を狙えるよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-table fa-5x" style="animation: fa-flip 5s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑧テスト3: 折りたたみテーブル — 9/10（今回の一番のお気に入り）</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>スライダーを右へ動かすと3Dで<span class="keyword-tag">なめらかに開脚</span>、左へ動かすと折りたたみ。</span></li>
+      <li><i class="fa-solid fa-tree"></i><span>木目の見える天板・丸縁・金属脚・斜め補強・黒いゴム足と、<span class="highlight">実物そっくりのディテール</span>。</span></li>
+      <li><i class="fa-solid fa-lightbulb"></i><span>コードも筋が良い: 2つの脚フレームの<span class="keyword-tag">幅を変えて天板下に収まる</span>設計、目標姿勢へイージングする動き。</span></li>
+      <li><i class="fa-solid fa-magnifying-glass"></i><span>完全収納・中間・全開の3姿勢をすべて確認済み。ポーズ間のスナップではなく<span class="highlight">自然な遷移</span>。</span></li>
+      <li><i class="fa-solid fa-trophy"></i><span><span class="keyword-tag">9点はGrok 4.7と並ぶこの課題の最高得点</span>（SWE 2・Opus 5.5は8点、GPT-6 Soulは7点）。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-star fa-lg"></i> ジオメトリとインタラクションが噛み合ったとき、M3.1 Flashは本当に強い結果を出せるんだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-paw fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑨テスト4: バーガーを食べるパンダのSVG — 7/10</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-palette"></i><span>丸いパステル背景に、大きな黒目のパンダとピンクの頬、傾けたバーガーを持つ両手を描画。</span></li>
+      <li><i class="fa-solid fa-layer-group"></i><span>バーガーはごま付きバンズに<span class="keyword-tag">レタス・トマト・チーズ・パティが別レイヤー</span>で分かれ、口元にくず、周囲に星の装飾。</span></li>
+      <li><i class="fa-solid fa-circle-exclamation"></i><span>弱点は「かじり跡」: 口の近くに丸いバンの欠片が浮き、下に不自然な切り欠き。<span class="highlight">きれいな一口に見えない</span>。</span></li>
+      <li><i class="fa-solid fa-circle-info"></i><span>アニメーションは要求外なので静的SVGで減点なし。</span></li>
+      <li><i class="fa-solid fa-code-compare"></i><span>7点。SWE 2は8点、Grok 4.7は4点、GPT-6 SoulとOpus 5.5は<span class="keyword-tag">10点満点</span>。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-face-smile fa-lg"></i> 意図したシーンは伝わるのに、口と食べ物のオーバーラップの詰めが甘い——細部で差がつく課題だね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-bow-arrow fa-5x" style="animation: fa-shake 3.6s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑩テスト5: アーチェリーゲーム — 4/10</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>課題は4つの的を撃ち、早いクリアでリーダーボードを上げるタイムトライアル。</span></li>
+      <li><i class="fa-solid fa-mountain-sun"></i><span>初見の見た目は好調: 山・太陽・草原・射手に、タイマー・風・残的・残り矢の<span class="keyword-tag">HUD</span>、引いて放す操作と軌道ガイド。</span></li>
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>しかし的の台は射場に並ぶのに、<span class="highlight">的の面だけが左上に重なって描画</span>。当たり判定場所に的が表示されない。</span></li>
+      <li><i class="fa-solid fa-bug"></i><span>原因は的の円を<span class="keyword-tag">キャンバス原点周りに描いたまま各位置へ移動させていない</span>コード。4つ目の的は未定義の初期高さで別エラー。</span></li>
+      <li><i class="fa-solid fa-stopwatch"></i><span>タイマーも照準中は停止（1.24秒で止まる）し、<span class="highlight">実プレイ時間を測れない</span>リーダーボードに。7点のSWE 2・Grok 4.7、9点のOpus 5.5に対し4点。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-xmark fa-lg"></i> 景色作りは上手なのに、ゲームとして成立させる論理でつまずく——グラフィックとロジックのギャップだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-square-root-variable fa-5x" style="animation: fa-beat-fade 4s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑪テスト6: 数学問題 — 10/10（満点）</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>20通りのx値と3通りのy値にまたがる<span class="keyword-tag">60個の順序対</span>、連続接続の規則に従い最上段開始・最下段終了の有効な並びを数える問題。</span></li>
+      <li><i class="fa-solid fa-equals"></i><span>ベンチマークの正答は<span class="keyword-tag">20,460</span>。M3.1 Flashは<span class="highlight">正解で10点満点</span>。</span></li>
+      <li><i class="fa-solid fa-users"></i><span>ただし<span class="highlight">比較対象の5モデル全員が10点</span>のため、この課題では差がつかない。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-medal fa-lg"></i> 確実に取るべき課題をきちんと取れている、という確認にもなるんだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-graduation-cap fa-5x" style="animation: fa-bounce 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑫テスト7: ローカルモデル学習 — 7/10（意欲的な部分評価）</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>パンダの事実のデータセットを作り、<span class="keyword-tag">Gemma 2Bをファインチューニング</span>、ページ更新ごとに事実を出すローカルWebアプリを構築する課題。</span></li>
+      <li><i class="fa-solid fa-database"></i><span>実績も本物: <span class="keyword-tag">184事実を920件の訓練例</span>へ拡張、4bit量子化Gemma 2B＋<span class="keyword-tag">LoRAアダプタ</span>で600イテレーション、検証損失は<span class="highlight">3.893→0.207</span>に低下。</span></li>
+      <li><i class="fa-solid fa-window-restore"></i><span>アプリは紙色の背景に大きな明朝体の事実とカテゴリ、「別の事実」ボタン付き。実際に開いて操作・更新し、異なる項目が出ることを確認。</span></li>
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>ただし検証例は訓練と<span class="highlight">同じ事実を別プロンプトで使ったもの</span>で、未知の質問への一般化を証明しない。</span></li>
+      <li><i class="fa-solid fa-circle-exclamation"></i><span>「verified」表示は<span class="keyword-tag">自前コーパスとの照合</span>の意味で、独立ソースによる裏付けではない。実際、パンダの消化器についてスミソニアン動物園の説明と矛盾する項目がコーパス内に混入。</span></li>
+      <li><i class="fa-solid fa-code-compare"></i><span>7点。他の4モデルは10点。データ品質と信頼性の改善が課題。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-diagram-project fa-lg"></i> データ作成→学習→推論→Web画面まで一式組めるのは立派。「verified」の意味を読み解く目も大事だよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-regular fa-clock fa-5x" style="animation: fa-spin 10s linear infinite;" aria-hidden="true"></i>
+    <h2>⑬テスト8: 3D腕時計「Meridian GMT」 — 5/10</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-circle-check"></i><span>現在時刻の表示・なめらかな針・曜日と日付・<span class="keyword-tag">2つのタイムゾーン</span>対応が要求。</span></li>
+      <li><i class="fa-solid fa-palette"></i><span>金属ケース、ディスプレイ用手首に巻いたストラップ、リューズ、ダーク文字盤、曜日・日付窓、第2時間帯の針。文字盤色・ストラップ・針の動き・照明・カメラの操作も搭載。</span></li>
+      <li><i class="fa-solid fa-globe"></i><span>ライブ時計はプレビューで動作。第2時間帯をロンドンから東京へ変えると、表示が<span class="highlight">ニューヨーク+5時間から+13時間へ正しく更新</span>。針も小数秒を使ったなめらか動作。</span></li>
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>しかし文字盤に重大な形状問題: 時間マーカーが<span class="highlight">上部に束になって星形の塊</span>になり、文字盤全体に配置されていない（同じ初期位置から局部回転させているため）。外周の数字も逆さま。</span></li>
+      <li><i class="fa-solid fa-camera"></i><span>カメラプリセットもほぼ真横の急角度で、<span class="keyword-tag">見やすくするボタンなのに逆効果</span>。SWE 2は8点、Opus 5.5とGPT-6 Soulは10点。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-gears fa-lg"></i> 時計としての機能は動いているのに、盤面デザインの幾何配置で大きく失点したパターンだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-calculator fa-5x" style="animation: fa-beat 3.3s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑭最終成績の内訳: 53/80＝66.25%</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-elevator"></i><span>エレベーター <span class="keyword-tag">3点</span> ／ レンズケース <span class="keyword-tag">8点</span> ／ 折りたたみテーブル <span class="keyword-tag">9点</span> ／ パンダSVG <span class="keyword-tag">7点</span></span></li>
+      <li><i class="fa-solid fa-bow-arrow"></i><span>アーチェリー <span class="keyword-tag">4点</span> ／ 数学 <span class="keyword-tag">10点</span> ／ ローカル学習 <span class="keyword-tag">7点</span> ／ 腕時計 <span class="keyword-tag">5点</span></span></li>
+      <li><i class="fa-solid fa-equals"></i><span>合計<span class="highlight">53/80＝66.25%</span>。3点から10点まで振れ幅が大きい「ばらつき型」の成績。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-chart-simple fa-lg"></i> 強い課題と弱い課題の差がはっきり出るスコアシートになっているよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-ranking-star fa-5x" style="animation: fa-flip 4.2s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑮直接比較: 強豪モデルとの差はまだ歴然</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-code-compare"></i><span>同一シートでの比較: <span class="keyword-tag">Grok 4.7＝62/80（77.5%）</span>、<span class="keyword-tag">GPT-6 Soul（medium）＝66/80（82.5%）</span>。</span></li>
+      <li><i class="fa-solid fa-arrow-up"></i><span><span class="keyword-tag">SWE 2＝67/80（83.75%）</span>、そして<span class="keyword-tag">Opus 5.5（medium）＝75/80（93.75%）</span>が最高。</span></li>
+      <li><i class="fa-solid fa-circle-exclamation"></i><span>参考: 別のリーダーボード図ではOpus 5.5が93.5%と表示されるが、75/80は<span class="highlight">93.75%が正しい計算</span>のため詳細シートを採用。</span></li>
+      <li><i class="fa-solid fa-chart-line"></i><span>M3.1 Flashの66.25%は<span class="highlight">上位勢に10ポイント以上の差</span>を残されたまま。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-flag-checkered fa-lg"></i> 前世代比では大躍進でも、頂点争いの集団にはまだ届いていないんだね！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-list-ol fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑯リーダーボード全体での位置: 下位団から中位団へ</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-arrows-up-down"></i><span>M3.1 Flash（66.25%）は<span class="keyword-tag">Grok 4.5（65%）の直上</span>、<span class="keyword-tag">Qwen 3.8 Flash（70%）の直下</span>に位置。</span></li>
+      <li><i class="fa-solid fa-arrow-up"></i><span>その上にはGPT-5.6 SoulとMuse Spark 1.3（71.25%）、DeepSeek V4 Flash（72.5%）、GLM 5.2（75%）ら中位団が連なる。</span></li>
+      <li><i class="fa-solid fa-crown"></i><span>頂点付近は<span class="highlight">Opus 5.5（93.75%）</span>、Fable 5.1（92.5%）、GLM 5.3（91.25%）、GPT-6 Astra（90%）の争い。</span></li>
+      <li><i class="fa-solid fa-arrow-down"></i><span>下位には旧MiniMax M3（31.25%）のほか、Gemini 3.5 Flash（30%）、GPT-5.6 Luna（40%）、Sonnet 5（48.75%）ら。表ではDeepSeek V4 Pro系の別エントリも分けて記載。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-stairs fa-lg"></i> 旧M3が最下位団だったことを考えれば、中位団まで一気に上がってきたのは印象的だよ！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-thumbs-up fa-5x" style="animation: fa-beat-fade 3.5s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑰良いところ: 単発の生成物より「パイプライン構築力」</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-table"></i><span><span class="keyword-tag">折りたたみテーブル（9点）</span>はジオメトリとアニメーションが噛み合った今ラン最高の生成物。</span></li>
+      <li><i class="fa-solid fa-glasses"></i><span><span class="keyword-tag">レンズケース（8点）</span>は実用的な出発点として十分な品質。</span></li>
+      <li><i class="fa-solid fa-diagram-project"></i><span>ローカル学習課題では<span class="highlight">データ準備→学習→推論→Webインターフェース</span>という複数の実コンポーネントをまとめ上げた。</span></li>
+      <li><i class="fa-solid fa-lightbulb"></i><span>「1発の(UIだけの)成果物」より、<span class="keyword-tag">複数工程を束ねる課題</span>で健闘する傾向が見える。</span></li>
+    </ul>
+    <div class="speech-bubble">
+      <span class="handwritten"><i class="fa-solid fa-seedling fa-lg"></i> 地味だけど重要な発見——完成度のばらつきを除けば、設計力自体はかなり上位に近いのかも！</span>
+    </div>
+  </div>
+</div>
+
+<div class="section-card fade-in-scale">
+  <div class="mega-icon-container">
+    <i class="fa-solid fa-clipboard-question fa-5x" style="animation: fa-shake 4.2s ease-in-out infinite;" aria-hidden="true"></i>
+    <h2>⑱総評: 「かなり良い」しかし検証は必須 — 使いこなしの処方箋</h2>
+  </div>
+  <div class="card-content">
+    <ul class="keyword-list">
+      <li><i class="fa-solid fa-triangle-exclamation"></i><span>問題は<span class="highlight">初歩的ミスが完成品に残る</span>こと: ボタンが何も生む前にクラッシュ、的が誤位置に描画、時計マーカーが同一位置に集合。</span></li>
+      <li><i class="fa-solid fa-magnifying-glass"></i><span>これらは<span class="keyword-tag">軽いブラウザ確認で見つかるレベル</span>の不具合。</span></li>
+      <li><i class="fa-solid fa-list-check"></i><span>プロトタイプ用途なら、成果物をそのまま信じず<span class="highlight">主要なインタラクションを必ず自分でテスト</span>してから組み立てよう。</span></li>
+      <li><i class="fa-solid fa-tags"></i><span>このモデル自体の価格と生成速度は未検証のため、<span class="keyword-tag">「Flashの名前＝最高のコスパ」とはまだ言えない</span>。</span></li>
+      <li><i class="fa-solid fa-scale-balanced"></i><span>結論: スコア改善は励みになるが、監督を減らして任せるには<span class="highlight">一貫性がもう一段必要</span>。総合評価は「かなり良い（pretty cool）」。</span></li>
+    </ul>
+    <div class="speech-bubble variant-1">
+      <span class="handwritten"><i class="fa-solid fa-user-check fa-lg"></i> 点数より「どこが壊れているか」を見てから使う——これが新モデルを賢く使い倒すコツだよ！</span>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<footer>
+  🎬 動画: <a href="https://www.youtube.com/watch?v=acPS3TGflXU" target="_blank" rel="noopener">AI Code King</a> — Minimax M3.1 Flash (Fully Tested): Okay, this MODEL is PRETTY GOOD! | 📅 2026年9月28日<br>
+  ※ 本インフォグラフィックは動画内容の要点を整理したものです。モデル名・スコア・価格情報は動画公開時点のもので、正式な情報はMiniMax公式発表をご確認ください。
+</footer>
+
+</div>
+</body>
+</html>

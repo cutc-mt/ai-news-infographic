@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenAIの新エージェントスタック: Computer Use・Decisions API・UltraFast・Dots | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: インディゴナイト × アクアミント（ダーク） */
+  --ui-color-1: #22D3EE;   /* アクアミント（メイン） */
+  --ui-color-2: #818CF8;   /* インディゴライト（アクセント） */
+  --ui-color-3: rgba(129, 140, 248, 0.18);  /* タグの下地（インディゴ） */
+  --ui-color-4: #C7D2FE;   /* ライトインディゴ（タグ文字） */
+  --ui-color-5: #6EE7B7;   /* ミントグリーン（差し色） */
+  --bg-canvas: #111827;    /* ナイトキャンバス */
+  --bg-card: #1E293B;      /* カード地 */
+  --text-main: #D1D5DB;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image: radial-gradient(ellipse 1200px 500px at 50% -100px, rgba(34, 211, 238, 0.10), transparent),
+                    radial-gradient(ellipse 1000px 600px at 90% 110%, rgba(129, 140, 248, 0.08), transparent);
+  font-family: 'Kaisei Decol', 'Zen Kurenaido', serif;
+  color: var(--text-main);
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  margin-bottom: 25px;
+  background: linear-gradient(160deg, #0F1B33 0%, #131C33 55%, #0E1B2E 100%);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 24px;
+  box-shadow: 0 0 40px rgba(34, 211, 238, 0.10), inset 0 1px 0 rgba(255,255,255,0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+.header .fa-7x {
+  color: var(--ui-color-1);
+  filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.55));
+  animation: fa-bounce 3s ease-in-out infinite;
+}
+
+.header h1 {
+  font-size: 36px;
+  font-weight: bold;
+  color: #F9FAFB;
+  margin: 10px 0 5px;
+}
+
+.header .subtitle {
+  font-size: 17px;
+  color: var(--ui-color-1);
+  font-weight: bold;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #94A3B8;
+  margin-top: 8px;
+}
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: var(--bg-card);
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(-0.5deg);
+  box-shadow: 0 16px 40px rgba(34, 211, 238, 0.18), 0 10px 30px rgba(0,0,0,0.5);
+  background-color: #223046;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+.section-card:nth-child(3n) { border-top-color: var(--ui-color-5); }
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--ui-color-1);
+  filter: drop-shadow(0 0 10px rgba(34, 211, 238, 0.45));
+}
+
+.mega-icon-container h2 {
+  font-size: 23px;
+  color: #F3F4F6;
+  margin: 10px 0 0;
+  font-weight: bold;
+}
+
+.timestamp {
+  font-size: 14px;
+  color: #94A3B8;
+  margin-top: 4px;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: var(--text-main);
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-1);
+  min-width: 16px;
+}
+
+.section-card:nth-child(even) .keyword-list li i { color: var(--ui-color-2); }
+.section-card:nth-child(3n) .keyword-list li i { color: var(--ui-color-5); }
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.keyword-tag.accent {
+  background-color: rgba(34, 211, 238, 0.16);
+  color: #A5F3FC;
+}
+
+.keyword-tag.alert {
+  background-color: rgba(110, 231, 183, 0.14);
+  color: var(--ui-color-5);
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #16213C;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 14px rgba(0, 0, 0, 0.4);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #12303F;
+  border-color: var(--ui-color-5);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #1D2148;
+  border-color: var(--ui-color-2);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #E5E7EB;
+  display: inline-block;
+}
+
+/* コードプレビュー */
+pre {
+  background: #0B1220;
+  border-left: 4px solid var(--ui-color-1);
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  color: #A5F3FC;
+}
+
+code.inline {
+  background: rgba(34, 211, 238, 0.14);
+  color: #A5F3FC;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 流れの矢印 */
+.flow-arrow {
+  text-align: center;
+  font-size: 14px;
+  color: var(--ui-color-5);
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.flow-arrow i {
+  color: var(--ui-color-1);
+  margin: 0 4px;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(34, 211, 238, 0); }
+  50% { text-shadow: 0 0 14px rgba(34, 211, 238, 0.65); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 30px;
+  background: #0F1B33;
+  border: 1px solid rgba(129, 140, 248, 0.30);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  font-size: 14px;
+  color: #94A3B8;
+}
+
+.footer a {
+  color: var(--ui-color-1);
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <header class="header">
+    <i class="fa-solid fa-microchip fa-7x" aria-hidden="true"></i>
+    <h1>OpenAIの新エージェントスタック — Computer Use・Decisions API・UltraFast・Dots</h1>
+    <div class="subtitle">OpenAI&rsquo;s New Agent Stack: Computer Use, Decisions API, UltraFast, Dots — Ari Weinstein &amp; Nikunj Handa</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026-10-01 ／ Latent Space Podcast ／ 40分18秒</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- カード 1: フック -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt fa-5x" style="animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① 「もう人間より速い」宣言</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:00 Hook</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gauge-high"></i><span>Computer Useは多くの場合<span class="keyword-tag accent">平均的な人間より速く</span>タスクを完遂する段階に到達</span></li>
+          <li><i class="fa-solid fa-arrow-up-right-dots"></i><span>次のフロンティアは<span class="keyword-tag">文字通り超人類的</span>な速度——熟練ユーザー並みのソフトウェア操作</span></li>
+          <li><i class="fa-solid fa-wave-square"></i><span>実現すれば<span class="keyword-tag accent">リアルタイム性の高い製品</span>を一気に構築できるように</span></li>
+          <li><i class="fa-solid fa-microphone-lines"></i><span>OpenAI DevDay基調講演の直後に収録——<span class="keyword-tag">Ari Weinstein氏</span>（Computer Use担当）が登場</span></li>
+        </ul>
+        <div class="flow-arrow">平均人類超え <i class="fa-solid fa-arrow-right"></i> エキスパート級 <i class="fa-solid fa-arrow-right"></i> リアルタイム製品</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-bolt-lightning fa-lg" style="color: var(--ui-color-1);"></i> 冒頭から衝撃宣言——「平均の人より速い」って、もう<span class="highlight-text">当たり前の時代</span>が来ちゃったの…？</span>
+      </div>
+    </div>
+
+    <!-- カード 2: DevDay総覧 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② DevDay発表の総点検</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:12 DevDay Recap</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-nodes"></i><span>新パーソナルアシスタント<span class="keyword-tag accent">Dots</span>——Computer Use機能を内蔵</span></li>
+          <li><i class="fa-solid fa-coins"></i><span><span class="keyword-tag">GPT-6.1 Sol</span>はCU用途に最適: Astraの<span class="keyword-tag accent">5分の1</span>、Computer Useなら<span class="keyword-tag accent">7分の1</span>のコスト</span></li>
+          <li><i class="fa-solid fa-plug"></i><span><span class="keyword-tag">Agents APIにComputer Use統合</span>——CodexやChatGPTと同一実装を開発者が利用可能に</span></li>
+          <li><i class="fa-solid fa-desktop"></i><span>App Shotsのデモと、<span class="keyword-tag">Mac上でネイティブ動作するCU</span>（作業中に自動スクショ）も披露</span></li>
+        </ul>
+        <div class="flow-arrow">Dots <i class="fa-solid fa-arrow-right"></i> GPT-6.1 Sol <i class="fa-solid fa-arrow-right"></i> Agents API <i class="fa-solid fa-arrow-right"></i> App Shots/Mac</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-5);"></i> 基調講演だけで発表が多すぎる…!特に「7分の1コスト」はエージェント開発の見積りが変わりそう。</span>
+      </div>
+    </div>
+
+    <!-- カード 3: Dots -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-server fa-5x" style="animation: fa-beat 1.9s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ Dotsは「専用Linuxコンピュータ」持ち</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 04:04 Dots &amp; Personal Cloud Computers</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-brands fa-linux"></i><span>各Dotにはクラウド上の<span class="keyword-tag accent">専用Linux仮想コンピュータ</span>が割り当てられる</span></li>
+          <li><i class="fa-solid fa-window-restore"></i><span>従来はクラウドのブラウザか自分のPCのみ——今回は<span class="keyword-tag">フルDesktopアプリが動作</span></span></li>
+          <li><i class="fa-solid fa-globe"></i><span>Webブラウザも使える——<span class="keyword-tag accent">人がPCでできることは何でも委任できる</span></span></li>
+          <li><i class="fa-solid fa-users-viewfinder"></i><span>世界中のソフトウェアは人間向け設計——<span class="keyword-tag">同じUIをエージェントが操作</span>できるのが本質</span></li>
+        </ul>
+        <div class="flow-arrow">専用Linux VM <i class="fa-solid fa-arrow-right"></i> Desktop+ブラウザ <i class="fa-solid fa-arrow-right"></i> 全面委任</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> 「ブラウザ貸し」から「丸ごとPC貸し」へ。エージェントの作業場が一気に広がった！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: 実例 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-utensils fa-5x" style="animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ 実例: 注文2時間が15分に</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 04:58 Use Cases</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-stopwatch"></i><span>Ari氏のミールキット注文は細かいカスタマイズゆえ手作業で<span class="keyword-tag">2時間</span>かかった</span></li>
+          <li><i class="fa-solid fa-bolt"></i><span>GPT-6.1 SolのCUに委任したら<span class="keyword-tag accent">15分で完了——8倍速い</span>、しかも2時間の節約</span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>最初の一歩は「<span class="keyword-tag">時間を溶かす作業を洗い出して委任</span>する」こと</span></li>
+          <li><i class="fa-brands fa-youtube"></i><span>フライト予約・買い物も定番。<span class="keyword-tag accent">API非公開のYouTube運用作業</span>の自動化にも好適</span></li>
+        </ul>
+        <div class="flow-arrow">手作業2時間 <i class="fa-solid fa-arrow-right"></i> CUに委任 <i class="fa-solid fa-arrow-right"></i> 15分完了（8倍）</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-face-grin-stars fa-lg" style="color: var(--ui-color-1);"></i> 2時間→15分は数字が直感に刺さる…!OpenAIの社内DXチームもYouTube自動化に使いまくってるらしい。</span>
+      </div>
+    </div>
+
+    <!-- カード 5: 180度 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rotate fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ 「180度変わった」——懐疑論への反論</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 06:11 180 Degrees Different</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-quote-right"></i><span>有力ポッドキャスト主宰の「<span class="keyword-tag">CUは2年進歩していない</span>」説をトピックに提起</span></li>
+          <li><i class="fa-solid fa-rotate"></i><span>Ari氏: 「数ヶ月前の発言なら、今は<span class="keyword-tag accent">180度違う</span>見方をするはず」</span></li>
+          <li><i class="fa-solid fa-route"></i><span>Ari氏の歩み: <span class="keyword-tag">AppleのShortcuts → スタートアップSky → OpenAI</span>——一貫して自動化一本</span></li>
+          <li><i class="fa-solid fa-chart-line"></i><span>Sky時代もCUに挑んだがモデル能力が足りず——<span class="keyword-tag accent">直近1年で様変わり</span></span></li>
+        </ul>
+        <div class="flow-arrow">Apple Shortcuts <i class="fa-solid fa-arrow-right"></i> Sky <i class="fa-solid fa-arrow-right"></i> OpenAI <i class="fa-solid fa-arrow-right"></i> 180度の進化</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-glasses fa-lg" style="color: var(--ui-color-5);"></i> 「半年で180度」——エージェント界の常識の賞味期限は本当に短い…。</span>
+      </div>
+    </div>
+
+    <!-- カード 6: 自己デバッグ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bug-slash fa-5x" style="animation: fa-flip 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ 最大の差分: 自己デバッグするエージェント</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 07:16 Self-Debugging Agents</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-play"></i><span>以前: タスクの<span class="keyword-tag">開始は安定</span>していたが、問題にぶつかると止まってしまった</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench"></i><span>今: <span class="keyword-tag accent">デバッグ・再試行・内省</span>が実に上手くなり自力で回復</span></li>
+          <li><i class="fa-solid fa-file-code"></i><span>Codexのツール呼び出しを展開すると<span class="keyword-tag accent">JavaScriptを書いて複数操作を一括実行</span>している</span></li>
+          <li><i class="fa-solid fa-gauge"></i><span>モデル加速＋ハーネス側の技術多様化（コード生成・マルチモーダル）で<span class="keyword-tag">速度が桁違い</span>に</span></li>
+        </ul>
+        <pre>agent.write(`js:
+  fill("email", ...); click("next");
+  select("plan", "pro"); submit();`)</pre>
+        <div class="flow-arrow">開始はできる <i class="fa-solid fa-arrow-right"></i> 詰まると停止 <i class="fa-solid fa-arrow-right"></i> デバッグで自力回復</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-2);"></i> 1アクションずつポチポチじゃなく、<span class="highlight-text">コード書いて一気に処理</span>——これが速度の秘密なんだ…！</span>
+      </div>
+    </div>
+
+    <!-- カード 7: マルチモーダル -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="animation: fa-beat 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ 見方の革命: スクショ＋アクセシビリティ＋DOM</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 10:36 How CU Sees Software</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-image"></i><span>従来の痛点: <span class="keyword-tag">スクショ→スクロール→スクショ</span>の非効率ループ</span></li>
+          <li><i class="fa-solid fa-tree"></i><span>アクセシビリティ情報と<span class="keyword-tag accent">DOMへの直接アクセス</span>でページ全体を一度に把握</span></li>
+          <li><i class="fa-solid fa-code"></i><span>全体が見えるので<span class="keyword-tag accent">複数ステップをまとめたコード</span>を書ける——速度が段違い</span></li>
+          <li><i class="fa-solid fa-shuffle"></i><span>スクショ/アクセシビリティ/<span class="keyword-tag">Playwright</span>をタスクに応じて使い分けるマルチモーダル設計</span></li>
+        </ul>
+        <div class="flow-arrow">1操作ずつ視認 <i class="fa-solid fa-arrow-right"></i> 全体を一望 <i class="fa-solid fa-arrow-right"></i> コードで一括実行</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color: var(--ui-color-1);"></i> 「スクロール地獄」からの解放。見え方が変われば速さも変わる、ってのがよく分かる一枚。</span>
+      </div>
+    </div>
+
+    <!-- カード 8: App Shots -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-camera-retro fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ App Shots——スクショの「情報欠落」を潰す</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 11:35 App Shots</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-keyboard"></i><span><span class="keyword-tag accent">コマンドキー2連打</span>で作業中アプリの文脈をCodex/ChatGPTへ高速取り込み</span></li>
+          <li><i class="fa-solid fa-image-slash"></i><span>普通のスクショには<span class="keyword-tag">リンク先URLや省略された予定タイトル</span>が含まれない</span></li>
+          <li><i class="fa-solid fa-file-lines"></i><span>App Shotsは<span class="keyword-tag accent">生テキスト＋アクセシビリティ表現</span>を丸ごと提供——トークン効率も職人芸</span></li>
+          <li><i class="fa-solid fa-universal-access"></i><span>人間向け<span class="keyword-tag">スクリーンリーダー技術</span>が、LLMのコンピュータ利用にもそのまま有効</span></li>
+        </ul>
+        <div class="flow-arrow">スクショ（情報欠落） <i class="fa-solid fa-arrow-right"></i> App Shots（全文脈） <i class="fa-solid fa-arrow-right"></i> 高速な委任</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-5);"></i> 「ただの画像添付」に見えて実は全データ添付だった——地味に凄い機能なんだ…。</span>
+      </div>
+    </div>
+
+    <!-- カード 9: 超人類 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-5x" style="animation: fa-beat 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ 平均人類超え→「超人類」への残課題</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 13:21 Superhuman Computer Use</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-plus"></i><span>現状: 多くのケースで平均的人間より速い。次は<span class="keyword-tag accent">熟練者と同等以上の速度</span>へ</span></li>
+          <li><i class="fa-solid fa-hourglass-half"></i><span>速度が上がるほど律速は「操作そのもの」に——例: <span class="keyword-tag">DoorDashのページロード待ち</span></span></li>
+          <li><i class="fa-solid fa-chart-area"></i><span>ロード完了→次アクション指示の遅延最小化は<span class="keyword-tag">統計的科学</span>の世界</span></li>
+          <li><i class="fa-solid fa-satellite-dish"></i><span>loadイベントで<span class="keyword-tag accent">イベント駆動化できる部分</span>と、できない部分（カスタマー応答等）が混在</span></li>
+        </ul>
+        <div class="flow-arrow">人間速に到達 <i class="fa-solid fa-arrow-right"></i> 律速はロード待ち <i class="fa-solid fa-arrow-right"></i> イベント駆動で圧縮</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-tachograph-digital fa-lg" style="color: var(--ui-color-2);"></i> 敵はモデルじゃなく<span class="highlight-text">ネットワーク待ち</span>になってきた——高速化の主戦場が移ってる！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: 信頼の証 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-heart fa-5x" style="animation: fa-flip 3.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ DNS設定も請求書支払いも任せる時代</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 15:31 Trust Milestones</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clock-rotate-left"></i><span>3〜4年前はLLMをWebやデバイスに繋ぐこと自体が<span class="keyword-tag">怖かった</span></span></li>
+          <li><i class="fa-solid fa-file-invoice-dollar"></i><span>今は<span class="keyword-tag accent">DNS設定や請求書支払い（数万ドル規模）</span>をCUに任せる段階へ</span></li>
+          <li><i class="fa-solid fa-headset"></i><span>カスタマーサポート対応も定番化——完璧な文章で返すので<span class="keyword-tag">向こうもbotと気づくかも</span></span></li>
+          <li><i class="fa-solid fa-diagram-nested"></i><span>待ち時間に<span class="keyword-tag accent">サブエージェントで調査</span>させる等、人間側の運用ノウハウも進化</span></li>
+        </ul>
+        <div class="flow-arrow">接続を恐れた時代 <i class="fa-solid fa-arrow-right"></i> DNS・支払いを委任 <i class="fa-solid fa-arrow-right"></i> bot対botの日常</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-money-bill-transfer fa-lg" style="color: var(--ui-color-1);"></i> 「数万ドルをYOLOで送る」——信頼の積み上がり速度が怖いくらい早い…！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: Agents API -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug-circle-bolt fa-5x" style="animation: fa-beat 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ Agents API——同一実装のCUを開発者へ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 17:15 Agents API</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-globe"></i><span>第三者サイト・サービスと連携するアプリに不可欠なCUの<span class="keyword-tag">汎用性</span></span></li>
+          <li><i class="fa-solid fa-equals"></i><span><span class="keyword-tag accent">CodexやChatGPTと同じComputer Use実装</span>をAPIで公開</span></li>
+          <li><i class="fa-solid fa-brain"></i><span>モデルは自社ハーネスで訓練——<span class="keyword-tag accent">分布内利用は速度・コスト・精度で有利</span></span></li>
+          <li><i class="fa-solid fa-toolbox"></i><span>自前ハーネス構築も可能だが難易度高——<span class="keyword-tag">公式実装を使うメリット</span>が大きい</span></li>
+        </ul>
+        <div class="flow-arrow">自前ハーネズ（難） <i class="fa-solid fa-arrow-right"></i> Agents APIのCU <i class="fa-solid fa-arrow-right"></i> 分布内で有利</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--ui-color-5);"></i> 「モデルが学んだ環境と同じ環境」をそのまま貸す——分布内だけのアドバンテージ、確かにデカい。</span>
+      </div>
+    </div>
+
+    <!-- カード 12: 安全設計 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-shield fa-5x" style="animation: fa-flip 2.9s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ 信頼を設計で築く——同意・権限・制限</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 17:58 Trust, Permissions &amp; Safety</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-handshake"></i><span>信頼は「確実に動く」積み重ねで構築——<span class="keyword-tag accent">信頼性の担保</span>が最優先</span></li>
+          <li><i class="fa-solid fa-scale-balanced"></i><span>支払い等の重要操作の前には<span class="keyword-tag">ユーザーの同意</span>を必ず求める設計</span></li>
+          <li><i class="fa-solid fa-ban"></i><span>タスクに必要な<span class="keyword-tag accent">サイト・アプリだけへアクセス制限</span></span></li>
+          <li><i class="fa-solid fa-sliders"></i><span>安全チェックは<span class="keyword-tag">タスク性質ごとに設定</span>——製品により構成が異なる</span></li>
+        </ul>
+        <div class="flow-arrow">同意 <i class="fa-solid fa-arrow-right"></i> 権限の絞り込み <i class="fa-solid fa-arrow-right"></i> 安全チェック <i class="fa-solid fa-arrow-right"></i> 信頼の蓄積</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-lock fa-lg" style="color: var(--ui-color-2);"></i> 「任せる」と「許可を取る」のバランス設計——魔法ではなく設計で信頼を作るんだね。</span>
+      </div>
+    </div>
+
+    <!-- カード 13: コーディング&QA -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-laptop-code fa-5x" style="animation: fa-beat 2.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ 「作って、テストして」のループ完結</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 18:43 Coding, Testing &amp; QA</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-check"></i><span>従来: Codexがビルド→人間がテスト——<span class="keyword-tag">あなたがエージェントのQA</span>になっていた</span></li>
+          <li><i class="fa-solid fa-arrows-rotate"></i><span>CUで<span class="keyword-tag accent">SDLC（開発ライフサイクル）が完結</span>: 構築→テストをエージェントが通しで</span></li>
+          <li><i class="fa-solid fa-vial-circle-check"></i><span>Ari氏: 「<span class="keyword-tag">私の手元に来る頃にはもう動いている</span>」——UIプレイテストで設計問題も検出</span></li>
+          <li><i class="fa-solid fa-infinity"></i><span>メタな光景: <span class="keyword-tag accent">CUエージェントがCUエージェントをテスト</span>する入れ子構造</span></li>
+        </ul>
+        <div class="flow-arrow">ビルド <i class="fa-solid fa-arrow-right"></i> 自己テスト <i class="fa-solid fa-arrow-right"></i> 動く状態で受け取る</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-robot fa-lg" style="color: var(--ui-color-1);"></i> QA作業こそ人間が一番溶かされてた時間——このループを閉じた効果は絶大！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: GPT-6 API -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-tower-broadcast fa-5x" style="animation: fa-flip 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ 非同期ツール呼び出し＋mid-turn steering</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 20:26 GPT-6 APIs</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-random"></i><span><span class="keyword-tag accent">非同期関数呼び出し</span>: ツール実行中もモデルの推論を停止させない</span></li>
+          <li><i class="fa-solid fa-list-ol"></i><span>ツール起動→推論継続→<span class="keyword-tag">結果を後で回収</span>という流れが可能に</span></li>
+          <li><i class="fa-solid fa-comment-dots"></i><span><span class="keyword-tag">mid-turn steering</span>: 推論の途中に新しい指示を注入（モデルの訓練とセットで実現）</span></li>
+          <li><i class="fa-solid fa-exchange"></i><span>数ヶ月前に提供の<span class="keyword-tag accent">WebSockets</span>が双方向通信を支え、GPT-6でも利用可能</span></li>
+        </ul>
+        <div class="flow-arrow">ツール待ちで停止 <i class="fa-solid fa-arrow-right"></i> 推論継続＋途中指示 <i class="fa-solid fa-arrow-right"></i> 応答性向上</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i> 「ツールを待つ間も考え続ける」——人間と同じ働き方をAPIができるようになったんだね。</span>
+      </div>
+    </div>
+
+    <!-- カード 15: UltraFast -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bolt-lightning fa-5x" style="animation: fa-beat 1.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ UltraFast——コーディングエージェントで推論を最適化</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 22:26 UltraFast Inference</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-fire-burner"></i><span>推論チームが<span class="keyword-tag accent">Codexエージェントを常時走らせ</span>性能を絞り出す「watching them cook」</span></li>
+          <li><i class="fa-solid fa-tags"></i><span>効率化の成果で<span class="keyword-tag">Lunaの価格を約80%削減</span>——今は速度極大化へギアチェンジ</span></li>
+          <li><i class="fa-solid fa-microchip"></i><span>GPT-5.3 Codex Spark（初のWebSocket対象）は<span class="keyword-tag">Cerebras協業が明示</span>——UltraFastは肯定も否定もせず</span></li>
+          <li><i class="fa-solid fa-rocket"></i><span><span class="keyword-tag accent">フロンティア知能を極限速度で</span>初めてAPI提供——ユーザー評価も上々</span></li>
+        </ul>
+        <div class="flow-arrow">効率化（価格▲80%） <i class="fa-solid fa-arrow-right"></i> 速度極大化 <i class="fa-solid fa-arrow-right"></i> UltraFast API</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-gears fa-lg" style="color: var(--ui-color-2);"></i> 推論スタックをAI自身に最適化させる時代——再帰的改善がもう日常業務になってる…！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: Decisions誕生 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-stopwatch fa-5x" style="animation: fa-flip 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ Decisions API——4週間の猛烈開発</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 24:33 The Rapid Story</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-fire"></i><span><span class="keyword-tag accent">Jev</span>が市場に火付け——OpenAIのユーザーと社内チームから要望が殺到</span></li>
+          <li><i class="fa-solid fa-code-branch"></i><span>「新モデルを訓練する」のではなく<span class="keyword-tag">既存資産でどこまで速くできるか</span>に挑戦</span></li>
+          <li><i class="fa-solid fa-terminal"></i><span>推論・インフラのメンバーが<span class="keyword-tag accent">プロトタイプをハック</span>→動いたのでレイテンシを山登り（hill climbing）で詰める</span></li>
+          <li><i class="fa-solid fa-calendar-check"></i><span><span class="keyword-tag">4週間前には存在しなかった</span>——レイテンシ目標到達次第で速攻リリース</span></li>
+        </ul>
+        <div class="flow-arrow">Jev登場 <i class="fa-solid fa-arrow-right"></i> 社内ハック <i class="fa-solid fa-arrow-right"></i> プロトタイプ <i class="fa-solid fa-arrow-right"></i> 数週間で提供</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-heart-pulse fa-lg" style="color: var(--ui-color-1);"></i> 「4週間でクラウド研究室初の追従」——ハッカー文化が商品を生む速度が本気でヤバい。</span>
+      </div>
+    </div>
+
+    <!-- カード 17: Decisions仕組み -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ Decisions APIの中身——Lunaの上に速度を積む</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 26:44 What Decisions API Is</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube"></i><span>新モデルではなく<span class="keyword-tag accent">既存Lunaのウェイトの上</span>に構築——推論スタックを速度最適化</span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span><span class="keyword-tag">構造化出力による制約＋複数質問の並列バッチ実行</span>で高速化</span></li>
+          <li><i class="fa-solid fa-gauge-simple-high"></i><span>推論なし・小型モデルで高速だが長期タスクは苦手——<span class="keyword-tag">得意領域を選ぶ設計</span></span></li>
+          <li><i class="fa-solid fa-headphones"></i><span><span class="keyword-tag accent">GPT Liveのツール呼び出し高速化</span>やサポート分類の社内利用が進行中</span></li>
+        </ul>
+        <div class="flow-arrow">Lunaウェイト <i class="fa-solid fa-arrow-right"></i> 構造化＋並列 <i class="fa-solid fa-arrow-right"></i> 超低レイテンシ分類</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-boxes-stacked fa-lg" style="color: var(--ui-color-5);"></i> 「速い小モデル」は魔法じゃなく制約と並列の職人技——構造化出力の高速版なんだね。</span>
+      </div>
+    </div>
+
+    <!-- カード 18: AIクラウド -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud fa-5x" style="animation: fa-flip 3.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ キャッシング・圧縮→「AIクラウド」へ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 33:35 Performance → 38:25 AI Cloud</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database"></i><span>プロンプトキャッシュ: <span class="keyword-tag accent">30分保証＋12時間ウィンドウ</span>をプレビュー提供——キャッシュ前提の設計を</span></li>
+          <li><i class="fa-solid fa-compress"></i><span><span class="keyword-tag">事前ウォーミング</span>でキャッシュを温めてから再利用／<span class="keyword-tag">自動＋手動（codexと同じ方式）の文脈圧縮</span></span></li>
+          <li><i class="fa-solid fa-building-columns"></i><span>元Stripe視点: 決済プリミティブの上に高レベル製品を重ねた<span class="keyword-tag accent">AWS的発明のAI版</span>を模索</span></li>
+          <li><i class="fa-solid fa-box-archive"></i><span><span class="keyword-tag">メモリボールト</span>等の高レベルAPI——かつてのAssistants APIの再挑戦として</span></li>
+        </ul>
+        <div class="flow-arrow">低レイテンシ＋キャッシュ <i class="fa-solid fa-arrow-right"></i> 高レベル抽象 <i class="fa-solid fa-arrow-right"></i> AIネイティブなEC2/S3</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-city fa-lg" style="color: var(--ui-color-2);"></i> 「OpenAIはAIクラウドを発明中」——プリミティブの層が厚くなるほど、作れるものが跳ね上がる！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div>🎬 動画: <a href="https://www.youtube.com/watch?v=z9OkBD2-MDU" target="_blank" rel="noopener">Latent Space Podcast</a> — 「OpenAI&rsquo;s New Agent Stack: Computer Use, Decisions API, UltraFast, Dots—Ari Weinstein &amp; Nikunj Handa」</div>
+    <div style="margin-top: 6px;"><i class="fa-solid fa-circle-info"></i> このインフォグラフィックは動画の内容をグラフィックレコーディング風にまとめたものです。</div>
+    <div style="margin-top: 4px;"><i class="fa-solid fa-circle-exclamation"></i> コスト・価格・機能の情報は動画公開時点（OpenAI DevDay直後）の発言に基づきます。モデル名の表記は字幕の聞き取りに依存します。</div>
+  </footer>
+
+</div>
+
+<script>
+// スクロールに連動したカードのフェードイン
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale:not(.visible)');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { observer.observe(c); });
+});
+</script>
+</body>
+</html>

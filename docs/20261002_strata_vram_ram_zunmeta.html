@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【VRAM 12GBで1250億パラメータ】Strataで巨大AIが動く仕組み 代わりに必要なのはRAM | ずんめたラボ インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Yomogi&family=M+PLUS+Rounded+1c:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: チャコール×ミントグリーン（落ち着いた闇×新鮮な成長のイメージ） */
+  --ui-color-1: #34D399;   /* ミントグリーン（メイン） */
+  --ui-color-2: #6EE7B7;   /* 明るいミント（アクセント） */
+  --ui-color-3: #1F2937;   /* カードの下地（チャコール） */
+  --ui-color-4: #A7F3D0;   /* 薄ミント */
+  --ui-color-5: #D1FAE5;   /* パールミント（差し色） */
+  --bg-canvas: #111827;    /* キャンバス（最深チャコール） */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 15% -5%, rgba(52, 211, 153, 0.14), transparent),
+    radial-gradient(ellipse 900px 550px at 85% 5%, rgba(110, 231, 183, 0.08), transparent);
+  font-family: 'Zen Maru Gothic', 'M PLUS Rounded 1c', sans-serif;
+  color: #ECFDF5;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  margin-bottom: 25px;
+  background: #1F2937;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: 24px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.header .fa-7x {
+  color: var(--ui-color-1);
+  animation: fa-beat 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(52, 211, 153, 0.5));
+}
+
+.header h1 {
+  font-size: 34px;
+  font-weight: bold;
+  color: #F0FDF4;
+  margin: 10px 0 5px;
+}
+
+.header .subtitle {
+  font-size: 17px;
+  color: #6EE7B7;
+  font-weight: bold;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin-top: 8px;
+}
+
+/* ヘッダー: メモリスロット装飾（VRAM→RAM→SSDへ広がる） */
+.memory-slots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  align-items: flex-end;
+  height: 46px;
+  margin: 12px auto 0;
+}
+
+.memory-slots span {
+  display: block;
+  width: 14px;
+  border-radius: 4px 4px 2px 2px;
+  animation: slot-pulse 1.8s ease-in-out infinite;
+}
+
+.memory-slots span:nth-child(1) { height: 38%; background: #065F46; animation-delay: 0s; }
+.memory-slots span:nth-child(2) { height: 50%; background: #059669; animation-delay: 0.1s; }
+.memory-slots span:nth-child(3) { height: 62%; background: #10B981; animation-delay: 0.2s; }
+.memory-slots span:nth-child(4) { height: 74%; background: #34D399; animation-delay: 0.3s; }
+.memory-slots span:nth-child(5) { height: 86%; background: #6EE7B7; animation-delay: 0.4s; }
+.memory-slots span:nth-child(6) { height: 100%; background: #D1FAE5; animation-delay: 0.5s; }
+
+@keyframes slot-pulse {
+  0%, 100% { transform: scaleY(0.65); opacity: 0.8; }
+  50% { transform: scaleY(1.0); opacity: 1; }
+}
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: var(--ui-color-3);
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(0.5deg);
+  box-shadow: 0 16px 38px rgba(52, 211, 153, 0.22), 0 10px 28px rgba(0,0,0,0.5);
+  background-color: #374151;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+.section-card:nth-child(3n) { border-top-color: #10B981; }
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--ui-color-1);
+  filter: drop-shadow(0 0 12px rgba(52, 211, 153, 0.5));
+}
+
+.section-card:nth-child(even) .mega-icon-container i.fa-5x {
+  color: var(--ui-color-5);
+  filter: drop-shadow(0 0 12px rgba(209, 250, 229, 0.4));
+}
+
+.mega-icon-container h2 {
+  font-size: 22px;
+  color: #F0FDF4;
+  margin: 10px 0 0;
+  font-weight: bold;
+}
+
+.timestamp {
+  font-size: 14px;
+  color: #9CA3AF;
+  margin-top: 4px;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15px;
+  color: #ECFDF5;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: #34D399;
+  min-width: 16px;
+}
+
+.section-card:nth-child(even) .keyword-list li i {
+  color: #6EE7B7;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: rgba(52, 211, 153, 0.14);
+  color: #6EE7B7;
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.keyword-tag.accent {
+  background-color: rgba(209, 250, 229, 0.14);
+  color: #D1FAE5;
+}
+
+.keyword-tag.alert {
+  background-color: rgba(248, 113, 113, 0.16);
+  color: #FCA5A5;
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #273549;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #1E3A2F;
+  border-color: #10B981;
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: #10B981 transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #20334A;
+  border-color: #6EE7B7;
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: #6EE7B7 transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #F0FDF4;
+  display: inline-block;
+}
+
+/* データボックス */
+.data-box {
+  background: #16212F;
+  border-left: 4px solid var(--ui-color-1);
+  padding: 8px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  margin-top: 10px;
+  color: #C7D2DC;
+}
+
+.data-box .big {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--ui-color-1);
+}
+
+/* 流れの矢印 */
+.flow-arrow {
+  text-align: center;
+  font-size: 14px;
+  color: #A7F3D0;
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.flow-arrow i {
+  color: #6EE7B7;
+  margin: 0 4px;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(52, 211, 153, 0); }
+  50% { text-shadow: 1px 1px 0 rgba(16, 185, 129, 0.7), 0 0 14px rgba(52, 211, 153, 0.4); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 30px;
+  background: #1F2937;
+  border: 1px solid rgba(52, 211, 153, 0.24);
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  font-size: 14px;
+  color: #9CA3AF;
+}
+
+.footer a {
+  color: var(--ui-color-1);
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <header class="header">
+    <i class="fa-solid fa-microchip fa-7x" aria-hidden="true"></i>
+    <h1>【VRAM 12GBで1250億パラメータ】Strataで巨大AIが動く</h1>
+    <div class="subtitle">高いGPUを買わずに巨大モデルをゲーミングPCで——代わりに必要なのはRAM 48〜64GB｜MoE×GPU・RAM・SSD分担の仕組み</div>
+    <div class="memory-slots" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026-10-02 ／ ずんめたラボ｜今知っておきたいAI</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- カード 1: 今回の主役 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-rocket fa-5x" style="animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① 今回の主役 — 無料ソフト「Strata」</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> オープニング</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bullhorn"></i><span>ローカルでAIを動かしたい人の注目の的——<span class="keyword-tag accent">無料のソフト「Strata」</span></span></li>
+          <li><i class="fa-solid fa-weight-hanging"></i><span><span class="keyword-tag">1250億パラメータ</span>の巨大モデルを<span class="keyword-tag accent">VRAM 12GB</span>のゲーミングPCで動かせる</span></li>
+          <li><i class="fa-solid fa-fire"></i><span>大きなニュースではないのに、公開わずか1週間で<span class="keyword-tag">GitHubスター4,300超</span>の人気</span></li>
+          <li><i class="fa-solid fa-gift"></i><span>利用は<span class="keyword-tag accent">無料</span>——ハードの買い替え不要なのが魅力</span></li>
+        </ul>
+        <div class="flow-arrow">巨大モデル <i class="fa-solid fa-arrow-right"></i> Strata <i class="fa-solid fa-arrow-right"></i> ゲーミングPCで動く</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-1);"></i> 「無理だろ」と思ったら動いちゃう——ローカルAI界の魔法のようなソフト！</span>
+      </div>
+    </div>
+
+    <!-- カード 2: ローカルAIの壁 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-money-bill-trend-up fa-5x" style="animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② これまでの常識 — VRAMの壁</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> ローカルAIの悩み</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wallet"></i><span>ローカルAIの入口で立ちはだかる<span class="keyword-tag alert">VRAMの多いGPUは高価</span>という壁</span></li>
+          <li><i class="fa-solid fa-box"></i><span>普通は<span class="keyword-tag">VRAMに収まる小さめのモデル</span>を選ぶしかなかった</span></li>
+          <li><i class="fa-solid fa-compress"></i><span>モデルを小さくすると<span class="keyword-tag alert">賢さも犠牲</span>になるジレンマ</span></li>
+          <li><i class="fa-solid fa-door-closed"></i><span>「巨大モデルは雲の上」——<span class="keyword-tag">あきらめ</span>がローカルの標準だった</span></li>
+        </ul>
+        <div class="data-box">従来: モデルサイズ ≦ <span class="big">VRAM容量</span> —— これが選択の上限</div>
+        <div class="flow-arrow">GPU高い <i class="fa-solid fa-arrow-right"></i> 小さいモデルで我慢 <i class="fa-solid fa-arrow-right"></i> 賢さ妥協</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-1);"></i> 「賢いAIは欲しい、でもGPUは買えない」——この板挟みを解決するのがStrata！</span>
+      </div>
+    </div>
+
+    <!-- カード 3: Qwen3.8-Flash-Next -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ 動かす相手 — Qwen3.8-Flash-Next</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 対象モデルの紹介</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-globe"></i><span>アリババの<span class="keyword-tag accent">Qwenチーム</span>が開発したモデル</span></li>
+          <li><i class="fa-solid fa-database"></i><span>総パラメータ<span class="keyword-tag">1250億（125B）</span>のマルチモーダルMoEモデル</span></li>
+          <li><i class="fa-solid fa-bolt-lightning"></i><span>1語の生成で実際に働くのは<span class="keyword-tag accent">約60億（6B）だけ</span>という省エネ設計</span></li>
+          <li><i class="fa-solid fa-hourglass-start"></i><span>次世代<span class="keyword-tag">Qwen4アーキテクチャの先取り</span>とされる注目モデル</span></li>
+        </ul>
+        <div class="data-box">総量 125B － 実働 約6B ＝ <span class="big">約95%は「待機」</span>している巨大モデル</div>
+        <div class="flow-arrow">Qwenチーム <i class="fa-solid fa-arrow-right"></i> 125B MoE <i class="fa-solid fa-arrow-right"></i> Strataが12GBカードへ</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-arrow-trend-up fa-lg" style="color: #6EE7B7;"></i> 「125Bなのに6Bしか働かない」——この隙間がローカル実行の鍵になる！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: GitHubスター -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-star fa-5x" style="animation: fa-beat 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ 公開1週間でスター4,300超</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 爆発的な人気の理由</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gauge-high"></i><span>公開わずか<span class="keyword-tag accent">1週間でGitHubスター4,300超</span>（2026-10-02時点）</span></li>
+          <li><i class="fa-solid fa-code-fork"></i><span><span class="keyword-tag">更新ペースが速い</span>ことでも知られる活発なプロジェクト</span></li>
+          <li><i class="fa-solid fa-users-viewfinder"></i><span>「手元のPCで巨大AIを」という<span class="keyword-tag accent">根強い需要</span>の証明</span></li>
+          <li><i class="fa-solid fa-heart"></i><span>メディアで大きく騒がれなくても、<span class="keyword-tag">開発者コミュニティで実力査定</span>されて急成長</span></li>
+        </ul>
+        <div class="data-box">1週間で <span class="big">★4,300超</span> —— 無名スタートのオープンソースとしては異例の伸び</div>
+        <div class="flow-arrow">公開 <i class="fa-solid fa-arrow-right"></i> 口コミで拡散 <i class="fa-solid fa-arrow-right"></i> スター急増</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-fire-flame-curved fa-lg" style="color: var(--ui-color-1);"></i> ニュースにならなくてもすごいものはすごい——星が物語る実力！</span>
+      </div>
+    </div>
+
+    <!-- カード 5: MoEとは -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-group fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ MoE — 2万4576人の専門家</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 仕組みの核心①</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-graduate"></i><span>MoE（Mixture of Experts）＝<span class="keyword-tag accent">「専門家の集団」</span>から必要な人だけ起用する方式</span></li>
+          <li><i class="fa-solid fa-users"></i><span>Qwen3.8-Flash-Nextには<span class="keyword-tag">専門家2万4576人</span>が在籍</span></li>
+          <li><i class="fa-solid fa-user-check"></i><span>1語を書くのに実際に働くのは<span class="keyword-tag accent">わずか10人だけ</span></span></li>
+          <li><i class="fa-solid fa-bed"></i><span>残り2万4566人は<span class="keyword-tag">「待機」</span>——巨大さのわりに動きが軽い理由</span></li>
+        </ul>
+        <div class="data-box">24,576人中 active は <span class="big">10人</span> —— 起用率わずか 0.04%</div>
+        <div class="flow-arrow">2万4576人待機 <i class="fa-solid fa-arrow-right"></i> 都度10人だけ出勤 <i class="fa-solid fa-arrow-right"></i> 軽い推論</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-person-rays fa-lg" style="color: var(--ui-color-1);"></i> 巨大会社なのに「その仕事は10人で足りる」——<span class="highlight-text">賢い組織設計</span>がMoE！</span>
+      </div>
+    </div>
+
+    <!-- カード 6: GPU RAM SSD 分担 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ GPU・RAM・SSDの三分割管理</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 仕組みの核心②</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microchip"></i><span>Strataは、VRAMに入らない巨大モデルを<span class="keyword-tag accent">GPU・RAM・SSDで分担</span>して配置</span></li>
+          <li><i class="fa-solid fa-bolt"></i><span>よく使う「専門家」は<span class="keyword-tag">速いVRAM/GPU</span>へ</span></li>
+          <li><i class="fa-solid fa-memory"></i><span>その他は<span class="keyword-tag accent">RAM</span>へ、さらに余った分は<span class="keyword-tag accent">SSD</span>へ退避</span></li>
+          <li><i class="fa-solid fa-puzzle-piece"></i><span>「全部は載らない」を<span class="keyword-tag">「分ければ載る」</span>に変換する発想の転換</span></li>
+        </ul>
+        <div class="flow-arrow">VRAMだけ <i class="fa-solid fa-arrow-right"></i> GPU＋RAM＋SSD <i class="fa-solid fa-arrow-right"></i> 125Bを収納</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-warehouse fa-lg" style="color: #6EE7B7;"></i> 机の引き出し＋棚＋倉庫——使う頻度で収納場所を変えるのがコツ！</span>
+      </div>
+    </div>
+
+    <!-- カード 7: 推測して確認 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-glasses fa-5x" style="animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ 「推測して確認」で速くなる</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 仕組みの核心③</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wand-magic-sparkles"></i><span>遅いストレージを補うのが<span class="keyword-tag accent">「推測して確認」</span>の手法</span></li>
+          <li><i class="fa-solid fa-pen-fancy"></i><span>次に来る語を<span class="keyword-tag">先回りして推測</span>し、用意しておく</span></li>
+          <li><i class="fa-solid fa-clipboard-check"></i><span>本番担当が<span class="keyword-tag accent">素早く正誤を確認</span>——当たればそのまま採用</span></li>
+          <li><i class="fa-solid fa-forward"></i><span>当たりが続けば<span class="keyword-tag">数語まとめて進める</span>ので体感速度がアップ</span></li>
+        </ul>
+        <div class="flow-arrow">推測 <i class="fa-solid fa-arrow-right"></i> 確認 <i class="fa-solid fa-arrow-right"></i> 採用/やり直し <i class="fa-solid fa-arrow-right"></i> 高速化</div>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-user-secret fa-lg" style="color: var(--ui-color-1);"></i> 優秀なアシスタントの「たぶんこれです」先読み——外れても確認は一瞬！</span>
+      </div>
+    </div>
+
+    <!-- カード 8: 速度 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge fa-5x" style="animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ 速さの実測 — 毎秒53〜93トークン</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 作者による計測</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-tachograph-digital"></i><span>作者計測で<span class="keyword-tag accent">RTX 5070・毎秒53〜93トークン</span></span></li>
+          <li><i class="fa-solid fa-gamepad"></i><span>まさに<span class="keyword-tag">普通のゲーミングPC</span>で出ている数値</span></li>
+          <li><i class="fa-solid fa-person-walking"></i><span>読みやすさでいえば<span class="keyword-tag">人の読む速度より速い</span>領域</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>ただし<span class="keyword-tag alert">作者本人による計測</span>で、第三者比較はまだ少ない段階</span></li>
+        </ul>
+        <div class="data-box">RTX 5070: <span class="big">53〜93 トークン/秒</span>（作者計測・2026-10時点）</div>
+        <div class="flow-arrow">12GB GPU <i class="fa-solid fa-arrow-right"></i> 125Bモデル <i class="fa-solid fa-arrow-right"></i> 快適な応答</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-alarm-clock fa-lg" style="color: var(--ui-color-1);"></i> 「125Bがこの速度？」——数字だけでも試す価値あり！</span>
+      </div>
+    </div>
+
+    <!-- カード 9: RAM -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-memory fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ 代わりに必要なのはRAM 48〜64GB</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 利用条件の要点</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-right-left"></i><span>GPUの代わりに<span class="keyword-tag accent">RAMを48〜64GB</span>使う設計</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench"></i><span>VRAM増設より<span class="keyword-tag">RAM増設の方がずっと安い</span>のが現実的なポイント</span></li>
+          <li><i class="fa-solid fa-computer"></i><span>デスクトップPCなら<span class="keyword-tag accent">メモリ増設で対応可能</span>な人が多い</span></li>
+          <li><i class="fa-solid fa-circle-info"></i><span>「GPUにお金→<span class="keyword-tag">RAMにお金</span>」へ最適化が移る発想</span></li>
+        </ul>
+        <div class="data-box">必要RAM: <span class="big">48〜64GB</span> ／ 必要VRAM: 12GB —— コストの柱が入れ替わる</div>
+        <div class="flow-arrow">高いVRAM富豪 <i class="fa-solid fa-arrow-right"></i> 大容量RAM <i class="fa-solid fa-arrow-right"></i> 手頃な自作PC</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-piggy-bank fa-lg" style="color: #6EE7B7;"></i> 「グラボよりメモリ」——パーツ選びの常識が変わるかも！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: 注意点 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="animation: fa-shake 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ 注意点 — ここは押さえて</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 使う前のチェック</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microchip"></i><span><span class="keyword-tag alert">Qwen3.8-Flash-Next専用</span>——他のモデルは（現時点では）動かせない</span></li>
+          <li><i class="fa-solid fa-1"></i><span><span class="keyword-tag alert">同時に答えられるのは1件</span>——複数ユーザー・並列処理は不向き</span></li>
+          <li><i class="fa-solid fa-memory"></i><span><span class="keyword-tag alert">RAMを48〜64GB</span>占有——他の作業との併用は計画的に</span></li>
+          <li><i class="fa-solid fa-book-open"></i><span>更新が速いので<span class="keyword-tag">試す前に公式READMEを確認</span></span></li>
+        </ul>
+        <div class="data-box">専用モデル ＋ 単発処理 ＋ 大容量RAM ＝ <span class="big">「自分専用」向き</span>の運用</div>
+        <div class="flow-arrow">条件確認 <i class="fa-solid fa-arrow-right"></i> RAM確認 <i class="fa-solid fa-arrow-right"></i> 導入</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--ui-color-1);"></i> 夢のソフトにも得意・不得意あり——用途に合うか先にチェック！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: 速さと品質 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ 速さと品質の引き換え</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> トレードオフの話</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-gauge-high"></i><span>速く動かすために<span class="keyword-tag accent">品質面を少し犠牲</span>にする引き換えが存在</span></li>
+          <li><i class="fa-solid fa-microscope"></i><span>厳密な正確さより<span class="keyword-tag">体感の軽さ</span>を取るチューニング</span></li>
+          <li><i class="fa-solid fa-face-thinking-slash"></i><span>用途次第——<span class="keyword-tag accent">下書き・雑談なら十分</span>、要精密作業なら要注意</span></li>
+          <li><i class="fa-solid fa-sliders"></i><span><span class="keyword-tag">速さ⇄品質のバランス</span>を理解して使うのが大人の付き合い方</span></li>
+        </ul>
+        <div class="flow-arrow">速度重視 <i class="fa-solid fa-left-right"></i> 品質重視 <i class="fa-solid fa-arrow-right"></i> 用途で使い分け</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-yin-yang fa-lg" style="color: var(--ui-color-1);"></i> 何かを得れば何かを手放す——ソフトウェアもおんなじ！</span>
+      </div>
+    </div>
+
+    <!-- カード 12: なぜ今ローカル -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-house-laptop fa-5x" style="animation: fa-bounce 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ なぜ今、ローカルAIなのか</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 動画の核心的問い</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud"></i><span>クラウドには<span class="keyword-tag">もっと賢いAI</span>がいくらでもある——それでもローカルが熱い</span></li>
+          <li><i class="fa-solid fa-user-shield"></i><span><span class="keyword-tag accent">データが外に出ない</span>プライバシーの安心</span></li>
+          <li><i class="fa-solid fa-coins"></i><span><span class="keyword-tag accent">使い放題で課金不要</span>——コストを気にせず試せる</span></li>
+          <li><i class="fa-solid fa-plug-circle-xmark"></i><span>回線やサービス終了に左右されない<span class="keyword-tag">「手元にある」安心</span></span></li>
+        </ul>
+        <div class="flow-arrow">賢さ最優先 <i class="fa-solid fa-arrow-right"></i> 自由・安心・コスト <i class="fa-solid fa-arrow-right"></i> ローカル再評価</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-key fa-lg" style="color: #6EE7B7;"></i> 「一番賢いAI」より「自分のもののAI」——価値の軸が多様化してる！</span>
+      </div>
+    </div>
+
+    <!-- カード 13: クラウドとの使い分け -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code-branch fa-5x" style="animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ クラウドAIとの使い分け</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 現実的な付き合い方</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud-arrow-up"></i><span>最重要・機密案件は<span class="keyword-tag">クラウドの高性能AI</span>へ</span></li>
+          <li><i class="fa-solid fa-laptop-code"></i><span>日常の下書き・試行錯誤は<span class="keyword-tag accent">ローカルで使い放題</span></span></li>
+          <li><i class="fa-solid fa-shuffle"></i><span>「どちらか一方」ではなく<span class="keyword-tag">棲み分けによるハイブリッド活用</span>が王道</span></li>
+          <li><i class="fa-solid fa-door-open"></i><span>Strataは<span class="keyword-tag accent">ローカルの選択肢を広げる切り札</span></span></li>
+        </ul>
+        <div class="flow-arrow">機密・重い作業: クラウド ／ 気軽・大量に: ローカル</div>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-scale-unbalanced fa-lg" style="color: var(--ui-color-1);"></i> 両方使えてこそ真のAIライフ——片肩じゃなく両肩で！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: おすすめの人 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-check fa-5x" style="animation: fa-flip 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ こんな方におすすめ</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 動画からの提案</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-heart-crack"></i><span><span class="keyword-tag accent">ローカルLLMに興味</span>があるけど、VRAMの多いGPUは高くて手が出ない方</span></li>
+          <li><i class="fa-solid fa-people-arrows"></i><span>MoEモデルの仕組みを<span class="keyword-tag">ざっくり知りたい</span>方</span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>自分のPCで動かせる<span class="keyword-tag accent">AIの選択肢</span>を知りたい方</span></li>
+          <li><i class="fa-solid fa-cube"></i><span>RAMはそこそこ積んでる——<span class="keyword-tag">メモリ富豪</span>には特にチャンス</span></li>
+        </ul>
+        <div class="data-box">要件の目安: VRAM <span class="big">12GB</span> ＋ RAM <span class="big">48〜64GB</span> のPC</div>
+        <div class="flow-arrow">PCスペック確認 <i class="fa-solid fa-arrow-right"></i> Strata導入 <i class="fa-solid fa-arrow-right"></i> 125B体験</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-face-smile-beam fa-lg" style="color: var(--ui-color-1);"></i> 「BTOでメモリだけ盛った」人には特に朗報かも！</span>
+      </div>
+    </div>
+
+    <!-- カード 15: 参考資料 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-bookmark fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ 参考資料 — 一次情報へ</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 動画の説明欄より</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-brands fa-github"></i><span>公式リポジトリ:<span class="keyword-tag accent">Niko1221/Strata</span>（GitHub）</span></li>
+          <li><i class="fa-solid fa-file-lines"></i><span><span class="keyword-tag">Strata 技術詳細 docs/DETAILS.md</span>——仕組みを深掘りしたい人へ</span></li>
+          <li><i class="fa-solid fa-newspaper"></i><span>MarkTechPost:<span class="keyword-tag accent">Qwen3.8-Flash-Next の解説記事</span></span></li>
+          <li><i class="fa-solid fa-calculator"></i><span>vramcalculator.com:<span class="keyword-tag">12GBカードで動かす記事</span></span></li>
+        </ul>
+        <div class="data-box">入手先: <span class="big">github.com/Niko1221/Strata</span> —— 試す前はREADMEを確認！</div>
+        <div class="flow-arrow">動画 <i class="fa-solid fa-arrow-right"></i> GitHub <i class="fa-solid fa-arrow-right"></i> 自分の環境で検証</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-link fa-lg" style="color: #6EE7B7;"></i> 説明欄に一次資料が並ぶ誠実な動画——自分でも確かめられる！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: 動画の姿勢 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clipboard-question fa-5x" style="animation: fa-flip 3.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ 数字の取り扱いに誠実な動画</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 視聴者への心遣い</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-pen"></i><span>速度53〜93トークンは<span class="keyword-tag alert">作者による計測</span>と明記</span></li>
+          <li><i class="fa-solid fa-users-slash"></i><span><span class="keyword-tag alert">第三者による比較はまだ少ない</span>段階と正直に注記</span></li>
+          <li><i class="fa-solid fa-calendar-check"></i><span>スター数・更新回数は<span class="keyword-tag">2026-10-02時点</span>と期限を明示</span></li>
+          <li><i class="fa-solid fa-desktop"></i><span>動画内の動作は<span class="keyword-tag accent">実機で確かめた結果ではない</span>と割り切りを表明</span></li>
+        </ul>
+        <div class="flow-arrow">速報性 <i class="fa-solid fa-plus"></i> 注意書き <i class="fa-solid fa-arrow-right"></i> 読者で判断</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-seal fa-lg" style="color: var(--ui-color-1);"></i> 「ここまでは確認済み・ここからは未確認」——信頼できる伝え方！</span>
+      </div>
+    </div>
+
+    <!-- カード 17: ずんめたラボ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microphone-lines fa-5x" style="animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ 解説 — ずんめたラボ</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> チャンネル紹介</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wand-magic-sparkles"></i><span><span class="keyword-tag accent">ずんだもん・四国めたん</span>（VOICEVOX）がAIニュースをやさしく解説</span></li>
+          <li><i class="fa-solid fa-bell"></i><span>「<span class="keyword-tag">今知っておきたいAI</span>」と題したシリーズで毎回話題をピックアップ</span></li>
+          <li><i class="fa-solid fa-comments"></i><span>難しい技術も<span class="keyword-tag accent">身近な比喩</span>で噛み砕くのが持ち味</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>超大の話題もローカルニッチも<span class="keyword-tag">見逃さない選球眼</span></span></li>
+        </ul>
+        <div class="flow-arrow">AIニュース <i class="fa-solid fa-arrow-right"></i> わかりやすい解説 <i class="fa-solid fa-arrow-right"></i> 視聴者の理解</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-comment-dots fa-lg" style="color: var(--ui-color-1);"></i> 専門用語だらけのAI業界、ふたりの声でならなんか分かる気がする！</span>
+      </div>
+    </div>
+
+    <!-- カード 18: まとめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ まとめ — GPU高騰時代の抜け道</h2>
+        <div class="timestamp"><i class="fa-regular fa-circle-play"></i> 全編を通して</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-microchip"></i><span>Strataは<span class="keyword-tag accent">125BのQwen3.8-Flash-Next</span>をVRAM 12GBで動かす無料ソフト</span></li>
+          <li><i class="fa-solid fa-people-group"></i><span>鍵はMoE——<span class="keyword-tag">2万4576人の専門家のうち1語10人</span>だけ起用する省エネ設計</span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span><span class="keyword-tag accent">GPU・RAM・SSDの分担</span>＋「推測して確認」で実用速度を実現</span></li>
+          <li><i class="fa-solid fa-memory"></i><span>代わりに<span class="keyword-tag accent">RAM 48〜64GB</span>——コストの柱がGPUからRAMへ</span></li>
+        </ul>
+        <div class="data-box">125B ＋ VRAM 12GB ＋ RAM <span class="big">48〜64GB</span> ＝ ローカルAIの新常識</div>
+        <div class="flow-arrow">高いGPU <i class="fa-solid fa-arrow-right"></i> Strata <i class="fa-solid fa-arrow-right"></i> 手元のPCで巨大AI</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: #6EE7B7;"></i> 「GPUが買えない」を「RAMで解決」——ぜひ動画で仕組みを味わって！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div>🎬 動画: <a href="https://www.youtube.com/watch?v=5GRjDRiv1Ww" target="_blank" rel="noopener">ずんめたラボ</a> — 「Strataで少ないVRAMでも巨大AIが動く仕組み 代わりに必要なのはRAM｜今知っておきたいAI」</div>
+    <div style="margin-top: 6px;">📅 公開日: 2026-10-02 ／ 動画ID: 5GRjDRiv1Ww ／ チャンネル: @zunmeta_lab_ch（ずんめたラボ）</div>
+    <div style="margin-top: 6px;">🔗 公式: <a href="https://github.com/Niko1221/Strata" target="_blank" rel="noopener">Niko1221/Strata（GitHub）</a> ｜ <a href="https://github.com/Niko1221/Strata/blob/main/docs/DETAILS.md" target="_blank" rel="noopener">技術詳細 DETAILS.md</a></div>
+    <div style="margin-top: 6px;">#AI #ローカルLLM #Strata #Qwen #生成AI #ずんだもん #四国めたん #AIニュース #めたん #VOICEVOX</div>
+    <div style="margin-top: 6px;"><i class="fa-solid fa-circle-info"></i> このインフォグラフィックは動画の公開情報・説明欄に基づき、グラフィックレコーディング風にまとめたものです。</div>
+    <div style="margin-top: 4px;"><i class="fa-solid fa-circle-exclamation"></i> 速度（毎秒53〜93トークン／RTX 5070）は作者による計測値で、第三者比較はまだ少ない段階です。スター数・更新状況は2026-10-02時点。Strataは更新が速いため、試す前に公式READMEをご確認ください。</div>
+  </footer>
+
+</div>
+
+<script>
+// スクロールに連動したカードのフェードイン
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale:not(.visible)');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { observer.observe(c); });
+});
+</script>
+</body>
+</html>

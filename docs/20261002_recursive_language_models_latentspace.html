@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>再帰言語モデル（RLM）と次世代エージェント — MIT Alex Zhang | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: ディープティール × ミントの深海テーマ */
+  --ui-color-1: #14B8A6;   /* ティール（メイン） */
+  --ui-color-2: #5EEAD4;   /* ミント（アクセント） */
+  --ui-color-3: #0C332D;   /* カードの下地（深いティールグリーン） */
+  --ui-color-4: #CCFBF1;   /* 淡いミントホワイト */
+  --ui-color-5: #FACC15;   /* レモンイエロー（差し色） */
+  --bg-canvas: #04211C;    /* キャンバス（深海グリーン黒） */
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 15% -5%, rgba(20, 184, 166, 0.16), transparent),
+    radial-gradient(ellipse 900px 550px at 85% 5%, rgba(94, 234, 212, 0.08), transparent);
+  font-family: 'Kaisei Decol', 'Zen Kurenaido', serif;
+  color: #DCF5F0;
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 30px 20px 20px;
+  margin-bottom: 25px;
+  background: #072A25;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-radius: 24px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  position: relative;
+  overflow: hidden;
+}
+
+.header .fa-7x {
+  color: var(--ui-color-2);
+  animation: fa-bounce 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(20, 184, 166, 0.6));
+}
+
+.header h1 {
+  font-size: 36px;
+  font-weight: bold;
+  color: #F0FDF9;
+  margin: 10px 0 5px;
+}
+
+.header .subtitle {
+  font-size: 18px;
+  color: var(--ui-color-2);
+  font-weight: bold;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #8FC4BA;
+  margin-top: 8px;
+}
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: var(--ui-color-3);
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(-0.5deg);
+  box-shadow: 0 16px 38px rgba(20, 184, 166, 0.30), 0 10px 28px rgba(0,0,0,0.5);
+  background-color: #11473E;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--ui-color-2); }
+.section-card:nth-child(3n) { border-top-color: var(--ui-color-5); }
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--ui-color-1);
+  filter: drop-shadow(0 0 12px rgba(20, 184, 166, 0.5));
+}
+
+.section-card:nth-child(even) .mega-icon-container i.fa-5x {
+  color: var(--ui-color-2);
+  filter: drop-shadow(0 0 12px rgba(94, 234, 212, 0.45));
+}
+
+.mega-icon-container h2 {
+  font-size: 24px;
+  color: #EAFBF6;
+  margin: 10px 0 0;
+  font-weight: bold;
+}
+
+.timestamp {
+  font-size: 14px;
+  color: #8FC4BA;
+  margin-top: 4px;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 16px;
+  color: #DCF5F0;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--ui-color-2);
+  min-width: 16px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: rgba(94, 234, 212, 0.14);
+  color: var(--ui-color-2);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.keyword-tag.accent {
+  background-color: rgba(20, 184, 166, 0.26);
+  color: #99F6E4;
+}
+
+.keyword-tag.alert {
+  background-color: rgba(250, 204, 21, 0.14);
+  color: var(--ui-color-5);
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #0A2A25;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #0D3A33;
+  border-color: var(--ui-color-2);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--ui-color-2) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #123B2E;
+  border-color: var(--ui-color-5);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--ui-color-5) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #E7F9F4;
+  display: inline-block;
+}
+
+/* コードプレビュー */
+pre {
+  background: #04201B;
+  border-left: 4px solid var(--ui-color-2);
+  padding: 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  color: #B8E8DE;
+}
+
+code.inline {
+  background: rgba(94, 234, 212, 0.14);
+  color: var(--ui-color-2);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* 流れの矢印 */
+.flow-arrow {
+  text-align: center;
+  font-size: 14px;
+  color: #99F6E4;
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.flow-arrow i {
+  color: var(--ui-color-2);
+  margin: 0 4px;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(20, 184, 166, 0); }
+  50% { text-shadow: 1px 1px 0 rgba(20, 184, 166, 0.65), 0 0 14px rgba(153, 246, 228, 0.4); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 20px;
+  margin-top: 30px;
+  background: #072A25;
+  border: 1px solid rgba(94, 234, 212, 0.20);
+  border-radius: 20px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+  font-size: 14px;
+  color: #A7D5CC;
+}
+
+.footer a {
+  color: var(--ui-color-2);
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <header class="header">
+    <i class="fa-solid fa-infinity fa-7x" aria-hidden="true"></i>
+    <h1>再帰言語モデル（RLM）と次世代エージェントの行方 — MIT Alex Zhang</h1>
+    <div class="subtitle">Recursive Language Models — Alex Zhang, MIT PhD | Latent Space Podcast</div>
+    <div class="date"><i class="fa-regular fa-calendar"></i> 2026-10-02 ／ Latent Space ／ swyx × Alex Zhang</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- カード 1: イントロ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-podcast fa-5x" style="animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① 今回のゲストとテーマ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:00 Hook ／ 00:01:56 Introduction</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-graduate"></i><span>MIT博士研究員<span class="keyword-tag accent">Alex Zhang</span>が、swyxの運営するLatent Space Podcastに登場</span></li>
+          <li><i class="fa-solid fa-bullseye"></i><span>核心の問い: <span class="keyword-tag accent">急速に強くなるモデルを、未熟なシステムで包んでいませんか？</span></span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span>GPUカーネル・KernelBenchから<span class="keyword-tag">RLM・ハーネス設計・大規模エージェント群</span>まで縦横無尽に語る</span></li>
+          <li><i class="fa-solid fa-key"></i><span>鍵概念は<span class="keyword-tag accent">capability overhang（能力の余剰）</span>——今日のモデルに眠る実力を引き出す方法</span></li>
+        </ul>
+        <div class="flow-arrow">強いモデル <i class="fa-solid fa-arrow-right"></i> 未熟なラッパー <i class="fa-solid fa-arrow-right"></i> 能力が眠っている</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i> 「モデルは強いのに外側のシステムが primitive（未熟）」——このギャップに迫る約1時間半の対談！</span>
+      </div>
+    </div>
+
+    <!-- カード 2: Alex Zhangという研究者 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microscope fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② Alex Zhang — 「現場×研究」を渡るMIT研究者</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:01:56 Introduction</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-code"></i><span><span class="keyword-tag accent">Recursive Language Models（RLM）</span>の研究者として知られる</span></li>
+          <li><i class="fa-solid fa-server"></i><span><span class="keyword-tag">GPU Mode</span>コミュニティと<span class="keyword-tag">KernelBench</span>（AIカーネル生成ベンチマーク）に関与</span></li>
+          <li><i class="fa-solid fa-robot"></i><span>エージェント・ハーネス・マルチエージェント群の設計を研究の主戦場に</span></li>
+          <li><i class="fa-solid fa-link"></i><span>Website: <span class="keyword-tag accent">alexzhang13.github.io</span> ／ X: <span class="keyword-tag">@a1zhang</span></span></li>
+        </ul>
+        <div class="flow-arrow">GPUの最下層 <i class="fa-solid fa-arrow-right"></i> LMの構造 <i class="fa-solid fa-arrow-right"></i> エージェント群まで見渡す視座</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--ui-color-2);"></i> カーネルの性能チューニングから1万エージェントの群れまで——レイヤーを問わず「無駄を省く」のが彼の持ち味！</span>
+      </div>
+    </div>
+
+    <!-- カード 3: GPU Mode / KernelBench -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-microchip fa-5x" style="animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ GPU ModeとKernelBench — AIが書くGPUカーネル</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:02:45 GPU Mode, KernelBench</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users"></i><span><span class="keyword-tag accent">GPU Mode</span>: GPU・MLエンジニアリングを語る大人気コミュニティ＆カンファレンス</span></li>
+          <li><i class="fa-solid fa-gauge-high"></i><span><span class="keyword-tag">KernelBench</span>: AIモデルにCUDAカーネルを書かせ、正しさと速度を競うベンチマーク</span></li>
+          <li><i class="fa-solid fa-code"></i><span>LLMに最適化カーネルを自動生成させる試みは、<span class="keyword-tag accent">GPUプログラミングの民主化</span>になりうる</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>しかし現状、AI生成カーネルには<span class="keyword-tag alert">人間の専門性で埋めるべき余地が残る</span></span></li>
+        </ul>
+        <div class="flow-arrow">プロンプト <i class="fa-solid fa-arrow-right"></i> AIがカーネル生成 <i class="fa-solid fa-arrow-right"></i> 正しさ・速度を検証</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i> モデルが書いたCUDAが人間の職人技に追いつけるか——GPU界隈で最熱いの勝負！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: 人間の専門性 vs 力任せ探索 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-unbalanced-flip fa-5x" style="animation: fa-beat 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ 人間の専門性 vs 力任せのAI探索</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:09:34 Human Expertise vs. Brute-Force</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>AIに大量のトークンを消費させて<span class="keyword-tag alert">総当たり探索</span>させるアプローチの限界</span></li>
+          <li><i class="fa-solid fa-gem"></i><span><span class="keyword-tag accent">専門家のたった1つの洞察</span>が、膨大なブルートフォース探索を置き換えうる</span></li>
+          <li><i class="fa-solid fa-brain"></i><span>例: 数学的トリックやアルゴリズムの知見が、<span class="keyword-tag">試行錯誤の桁をひとつ消し飛ばす</span></span></li>
+          <li><i class="fa-solid fa-handshake"></i><span>結論は対立ではなく<span class="keyword-tag accent">協調</span>——人間の洞察を探索に inject する未来像</span></li>
+        </ul>
+        <div class="flow-arrow">1つの洞察 <i class="fa-solid fa-arrow-right"></i> 億単位の無駄な試行を削減 <i class="fa-solid fa-arrow-right"></i> 高速な最適化</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-gem fa-lg" style="color: var(--ui-color-2);"></i> 「賢い1行」が「億の試行」に勝つ——計算資源の爆発時代だからこそ光る職人の知恵！</span>
+      </div>
+    </div>
+
+    <!-- カード 5: 研究の目利きと大きな賭け -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-dice fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ 研究の「目利き」と大きな賭け</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:15:16 Research Taste and Big Bets</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-graduation-cap"></i><span>PhD学生は<span class="keyword-tag accent">産業ラボが取らない賭け</span>を取るべき、という主張</span></li>
+          <li><i class="fa-solid fa-eye-slash"></i><span>最初は<span class="keyword-tag">些細・奇妙・無意味</span>に見えるテーマが、後から大化けする</span></li>
+          <li><i class="fa-solid fa-building-columns"></i><span>大手ラボは短期のROIを追い、<span class="keyword-tag alert">変てこな研究には手を出しにくい</span>構造的事情</span></li>
+          <li><i class="fa-solid fa-arrow-trend-up"></i><span>アカデミアの強みは<span class="keyword-tag accent">長期視点での変人枠</span>——そこに研究の可能性が残る</span></li>
+        </ul>
+        <div class="flow-arrow">一見無意味 <i class="fa-solid fa-arrow-right"></i> 誰もやらない <i class="fa-solid fa-arrow-right"></i> 大化けする研究</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-dice fa-lg" style="color: var(--ui-color-2);"></i> 「バカバカしいと思われた題材」こそノーベル賞の種——研究の世界では逆張りが正義になる！</span>
+      </div>
+    </div>
+
+    <!-- カード 6: 研究センスの系譜 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-star-half-stroke fa-5x" style="animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ SWE-bench・ReAct・Quiet-STaRに見る研究センス</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:15:16 の章で言及 ／ 研究センスの系譜</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bug"></i><span><span class="keyword-tag accent">SWE-bench</span>: 実際のGitHubリポジトリのIssue解決でコーディングAIを測る定番ベンチマーク</span></li>
+          <li><i class="fa-solid fa-arrows-rotate"></i><span><span class="keyword-tag">ReAct</span>: 「推論」と「行動」を交互に回すシンプルな枠組み——エージェント設計の原点</span></li>
+          <li><i class="fa-solid fa-moon"></i><span><span class="keyword-tag accent">Quiet-STaR</span>: 思考トークンを内部で生成し、答える前に「考える」モデル</span></li>
+          <li><i class="fa-solid fa-heart"></i><span>共通点は<span class="keyword-tag">シンプルだが誰もやっていなかった発想</span>——RLMもこの系譜にある</span></li>
+        </ul>
+        <div class="flow-arrow">シンプルな発想 <i class="fa-solid fa-arrow-right"></i> 大量の後続研究 <i class="fa-solid fa-arrow-right"></i> 分野の常識を変える</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-wand-magic-sparkles fa-lg" style="color: var(--ui-color-5);"></i> 「当たり前に見えて誰もやらなかった」——それが研究センスの核心！</span>
+      </div>
+    </div>
+
+    <!-- カード 7: GEV -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ GEV — 「言語モデル」の前提を再考する</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:21:24 GEV and Rethinking the LM</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-question"></i><span>言語モデル ＝ <span class="keyword-tag alert">「自己回帰的なtext-to-textデコーダ」である必要はない</span></span></li>
+          <li><i class="fa-solid fa-shuffle"></i><span><span class="keyword-tag accent">GEV</span>など、標準自己回帰モデルの代替となる生成方式の研究が進む</span></li>
+          <li><i class="fa-solid fa-cube"></i><span>トークンを左から右へ積む常識を崩せば、<span class="keyword-tag">推論・計算効率の新天地</span>が見える</span></li>
+          <li><i class="fa-solid fa-flask"></i><span>RLMも「LMの外側」を再定義する点で、<span class="keyword-tag accent">同じ問題意識</span>を共有</span></li>
+        </ul>
+        <div class="flow-arrow">次トークン予測 <i class="fa-solid fa-arrow-right"></i> 生成の仕組み自体を再設計 <i class="fa-solid fa-arrow-right"></i> 新しいLM</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-cubes fa-lg" style="color: var(--ui-color-2);"></i> 「LMとは何か」の定義から組み直す——地動説級の研究が静かに進行中！</span>
+      </div>
+    </div>
+
+    <!-- カード 8: ゲームエージェントとハーネス問題 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gamepad fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ ビデオゲームエージェントと「ハーネス問題」</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:30:59 Video Game Agents</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-khanda"></i><span>ゲーム内でLLMエージェントを動かす取り組みから見えてきた<span class="keyword-tag accent">ハーネス（外装システム）の壁</span></span></li>
+          <li><i class="fa-solid fa-magnet"></i><span>同じモデルでも<span class="keyword-tag">外側のシステム設計次第で成績が激変</span>する</span></li>
+          <li><i class="fa-solid fa-screwdriver-wrench"></i><span>プロンプト・メモリ・ツール呼び出しの配線＝<span class="keyword-tag accent">ハーネス設計</span>が研究対象に</span></li>
+          <li><i class="fa-solid fa-puzzle-piece"></i><span>モデル改良とハーネス改良は<span class="keyword-tag">別個の能力軸</span>——後者が大幅に遅れている</span></li>
+        </ul>
+        <div class="flow-arrow">モデル <i class="fa-solid fa-plus"></i> ハーネス <i class="fa-solid fa-arrow-right"></i> 初めて発揮される実力</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-gamepad fa-lg" style="color: var(--ui-color-2);"></i> ゲームはエージェント研究の実験場——遊んでいるように見えて、ここでハーネスの真理が磨かれる！</span>
+      </div>
+    </div>
+
+    <!-- カード 9: Claude Code / Codex / Pi の類似性 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clone fa-5x" style="animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ Claude Code・Codex・Piはなぜ似ているのか</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:32:57 Why They Are So Similar</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code"></i><span><span class="keyword-tag accent">Claude Code・Codex・Pi</span>など主要コーディングエージェントは<span class="keyword-tag">構造がほぼ同一</span></span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>「ツール定義→計画→実行→フィードバック」の<span class="keyword-tag">同じループの焼き直し</span></span></li>
+          <li><i class="fa-solid fa-tags"></i><span>見かけの差はブランドやUIで、<span class="keyword-tag alert">アーキテクチャ上の差は小さい</span></span></li>
+          <li><i class="fa-solid fa-lightbulb"></i><span>つまり<span class="keyword-tag accent">ハーネス設計にはまだ空白地帯</span>が大量に残っている</span></li>
+        </ul>
+        <div class="flow-arrow">各社のエージェント <i class="fa-solid fa-arrow-right"></i> 分解すると同じ骨格 <i class="fa-solid fa-arrow-right"></i> 改善余地は巨大</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-clone fa-lg" style="color: var(--ui-color-5);"></i> 「どの社製コーディングエージェントも中身は親戚」——衝撃の構造告白が対談の白眉！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: ハーネスは構成的汎化器 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-successor fa-5x" style="animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ ハーネスは「構成的汎化器」である</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:38:38 Compositional Generalizers</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-shapes"></i><span>良いハーネスは<span class="keyword-tag accent">構成的汎化（compositional generalization）</span>を実現する</span></li>
+          <li><i class="fa-solid fa-right-left"></i><span>個別タスクで覚えた能力が、<span class="keyword-tag">別ドメイン・別タスクへ自動で組み替わる</span></span></li>
+          <li><i class="fa-solid fa-database"></i><span>ポイントは<span class="keyword-tag accent">文脈の管理・分解・再利用の設計</span>——RLMの核心につながる</span></li>
+          <li><i class="fa-solid fa-rocket"></i><span>ハーネスを鍛えれば<span class="keyword-tag alert">今日のモデルのまま</span>で能力が底上げできる</span></li>
+        </ul>
+        <div class="flow-arrow">部品化された能力 <i class="fa-solid fa-arrow-right"></i> ハーネスが組み替え <i class="fa-solid fa-arrow-right"></i> 未知のタスクへ汎化</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-shapes fa-lg" style="color: var(--ui-color-2);"></i> エージェントの真の実力は「モデル」ではなく「組み立て方」で決まる——それが構成的汎化器の意味！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: RLMの解説 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-infinity fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ RLM（再帰言語モデル）の核心</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:46:20 RLMs Explained</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-box-open"></i><span><span class="keyword-tag accent">context offloading</span>: 伸び続けるコンテキストを外部へ退避させ、窓をクリアに保つ</span></li>
+          <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag">コード実行</span>を第一級の部品として利用——思考はプログラムで表現</span></li>
+          <li><i class="fa-solid fa-sitemap"></i><span><span class="keyword-tag accent">再帰的なサブエージェント呼び出し</span>: LM自身がプログラム的に子エージェントを spawn</span></li>
+          <li><i class="fa-solid fa-database"></i><span><span class="keyword-tag">共有メモリ</span>で親子・兄弟エージェント間の状態を受け渡す</span></li>
+        </ul>
+<pre>def solve(task):
+    plan = lm("計画を立てて", ctx=offload(task))
+    for sub in plan:
+        result = solve(sub)      # 再帰!
+        memory.commit(sub, result)
+    return lm("統合して", ctx=memory)</pre>
+        <div class="flow-arrow">巨大な文脈 <i class="fa-solid fa-arrow-right"></i> 分解・委譲 <i class="fa-solid fa-arrow-right"></i> 再帰的に解決</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-infinity fa-lg" style="color: var(--ui-color-2);"></i> 「コンテキストが溢れたら、自分自身を呼び出せ」——再帰という古の知恵がLMに降りてきた！</span>
+      </div>
+    </div>
+
+    <!-- カード 12: Prime Agent -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-arrows fa-5x" style="animation: fa-bounce 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ Prime Agentと永続サブエージェント</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:53:57 Prime Agent &amp; Persistent Subagents</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrows-rotate"></i><span><span class="keyword-tag accent">Prime Agent</span>: タスクごとに使い捨てず、<span class="keyword-tag">続けて使う（continual）ハーネス</span>の構想</span></li>
+          <li><i class="fa-solid fa-user-clock"></i><span><span class="keyword-tag accent">永続サブエージェント</span>: 子エージェントが経験・記憶を保持し続ける</span></li>
+          <li><i class="fa-solid fa-comments"></i><span>親子だけでなく<span class="keyword-tag">エージェント同士の直接通信</span>（agent-to-agent）も視野に</span></li>
+          <li><i class="fa-solid fa-seedling"></i><span>「使い捨ての群れ」から<span class="keyword-tag accent">育つ組織</span>へ——組織論的なエージェント設計</span></li>
+        </ul>
+        <div class="flow-arrow"> spawn→破棄 <i class="fa-solid fa-arrow-right"></i> 永続・蓄積・対話 <i class="fa-solid fa-arrow-right"></i> 学習する組織</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-people-arrows fa-lg" style="color: var(--ui-color-5);"></i> エージェントも「新卒採用より中途育成」——記憶を持つ部下たちという未来の職場！</span>
+      </div>
+    </div>
+
+    <!-- カード 13: RLM in the Wild -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wrench fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ RLM in the Wild — 実環境での運用</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:59:37 RLMs in the Wild</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-earth-americas"></i><span>RLMを<span class="keyword-tag accent">実タスク・実環境</span>で回したときに見える工夫と限界</span></li>
+          <li><i class="fa-solid fa-gauge"></i><span>実運用では<span class="keyword-tag">トークンコストとレイテンシ</span>との戦いが本番</span></li>
+          <li><i class="fa-solid fa-sitemap"></i><span>どこまでオフロードし、どこで再帰を打ち切るかの<span class="keyword-tag accent">設計判断</span>が効く</span></li>
+          <li><i class="fa-solid fa-vial"></i><span>デモで動くだけでなく<span class="keyword-tag">日々のワークフローに耐える</span>構成の模索</span></li>
+        </ul>
+        <div class="flow-arrow">理論 <i class="fa-solid fa-arrow-right"></i> 実装 <i class="fa-solid fa-arrow-right"></i> 実運用で磨くRLM</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-bug-slash fa-lg" style="color: var(--ui-color-2);"></i> 論文の美しい図はそのままでは動かない——現場の泥臭い調整こそRLMの次の勝負！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: OpenAIの1万エージェント実験 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-mosquito fa-5x" style="animation: fa-beat 2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ OpenAIの1万エージェント実験</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:02:26 OpenAI Swarms</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-people-group"></i><span>OpenAIが単一問題に投入した<span class="keyword-tag accent">10,000体のエージェント</span>による大規模実験</span></li>
+          <li><i class="fa-solid fa-coins"></i><span>総出力は<span class="keyword-tag accent">1,300億トークン</span>、コスト換算で<span class="keyword-tag alert">約4,000万ドル相当</span>の問題解決</span></li>
+          <li><i class="fa-solid fa-boxes-stacked"></i><span>未来の「言語モデル」は、<span class="keyword-tag">単一モデルではなく不可視の群れ</span>かもしれない</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>ユーザーが見るのはシンプルなUI——<span class="keyword-tag accent">その下で大群が働く</span>構図</span></li>
+        </ul>
+        <div class="flow-arrow">1つの質問 <i class="fa-solid fa-arrow-right"></i> 1万エージェント <i class="fa-solid fa-arrow-right"></i> 1つの答え</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--ui-color-2);"></i> 「あなたのChatGPTの裏で1万人が働いています」——近未来の真実かもしれない！</span>
+      </div>
+    </div>
+
+    <!-- カード 15: 無駄な探索とオープンエンデッドネス -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gem fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ 群れの無駄と Open-Endedness — Sakana AI</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:09:22 Open-Endedness and Sakana AI</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-trash-can"></i><span>1万体の大部分は<span class="keyword-tag alert">無駄な探索</span>かもしれません——それでも収束は難しい</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-dollar"></i><span>大量生成された成果物から<span class="keyword-tag accent">埋もれた傑作（hidden gems）</span>を見つける問題</span></li>
+          <li><i class="fa-solid fa-fish"></i><span><span class="keyword-tag">Sakana AI</span>のオープンエンデッド（創発的）研究との接続</span></li>
+          <li><i class="fa-solid fa-infinity"></i><span><span class="keyword-tag accent">open-endedness</span>: 終わりのない自己改善・自己生成が研究の新フロンティア</span></li>
+        </ul>
+        <div class="flow-arrow">大量生成 <i class="fa-solid fa-arrow-right"></i> 選別がボトルネック <i class="fa-solid fa-arrow-right"></i> 傑作を発掘</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-gem fa-lg" style="color: var(--ui-color-5);"></i> 「作る」より「見つける」が難しい時代へ——AIの洪水中から宝石をすくう技術！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: Kimi vs OpenAI -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ Kimi vs OpenAI — 群れの設計思想を比較する</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:17:48 Kimi vs. OpenAI Swarms</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code-branch"></i><span><span class="keyword-tag accent">Kimi（月の暗面）</span>のスウォーム型マルチエージェント実験が話題に</span></li>
+          <li><i class="fa-solid fa-code-compare"></i><span>OpenAI型（大規模・一斉投入）とKimi型（<span class="keyword-tag">実行計画の分割・割当</span>）の対照</span></li>
+          <li><i class="fa-solid fa-ruler"></i><span>評価軸は<span class="keyword-tag accent">コスト・収束速度・成果の質</span>——正解はまだない</span></li>
+          <li><i class="fa-solid fa-globe"></i><span>中国発のエージェント研究が<span class="keyword-tag">米国と並ぶ競争相手</span>になった実感</span></li>
+        </ul>
+        <div class="flow-arrow">群れの作り方比較 <i class="fa-solid fa-arrow-right"></i> 得手不得手が判明 <i class="fa-solid fa-arrow-right"></i> 次の設計へ</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--ui-color-2);"></i> 「10万体の一斉射出」か「計画的な分業」か——エージェント群の組織論バトルが始まっている！</span>
+      </div>
+    </div>
+
+    <!-- カード 17: ケイパビリティオーバーハング -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-angles-up fa-5x" style="animation: fa-beat 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ ケイパビリティ・オーバーハングと投機的ツール呼び出し</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:22:02 Capability Overhang</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-battery-half"></i><span>現行のフロンティアモデルには<span class="keyword-tag alert">既に大きな能力の余剰</span>が眠っている</span></li>
+          <li><i class="fa-solid fa-plug"></i><span>引き出せていない原因はモデルではなく<span class="keyword-tag accent">ハーネスとインターフェース</span>の側</span></li>
+          <li><i class="fa-solid fa-forward"></i><span><span class="keyword-tag accent">投機的プログラム的ツール呼び出し</span>: ツール実行を生成と並行して先回り実行</span></li>
+          <li><i class="fa-solid fa-stopwatch"></i><span>レイテンシを隠すこの設計は<span class="keyword-tag">エージェントの体感速度</span>を一変させる可能性</span></li>
+        </ul>
+        <div class="flow-arrow">モデルの潜在能力 <i class="fa-solid fa-arrow-right"></i> ハーネス改善 <i class="fa-solid fa-arrow-right"></i> 一気に開放</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--ui-color-5);"></i> 最高のモデルは既に手元にある——足りないのは「使いこなす側」だけ、それが overhang の意味！</span>
+      </div>
+    </div>
+
+    <!-- カード 18: Neuraleseと今後の研究 + まとめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ Neuralese・AI for Science — そして次の賭けへ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:30:15 Neuralese, Future Research</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-language"></i><span>英語でもコードでもない<span class="keyword-tag accent">「Neuralese」</span>——モデル間の内部表現で直接推論する未来</span></li>
+          <li><i class="fa-solid fa-flask-vial"></i><span><span class="keyword-tag">AI for Science</span>と高速に移り変わるベンチマーク環境への対応</span></li>
+          <li><i class="fa-solid fa-map"></i><span>Alex流の研究選択基準: <span class="keyword-tag accent">「誰も賭けていないが当たれば大きい」場所</span>を探す</span></li>
+          <li><i class="fa-solid fa-flag-checkered"></i><span>まとめ: <span class="keyword-tag">RLM・ハーネス・群れ</span>——「モデルの外側」が次の主戦場に</span></li>
+        </ul>
+        <div class="flow-arrow">英語/コード <i class="fa-solid fa-arrow-right"></i> Neuralese <i class="fa-solid fa-arrow-right"></i> 見えない群れが答える未来</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-brain fa-lg" style="color: var(--ui-color-2);"></i> 未来のLMは「1つの頭脳」ではなく「姿の見えない組織」——その入口に立ったのがRLMだった！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div>🎬 動画: <a href="https://www.youtube.com/watch?v=kog7mwsDqnk" target="_blank" rel="noopener">Latent Space</a> — 「Recursive Language Models — Alex Zhang, MIT PhD」</div>
+    <div style="margin-top: 6px;">👤 Alex Zhang: <a href="https://alexzhang13.github.io" target="_blank" rel="noopener">alexzhang13.github.io</a> ／ X: <a href="https://x.com/a1zhang" target="_blank" rel="noopener">@a1zhang</a></div>
+    <div style="margin-top: 6px;"><i class="fa-solid fa-circle-info"></i> このインフォグラフィックは動画の内容をグラフィックレコーディング風にまとめたものです。</div>
+    <div style="margin-top: 4px;"><i class="fa-solid fa-circle-exclamation"></i> 動画公開日は2026年10月2日です。トーク中の数値（1万エージェント・130Bトークン・約4,000万ドル相当）は番組での言及に基づきます。</div>
+  </footer>
+
+</div>
+
+<script>
+// スクロールに連動したカードのフェードイン
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale:not(.visible)');
+  if (!('IntersectionObserver' in window)) {
+    cards.forEach(function (c) { c.classList.add('visible'); });
+    return;
+  }
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (entry) {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        observer.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.12 });
+  cards.forEach(function (c) { observer.observe(c); });
+});
+</script>
+</body>
+</html>

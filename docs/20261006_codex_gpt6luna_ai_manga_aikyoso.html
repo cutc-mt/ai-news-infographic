@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CodexとGPT-6 LunaでAI漫画を自動生成 モデル役割分担とサブエージェント並列化 | AI共創イノベーション | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: 製図板のスチール&インクイエロー（漫画のアトリエ） */
+  --ui-color-1: #475569;   /* スレート（メイン） */
+  --ui-color-2: #CA8A04;   /* イエローアクセント */
+  --ui-color-3: #F1F5F9;   /* 明るいスレート */
+  --ui-color-4: #1E293B;   /* 最暗のスレート（テキスト） */
+  --ui-color-5: #EAB308;   /* 明るいイエロー */
+  --slate: #475569;
+  --deep: #1E293B;
+  --light: #94A3B8;
+  --accent: #CA8A04;
+  --bg-canvas: #F8FAFC;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 10% -5%, rgba(30, 41, 59, 0.12), transparent),
+    radial-gradient(ellipse 900px 550px at 90% 4%, rgba(202, 138, 4, 0.12), transparent);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: var(--ui-color-4);
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 34px 20px 24px;
+  margin-bottom: 25px;
+  background: linear-gradient(135deg, #1E293B 0%, #475569 55%, #94A3B8 100%);
+  border-radius: 24px;
+  box-shadow: 0 14px 42px rgba(30, 41, 59, 0.4);
+  position: relative;
+  overflow: hidden;
+  color: #FFFFFF;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 30%, rgba(234, 179, 8, 0.22), transparent 42%),
+    radial-gradient(circle at 82% 68%, rgba(148, 163, 184, 0.28), transparent 46%);
+  pointer-events: none;
+}
+
+.header > * { position: relative; }
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  margin: 12px 0 10px;
+  text-shadow: 0 2px 8px rgba(30, 41, 59, 0.55);
+}
+
+.header .subtitle {
+  font-size: 17px;
+  opacity: 0.94;
+  max-width: 1100px;
+  margin: 0 auto 12px;
+}
+
+.header .date {
+  font-size: 14px;
+  opacity: 0.88;
+}
+
+.header .date a { color: #FDE68A; text-decoration: none; }
+.header .date a:hover { text-decoration: underline; }
+
+/* セクションレイアウト（4カラム） */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 22px;
+  justify-content: center;
+}
+
+/* カードスタイル */
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(30, 41, 59, 0.12);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--slate);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 8px 10px 22px rgba(30, 41, 59, 0.2);
+}
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 21px;
+  color: var(--deep);
+  margin: 10px 0 4px;
+}
+
+.mega-icon-container .timestamp {
+  font-size: 13px;
+  color: #64748B;
+  margin-bottom: 4px;
+}
+
+.timestamp i { color: var(--accent); }
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 10px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--accent);
+  min-width: 18px;
+  margin-top: 4px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin: 0 3px;
+  display: inline-block;
+  font-weight: bold;
+  border: 1px solid #CBD5E1;
+}
+
+.keyword-tag.accent {
+  background-color: #FEF9C3;
+  color: #713F12;
+  border-color: var(--accent);
+}
+
+/* 強調テキスト */
+.highlight {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* フロー矢印 */
+.flow-arrow {
+  background: var(--ui-color-3);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: var(--deep);
+  text-align: center;
+  margin-top: 8px;
+  border: 1px dashed #94A3B8;
+}
+
+.flow-arrow i { color: var(--accent); margin: 0 3px; }
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--slate);
+  border-radius: 20px;
+  padding: 10px 14px;
+  margin: 16px 5px 10px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(30, 41, 59, 0.14);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--slate) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FEF9C3;
+  border-color: var(--accent);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--accent) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #E2E8F0;
+  border-color: #1E293B;
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: #1E293B transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+/* コードプレビュー */
+pre {
+  background: #1E293B;
+  color: #E2E8F0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+pre .cmt { color: #94A3B8; }
+pre .kw { color: #FDE68A; font-weight: bold; }
+pre .str { color: #A5F3FC; }
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(202, 138, 4, 0); }
+  50% { text-shadow: 1px 1px 0 rgba(71, 85, 105, 0.45), 0 0 14px rgba(234, 179, 8, 0.65); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 22px;
+  margin-top: 30px;
+  background: linear-gradient(135deg, #1E293B 0%, #475569 60%, #64748B 100%);
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(30, 41, 59, 0.4);
+  font-size: 14px;
+  color: #E2E8F0;
+}
+
+.footer a {
+  color: #FDE68A;
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <i class="fa-solid fa-wand-magic-sparkles fa-7x" aria-hidden="true"></i>
+    <h1>Codex &amp; GPT-6 LunaでAI漫画を自動生成</h1>
+    <div class="subtitle">高品質・超高速・低コスト、三拍子揃った最強のAI漫画生成術——小説を原案に、モデルの役割分担・絵コンテ先行設計・サブエージェント3並列による劇的な効率化までを18枚にまとめ</div>
+    <div class="date">🎬 <a href="https://www.youtube.com/watch?v=oBNEF2TvtOE" target="_blank" rel="noopener">【AI漫画】Codex ＆ GPT-6 LunaでAI漫画生成を自動生成を解説！高品質・超高速・コスパ、三拍子揃った最強のAI漫画生成術を伝授！</a> — AI共創イノベーション（2026年10月5日公開・21分34秒）</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- カード 1: 今回のテーマ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① Codex ＆ GPT-6 Lunaで漫画を描く</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> オープニング</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info"></i><span>ワンダー佐藤氏が登壇し、<span class="keyword-tag accent">Codex</span>で<span class="keyword-tag accent">GPT-6 Luna</span>を使った漫画制作術を解説する動画です</span></li>
+          <li><i class="fa-solid fa-bolt"></i><span>目指すのは<span class="highlight">高速・効率よく・低コスト</span>での漫画の執筆</span></li>
+          <li><i class="fa-solid fa-rocket"></i><span>題材は現在制作中の<span class="keyword-tag">宇宙艦もの</span>の漫画。13ページを一気に生成しました</span></li>
+          <li><i class="fa-solid fa-star"></i><span>動画の軸は「品質」と「効率性」の両立。特に<span class="highlight-text">サブエージェントの使い方</span>が今回の肝になります</span></li>
+        </ul>
+        <div class="flow-arrow">小説を用意 <i class="fa-solid fa-arrow-right"></i> Codexに投げる <i class="fa-solid fa-arrow-right"></i> 高品質な漫画が完成</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--accent);"></i> 三拍子揃った最強のAI漫画生成術、始まります！</span>
+      </div>
+    </div>
+
+    <!-- カード 2: 制作の流れ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② 原案は小説から — 制作の流れ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 制作フロー</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-feather"></i><span>今回の原作は<span class="keyword-tag">Gemini Spark</span>を使い、上位モデルのソルでストーリーを構成して執筆した小説です</span></li>
+          <li><i class="fa-solid fa-cloud-arrow-up"></i><span>書き上げた小説は<span class="keyword-tag">小説サイトに投稿済み</span>。それを漫画化の題材にしています</span></li>
+          <li><i class="fa-solid fa-terminal"></i><span>ChatGPTでも何でも良いので小説を書き、あとは<span class="highlight">Codexに投げるだけ</span>で漫画が仕上がります</span></li>
+          <li><i class="fa-solid fa-user-astronaut"></i><span>ジャンル問わず対応可能。今回は宇宙艦もののストーリーを漫画化しました</span></li>
+        </ul>
+        <div class="flow-arrow">小説の執筆 <i class="fa-solid fa-arrow-right"></i> 小説サイトに投稿 <i class="fa-solid fa-arrow-right"></i> Codexで漫画化</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 原案さえあれば、あとはAIが描いてくれます！</span>
+      </div>
+    </div>
+
+    <!-- カード 3: 生成品質 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-paintbrush fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ GPTイメージ2.5の圧倒的クオリティ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 出力サンプル</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-drumstick-bite"></i><span>肉の質感や湯気が「ジュー」と立ちのぼる描写など、<span class="highlight">漫画なのか実写なのか分からない</span>レベルのクオリティ</span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span>手前をぼかす<span class="keyword-tag">遠近感・奥行き表現</span>も自然に再現されます</span></li>
+          <li><i class="fa-solid fa-user-check"></i><span><span class="keyword-tag">キャラクターの一貫性</span>が保たれ、アクションシーンでも崩れません</span></li>
+          <li><i class="fa-solid fa-language"></i><span>画像内の<span class="keyword-tag">日本語はほぼ誤りなし</span>。GPTイメージ2.5への更新で大きく向上しました</span></li>
+          <li><i class="fa-solid fa-fire-flame-curved"></i><span>湯気の吹き出しや金属の質感など、細部の演出も申し分ありません</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-star fa-lg" style="color: var(--accent);"></i> GPTイメージ2.5は神——今使うべき画像生成です！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: 13ページ一気に生成 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ 13ページを一気に、ほぼ正確に</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 今回の成果物</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clone"></i><span>設定をきちんと整えた上で、<span class="highlight">13ページを一気に生成</span>。ほぼ正確に仕上がります</span></li>
+          <li><i class="fa-solid fa-face-flushed"></i><span>後半は深刻な展開に。問題が起こり、ナレーションが入り、乗員が不安を抱く場面へ</span></li>
+          <li><i class="fa-solid fa-lightbulb"></i><span><span class="keyword-tag">赤い光の演出</span>で緊張感を表現するなど、画の雰囲気作りも自動で可能です</span></li>
+          <li><i class="fa-solid fa-crown"></i><span>ラストは<span class="keyword-tag">紋章が光る引き</span>で終わり、「この先どうなるのか」という手に汗握る結びに</span></li>
+        </ul>
+        <div class="flow-arrow">設定を固める <i class="fa-solid fa-arrow-right"></i> 13ページ一括生成 <i class="fa-solid fa-arrow-right"></i> ほぼ修正不要で完成</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-circle-check fa-lg" style="color: var(--accent);"></i> 連続したストーリー性まで維持されるのが驚き！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 5: モデル役割分担 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ モデルの役割分担 — 頭と手足</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> モデル戦略</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-crown"></i><span><span class="keyword-tag accent">ストーリー</span>は「頭」が必要な作業。<span class="keyword-tag">ソルなどの上位モデル</span>で構成するのがおすすめです</span></li>
+          <li><i class="fa-solid fa-clapperboard"></i><span><span class="keyword-tag accent">絵コンテ</span>もコマの配置を考えるため、頭の良いモデルで作る方が良いと考えています</span></li>
+          <li><i class="fa-solid fa-moon"></i><span><span class="keyword-tag accent">画像生成</span>の部分は<span class="highlight">Lunaでも品質はほぼ変わらない</span>。絵コンテで固定すれば、あとはLunaで大量生産するだけ</span></li>
+          <li><i class="fa-solid fa-code-branch"></i><span>「頭＝上位モデル、手足＝Luna」という分担が、品質とコストのバランス取れた設計です</span></li>
+        </ul>
+        <div class="flow-arrow">ストーリー（上位モデル） <i class="fa-solid fa-arrow-right"></i> 絵コンテ（上位モデル） <i class="fa-solid fa-arrow-right"></i> 画像生成（Luna）</div>
+      </div>
+      <div class="speech-bubble right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 頭の良い仕事と手を動かす仕事を分けるのがコツです</span>
+      </div>
+    </div>
+
+    <!-- カード 6: 全部LunaでもOK -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-circle-check fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ コスト最優先なら全部Lunaでも可</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 低コスト運用</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-moon"></i><span>絵コンテをLunaで書くことも「かけんことはない」——Lunaも十分に賢いのです</span></li>
+          <li><i class="fa-solid fa-sack-dollar"></i><span><span class="highlight">とことんコストを下げたい</span>場合は、ストーリーも絵コンテも画像生成も全部Lunaで統一しましょう</span></li>
+          <li><i class="fa-solid fa-gauge-high"></i><span>その場合は<span class="keyword-tag accent">エフォート（推論の度合い）を最も高い段階</span>に設定するのがポイントです</span></li>
+          <li><i class="fa-solid fa-scale-balanced"></i><span>品質重視なら頭だけ上位モデル、コスト重視なら全部Luna——使い分けは自由です</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-1 top">
+        <span class="handwritten"><i class="fa-solid fa-tags fa-lg" style="color: var(--accent);"></i> 全体Luna ＋ エフォート最大、が省コストの鉄板構成！</span>
+      </div>
+    </div>
+
+    <!-- カード 7: エフォート最大の意味 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ エフォート最大は「賢さ」ではなく「粘り」</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> エフォートの効果</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info"></i><span>エフォートを上げても<span class="highlight">モデルが賢くなるわけではありません</span></span></li>
+          <li><i class="fa-solid fa-hourglass-half"></i><span>その代わり<span class="keyword-tag accent">長い時間、じゃんじゃん動き続けてくれる</span>ようになります</span></li>
+          <li><i class="fa-solid fa-rotate-right"></i><span>失敗しても<span class="keyword-tag">もう1回やり直す</span>。そういうリトライのループを組ませられます</span></li>
+          <li><i class="fa-solid fa-comments"></i><span>品質をさらに上げたい場合は、生成画像を見せて<span class="keyword-tag">確認→フィードバック→再生成</span>のサイクルも組める（時間はかかります）</span></li>
+          <li><i class="fa-solid fa-flag-checkered"></i><span>今回は設定をしっかり固め、<span class="highlight">ほぼ1発で完成まで到達</span>させました</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-repeat fa-lg" style="color: var(--accent);"></i> 粘り強く動かして、最後まで仕上げさせましょう！</span>
+      </div>
+    </div>
+
+    <!-- カード 8: サブエージェントの基本 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users-gear fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ サブエージェントの基本仕様</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 今回の主役</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list-ol"></i><span>Codexのサブエージェントは<span class="keyword-tag accent">同時に動くのは3つまで</span>。ただし設定自体は<span class="highlight">10個でも20個でも作れます</span></span></li>
+          <li><i class="fa-solid fa-layer-group"></i><span>今回は<span class="keyword-tag">13ページに対して13個のエージェント</span>を作成しました</span></li>
+          <li><i class="fa-solid fa-circle-question"></i><span>「3つしか動けないなら速度は変わらないのでは？」→<span class="highlight">速度は確かに3倍どまり</span>です</span></li>
+          <li><i class="fa-solid fa-star"></i><span>しかし今回のポイントは速度以外の<span class="highlight-text">大きなメリット</span>にあります（次のカードへ）</span></li>
+        </ul>
+        <div class="flow-arrow">同時実行は3つ <i class="fa-solid fa-arrow-right"></i> 設定は無制限に近い <i class="fa-solid fa-arrow-right"></i> 13ページ＝13エージェント</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-users fa-lg" style="color: var(--accent);"></i> エージェントを10個一気に作るのも全然ありです！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 9: コンテキスト汚染 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shield-halved fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ 最大のメリットは「コンテキストが汚れない」</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 品質安定の秘密</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>3つのエージェントだけで回すと、1ページ目を作ったエージェントが4ページ目を作る際、<span class="highlight">過去のページを見てしまう</span></span></li>
+          <li><i class="fa-solid fa-water"></i><span>するとコンテキストが汚れ、出力に徐々に<span class="keyword-tag">ドロドロ感</span>が出てきます</span></li>
+          <li><i class="fa-solid fa-broom"></i><span>ページごとに<span class="keyword-tag accent">別のエージェントが担当</span>すれば、常にフレッシュな状態で描画できます</span></li>
+          <li><i class="fa-solid fa-arrow-up"></i><span>汚れがなくなることで<span class="highlight">品質が安定</span>。これが1番重要なメリットです</span></li>
+        </ul>
+        <div class="flow-arrow">1エージェントで連続生成 <i class="fa-solid fa-arrow-right"></i> 汚れ・ドロドロ感 <i class="fa-solid fa-arrow-right"></i> ページ担当制で解消</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 速さより「フレッシュな描画」が本命です！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: トレードオフ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ トレードオフとコスト対策</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 注意点</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-stopwatch"></i><span>速度アップは<span class="keyword-tag">最大3倍まで</span>。それ以上は速くなりません</span></li>
+          <li><i class="fa-solid fa-coins"></i><span>各エージェントに絵コンテを渡す分、<span class="highlight">トークン消費が増える可能性</span>があります</span></li>
+          <li><i class="fa-solid fa-pen-nib"></i><span>頭の良いエージェントなら<span class="keyword-tag accent">「位置だけ渡す」</span>ような簡潔なプロンプトで調整可能。プロンプトエンジニアリングで効率化しましょう</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>何も指定しないと全文脈を渡してしまい、コストが跳ね上がる恐れも</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>とはいえLunaなので費用はたかが知れている。<span class="keyword-tag">Proプラン</span>なら気にするほどではなく、<span class="keyword-tag">Plusプラン</span>でも十分余裕があります</span></li>
+        </ul>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-coins fa-lg" style="color: var(--accent);"></i> 渡す文脈は最小に——これがコスト削減のコツ！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: 絵コンテの作り方 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-cells fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ 絵コンテ先行の設計手順</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> エコンテの作成</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-ban"></i><span><span class="highlight">いきなり漫画にせず、まず絵コンテ化</span>するのが手順です</span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>第1話のみを見て絵コンテを書かせ、<span class="keyword-tag accent">ページ数とコマの配置</span>を考えさせます</span></li>
+          <li><i class="fa-solid fa-folder-open"></i><span>絵コンテは<span class="keyword-tag">添付フォルダーに書き出し</span>。ここで画の設計を固定します</span></li>
+          <li><i class="fa-solid fa-circle-info"></i><span>面倒なら絵コンテなしでも漫画は書けますが、<span class="highlight">品質を考えるなら絶対にやるべき</span>工程です</span></li>
+        </ul>
+        <pre><span class="cmt"># 絵コンテ用プロンプトの例</span>
+<span class="str">「第1話のみ見てエコンテを書いて。
+   ページ数と構成を考えて、
+   エコンテは添付フォルダーに書き出して」</span></pre>
+      </div>
+      <div class="speech-bubble top">
+        <span class="handwritten"><i class="fa-solid fa-thumbtack fa-lg" style="color: var(--accent);"></i> コンテキストの固定が、品質の土台になります！</span>
+      </div>
+    </div>
+
+    <!-- カード 12: スキル固定化 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-graduation-cap fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ 漫画用「スキル」を作って固定化</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> スキルの自作</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-screwdriver-wrench"></i><span>漫画のための<span class="keyword-tag accent">スキルを作成して固定化</span>すれば、出力が安定します</span></li>
+          <li><i class="fa-solid fa-magic"></i><span>スキルで固定すれば、<span class="highlight">これくらいの短いプロンプトで完結</span>します</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>スキルを使わない場合は添付フォルダーに<span class="keyword-tag">キャラクター画像を置いて参照させる</span>形でもOK</span></li>
+          <li><i class="fa-solid fa-circle-info"></i><span>実演では、指示していないのに<span class="keyword-tag">3面図を勝手に読み込んで</span>くれました</span></li>
+          <li><i class="fa-solid fa-film"></i><span>絵コンテとスキルの作り方は<span class="highlight">過去の動画</span>で解説済み。それを見れば誰でも再現できます</span></li>
+        </ul>
+        <div class="flow-arrow">スキル作成 <i class="fa-solid fa-arrow-right"></i> 絵コンテ作成 <i class="fa-solid fa-arrow-right"></i> 出力が安定</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-book fa-lg" style="color: var(--accent);"></i> 仕込みを一度作れば、あとはずっと楽です！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 13: タッチ選び -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-palette fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ 絵のタッチは3パターン同時に比較</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> タッチ選定</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-images"></i><span>最初に決めるのは<span class="keyword-tag accent">絵のタッチ</span>。文章で言えばスタイルとトーンです</span></li>
+          <li><i class="fa-solid fa-user-group"></i><span>3パターンのタッチ案は<span class="highlight">サブエージェント3つで一気に生成</span></span></li>
+          <li><i class="fa-solid fa-stopwatch"></i><span>1案2分かかる場合、直列だと6分。並列なら<span class="keyword-tag">2分で3案が出揃います</span></span></li>
+          <li><i class="fa-solid fa-eye"></i><span>単体で生成すると前の案を見てしまうため、<span class="highlight">純粋なタッチの比較ができません</span>。文脈がないサブエージェントだからこそ純粋に出せるのです</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>実演では2番目の案（繊細な線画）を採用しました</span></li>
+        </ul>
+        <pre><span class="cmt"># タッチ比較のプロンプト例</span>
+<span class="str">「絵のタッチの候補を3パターン書いて」</span>
+<span class="cmt"># → サブエージェント3つが同時に生成</span></pre>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 文脈がないことは、比較にはむしろ利点です！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: 実績 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-stopwatch fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ 実績 — 13ページを29分で完成</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 今回の結果</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users"></i><span><span class="keyword-tag accent">13個のサブエージェント</span>で13ページ全てを生成しました</span></li>
+          <li><i class="fa-solid fa-clock"></i><span>所要時間は<span class="highlight">わずか29分</span>。1ページあたり<span class="keyword-tag">3分未満</span>です</span></li>
+          <li><i class="fa-solid fa-brain"></i><span>思考の過程でキャラクターをきちんと読み込み、<span class="keyword-tag">3面図を参照</span>しながら描画します</span></li>
+          <li><i class="fa-solid fa-user-astronaut"></i><span>船長「バズ」の顔や体格が<span class="highlight">全ページで一貫</span>。きちんと資料を見てくれています</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>ここまで固定化すれば<span class="highlight">ほぼ間違えません</span>。修正は1ページのみで済みました</span></li>
+        </ul>
+        <div class="flow-arrow">13エージェント <i class="fa-solid fa-arrow-right"></i> 29分で13ページ <i class="fa-solid fa-arrow-right"></i> 修正は実質1箇所</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--accent);"></i> 早くて品質が良い——この両立が最大の強み！</span>
+      </div>
+    </div>
+
+    <!-- カード 15: キャラクター名の一致 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-id-card fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ キャラ名は画像とファイルの両方に書く</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> キャラ設定のコツ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-image"></i><span>小説・絵コンテ・キャラクター画像で<span class="keyword-tag accent">名前が一致していない</span>と正しく紐づきません</span></li>
+          <li><i class="fa-solid fa-pen-nib"></i><span>対策その1：<span class="keyword-tag">3面図などの画像自体に名前を書く</span>（例: バズホーキンス）</span></li>
+          <li><i class="fa-solid fa-file-lines"></i><span>対策その2：<span class="keyword-tag">参照ファイルの名前にも入れる</span>。どちらか一方で十分ですが、私は両方やっています</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>2箇所に入れておけば<span class="highlight">まず間違えることはない</span>でしょう。AIが「このキャラがこう動く」と理解できます</span></li>
+        </ul>
+        <div class="flow-arrow">画像に名前を記入 <i class="fa-solid fa-arrow-right"></i> ファイル名にも反映 <i class="fa-solid fa-arrow-right"></i> 紐づきミスを防止</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-tag fa-lg" style="color: var(--accent);"></i> 名前の一致は地味ですが、超重要な設定です！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: 修正ワークフロー -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wrench fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ 修正も「レビュー→指摘→再生成」で</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 修正の実際</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>不具合を見つけたらLunaに<span class="keyword-tag accent">「画像を見て変な点を指摘して」</span>と投げかけます</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>実際に「右上でステラはすでにフォークで肉を食べている（食事の順序が逆）」<span class="highlight">と正しく認識</span>してくれました</span></li>
+          <li><i class="fa-solid fa-scissors"></i><span>「左下のスパークとステラを消す」など指示を伝えるだけで反映。<span class="keyword-tag">不要な2人いるキャラも解消</span>しました</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>実例: ご飯が届いていないのに肉を持ち、しかもフォークを持っていない矛盾コマなど</span></li>
+          <li><i class="fa-solid fa-circle-info"></i><span>絵コンテを修正するより<span class="highlight">できた漫画を後から直す方が早い</span>場合が多いです</span></li>
+        </ul>
+        <pre><span class="cmt"># 修正時のプロンプト例</span>
+<span class="str">「画像を見て変な点を指摘して」</span>
+<span class="cmt"># → レビューさせてから直すのが確実</span></pre>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-comments fa-lg" style="color: var(--accent);"></i> まずレビューを挟むと、直し忘れが減ります！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 17: 修正コンペとナンバリング -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-trophy fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ 修正も3案コンペ、仕上げはナンバリング</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 仕上げの工夫</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-layer-group"></i><span>修正もサブエージェント3つで<span class="keyword-tag accent">3パターン同時に出してコンペ</span>にします</span></li>
+          <li><i class="fa-solid fa-dice"></i><span>1案だけだと<span class="highlight">一発勝負</span>になってしまいます。3案出せばどれか当たりが来ます</span></li>
+          <li><i class="fa-solid fa-repeat"></i><span>何度も修正を重ねるとコンテキストが汚れ、時間もかかる——<span class="keyword-tag">一気に3案で決める</span>のが理にかなっています</span></li>
+          <li><i class="fa-solid fa-list-ol"></i><span>仕上げは<span class="keyword-tag accent">ファイル名に連番を振る</span>よう指示。ページ順に並び、投稿も一気にできます</span></li>
+        </ul>
+        <pre><span class="cmt"># ナンバリングの指示例</span>
+<span class="str">「ファイル名はナンバー付きにして」</span>
+<span class="cmt"># → 01.jpg, 02.jpg ... ページ通りに整列</span></pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-ranking-star fa-lg" style="color: var(--accent);"></i> 良い案を1つ選んで、もう1段階磨くのもあり！</span>
+      </div>
+    </div>
+
+    <!-- カード 18: まとめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-crown fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ まとめ — 最強の漫画生成パイプライン</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> クロージング</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal"></i><span><span class="keyword-tag accent">Codexが非常に使いやすい</span>。サブエージェントを併用すれば、さらに速くなりドロドロ感も消えます</span></li>
+          <li><i class="fa-solid fa-image"></i><span><span class="keyword-tag accent">GPTイメージ2.5</span>が神。今の組み合わせは<span class="highlight">漫画生成において最強</span>です</span></li>
+          <li><i class="fa-solid fa-moon"></i><span>描くのはLunaで十分。<span class="keyword-tag">Lunaのエフォートを最大</span>にして、うまく設計しましょう</span></li>
+          <li><i class="fa-solid fa-users"></i><span>エージェントを<span class="keyword-tag">10個一気に作る</span>のも全然あり。100枚一気の生成もおそらく可能です</span></li>
+          <li><i class="fa-solid fa-gauge"></i><span>最後は<span class="highlight">コストの消費を見ながら</span>、ほどほどに調整して運用してください</span></li>
+        </ul>
+        <div class="flow-arrow">小説 <i class="fa-solid fa-arrow-right"></i> 絵コンテ <i class="fa-solid fa-arrow-right"></i> スキル固定 <i class="fa-solid fa-arrow-right"></i> 13エージェント並列 <i class="fa-solid fa-arrow-right"></i> 完成</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--accent);"></i> 高品質・超高速・低コスト——三拍子、ここに揃いました！</span>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div>📝 ソース: 🎬 動画: <a href="https://www.youtube.com/watch?v=oBNEF2TvtOE" target="_blank" rel="noopener">AI共創イノベーション</a> — 「【AI漫画】Codex ＆ GPT-6 LunaでAI漫画生成を自動生成を解説！」（2026年10月5日公開）</div>
+    <div style="margin-top: 6px;">🎨 このインフォグラフィックは動画の内容を18枚のカードに整理したものです。</div>
+  </footer>
+
+</div>
+
+<script>
+  // スクロール連動のフェードイン
+  document.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.fade-in-scale');
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    cards.forEach(function (card) { observer.observe(card); });
+  });
+</script>
+</body>
+</html>

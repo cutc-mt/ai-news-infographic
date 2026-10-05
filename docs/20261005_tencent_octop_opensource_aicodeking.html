@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>テンセントのオープンソースAIアシスタント「Octop」を自前のマシンで動かす | AI Code King | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: ベリーピンク（熟したベリーのガーデン） */
+  --ui-color-1: #DB2777;   /* ピンク（メイン） */
+  --ui-color-2: #9D174D;   /* ディープベリー */
+  --ui-color-3: #FFFFFF;   /* カードの下地（白） */
+  --ui-color-4: #500724;   /* 最暗のベリー（テキスト） */
+  --ui-color-5: #FCE7F3;   /* 最明のピンク */
+  --pink: #DB2777;
+  --deep: #9D174D;
+  --light: #F472B6;
+  --bg-canvas: #FDF2F8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 12% -5%, rgba(219, 39, 119, 0.13), transparent),
+    radial-gradient(ellipse 900px 550px at 88% 4%, rgba(244, 114, 182, 0.16), transparent);
+  font-family: 'Zen Maru Gothic', 'Zen Kurenaido', sans-serif;
+  color: var(--ui-color-4);
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 34px 20px 24px;
+  margin-bottom: 25px;
+  background: linear-gradient(135deg, #9D174D 0%, #DB2777 55%, #F472B6 100%);
+  border-radius: 24px;
+  box-shadow: 0 14px 42px rgba(157, 23, 77, 0.35);
+  position: relative;
+  overflow: hidden;
+  color: #FFFFFF;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 20% 120%, rgba(252, 231, 243, 0.22), transparent 45%),
+    radial-gradient(circle at 85% -20%, rgba(252, 231, 243, 0.18), transparent 40%);
+  pointer-events: none;
+}
+
+.header .fa-7x {
+  color: #FCE7F3;
+  animation: fa-bounce 3s ease-in-out infinite;
+  filter: drop-shadow(0 0 18px rgba(252, 231, 243, 0.55));
+}
+
+.header h1 {
+  font-size: 36px;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin: 10px 0 5px;
+  text-shadow: 0 2px 10px rgba(80, 7, 36, 0.45);
+}
+
+.header .subtitle {
+  font-size: 17px;
+  color: #FCE7F3;
+  font-weight: bold;
+}
+
+.header .date {
+  font-size: 14px;
+  color: #FBCFE8;
+  margin-top: 8px;
+}
+
+.header .date a { color: #FFFFFF; text-decoration: none; font-weight: bold; border-bottom: 2px dotted rgba(255,255,255,0.6); }
+
+/* 4カラムレイアウト */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: var(--ui-color-3);
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 0 10px 26px rgba(157, 23, 77, 0.14);
+  position: relative;
+  overflow: hidden;
+  border-top: 6px solid var(--ui-color-1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-6px) rotate(-0.5deg);
+  box-shadow: 0 16px 36px rgba(219, 39, 119, 0.28);
+  background-color: #FFFBFD;
+}
+
+.section-card:nth-child(even) { border-top-color: var(--light); }
+.section-card:nth-child(3n) { border-top-color: var(--deep); }
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0;
+}
+
+.mega-icon-container i.fa-5x {
+  color: var(--pink);
+  filter: drop-shadow(0 0 12px rgba(219, 39, 119, 0.35));
+}
+
+.section-card:nth-child(even) .mega-icon-container i.fa-5x {
+  color: var(--deep);
+  filter: drop-shadow(0 0 12px rgba(157, 23, 77, 0.35));
+}
+
+.section-card:nth-child(3n) .mega-icon-container i.fa-5x {
+  color: var(--light);
+  filter: drop-shadow(0 0 12px rgba(244, 114, 182, 0.45));
+}
+
+.mega-icon-container h2 {
+  font-size: 22px;
+  color: var(--ui-color-4);
+  margin: 10px 0 0;
+  font-weight: bold;
+}
+
+.timestamp {
+  font-size: 14px;
+  color: #BE5A8A;
+  margin-top: 4px;
+}
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 15px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 15px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15px;
+  color: #67203E;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--pink);
+  min-width: 16px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-5);
+  color: var(--ui-color-2);
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-right: 5px;
+  display: inline-block;
+  font-weight: bold;
+}
+
+.keyword-tag.accent {
+  background-color: rgba(219, 39, 119, 0.14);
+  color: #9D174D;
+}
+
+.keyword-tag.sky {
+  background-color: rgba(157, 23, 77, 0.12);
+  color: #9D174D;
+}
+
+.keyword-tag.star {
+  background-color: #FFFFFF;
+  color: #DB2777;
+  border: 1px dashed var(--light);
+}
+
+/* 重要ポイントのハイライト */
+.highlight {
+  background: linear-gradient(transparent 60%, rgba(244, 114, 182, 0.5) 60%);
+  font-weight: bold;
+  color: #9D174D;
+  padding: 0 2px;
+}
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #FFF6FA;
+  border: 3px solid var(--pink);
+  border-radius: 20px;
+  padding: 10px 15px;
+  margin: 15px 5px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 0 6px 16px rgba(219, 39, 119, 0.16);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--pink) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+  transform: rotate(15deg);
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FDF2F8;
+  border-color: var(--light);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--light) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #FBE5F0;
+  border-color: var(--deep);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: var(--deep) transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #67203E;
+  display: inline-block;
+}
+
+/* 流れの矢印 */
+.flow-arrow {
+  text-align: center;
+  font-size: 14px;
+  color: var(--deep);
+  font-weight: bold;
+  margin-top: 8px;
+}
+
+.flow-arrow i {
+  color: var(--pink);
+  margin: 0 4px;
+}
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(219, 39, 119, 0); }
+  50% { text-shadow: 1px 1px 0 rgba(219, 39, 119, 0.45), 0 0 14px rgba(244, 114, 182, 0.55); }
+}
+
+/* コードプレビュー */
+pre {
+  background: #500724;
+  color: #FCE7F3;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+pre .cmt { color: #F9A8D4; }
+pre .kw { color: #FBCFE8; font-weight: bold; }
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 22px;
+  margin-top: 30px;
+  background: linear-gradient(135deg, #500724 0%, #9D174D 60%, #DB2777 100%);
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(80, 7, 36, 0.35);
+  font-size: 14px;
+  color: #FCE7F3;
+}
+
+.footer a {
+  color: #FFFFFF;
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <i class="fa-solid fa-robot fa-7x" aria-hidden="true"></i>
+    <h1>テンセントの「Octop」を自前で動かす</h1>
+    <div class="subtitle">オープンソースAIアシスタント徹底ガイド——専門家エージェント・自分の文書・予定タスク・コーディング委任を1か所にまとめる18枚のまとめ</div>
+    <div class="date">🎬 <a href="https://www.youtube.com/watch?v=fw1b7Lz5TE4" target="_blank" rel="noopener">Tecent Octop (Opensource): Wait, Tencent just ENDED OpenAI Dots &amp; Muse!?</a> — AI Code King（2026年10月5日）</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- カード 1: 今回のトピック -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x" style="animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① テンセントの「Octop」登場</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:00 イントロ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-question"></i><span>Tencent Cloud のGitHub 組織が公開したのが、<span class="keyword-tag accent">オープンソースのAIアシスタント「Octop」</span>。自分のマシンで動かせる</span></li>
+          <li><i class="fa-solid fa-tag"></i><span>動画の題名は「OpenAIのDotsやMuseは終わったのか!?」と煽っているけれど、中身は<span class="keyword-tag">Octopの導入から運用までの実践チュートリアル</span></span></li>
+          <li><i class="fa-solid fa-cubes"></i><span>特徴は<span class="keyword-tag accent">専門家エージェント・自分の文書・予定タスク・コーディング道具の接続</span>を1か所にまとめられること</span></li>
+          <li><i class="fa-solid fa-comments"></i><span>文書について専門家に質問し、別の専門家に答えのレビューを頼み、コーディングの作業を別の道具に任せられる。<span class="highlight">環境を毎回作り直さずに済む</span>のが魅力</span></li>
+        </ul>
+        <div class="flow-arrow">導入 <i class="fa-solid fa-arrow-right"></i> モデル接続 <i class="fa-solid fa-arrow-right"></i> エキスパート作成 <i class="fa-solid fa-arrow-right"></i> 小さなワークフロー</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: #DB2777;"></i> 題名は豪快ですが、中身は丁寧なハンズオン動画です！</span>
+      </div>
+    </div>
+
+    <!-- カード 2: 料金とプライバシー -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-scale-balanced fa-5x" style="animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② 無料だけどモデルは自己負担</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 00:49 料金とプライバシー</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-coins"></i><span>Octop 自体は<span class="keyword-tag accent">MITライセンスの無料オープンソース</span>。ただし<span class="keyword-tag">モデルは自分で用意する</span>ので、クラウドAPIの利用費は発生する</span></li>
+          <li><i class="fa-solid fa-microchip"></i><span><span class="keyword-tag sky">Ollamaでのローカルモデル</span>にも対応。ただし必要なハードウェアと結果の品質は、動かす内容しだい</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>アプリを自己ホストしても<span class="highlight">すべての要求がローカルになるわけではない</span>。クラウドのプロバイダに繋いだら、送った情報はマシンの外へ出る</span></li>
+          <li><i class="fa-solid fa-folder-open"></i><span>自分の文書をアップロードする前に、<span class="keyword-tag accent">この点を理解しておくべき</span>と動画は注意を促す</span></li>
+        </ul>
+        <div class="flow-arrow">アプリは無料 <i class="fa-solid fa-plus"></i> モデルは自己調達 <i class="fa-solid fa-arrow-right"></i> クラウドなら費用と流出に注意</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-shield-halved fa-lg" style="color: #9D174D;"></i> 「自己ホスト＝全部ローカル」ではない、ここが最初の関門です！</span>
+      </div>
+    </div>
+
+    <!-- カード 3: インストール -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-download fa-5x" style="animation: fa-bounce 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ インストールはターミナルで</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:14 インストール</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bookmark"></i><span>概要欄のリンクからGitHubのリポジトリを開き、<span class="keyword-tag accent">インストール手順</span>までスクロールして確認</span></li>
+          <li><i class="fa-solid fa-terminal"></i><span>Mac や Linux なら<span class="keyword-tag sky">シェルのインストール用コマンド</span>を、Windows なら<span class="keyword-tag sky">PowerShellのコマンド</span>をターミナルに貼る</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>インストーラが<span class="keyword-tag accent">Pythonの環境を整えてくれる</span>ので、Pythonを手で用意する必要はない</span></li>
+          <li><i class="fa-solid fa-desktop"></i><span>完了したら新しいターミナルを開いてコマンドを使えるように。Windows・Mac・Linux用の<span class="keyword-tag">デスクトップ版</span>もリリースのページにある</span></li>
+        </ul>
+        <pre><span class="cmt"># インストール後に新しいターミナルを開くと octop コマンドが使える</span>
+<span class="kw">octop</span> --help</pre>
+        <div class="flow-arrow">リポジトリを確認 <i class="fa-solid fa-arrow-right"></i> コマンドをコピー <i class="fa-solid fa-arrow-right"></i> 実行 <i class="fa-solid fa-arrow-right"></i> 新ターミナルで準備完了</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: #DB2777;"></i> Pythonの準備が不要なのは、導入のハードルを大きく下げます！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: 起動とタイムゾーン -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-terminal fa-5x" style="animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ 起動とタイムゾーンの指定</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 01:52 起動</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-play"></i><span>アプリを起動する普段のコマンドは<span class="keyword-tag accent">octop run</span>。動画では既定のタイムゾーンをニューヨークに指定する書き方を使う</span></li>
+          <li><i class="fa-solid fa-globe"></i><span>プロジェクトの既定は<span class="keyword-tag sky">Asia/Shanghai（上海）</span>。<span class="highlight">予定タスクを使うなら自分のタイムゾーンに必ず変更</span></span></li>
+          <li><i class="fa-solid fa-window-restore"></i><span>ターミナルは動かしたまま、<span class="keyword-tag accent">ポート8088のローカルアドレス</span>をブラウザで開く</span></li>
+          <li><i class="fa-solid fa-key"></i><span>初期設定でパスワードを求められたら、<span class="keyword-tag">ターミナルに表示された臨時パスワード</span>を使う。そこから管理者アカウントを作る流れへ</span></li>
+        </ul>
+        <pre><span class="cmt"># 普段の起動コマンド</span>
+<span class="kw">octop</span> run
+<span class="cmt"># タイムゾーンを指定して起動する書き方も用意されている
+# （動画の例では America/New_York を設定）</span></pre>
+        <div class="flow-arrow">octop run <i class="fa-solid fa-arrow-right"></i> タイムゾーンを確認 <i class="fa-solid fa-arrow-right"></i> ブラウザで8088番を開く</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-clock fa-lg" style="color: #9D174D;"></i> 既定は上海のタイムゾーン——日本で使うなら最初に直しましょう！</span>
+      </div>
+    </div>
+
+    <!-- カード 5: セットアップウィザード -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-shield fa-5x" style="animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ ブラウザで完了する初期設定</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 02:12 セットアップ</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-door-open"></i><span>新規のインストールなら、<span class="keyword-tag accent">設定はブラウザの中で完結</span>する</span></li>
+          <li><i class="fa-solid fa-database"></i><span>今回の解説でデータベースは<span class="keyword-tag sky">SQLite</span>を選択</span></li>
+          <li><i class="fa-solid fa-lock"></i><span>管理者のユーザー名と強いパスワードを登録。パスワードは<span class="keyword-tag accent">英数字を含む8文字以上</span>が必要</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>次の工程でモデルのプロバイダを設定して、初期設定を完了させればダッシュボードへ進める</span></li>
+        </ul>
+        <div class="flow-arrow">臨時パスワードで入る <i class="fa-solid fa-arrow-right"></i> SQLiteを選択 <i class="fa-solid fa-arrow-right"></i> 管理者を作成 <i class="fa-solid fa-arrow-right"></i> ダッシュボード</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-user-check fa-lg" style="color: #DB2777;"></i> 難しい操作はなし——ブラウザの案内に沿って進めるだけです！</span>
+      </div>
+    </div>
+
+    <!-- カード 6: モデルを接続 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="animation: fa-beat-fade 2.9s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ モデルを接続する</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 02:33 モデル接続</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-key"></i><span>すでに使える<span class="keyword-tag accent">プロバイダを選び、APIキーを入力</span>して、APIのアドレスを確認</span></li>
+          <li><i class="fa-solid fa-wrench"></i><span>独自のサービスを使う場合は<span class="keyword-tag sky">一致するAPIタイプを選び、ベースURLを入力</span>。使うモデルを有効化して接続を試す</span></li>
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>接続が失敗したら<span class="keyword-tag">キー・モデルの名前・利用枠の残り</span>を確認。Octop を入れてもプロバイダの残高は増えない</span></li>
+          <li><i class="fa-solid fa-robot"></i><span><span class="keyword-tag sky">Ollamaのローカルモデル</span>も接続できる。今回の解説は<span class="highlight">まず1つのチャットモデルで基本を確認</span>。文書の検索や作業の委任をさせるので、道具の呼び出しを確実に扱えるモデルが必要</span></li>
+        </ul>
+        <div class="flow-arrow">プロバイダを選ぶ <i class="fa-solid fa-arrow-right"></i> キーとURLを入力 <i class="fa-solid fa-arrow-right"></i> 接続試験 <i class="fa-solid fa-arrow-right"></i> 会話を確認</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-microchip fa-lg" style="color: #9D174D;"></i> 最初は1つのモデルだけ——動く部品を増やさないのがコツ！</span>
+      </div>
+    </div>
+
+    <!-- カード 7: 最初のエキスパート -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-tie fa-5x" style="animation: fa-bounce 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ 最初のエキスパートを作る</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 03:13 エキスパート作成</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users"></i><span>Octop は自分のエージェントを<span class="keyword-tag accent">「エキスパート（Experts）」</span>と呼ぶ。それぞれ<span class="keyword-tag sky">独自の作業場所と設定</span>を持つ</span></li>
+          <li><i class="fa-solid fa-pen-to-square"></i><span>片方には書く役割を、もう片方にはレビューの役割を与えられ、<span class="keyword-tag">エキスパートごとに別のモデル</span>も選べる</span></li>
+          <li><i class="fa-solid fa-file-lines"></i><span>Experts のページで新規作成。「Release Helper」と名付けて、プロンプトのファイル（AGENTS.md）を編集。<span class="keyword-tag accent">「明確なリリース要約を書く。提供された情報を使い、記載がないものはその旨を伝える」</span>と指示</span></li>
+          <li><i class="fa-solid fa-comments"></i><span>雛形や性格の設定もあるが、まずは<span class="highlight">明確な仕事内容の記述だけで十分</span>。起動してチャットで役割を一文で説明してもらい、普通の返事が来ることを確認</span></li>
+        </ul>
+        <div class="flow-arrow">新規エキスパート <i class="fa-solid fa-arrow-right"></i> 役割を書く <i class="fa-solid fa-arrow-right"></i> 起動 <i class="fa-solid fa-arrow-right"></i> 一文で自己説明</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-user-pen fa-lg" style="color: #DB2777;"></i> 「役割の説明文」の質が、そのまま返事の質になります！</span>
+      </div>
+    </div>
+
+    <!-- カード 8: サンプルのリリースノート -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-lines fa-5x" style="animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ 罠を仕込んだサンプル文書</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 04:06 サンプル文書</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-clapperboard"></i><span>動画で用意したのは、架空のアプリ<span class="keyword-tag accent">「Taskboard」のリリースノート</span>（見本のデータが動画に付いている）</span></li>
+          <li><i class="fa-solid fa-list-ul"></i><span>今回の更新で<span class="keyword-tag sky">CSVエクスポート・タスクの絞り込み・タスク作成のキーボードショートカット</span>が追加</span></li>
+          <li><i class="fa-solid fa-bug"></i><span>既知の不具合として<span class="keyword-tag">エクスポートの問題</span>がある。<span class="keyword-tag">デバイスの同期は未対応</span>で、<span class="keyword-tag">リリース日も未発表</span></span></li>
+          <li><i class="fa-solid fa-magnet"></i><span>もしAIがリリース日を作ったり、同期に対応と答えたりしたら<span class="highlight">文書の外へ出た（見当違いの作り話）</span>と一目で分かる——確かめるための罠</span></li>
+        </ul>
+        <div class="flow-arrow">事実を確認できる内容 <i class="fa-solid fa-plus"></i> 作り話を見破れる内容 <i class="fa-solid fa-arrow-right"></i> 検証用の小さな文書</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: #9D174D;"></i> 正解を自分が知っている文書で試す——これが確かめ方の鉄則！</span>
+      </div>
+    </div>
+
+    <!-- カード 9: ナレッジベースとONNX -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-database fa-5x" style="animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ ナレッジベースとローカル埋め込み</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 04:37 ナレッジベース</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-folder-open"></i><span>Knowledge Bases の設定を開いて機能を有効化し、<span class="keyword-tag accent">埋め込み（embeddings）の作り方</span>を選ぶ</span></li>
+          <li><i class="fa-solid fa-quote-left"></i><span>埋め込みとは<span class="keyword-tag sky">文書の中から関連する箇所を探すための仕組み</span>のこと</span></li>
+          <li><i class="fa-solid fa-microchip"></i><span>今回は<span class="keyword-tag accent">「Local on ONNX」を選び、英語の埋め込みモデルを一覧からダウンロード</span>。準備ができたら設定を保存</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>オンラインの埋め込みサービスも使えるが、<span class="highlight">文書の内容がそのサービスへ送信され、別の費用が増える可能性</span>もある。埋め込みのモデルは先ほどのチャットモデルとは別物で、埋め込みをローカルで動かしてもチャットモデルの居場所は変わらない</span></li>
+        </ul>
+        <div class="flow-arrow">機能を有効化 <i class="fa-solid fa-arrow-right"></i> ONNXのモデル入手 <i class="fa-solid fa-arrow-right"></i> 文書を登録 <i class="fa-solid fa-arrow-right"></i> 検索の準備完了</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-box-archive fa-lg" style="color: #DB2777;"></i> 埋め込み＝検索用、チャット＝会話用。2つのモデルは別々です！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: 引用付きで質問 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass fa-5x" style="animation: fa-beat-fade 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ 引用付きの回答を確かめる</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 05:23 引用付きで質問</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-upload"></i><span>「taskboard demo」という名前のナレッジベースを作り、リリースノートを登録。<span class="keyword-tag accent">文書が準備完了と表示されるのを待つ</span></span></li>
+          <li><i class="fa-solid fa-paper-plane"></i><span>「チャットに追加」で Release Helper と対話し、<span class="keyword-tag sky">「ナレッジベースを検索して変更点を平易に要約して。既知の制限と出典を含め、同期の可否とリリース日を教えて」</span>と送る</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>正しい答えの条件：<span class="keyword-tag">CSVエクスポート・絞り込み・ショートカットに触れて、アーカイブ済みのタスクも書き出せること</span>を説明。同期は未対応、リリース日は未発表と答える</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>答えの中の<span class="highlight">出典の参照を開いて、元のファイルと見比べる</span>。抜けがあれば再検索を頼み、使った箇所を指させる。小さな文書なら<span class="keyword-tag accent">全体を自分の目で確認できる</span>ので、大きなコレクションを任せる前の信頼の土台になる</span></li>
+        </ul>
+        <div class="flow-arrow">質問 <i class="fa-solid fa-arrow-right"></i> 検索と要約 <i class="fa-solid fa-arrow-right"></i> 出典を開く <i class="fa-solid fa-arrow-right"></i> 元ファイルと照合</div>
+      </div>
+      <div class="speech-bubble variant-2 right">
+        <span class="handwritten"><i class="fa-solid fa-check-double fa-lg" style="color: #9D174D;"></i> 社内文書やプロジェクトメモでも同じ流れが使えます！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: レビューア -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-pen fa-5x" style="animation: fa-bounce 3.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ 二人目はレビュー役</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 06:25 レビュー役を追加</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-user-plus"></i><span>二人目のエキスパートとして「Reviewer」を追加。仕事は<span class="keyword-tag accent">「草案を提供されたソースと照合し、根拠のない主張を指摘する」</span>こと</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>モデルを設定して起動し、<span class="keyword-tag sky">普通に返事が来ること</span>を確認しておく</span></li>
+          <li><i class="fa-solid fa-handshake"></i><span>書く人とレビューする人が同時にいる構図は便利。ただし<span class="highlight">モデルの呼び出しが増える分、単純な質問にはエキスパート1人で十分</span></span></li>
+          <li><i class="fa-solid fa-rotate-left"></i><span>二人目の役割が必要になった時点でチームへ加える——これが動画の基本的な考え方</span></li>
+        </ul>
+        <div class="flow-arrow">書く人 <i class="fa-solid fa-plus"></i> 検す人 <i class="fa-solid fa-arrow-right"></i> 根拠の確認 <i class="fa-solid fa-arrow-right"></i> 修正された草案</div>
+      </div>
+      <div class="speech-bubble variant-1">
+        <span class="handwritten"><i class="fa-solid fa-user-graduate fa-lg" style="color: #DB2777;"></i> 書く役と検す役の分担——人の仕事と同じ形です！</span>
+      </div>
+    </div>
+
+    <!-- カード 12: エージェントチーム -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-people-group fa-5x" style="animation: fa-flip 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ エージェントチームを組む（β）</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 06:25 チーム作成</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-users"></i><span>Experts のページの「My Teams」から<span class="keyword-tag accent">「Release Team」</span>を作成</span></li>
+          <li><i class="fa-solid fa-user-plus"></i><span>Release Helper と Reviewer を<span class="keyword-tag sky">2人のメンバー</span>に加え、<span class="keyword-tag sky">取りまとめ役（コーディネーター）用のモデル</span>を選ぶ</span></li>
+          <li><i class="fa-solid fa-sitemap"></i><span>コーディネーターは<span class="keyword-tag accent">割り振りと結果の取りまとめ</span>を担当。メンバーが専門の作業を担う</span></li>
+          <li><i class="fa-solid fa-power-off"></i><span>メンバーは<span class="highlight">コーディネーターとは別に2人以上必要で、作業を頼む前に起動しておくこと</span>。各メンバーに作業場所があるため、初回の実演ではリリースノートをメッセージへ直接貼る</span></li>
+        </ul>
+        <div class="flow-arrow">メンバーを起動 <i class="fa-solid fa-arrow-right"></i> チームへ依頼 <i class="fa-solid fa-arrow-right"></i> 割り振り <i class="fa-solid fa-arrow-right"></i> 結果を取りまとめ</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-people-group fa-lg" style="color: #9D174D;"></i> まだβ版の機能——その点は頭に入れておきましょう！</span>
+      </div>
+    </div>
+
+    <!-- カード 13: わざと間違えた草案 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bug fa-5x" style="animation: fa-beat 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ わざと間違えた草案で実力検査</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 06:59 チームの会話と検査</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-paper-plane"></i><span>依頼の例：<span class="keyword-tag accent">「Release Helper に短いリリース告知文を書かせ、Reviewer にすべての主張を同じノートで検証させ、修正済みの告知文と修正点を返して」</span>。各割り当てに元のノートを含める</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>チームの会話を見ながら<span class="keyword-tag sky">誰が話しているか・Reviewer が何を指摘したか・最終的な答えに反映されたか</span>を確認</span></li>
+          <li><i class="fa-solid fa-magnet"></i><span>もっと良い検査がある：<span class="keyword-tag">「デバイスの同期に対応し、明日リリース」という意図的に間違えた草案</span>を渡して、ノートを基に直させる</span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>どの主張が間違いか<span class="highlight">自分で分かっているので、レビューが捕捉できるか確かめられる</span>。2つのAI同士の合意を確かめるより、はるかに良いチェックだと動画は説明する</span></li>
+        </ul>
+        <div class="flow-arrow">間違えた草案を渡す <i class="fa-solid fa-arrow-right"></i> Reviewer が検証 <i class="fa-solid fa-arrow-right"></i> 誤りを指摘 <i class="fa-solid fa-arrow-right"></i> 修正と説明を回収</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: #DB2777;"></i> 「AI同士が納得」よりも「誤りを見抜けたか」——検査はこう作ります！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: ACPでOpenCodeに委任 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-laptop-code fa-5x" style="animation: fa-beat-fade 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ コーディングはACPで外注</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 08:08 ACPでの委任</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code"></i><span>Octop は<span class="keyword-tag accent">ACP（Agent Client Protocol）</span>経由で外部のコーディングエージェントに作業を委任できる。実演には OpenCode を使用</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>OpenCode は<span class="keyword-tag sky">Octop と同じマシンにインストール</span>し、コマンドが見つかるように設定（実行ファイルの完全なパス指定も可）</span></li>
+          <li><i class="fa-solid fa-toggle-on"></i><span>ACP のページで OpenCode のランナーを有効化し、Release Helper の<span class="keyword-tag sky">ACPランナーの道具をオン</span>に。作業用のフォルダにリリースノートを置いて、<span class="keyword-tag accent">ファイルを読ませて announcement.md の草案を作らせる</span></span></li>
+          <li><i class="fa-solid fa-eye"></i><span>許可の要求が出たら内容を確認してから続行。<span class="highlight">チャットが完了と言っても、実際のファイルを自分で検査する</span>。ランナーの接続には道具側のモデルは含まれず、OpenCode 自身の設定が別に必要</span></li>
+        </ul>
+        <div class="flow-arrow">ACPを有効化 <i class="fa-solid fa-arrow-right"></i> 道具を起動 <i class="fa-solid fa-arrow-right"></i> 読み書きを委任 <i class="fa-solid fa-arrow-right"></i> 実ファイルを検査</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-code-branch fa-lg" style="color: #9D174D;"></i> 文書の調査からリポジトリ作業まで、1つの会話から繋げられます！</span>
+      </div>
+    </div>
+
+    <!-- カード 15: 予定タスク -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bell fa-5x" style="animation: fa-bounce 2.9s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ 予定タスクで自動化</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 09:24 予定タスク</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-calendar-check"></i><span>Release Helper に<span class="keyword-tag accent">「平日の朝9時にタスクボードのリリース確認表を見るリマインダー」</span>を作らせる。固定の文をダッシュボードの会話へ届ける指定にする</span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>予定タスクのページで<span class="keyword-tag sky">時刻・タイムゾーン・宛先</span>を検査。<span class="highlight">「作りました」という言葉は、実際のタスクが登録されてこそ意味がある</span></span></li>
+          <li><i class="fa-solid fa-comment-dots"></i><span>2つのモードがある：<span class="keyword-tag accent">Text は固定の文を送る</span>だけ。<span class="keyword-tag accent">Agent は実行時にモデルに作業させる</span>。リマインダーは Text で、プロジェクトメモの新しい要約には Agent</span></li>
+          <li><i class="fa-solid fa-play"></i><span>「Execute Now」で試しに実行し、届いたら不要なら無効化。タスクには<span class="keyword-tag">Octop のプロセスが動き続けること</span>が必要で、バックグラウンド化は<span class="keyword-tag sky">octop service start</span>（背景のサービスにも意図したタイムゾーンを）</span></li>
+        </ul>
+        <div class="flow-arrow">リマインダーを作らせる <i class="fa-solid fa-arrow-right"></i> 登録内容を検査 <i class="fa-solid fa-arrow-right"></i> Execute Now で試験 <i class="fa-solid fa-arrow-right"></i> 運用へ</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-bell fa-lg" style="color: #DB2777;"></i> 決まった時刻の作業は仕組みに任せて、人は確認だけ！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: チャンネル・コネクタ・ブラウザ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-globe fa-5x" style="animation: fa-flip 3.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ チャンネル・コネクタ・ブラウザ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 10:24 その他の機能</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-plug"></i><span>ダッシュボードには他にも<span class="keyword-tag accent">メッセージングのチャンネル接続・コネクタ・ブラウザの道具</span>がある</span></li>
+          <li><i class="fa-solid fa-list-check"></i><span>それぞれ独自の準備が要るので、<span class="keyword-tag sky">基本のワークフローが動いてから追加する</span>のが動画の勧め方</span></li>
+          <li><i class="fa-solid fa-window-restore"></i><span>おまけのブラウザ試験：部品を入れて、Browser AI+ で<span class="keyword-tag accent">Octop のリポジトリを開いて画面の撮影</span>を頼む</span></li>
+          <li><i class="fa-solid fa-images"></i><span>撮れた画面と実際の表示を報告と<span class="highlight">見比べて確かめる</span>。長いブラウザ作業の前に試せる小さな課題として最適</span></li>
+        </ul>
+        <div class="flow-arrow">基本の流れを完成 <i class="fa-solid fa-arrow-right"></i> チャンネルを接続 <i class="fa-solid fa-arrow-right"></i> ブラウザ試験 <i class="fa-solid fa-arrow-right"></i> 活用の幅を拡張</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-shapes fa-lg" style="color: #9D174D;"></i> 盛りだくさんですが、足元から1つずつ整えるのが近道！</span>
+      </div>
+    </div>
+
+    <!-- カード 17: 注意点 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="animation: fa-beat 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ 知っておきたい注意点</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 導入前に知るべきこと</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hand-paper"></i><span>AgentTeams は<span class="keyword-tag accent">まだβ版</span>。<span class="keyword-tag sky">コーディネーターの返事を止めても、メンバーへ割り当て済みの作業は止まらない</span>場合がある。作業の完了を待ち、メンバーの活動を確認してからアプリを再起動</span></li>
+          <li><i class="fa-solid fa-coins"></i><span>エージェントが増えると<span class="keyword-tag">モデルの呼び出しも増え、請求も増える</span>。単純な質問には1人のエキスパートで十分</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>準備の手間はある：<span class="keyword-tag accent">モデルの資格情報の管理・文書検索の方法の決定・予定作業のためにアプリを使える状態に保つこと</span></span></li>
+          <li><i class="fa-solid fa-shield-halved"></i><span>そして<span class="highlight">自己ホスト＝全部ローカルではない</span>点も再確認（②の復習）。クラウドに繋いだ情報はマシンの外へ出る</span></li>
+        </ul>
+        <div class="flow-arrow">β機能の癖 <i class="fa-solid fa-plus"></i> 費用の増加 <i class="fa-solid fa-plus"></i> 運用の手間 <i class="fa-solid fa-arrow-right"></i> 最初は小さく</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-shield fa-lg" style="color: #DB2777;"></i> 便利さの裏にある費用と癖——ここを知っているのが大人の使い方！</span>
+      </div>
+    </div>
+
+    <!-- カード 18: 総評 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flag-checkered fa-5x" style="animation: fa-beat-fade 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ 総評：まず小さく始める</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 10:53 総評</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cubes"></i><span>特定の仕事向けにエキスパートを何体か設定し、プロジェクトの文書を与え、<span class="keyword-tag accent">複数の役割が必要な時にまとめる</span>——この組み合わせは興味深い</span></li>
+          <li><i class="fa-solid fa-arrows-turn-right"></i><span>調査・執筆・リポジトリを行き来する仕事では、<span class="keyword-tag sky">コーディングエージェントへの接続</span>が特に魅力的</span></li>
+          <li><i class="fa-solid fa-shoe-prints"></i><span>動画のすすめ方は<span class="keyword-tag accent">「まず1人のエキスパート、1つのモデル、1つの小さな文書から」</span>。役割が必要になったらレビュー役やコーディングのランナーを追加</span></li>
+          <li><i class="fa-solid fa-heart"></i><span><span class="highlight">アシスタントの設定を自分で制御したい人には試す価値あり</span>。ソースは公開され、自分で動かせて、ワークフローを少しずつ育てる余地がある。総合的には「かなり良い」とのが評価</span></li>
+        </ul>
+        <div class="flow-arrow">1人のエキスパート <i class="fa-solid fa-arrow-right"></i> 役割を追加 <i class="fa-solid fa-arrow-right"></i> チームと委任 <i class="fa-solid fa-arrow-right"></i> 自分のワークフローへ</div>
+      </div>
+      <div class="speech-bubble variant-2">
+        <span class="handwritten"><i class="fa-solid fa-rocket fa-lg" style="color: #9D174D;"></i> 小さく始めて、必要になったら拡張——それがOctopの楽しみ方！</span>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    🎬 動画: <a href="https://www.youtube.com/watch?v=fw1b7Lz5TE4" target="_blank" rel="noopener">Tecent Octop (Opensource): Wait, Tencent just ENDED OpenAI Dots &amp; Muse!?</a> — AI Code King | 📅 2026年10月5日<br>
+    📝 参考: Tencent Cloud GitHub 組織「Octop」（MITライセンス）／動画内のTaskboardは見本のデータです
+  </footer>
+
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var cards = document.querySelectorAll('.fade-in-scale');
+  if ('IntersectionObserver' in window) {
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+    cards.forEach(function (card) { observer.observe(card); });
+  } else {
+    cards.forEach(function (card) { card.classList.add('visible'); });
+  }
+});
+</script>
+</body>
+</html>

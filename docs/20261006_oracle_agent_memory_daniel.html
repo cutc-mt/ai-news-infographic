@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oracle AI DatabaseとAgent Memoryでエージェントに顧客の記憶を持たせる | Daniel | Tech & Data | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: アメジストクリスタル&オーキッド（Oracleの記憶保管庫） */
+  --ui-color-1: #6B21A8;   /* アメジストパープル（メイン） */
+  --ui-color-2: #F0ABFC;   /* ライトオーキッド（アクセント） */
+  --ui-color-3: #F5F3FF;   /* 薄ラベンダー */
+  --ui-color-4: #2E1065;   /* 最暗パープル（テキスト） */
+  --ui-color-5: #A78BFA;   /* ミディアムパープル */
+  --amethyst: #6B21A8;
+  --deep: #2E1065;
+  --light: #A78BFA;
+  --accent: #C026D3;
+  --bg-canvas: #FAF5FF;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 10% -5%, rgba(46, 16, 101, 0.10), transparent),
+    radial-gradient(ellipse 900px 550px at 90% 4%, rgba(192, 38, 211, 0.10), transparent);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: var(--ui-color-4);
+  line-height: 1.5;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 34px 20px 24px;
+  margin-bottom: 25px;
+  background: linear-gradient(135deg, #2E1065 0%, #6B21A8 55%, #A78BFA 100%);
+  border-radius: 24px;
+  box-shadow: 0 14px 42px rgba(46, 16, 101, 0.4);
+  position: relative;
+  overflow: hidden;
+  color: #FFFFFF;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 30%, rgba(240, 171, 252, 0.25), transparent 42%),
+    radial-gradient(circle at 82% 68%, rgba(167, 139, 250, 0.30), transparent 46%);
+  pointer-events: none;
+}
+
+.header > * { position: relative; }
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 36px;
+  margin: 12px 0 10px;
+  text-shadow: 0 2px 8px rgba(46, 16, 101, 0.55);
+}
+
+.header .subtitle {
+  font-size: 17px;
+  opacity: 0.94;
+  max-width: 1100px;
+  margin: 0 auto 12px;
+}
+
+.header .date {
+  font-size: 14px;
+  opacity: 0.88;
+}
+
+.header .date a { color: #F5D0FE; text-decoration: none; }
+.header .date a:hover { text-decoration: underline; }
+
+/* セクションレイアウト（4カラム） */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 22px;
+  justify-content: center;
+}
+
+/* カードスタイル */
+.section-card {
+  flex: 1;
+  min-width: 220px;
+  max-width: 450px;
+  background-color: white;
+  border-radius: 20px;
+  padding: 15px;
+  box-shadow: 5px 5px 15px rgba(46, 16, 101, 0.12);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--amethyst);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.section-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 8px 10px 22px rgba(46, 16, 101, 0.2);
+}
+
+/* カード内アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 15px 0 5px;
+}
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 21px;
+  color: var(--deep);
+  margin: 10px 0 4px;
+}
+
+.mega-icon-container .timestamp {
+  font-size: 13px;
+  color: #7C6BA8;
+  margin-bottom: 4px;
+}
+
+.timestamp i { color: var(--accent); }
+
+/* カードコンテンツ */
+.card-content {
+  padding: 0 10px 10px;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 12px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--accent);
+  min-width: 18px;
+  margin-top: 4px;
+}
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 2px 8px;
+  border-radius: 6px;
+  margin: 0 3px;
+  display: inline-block;
+  font-weight: bold;
+  border: 1px solid #DDD6FE;
+}
+
+.keyword-tag.accent {
+  background-color: #FAE8FF;
+  color: var(--deep);
+  border-color: var(--accent);
+}
+
+/* 強調テキスト */
+.highlight {
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* フロー矢印 */
+.flow-arrow {
+  background: var(--ui-color-3);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  color: var(--deep);
+  text-align: center;
+  margin-top: 8px;
+  border: 1px dashed #A78BFA;
+}
+
+.flow-arrow i { color: var(--accent); margin: 0 3px; }
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #fff;
+  border: 3px solid var(--amethyst);
+  border-radius: 20px;
+  padding: 10px 14px;
+  margin: 16px 5px 10px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(46, 16, 101, 0.14);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--amethyst) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after {
+  left: auto;
+  right: 20px;
+}
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+  transform: rotate(-5deg);
+}
+
+.speech-bubble.variant-1 {
+  background: #FAE8FF;
+  border-color: var(--accent);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after {
+  border-color: var(--accent) transparent;
+}
+
+.speech-bubble.variant-2 {
+  background: #EDE9FE;
+  border-color: #2E1065;
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after {
+  border-color: #2E1065 transparent;
+}
+
+/* 手書き文字 */
+.handwritten {
+  font-family: 'Yomogi', cursive;
+  font-size: 15px;
+  line-height: 1.55;
+  color: #4C1D95;
+}
+
+/* コードプレビュー */
+pre {
+  background: #2E1065;
+  color: #EDE9FE;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  margin-top: 10px;
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+pre .cmt { color: #A78BFA; }
+pre .kw { color: #F5D0FE; font-weight: bold; }
+pre .str { color: #F0ABFC; }
+
+/* 出現アニメーション */
+.fade-in-scale {
+  opacity: 0;
+  transform: scale(0.92) translateY(20px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+/* ハイライトキーワード */
+.highlight-text {
+  animation: highlight-pulse 2.5s ease-in-out infinite;
+  display: inline-block;
+}
+
+@keyframes highlight-pulse {
+  0%, 100% { text-shadow: 0 0 0 rgba(192, 38, 211, 0); }
+  50% { text-shadow: 1px 1px 0 rgba(107, 33, 168, 0.45), 0 0 14px rgba(240, 171, 252, 0.75); }
+}
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 22px;
+  margin-top: 30px;
+  background: linear-gradient(135deg, #2E1065 0%, #6B21A8 60%, #86198F 100%);
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(46, 16, 101, 0.4);
+  font-size: 14px;
+  color: #EDE9FE;
+}
+
+.footer a {
+  color: #F0ABFC;
+  font-weight: bold;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) {
+  .section-card { min-width: 280px; }
+}
+
+@media (max-width: 1200px) {
+  .section-card { min-width: 320px; }
+}
+
+@media (max-width: 900px) {
+  .section-card { min-width: 380px; }
+}
+
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <i class="fa-solid fa-database fa-7x" aria-hidden="true"></i>
+    <h1>Oracle AI DatabaseとAgent Memoryで顧客を覚えるAIエージェントを構築</h1>
+    <div class="subtitle">チャットをまたいで記憶は残るのか？——LangGraph＋Python＋Oracle AI Databaseで「セッション1で好みを登録→完全に新しい会話で記憶を取り出す」クロスセッション検証までを18枚にまとめ</div>
+    <div class="date">🎬 <a href="https://www.youtube.com/watch?v=z1RpM-JLg4w" target="_blank" rel="noopener">Oracle AI Database Review (2026) - Build an AI Agent That Remembers Users with Oracle Agent Memory</a> — Daniel | Tech &amp; Data（2026年10月5日公開）</div>
+  </header>
+
+  <div class="section-layout">
+
+    <!-- カード 1: エージェントの記憶問題 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>① ほとんどのAIは「チャット内」でしか覚えない</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 0:00 オープニング</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-info"></i><span>多くのAIエージェントは<span class="keyword-tag accent">1つのチャット内</span>でしか会話を記憶できません</span></li>
+          <li><i class="fa-solid fa-user-clock"></i><span>しかし実際のアプリでは、顧客が<span class="highlight">翌日新しい会話を始めて戻ってくる</span>のが当たり前です</span></li>
+          <li><i class="fa-solid fa-user-slash"></i><span>その際にAssistantが顧客を<span class="keyword-tag">他人のように扱う</span>のは問題——好みも過去の選択も最初から説明し直しに</span></li>
+          <li><i class="fa-solid fa-bullseye"></i><span>本動画の目標: <span class="keyword-tag accent">Oracle AI Database</span>＋<span class="keyword-tag accent">LangGraph</span>＋Pythonで小さなサポートAssistantを構築すること</span></li>
+        </ul>
+        <div class="flow-arrow">セッション1で好みを共有 <i class="fa-solid fa-arrow-right"></i> 完全な新規会話 <i class="fa-solid fa-arrow-right"></i> 記憶を取り出せるか検証</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-fire fa-lg" style="color: var(--accent);"></i> 「また来てくれたね」と言えるエージェント、作れます！</span>
+      </div>
+    </div>
+
+    <!-- カード 2: テストの設計 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-flask-vial fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>② 検証テストの設計はシンプルに</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> テストの全体像</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-list-ol"></i><span><span class="keyword-tag accent">セッション1</span>: 顧客が自分の好み（好きなもの・避けたいもの）をAssistantに伝える</span></li>
+          <li><i class="fa-solid fa-rotate"></i><span><span class="keyword-tag accent">セッション2</span>: <span class="highlight">まったく別の新しい会話</span>を開始し、記憶が取り出せるかチェック</span></li>
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>同一チャット内の「覚えているふり」ではなく、<span class="keyword-tag">DBからの真正な取得</span>であることを証明する設計です</span></li>
+          <li><i class="fa-solid fa-link"></i><span>テストに使うのは一般公開のリソース。説明欄のリンク（割引情報もあるかも）も要チェック</span></li>
+        </ul>
+        <div class="flow-arrow">顧客が好みを伝える <i class="fa-solid fa-arrow-right"></i> DBに保存 <i class="fa-solid fa-arrow-right"></i> 新会話で取得 <i class="fa-solid fa-arrow-right"></i> 自然な提案</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-clipboard-check fa-lg" style="color: var(--accent);"></i> 「オフカメラでなぜか動くデモ」ではなく、きちんと検証します！</span>
+      </div>
+    </div>
+
+    <!-- カード 3: なぜOracle AI Databaseか -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-server fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>③ エージェントを「データの近く」で動かす</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 0:49 アーキテクチャの考え方</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database"></i><span>Oracle AI DatabaseはAssistantを<span class="keyword-tag accent">必要なデータの近く</span>に置きます</span></li>
+          <li><i class="fa-solid fa-arrows-left-right"></i><span>メモリとアプリケーションコンテキストを<span class="highlight">別システム間でたびたび移動させずに済む</span>のが大きな利点</span></li>
+          <li><i class="fa-solid fa-user-check"></i><span>有用なエージェントに必要なのは良い応答だけではなく、<span class="keyword-tag">会話状態の信頼できる保管場所</span></span></li>
+          <li><i class="fa-solid fa-clock-rotate-left"></i><span>そして後から<span class="keyword-tag">重要なユーザーの詳細を思い出せる</span>こと——この2つをDBが担います</span></li>
+        </ul>
+        <div class="flow-arrow">会話状態 <i class="fa-solid fa-arrow-right"></i> Oracle内で一元管理 <i class="fa-solid fa-arrow-right"></i> システム間移動を削減</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-bolt fa-lg" style="color: var(--accent);"></i> 「動くデモ」より「置き場所が正しい構成」——地味だけど効きます！</span>
+      </div>
+    </div>
+
+    <!-- カード 4: 2種類の記憶 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--ui-color-1); animation: fa-flip 3.2s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>④ チェックポイントと長期記憶の2層構造</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 記憶の2つの部品</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-flag"></i><span><span class="keyword-tag accent">チェックポイント</span>: <span class="highlight">1つのアクティブな会話</span>を追跡し、ワークフローがどこで止まったかを記憶</span></li>
+          <li><i class="fa-solid fa-user-gear"></i><span><span class="keyword-tag accent">長期記憶</span>: <span class="highlight">ユーザーに帰属</span>する情報。新しいチャットで戻ってきても重要な詳細を利用可能に</span></li>
+          <li><i class="fa-solid fa-gears"></i><span>この構成では<span class="keyword-tag">Oracle Saver</span>がチェックポイントを、<span class="keyword-tag">Oracle Store</span>が長期コンテキストを担当</span></li>
+          <li><i class="fa-solid fa-key"></i><span>考え方の基本: <span class="highlight-text">thread_idは会話、user_idは顧客</span>を表す——この分離がアーキテクチャの核心</span></li>
+        </ul>
+        <div class="flow-arrow">thread_id（会話単位）<i class="fa-solid fa-plus"></i> user_id（顧客単位）<i class="fa-solid fa-arrow-right"></i> 2つの記憶が協調</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 似たような仕組みに聞こえるけど、解く問題が違う——ここが肝！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 5: DockerでDB起動 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-brands fa-docker fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑤ DockerでOracle Databaseを起動</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 1:43 構築スタート</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-box-open"></i><span>最初の一歩はDocker。エージェントのメモリを<span class="keyword-tag accent">実際のデータベース内</span>に置くためです</span></li>
+          <li><i class="fa-solid fa-eye-slash"></i><span>古いメッセージをプロンプトに戻すだけでも「保存したように見える」けど、<span class="highlight">会話終了後に残る証明にならない</span></span></li>
+          <li><i class="fa-solid fa-download"></i><span><span class="keyword-tag">Oracle Database Freeのイメージ</span>をpullして画面のコマンドでコンテナ起動</span></li>
+          <li><i class="fa-solid fa-plug-circle-check"></i><span>DBが準備完了を報告したら基盤完成。<span class="keyword-tag accent">永続ストレージ</span>がAssistantの背後にできました</span></li>
+        </ul>
+        <pre><span class="cmt"># DockerでOracle DB（Freeイメージ）を起動</span>
+<span class="kw">docker run</span> -d oracle/database-free
+<span class="cmt"># → DATABASE IS READY TO USE が出たら土台OK</span></pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-brands fa-docker fa-lg" style="color: var(--accent);"></i> 「本物のDBに置く」——これがデモと実運用の境目です！</span>
+      </div>
+    </div>
+
+    <!-- カード 6: Python環境と接続テスト -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-plug fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑥ 最初にやるは接続テスト</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 開発者流の順序</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal"></i><span>次にPython環境を整え、<span class="keyword-tag accent">モデルアクセスキー</span>を設定してプロジェクトフォルダを準備</span></li>
+          <li><i class="fa-solid fa-vial-circle-check"></i><span>agentロジックに触る前に<span class="highlight">軽い接続テスト</span>を実行——この小さな確認が時間を大幅に節約します</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>PythonがOracleコンテナに届かない状態で<span class="keyword-tag">LangGraphメモリをデバッグするのは無駄</span>になる恐れ</span></li>
+          <li><i class="fa-solid fa-lock"></i><span>接続ファイルに必要なのは<span class="keyword-tag accent">DBパスワード</span>だけ。他の設定はローカルDBへ既に向いています</span></li>
+        </ul>
+        <div class="flow-arrow">環境構築 <i class="fa-solid fa-arrow-right"></i> 接続テスト成功 <i class="fa-solid fa-arrow-right"></i> ようやくagent.pyへ</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-circle-check fa-lg" style="color: var(--accent);"></i> 地道な下準備こそ、後のトラブルを防ぐ最短ルート！</span>
+      </div>
+    </div>
+
+    <!-- カード 7: agent.pyの構成 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-file-code fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑦ agent.pyの骨格——StoreとSaver</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> メインファイル解説</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-code"></i><span>例は<span class="highlight">意図的に小さく</span>保ち、動作を追いやすくしています（完全なサポートシステムではない）</span></li>
+          <li><i class="fa-solid fa-floppy-disk"></i><span><span class="keyword-tag accent">Oracle Store</span>: user_idに紐づく長期記憶を管理。テスト顧客は「customer 42」</span></li>
+          <li><i class="fa-solid fa-flag-checkered"></i><span><span class="keyword-tag accent">Oracle Saver</span>: LangGraphワークフローのチェックポイントを管理し、thread_idに紐づく</span></li>
+          <li><i class="fa-solid fa-key"></i><span>まとめると——<span class="highlight-text">threadは会話を覚え、storeは顧客を覚える</span>。この分離がアーキテクチャで最も重要な部分</span></li>
+        </ul>
+        <pre><span class="cmt"># agent.py の役割分担（イメージ）</span>
+store  = <span class="kw">OracleStore</span>()  <span class="cmt"># 長期記憶（user_id）</span>
+saver  = <span class="kw">OracleSaver</span>()  <span class="cmt"># チェックポイント（thread_id）</span></pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--accent);"></i> 似た2つの仕組み——でも役割はまるで別物なんです！</span>
+      </div>
+    </div>
+
+    <!-- カード 8: モデルノードの動き -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑧ 単一ノード「model」の記憶ループ</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> LangGraphフローの中身</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-nodes"></i><span>LangGraphフローには<span class="keyword-tag accent">model</span>という1つのメインノードのみ。構成は極簡です</span></li>
+          <li><i class="fa-solid fa-magnifying-glass-chart"></i><span>応答の前に<span class="highlight">Oracle Storeを検索</span>し、現在のユーザーに関連する好みがないか確認</span></li>
+          <li><i class="fa-solid fa-paper-plane"></i><span>記憶が見つかれば、それを<span class="keyword-tag">モデルのコンテキストに追加</span>してから回答を生成</span></li>
+          <li><i class="fa-solid fa-satellite-dish"></i><span>同時に新しいメッセージを走査し、<span class="keyword-tag accent">保存する価値のある詳細</span>がないかレビューします</span></li>
+        </ul>
+        <div class="flow-arrow">メッセージ受信 <i class="fa-solid fa-arrow-right"></i> Store検索 <i class="fa-solid fa-arrow-right"></i> コンテキスト注入 <i class="fa-solid fa-arrow-right"></i> 応答＋保存判定</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-rotate fa-lg" style="color: var(--accent);"></i> 読んで・足して・書く——たったこれだけで記憶が回る！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 9: 保存ルール -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-filter fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑨ 何を保存するか——デモと実運用の境界</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 保存ロジックの設計</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-mug-saucer"></i><span>デモでは、顧客が<span class="keyword-tag accent">製品の好み</span>や<span class="keyword-tag accent">カフェイン制限</span>に言及したらStoreへ書き込むシンプルな判定</span></li>
+          <li><i class="fa-solid fa-shield-halved"></i><span>実運用なら<span class="highlight">もっと厳格なルール</span>が必要——ユーザーは何が保存されるか知り、更新・削除する手段を持つべき</span></li>
+          <li><i class="fa-solid fa-ban"></i><span>1つのメッセージに<span class="highlight">現れたという理由だけで</span>個人的な詳細を全部保存することはすべきでない、とDaniel氏</span></li>
+          <li><i class="fa-solid fa-scale-balanced"></i><span>ただしチュートリアルでは<span class="highlight">シンプルな方がテストを理解しやすい</span>——割り切りのバランスも設計のうち</span></li>
+        </ul>
+        <div class="flow-arrow">言及を検知 <i class="fa-solid fa-arrow-right"></i> ルールで判定 <i class="fa-solid fa-arrow-right"></i> Oracle Storeへ保存</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-user-shield fa-lg" style="color: var(--accent);"></i> 「保存の透明性」——実製品化のときに忘れちゃいけない視点！</span>
+      </div>
+    </div>
+
+    <!-- カード 10: セッション1 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comment-dots fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.7s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑩ セッション1——好みを伝える</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 最初の会話</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-hashtag"></i><span>thread_idは<span class="keyword-tag accent">session-one</span>、user_idは<span class="keyword-tag accent">customer 42</span>で会話を開始</span></li>
+          <li><i class="fa-solid fa-martini-glass-citrus"></i><span>伝える内容は2つ: <span class="highlight">シトラスパンチが好き</span>なこと、<span class="highlight">午後6時以降はカフェインを避けたい</span>こと</span></li>
+          <li><i class="fa-solid fa-reply"></i><span>応答は両方の詳細を正しく反映——しかしこれだけでは<span class="keyword-tag">長期記憶の証明にならない</span>と警戒</span></li>
+          <li><i class="fa-solid fa-circle-question"></i><span>同一会話内にまだ情報が見えているので、<span class="keyword-tag">単なる復唱の可能性</span>を排除できないためです</span></li>
+        </ul>
+        <div class="flow-arrow">「シトラスパンチ好き・6時以降カフェイン回避」<i class="fa-solid fa-arrow-right"></i> 応答は正しい…が証明はまだ</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--accent);"></i> 「答えが合ってる」だけじゃだめ——証拠が要るんです！</span>
+      </div>
+    </div>
+
+    <!-- カード 11: セッション2 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-comments fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑪ セッション2——何もなかったかのように聞く</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> クロスセッション検証</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-circle-plus"></i><span>新ファイル<span class="keyword-tag accent">session2.py</span>を作成。ロジックもuser_id（customer 42）もそのまま</span></li>
+          <li><i class="fa-solid fa-rotate-right"></i><span>唯一の重要な変更はthread_idを<span class="keyword-tag accent">session-two</span>にすること——<span class="highlight">完全に新しい会話</span>になります</span></li>
+          <li><i class="fa-solid fa-box-archive"></i><span>1つ目のスレッドのチェックポイントは<span class="keyword-tag">以前のメッセージを持ち込まない</span>ので情報はゼロの状態</span></li>
+          <li><i class="fa-solid fa-moon"></i><span>質問はたった一言——<span class="highlight-text">「今夜は何を注文すべき？」</span>。シトラスパンチもカフェイン制限も一切言及しません</span></li>
+        </ul>
+        <div class="flow-arrow">thread_idだけ変更 <i class="fa-solid fa-arrow-right"></i> 過去メッセージゼロ <i class="fa-solid fa-arrow-right"></i> 「今夜何を頼む？」</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-masks-theater fa-lg" style="color: var(--accent);"></i> ヒントを一切出さない——フェアな実験デザインです！</span>
+      </div>
+    </div>
+
+    <!-- カード 12: 結果 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--ui-color-2); animation: fa-beat 2.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑫ 結果——記憶が新しい会話に届いた</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 検証の結果</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-martini-glass-citrus"></i><span>Assistantは<span class="keyword-tag accent">シトラスパンチを推奨</span>——しかも<span class="keyword-tag accent">午後6時以降のカフェイン回避</span>の希望も尊重</span></li>
+          <li><i class="fa-solid fa-user-clock"></i><span>顧客側の体感は「エージェントが自分を覚えていた」のように感じられます</span></li>
+          <li><i class="fa-solid fa-database"></i><span>しかし技術的に重要なのは、<span class="highlight">Oracle Storeが保存済みの好みを取得し、真新しい会話に注入した</span>こと</span></li>
+          <li><i class="fa-solid fa-arrows-split-up-and-left"></i><span>これは1つの長いチャット内のパーソナライズではなく、<span class="highlight-text">本物のクロスセッション知識</span>です</span></li>
+        </ul>
+        <div class="flow-arrow">Oracle Storeから取得 <i class="fa-solid fa-arrow-right"></i> 新会話へ注入 <i class="fa-solid fa-arrow-right"></i> 的確な提案が完成</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-heart fa-lg" style="color: var(--accent);"></i> 体感は「気配り」、正体は「設計」——いいとこ取り！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 13: DB直接確認 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-table-list fa-5x" style="color: var(--ui-color-1); animation: fa-bounce 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑬ DBの中を直接のぞいて確認</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 8:08 検証を突き詰める</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal"></i><span>結果を信用するだけでなく、<span class="highlight">別ターミナルからOracleコンテナに接続</span>して直接確認します</span></li>
+          <li><i class="fa-solid fa-table-columns"></i><span>LangGraph連携はチェックポイント用と長期記憶用で<span class="keyword-tag accent">別々のテーブル</span>を自動作成</span></li>
+          <li><i class="fa-solid fa-magnifying-glass"></i><span>今回はOracle Storeが使うテーブルに注目し、SQLクエリを実行</span></li>
+          <li><i class="fa-solid fa-address-card"></i><span>すると<span class="keyword-tag">customer 42のレコード</span>がデータベースに直接現れました</span></li>
+        </ul>
+        <pre><span class="cmt">-- Store用テーブルを直接確認</span>
+<span class="kw">SELECT</span> * <span class="kw">FROM</span> store_table
+<span class="kw">WHERE</span> user_id = <span class="str">'customer 42'</span>;
+<span class="cmt">→ シトラスパンチ好み＋カフェイン制限が記録</span></pre>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-eye fa-lg" style="color: var(--accent);"></i> 「パーソナライズされた気がする」じゃなく、レコードが見える！</span>
+      </div>
+    </div>
+
+    <!-- カード 14: store JSON -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code fa-5x" style="color: var(--ui-color-2); animation: fa-flip 3.1s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑭ store JSONに全道筋が見える</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 証明の瞬間</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-code"></i><span>StoreのJSONには<span class="keyword-tag accent">シトラスパンチの好み</span>と<span class="keyword-tag accent">午後6時以降カフェイン回避のルール</span>の両方が格納</span></li>
+          <li><i class="fa-solid fa-route"></i><span>全過程が可視化: セッション1で顧客が共有 <i class="fa-solid fa-arrow-right"></i> Oracle Storeが保存</span></li>
+          <li><i class="fa-solid fa-id-badge"></i><span>セッション2は新threadで開始したが<span class="keyword-tag">同じuser_idを維持</span></span></li>
+          <li><i class="fa-solid fa-circle-check"></i><span>ワークフローがレコードを取得し、<span class="highlight">まったく別の質問に答えるために使用</span>——これが証明モーメント</span></li>
+        </ul>
+        <pre><span class="cmt">// store JSON（イメージ）</span>
+{ <span class="str">"preference"</span>: <span class="str">"citrus_punch"</span>,
+  <span class="str">"rule"</span>: <span class="str">"no_caffeine_after_6pm"</span> }</pre>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-trophy fa-lg" style="color: var(--accent);"></i> 保存→取得→活用のパスが全部見えました！</span>
+      </div>
+    </div>
+
+    <!-- カード 15: ベクター不要論 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-shapes fa-5x" style="color: var(--ui-color-1); animation: fa-beat-fade 2.9s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑮ この検証にベクター索引は不要</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 実装の取捨選択</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-check-double"></i><span>今回の例では<span class="keyword-tag accent">ノンベクター版</span>のテーブルを使用——それで十分だと判断</span></li>
+          <li><i class="fa-solid fa-key"></i><span>理由はシンプル: <span class="highlight">user_idが既に分かっていて、特定の好みの取得だけが必要</span>だから</span></li>
+          <li><i class="fa-solid fa-ban"></i><span>こんな小さなテストに<span class="keyword-tag">ベクター索引は不要な複雑さ</span>を加えるだけ、と割り切り</span></li>
+          <li><i class="fa-solid fa-scale-balanced"></i><span>用途に合わせて<span class="highlight">シンプルな構成と高度な検索を使い分ける</span>判断もエンジニアリングのうち</span></li>
+        </ul>
+        <div class="flow-arrow">user_id既知 <i class="fa-solid fa-arrow-right"></i> キー検索で十分 <i class="fa-solid fa-arrow-right"></i> 複雑さを避ける設計</div>
+      </div>
+      <div class="speech-bubble">
+        <span class="handwritten"><i class="fa-solid fa-feather fa-lg" style="color: var(--accent);"></i> 最新機能を詰め込むより「目的に合う道具選び」が本番！</span>
+      </div>
+    </div>
+
+    <!-- カード 16: Oracle AI Developer Hub -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-open fa-5x" style="color: var(--ui-color-2); animation: fa-bounce 2.6s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑯ Oracle AI Developer Hubのサンプルが母体</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 参考リソース</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cubes"></i><span>この構成は<span class="keyword-tag accent">Oracle AI Developer Hub</span>のリソースがベースです</span></li>
+          <li><i class="fa-solid fa-microscope"></i><span>公式の1例は<span class="keyword-tag">より高度なリサーチエージェント</span>による長期記憶の探求がテーマ</span></li>
+          <li><i class="fa-solid fa-video"></i><span>本動画では同じパターンを<span class="highlight">カメラに映しやすい形</span>に翻訳した、とのこと</span></li>
+          <li><i class="fa-solid fa-code-branch"></i><span>デモの完全なコードは<span class="keyword-tag accent">GitHubリポジトリへPRで提出予定</span>——開発者が同じメモリパターンを適用できます</span></li>
+        </ul>
+        <div class="flow-arrow">公式サンプル <i class="fa-solid fa-arrow-right"></i> 映像向けに簡略化 <i class="fa-solid fa-arrow-right"></i> PRで還元</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-brands fa-github fa-lg" style="color: var(--accent);"></i> 学んだら公開で返す——開発者コミュニティの良い循環！</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-layout">
+
+    <!-- カード 17: 実運用への注意 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-shield fa-5x" style="color: var(--ui-color-1); animation: fa-beat 2.5s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑰ 実製品化するときの注意点</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> 8:08 Is Oracle AI Worth It?</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-triangle-exclamation"></i><span>実製品への持ち込みには<span class="highlight">慎重さがまだ必要</span>、とDaniel氏は戒めます</span></li>
+          <li><i class="fa-solid fa-eye"></i><span>ユーザーは<span class="keyword-tag accent">何が保存されているかを知る権利</span>を持つべき</span></li>
+          <li><i class="fa-solid fa-sliders"></i><span>保存した情報を<span class="keyword-tag accent">確認・更新・削除する明確な手段</span>を提供することが前提</span></li>
+          <li><i class="fa-solid fa-lock"></i><span>記憶の利便性と<span class="highlight">プライバシー管理の両立</span>——エージェント設計の新しい責任領域です</span></li>
+        </ul>
+        <div class="flow-arrow">保存の透明化 <i class="fa-solid fa-arrow-right"></i> 更新・削除の手段 <i class="fa-solid fa-arrow-right"></i> 信頼できる運用</div>
+      </div>
+      <div class="speech-bubble variant-2 top">
+        <span class="handwritten"><i class="fa-solid fa-scale-balanced fa-lg" style="color: var(--accent);"></i> 覚える力が強くなるほど、扱いのルールも大事に！</span>
+      </div>
+    </div>
+
+    <!-- カード 18: まとめ -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-crown fa-5x" style="color: var(--ui-color-2); animation: fa-beat-fade 2.8s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>⑱ まとめ——同じ構成で広がる応用</h2>
+        <div class="timestamp"><i class="fa-regular fa-clock"></i> クロージング</div>
+      </div>
+      <div class="card-content">
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-check"></i><span>LangGraphサポートエージェントをOracle DBに接続し、<span class="keyword-tag accent">顧客の好みが別セッション間を生存</span>することを実証</span></li>
+          <li><i class="fa-solid fa-key"></i><span>最大の学びは<span class="highlight">チェックポイントと長期記憶の違い</span>——1つは現在の会話、もう1つは時間を超えた同一ユーザーの認識</span></li>
+          <li><i class="fa-solid fa-seedling"></i><span>同じアーキテクチャで<span class="keyword-tag">オンボーディング文脈・アカウント設定・過去のサポート内容</span>なども支えられる</span></li>
+          <li><i class="fa-solid fa-hand-holding-heart"></i><span>顧客は1度伝えるだけで、戻ってきたとき<span class="highlight">自然に使ってもらえる</span>——それがこのパターンの価値</span></li>
+          <li><i class="fa-solid fa-code"></i><span>完全なコードは説明欄の<span class="keyword-tag accent">GitHubリンク</span>から。デモはOracle AI Developer HubへPR予定（本動画はOracle提供）</span></li>
+        </ul>
+        <div class="flow-arrow">Docker起動 <i class="fa-solid fa-arrow-right"></i> Store＋Saver実装 <i class="fa-solid fa-arrow-right"></i> クロスセッション検証 <i class="fa-solid fa-arrow-right"></i> DBで証明</div>
+      </div>
+      <div class="speech-bubble variant-1 right">
+        <span class="handwritten"><i class="fa-solid fa-flag-checkered fa-lg" style="color: var(--accent);"></i> 「覚えているエージェント」の作り方、これで完成です！</span>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div>📝 ソース: 🎬 動画: <a href="https://www.youtube.com/watch?v=z1RpM-JLg4w" target="_blank" rel="noopener">Daniel | Tech &amp; Data</a> — 「Oracle AI Database Review (2026) - Build an AI Agent That Remembers Users with Oracle Agent Memory」（2026年10月5日公開）</div>
+    <div style="margin-top: 6px;">🎨 このインフォグラフィックは動画の内容を18枚のカードに整理したものです。</div>
+  </footer>
+
+</div>
+
+<script>
+  // スクロール連動のフェードイン
+  document.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.fade-in-scale');
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    cards.forEach(function (card) { observer.observe(card); });
+  });
+</script>
+</body>
+</html>

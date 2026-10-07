@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【Dots】AI漫画を自動生成する方法！Astra搭載・PCを閉じても進む漫画制作を実践解説 | AI共創イノベーション | AIニュース インフォグラフィック</title>
+<style>
+:root {
+  /* 独自テーマ: Dots×Astra 深紅レッド（暗黒クリムゾン×スカーレット） */
+  --bg-canvas: #1A0505;      /* 深紅ブラック */
+  --bg-card: #2B0A0A;        /* カード下地（暗赤） */
+  --bg-card-deep: #3B1010;   /* カード内の濃面 */
+  --ink: #FFF1F1;            /* 淡いローズホワイト（主文字） */
+  --red: #DC2626;            /* スカーレット（主アクセント） */
+  --red-hi: #F87171;         /* ライトレッド（強調） */
+  --red-soft: #B91C1C;       /* ディープレッド（補助） */
+  --gold: #FBBF24;           /* ゴールド（Astra側アクセント） */
+  --sky: #7DD3FC;            /* スカイ（比較対象側） */
+  --text-main: #FBEAE4;
+  --text-sub: #D9A196;       /* 補助文字色 */
+  --line-soft: rgba(220, 38, 38, 0.32);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 950px 520px at 8% -4%, rgba(220, 38, 38, 0.16), transparent),
+    radial-gradient(ellipse 900px 540px at 92% 6%, rgba(185, 28, 28, 0.13), transparent),
+    linear-gradient(135deg, #450A0A 0%, #7F1D1D 50%, #DC2626 100%);
+  background-attachment: fixed;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+  color: var(--text-main);
+  line-height: 1.65;
+}
+
+.container { max-width: 2000px; margin: 0 auto; }
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 0 0 26px;
+  margin-bottom: 26px;
+  background: linear-gradient(160deg, rgba(26, 5, 5, 0.96) 0%, rgba(127, 29, 29, 0.92) 60%, rgba(220, 38, 38, 0.88) 130%);
+  border: 1px solid var(--line-soft);
+  border-radius: 22px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.45);
+  position: relative;
+  overflow: hidden;
+}
+
+.red-stripe {
+  height: 12px;
+  background: repeating-linear-gradient(45deg, var(--red) 0 14px, #1A0505 14px 28px);
+}
+
+.header-inner { padding: 26px 22px 8px; position: relative; }
+
+.header .date-badge {
+  display: inline-block;
+  background: rgba(220, 38, 38, 0.16);
+  border: 1px solid var(--red-soft);
+  color: var(--red-hi);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  padding: 5px 16px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.header h1 {
+  font-size: 32px;
+  font-weight: 900;
+  margin: 10px 0;
+  color: #FCA5A5;
+  line-height: 1.4;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.5);
+}
+
+.header .channel {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--red-hi);
+  margin-bottom: 12px;
+}
+
+.header .channel::before { content: '▶ '; color: var(--red); }
+
+.header .video-link {
+  display: inline-block;
+  background: var(--red);
+  color: #FFF7F7;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 9px 26px;
+  border-radius: 999px;
+  text-decoration: none;
+  box-shadow: 0 6px 18px rgba(220, 38, 38, 0.4);
+  margin-bottom: 8px;
+  transition: transform 0.15s ease;
+}
+
+.header .video-link:hover { transform: translateY(-2px); }
+
+/* 結論サマリー帯 */
+.verdict {
+  background: linear-gradient(135deg, #2B0A0A 0%, #5A1414 100%);
+  color: var(--ink);
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  padding: 18px 24px;
+  margin-bottom: 28px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+}
+
+.verdict .verdict-label {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--red-hi);
+  white-space: nowrap;
+}
+
+.verdict p { margin: 0; font-size: 15px; flex: 1; min-width: 260px; }
+
+.verdict b { color: var(--gold); }
+
+/* グリッド */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background: rgba(43, 10, 10, 0.92);
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  padding: 20px 20px 16px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+}
+
+.card-no {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--red-soft);
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+}
+
+.card h2 {
+  font-size: 20px;
+  font-weight: 900;
+  margin: 0 0 10px;
+  color: var(--red-hi);
+  line-height: 1.45;
+}
+
+.card h2::before { content: '◆ '; color: var(--red); font-size: 15px; }
+
+.card p, .card li { font-size: 14.5px; margin: 0 0 8px; }
+
+.card ul { margin: 0 0 8px; padding-left: 20px; }
+
+.card b { color: var(--gold); }
+
+/* 比較カード */
+.compare { margin-top: 10px; border-top: 2px dashed var(--line-soft); padding-top: 10px; }
+
+.compare .model-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: flex-start; }
+
+.compare .model-tag {
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  margin-top: 2px;
+  min-width: 84px;
+  text-align: center;
+}
+
+.tag-astra { background: rgba(251, 191, 36, 0.12); color: var(--gold); border: 1px solid var(--gold); }
+.tag-other { background: rgba(125, 211, 252, 0.12); color: var(--sky); border: 1px solid var(--sky); }
+
+.compare .model-row p { margin: 0; font-size: 14px; }
+
+.winner {
+  margin-top: auto;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: var(--bg-card-deep);
+  border: 1px solid var(--line-soft);
+}
+
+.winner::before { content: '★ '; color: var(--red); }
+
+.winner.w-astra { color: var(--gold); }
+.winner.w-other { color: var(--sky); }
+.winner.w-even { color: var(--red-hi); }
+
+/* ステージラベル */
+.stage {
+  grid-column: 1 / -1;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--red-hi);
+  padding: 10px 6px 0;
+  border-bottom: 3px solid var(--red);
+  margin-bottom: -6px;
+}
+
+.stage::before { content: '■ '; color: var(--red); }
+
+/* フッター */
+.footer {
+  margin-top: 30px;
+  padding: 18px 22px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-sub);
+  background: rgba(43, 10, 10, 0.85);
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+}
+
+.footer a { color: var(--red-hi); text-decoration: none; font-weight: 700; }
+.footer a:hover { text-decoration: underline; }
+
+@media (max-width: 640px) {
+  .header h1 { font-size: 24px; }
+  body { padding: 10px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header">
+    <div class="red-stripe"></div>
+    <div class="header-inner">
+      <div class="date-badge">2026.10.07</div>
+      <h1>【Dots】AI漫画を自動生成する方法！<br>Astra搭載・PCを閉じても進む漫画制作</h1>
+      <div class="channel">AI共創イノベーション（@AICoCreation）</div>
+      <a class="video-link" href="https://www.youtube.com/watch?v=c1_DnyBtq-s" target="_blank" rel="noopener">▶ 動画を見る</a>
+    </div>
+  </header>
+
+  <div class="verdict">
+    <div class="verdict-label">◆ 結論から</div>
+    <p>OpenAIのエージェントサービス<b>Dots（Astra搭載）</b>は<b>クラウドで動く</b>ため、PCを閉じても漫画の生成が進む。絵コンテとキャラクター資料を渡すだけで、日本語の吹き出し・コマ割り・背景の描き込みまで含む<b>13ページ</b>を自動生成。キャラクターの一貫性が最後まで保たれる<b>Astraの安定感</b>と、Google Driveへの書き出し連携が大きな強み。</p>
+  </div>
+
+  <div class="grid">
+
+    <div class="stage">Dotsとは —— クラウドで動くAIエージェント</div>
+
+    <div class="card">
+      <div class="card-no">CARD 01</div>
+      <h2>DotsでAI漫画に挑戦</h2>
+      <p>今回はOpenAIの<b>Dots（ドット）</b>というサービスでAI漫画を描いていく。Dotsは<b>いろいろなことができる</b>サービスで、その中から漫画制作に使ってみようという試み。</p>
+      <p>担当はワンダー佐藤。まず「絵が描けるのか」と風景画を依頼してみたところ、<b>きれいな風景をきちんと描いてくれる</b>ことが確認でき、漫画もいけると手応えを得た。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 02</div>
+      <h2>GPT Image搭載できれいな絵が出る</h2>
+      <p>Dotsには<b>GPT Image</b>が入っているため、生成画像のクオリティは非常に高い。風景画も「めっちゃきれい」な仕上がり。</p>
+      <p>この描画力がそのまま漫画ページにも活きるため、<b>質感・陰影・背景の描き込み</b>まで期待できる。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 03</div>
+      <h2>最大の特徴はクラウド実行 —— PCを閉じても動く</h2>
+      <p>Dotsの最大の利点は<b>クラウドで動いている</b>こと。AIエージェントがクラウド側で作業するため、<b>パソコンを閉じても描き続けてくれる</b>。</p>
+      <p>設定なしでこの運用が可能で、「AIと本当に気軽に、PCを閉じてもぐるぐる動いてくれる」体験が手に入ると評価。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 04</div>
+      <h2>Codex（ローカル）との違い</h2>
+      <p>Codexで制作すると<b>ローカルで動く</b>ため、パソコンを閉じると動かなくなる。Codex Cloudも使えるが、そちらは<b>GitHubと連携してリポジトリに書き出す</b>形になる。</p>
+      <p>対してDotsは<b>GitHub連携などをやらなくてもすぐ描き始められる</b>。手軽さではDotsに分がある。</p>
+    </div>
+
+    <div class="stage">下準備 —— 資料と書き出し先の整備</div>
+
+    <div class="card">
+      <div class="card-no">CARD 05</div>
+      <h2>入れた資料は「キャラ画像＋絵コンテ」</h2>
+      <p>Dotsに投入したのは<b>キャラクター画像と絵コンテ</b>。フォルダーごとは放り込めなかったため、画像をそのまま投入したという。</p>
+      <p>絵コンテには<b>どういうコマがあるか、どの位置にどの人物がいるか</b>といった情報が書き込まれており、生成の土台になる。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 06</div>
+      <h2>ストーリーはGemini Spark→Codexで絵コンテ化</h2>
+      <p>ストーリーは<b>Gemini Sparkで自動的に作成</b>し、<b>Codexで構成を整理</b>。その後、スキルを使って<b>絵コンテ化</b>した。</p>
+      <p>小説→絵コンテ→漫画というパイプラインを、複数ツールの組み合わせで組んでいる点が実際の制作フロー。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 07</div>
+      <h2>出力先はGoogle Drive連携が最有力</h2>
+      <p>「こちらに書き出して」と出力先を指定するのが大事なポイント。Dotsの書き出し先としては<b>Google Driveとの連携が最もやりやすい</b>。</p>
+      <p>Codex Cloudの出力先がGitHubなのに対し、Dotsでは<b>Google Driveにきれいに保存</b>できる。連携しておくと生成結果の管理が格段に楽になる。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 08</div>
+      <h2>13ページをバックグラウンド生成</h2>
+      <p>PCを閉じている間に<b>13ページ</b>の漫画を生成。<b>「すごく楽」</b>と実感するほど管理の手間がない。</p>
+      <p>PCをつけっぱなしにしているとパソコンの痛みが気になるが、クラウド実行なら<b>パソコンにやさしい</b>書き方になる。もちろんローカルで描いても全然良く、どちらを取るかは好みと評価。</p>
+    </div>
+
+    <div class="stage">制限と運用 —— Deep Workの利用枠</div>
+
+    <div class="card">
+      <div class="card-no">CARD 09</div>
+      <h2>長時間エージェント作業には回数制限</h2>
+      <p>Dotsでは<b>重い・長時間のエージェント作業に回数制限</b>がある模様。<b>Deep Workの利用枠</b>という概念があり、調べても明確な上限は分かりにくい状況。</p>
+      <p>Dotsは電話などの機能も持つが、使いすぎると<b>利用枠に達してできなくなる</b>ことがあるという。数時間経つと復活するという情報も。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 10</div>
+      <h2>「会話の頭」なら消費は軽い</h2>
+      <p>普通の会話の相手として使う分には<b>それほど消費はない</b>と推測。一方、<b>ワークフロー系の作業</b>をさせると回数制限に触れやすい。</p>
+      <p>AIイベントなどで<b>手足として使う</b>使い方なら全然あり、と位置づけを紹介。</p>
+    </div>
+
+    <div class="stage">作例検証 —— 『ガルガンチュア・ロンド』船内食堂</div>
+
+    <div class="card">
+      <div class="card-no">CARD 11</div>
+      <h2>1コマ目から圧巻の「肉」の描写</h2>
+      <p>作例はSF小説『<b>ガルガンチュア・ロンド</b>』の船内食堂シーン。1コマ目から<b>肉の焦げ具合・肉汁・湯気</b>が見事に描写される。</p>
+      <p>さらに<b>鉄板のメタリックな質感</b>まで再現。人物の一貫性も全部取れており、映画的な奥行き（手前ボケ・遠景シャープ）も表現され、クオリティは非常に高い。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 12</div>
+      <h2>Nanobanana2.1（Antigravity）との比較</h2>
+      <p>同じプロンプト・情報を与えて<b>Nanobanana2.1（正式名称: Gemini 3.1 Flash Image）</b>をAntigravityで実行した結果と比較。</p>
+      <div class="compare">
+        <div class="model-row"><span class="model-tag tag-astra">Dots×Astra</span><p>構成配置が安定しミスが少ない。人物の一貫性が最後まで維持される。</p></div>
+        <div class="model-row"><span class="model-tag tag-other">Nanobanana</span><p>同じ入力でも仕上がりは全く異なる。ラフで漫画らしいタッチだが、ページが進むと一貫性が崩れる。</p></div>
+      </div>
+      <div class="winner w-astra">質感・一貫性重視ならDots×Astra</div>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 13</div>
+      <h2>Codex×Lunaの作例とAstraの安定性</h2>
+      <p>同じシーンをCodexでも生成。モデルは同じでも<b>ルナ（Luna）でも十分</b>なクオリティが出る。</p>
+      <p>その上でAstra版を見ると<b>構成配置が安定していてミスが少ない</b>。Lunaが間違えたページをAstraは正しく処理し、<b>カメラワーク</b>（近くはボケて遠くがシャープ）まで表現。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 14</div>
+      <h2>物語の展開も正確に追従</h2>
+      <p>ストーリー通りにコマを進め、<b>位置配置も適切</b>。物語は「古代兵器の発見」から10カ国の戦いへと深刻に展開し、最後は<b>紋章が光る</b>場面へ。</p>
+      <p>後半に行っても<b>キャラクターの一貫性</b>が保たれ、安心して読み進められる。<b>「どこまで行っても一貫性がある」</b>のがAstraの安定感。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 15</div>
+      <h2>Nanobananaの一貫性崩壊 vs Astraのパーフェクト</h2>
+      <p>Nanobanana2.1はページが進むと<b>登場しないはずの人物が出てきたり、全く違うキャラクターに変わったり</b>して一貫性が失われる。</p>
+      <p>原因は<b>Geminiが情報を保持できない</b>ことと分析。対策として<b>画像を都度送り直す</b>運用が有効。対してAstraは<b>全ページパーフェクトに一貫性を維持</b>。</p>
+    </div>
+
+    <div class="stage">使い分けと結論</div>
+
+    <div class="card">
+      <div class="card-no">CARD 16</div>
+      <h2>大長編はCodex、お手軽連載はDots</h2>
+      <p>13ページ程度で終わるのか制限が不明なDotsに対し、<b>Codexはクレジット（使用回数）が見える</b>ため「ここまで書ける」と把握しやすい。</p>
+      <p>前日はCodexで約2〜3時間かけて<b>183ページ</b>を制作済み。<b>何十枚・何百枚</b>という大長編を一気に書くならCodexが本命。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 17</div>
+      <h2>ハイブリッド運用とPCへのやさしさ</h2>
+      <p>両者を<b>ハイブリッドで使い分ける</b>のも良い。DotsはPCを閉じていても作業が進み、<b>パソコンの負荷が減る</b>。</p>
+      <p>「PCが動いていると落ち着かない」という人にも、<b>ゆっくり静かにDotsをちょこちょこ使う</b>スタイルが合う。一気に書きたいならCodexへ、という棲み分け。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-no">CARD 18</div>
+      <h2>結論: Astra×Google DriveがDotsの価値</h2>
+      <p>Dots＋Astraの意味は<b>品質の高さ</b>に加えて<b>Google Driveへの確実な書き出し</b>。保存先を指定しないと生成物が散らばるが、Dotsなら<b>1発でDriveに書き出してくれる</b>。</p>
+      <p>通常ドライブ保存は失敗しがちだが、<b>Astraなら失敗がほぼない</b>。「PCを閉じても漫画が描ける」選択肢として、Dots×Astraは十分に価値があると結論。</p>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    出典: <a href="https://www.youtube.com/watch?v=c1_DnyBtq-s" target="_blank" rel="noopener">【Dots】AI漫画を自動生成する方法！Astra搭載・PCを閉じても進む漫画制作を実践解説</a>（AI共創イノベーション / 2026.10.07）<br>
+    AI漫画の作例: オリジナルSF作品『ガルガンチュア・ロンド』の船内食堂シーン｜比較対象: Nanobanana2.1（Gemini 3.1 Flash Image）・Codex・Luna<br>
+    このインフォグラフィックは動画内容を要約・整理したものであり、動画内の生成画像の引用は含まれません。
+  </div>
+
+</div>
+</body>
+</html>

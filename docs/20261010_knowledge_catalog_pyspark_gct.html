@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Knowledge Catalog で実証する PySpark ML | Google Cloud Tech | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Zen+Maru+Gothic:wght@500;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* インディゴ/データカタログテーマ */
+  --ui-color-1: #4F46E5;   /* メイン・インディゴ */
+  --ui-color-2: #1E1B4B;   /* 最暗色 */
+  --ui-color-3: #E0E7FF;   /* ライト(タグ下地) */
+  --ui-color-4: #312E81;   /* テキスト */
+  --ui-color-5: #7069DC;   /* ミディアムインディゴ(差し色) */
+  --accent: #4F46E5;       /* インディゴ */
+  --deep: #1E1B4B;
+  --main: #4F46E5;
+  --light: #A5B4FC;
+  --bg-canvas: #F5F6FE;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 500px at 8% -5%, rgba(79, 70, 229, 0.12), transparent),
+    radial-gradient(ellipse 900px 550px at 92% 4%, rgba(165, 180, 252, 0.20), transparent);
+  font-family: 'Noto Sans JP', 'Zen Kurenaido', sans-serif;
+  color: var(--ui-color-4);
+  line-height: 1.6;
+}
+
+.container {
+  max-width: 2000px;
+  margin: 0 auto;
+}
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 38px 20px 28px;
+  margin-bottom: 26px;
+  background: linear-gradient(135deg, #1E1B4B 0%, #4F46E5 55%, #A5B4FC 100%);
+  border-radius: 24px;
+  box-shadow: 0 14px 42px rgba(30, 27, 75, 0.40);
+  position: relative;
+  overflow: hidden;
+  color: #FFFFFF;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 18% 30%, rgba(224, 231, 255, 0.22), transparent 42%),
+    radial-gradient(circle at 82% 68%, rgba(245, 246, 254, 0.14), transparent 46%);
+  pointer-events: none;
+}
+
+.header > * { position: relative; }
+
+.header .channel {
+  display: inline-block;
+  font-size: 14px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: #E0E7FF;
+  border: 1px solid rgba(224, 231, 255, 0.50);
+  border-radius: 999px;
+  padding: 5px 18px;
+  margin-bottom: 6px;
+}
+
+.header h1 {
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  margin: 12px 0 10px;
+  text-shadow: 0 2px 8px rgba(30, 27, 75, 0.60);
+}
+
+.header .subtitle {
+  font-size: 16px;
+  opacity: 0.96;
+  max-width: 1150px;
+  margin: 0 auto 12px;
+}
+
+.header .date {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.header .date a { color: #E0E7FF; text-decoration: none; }
+.header .date a:hover { text-decoration: underline; }
+
+.header .header-icon {
+  font-size: 52px;
+  margin-bottom: 4px;
+  color: #F5F6FE;
+  text-shadow: 0 3px 10px rgba(30, 27, 75, 0.55);
+}
+
+/* カードグリッド(4カラム構成・レスポンシブ) */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(430px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* カードスタイル */
+.card {
+  flex: 1;
+  min-width: 220px;
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 18px 18px 16px;
+  box-shadow: 5px 5px 15px rgba(30, 27, 75, 0.12);
+  position: relative;
+  overflow: hidden;
+  border-top: 5px solid var(--main);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 7px 9px 22px rgba(30, 27, 75, 0.20);
+}
+
+.card:nth-child(even) {
+  background: #F7F8FF;
+  border-top-color: var(--accent);
+}
+
+/* 大型アイコンコンテナ */
+.mega-icon-container {
+  text-align: center;
+  margin: 8px 0 6px;
+}
+
+.mega-icon-container i {
+  color: var(--main);
+}
+
+.card:nth-child(even) .mega-icon-container i { color: var(--ui-color-5); }
+
+.card h2 {
+  font-family: 'Zen Maru Gothic', sans-serif;
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--deep);
+  margin: 4px 0 8px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.card-content { padding: 0 6px; }
+
+.card p.lead {
+  font-size: 14.5px;
+  margin: 8px 0 10px;
+  line-height: 1.7;
+}
+
+/* キーワードリスト */
+.keyword-list {
+  margin: 10px 0;
+  padding: 0;
+  list-style-type: none;
+}
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.keyword-list li i {
+  margin-right: 9px;
+  margin-top: 5px;
+  color: var(--ui-color-5);
+  min-width: 16px;
+  font-size: 13px;
+}
+
+.card:nth-child(even) .keyword-list li i { color: var(--main); }
+
+/* キーワードタグ */
+.keyword-tag {
+  background-color: var(--ui-color-3);
+  color: var(--ui-color-4);
+  padding: 1px 8px;
+  border-radius: 5px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 0.92em;
+  white-space: nowrap;
+}
+
+/* 強調 */
+.highlight {
+  color: var(--ui-color-5);
+  font-weight: 700;
+  background: linear-gradient(transparent 65%, rgba(165, 180, 252, 0.35) 65%);
+}
+
+/* 数値バッジ */
+.stat-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stat-box {
+  flex: 1;
+  min-width: 100px;
+  background: #FFFFFF;
+  border: 1px solid var(--light);
+  border-radius: 12px;
+  padding: 9px 8px;
+  text-align: center;
+}
+
+.stat-box .num {
+  display: block;
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--deep);
+  font-family: 'Zen Maru Gothic', sans-serif;
+}
+
+.stat-box .num em { font-style: normal; color: var(--main); }
+
+.stat-box .lbl {
+  display: block;
+  font-size: 11.5px;
+  color: var(--ui-color-5);
+  margin-top: 2px;
+}
+
+/* フロー矢印 */
+.flow-arrow {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--deep);
+  text-align: center;
+  margin-top: 10px;
+  border: 1px dashed var(--accent);
+}
+
+.flow-arrow i { color: var(--main); margin: 0 4px; }
+
+/* 手書き風吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #FFFFFF;
+  border: 3px solid var(--ui-color-1);
+  border-radius: 20px;
+  padding: 10px 14px;
+  margin: 16px 4px 8px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(30, 27, 75, 0.10);
+  transform: rotate(-1deg);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.speech-bubble::after {
+  content: '';
+  position: absolute;
+  bottom: -13px;
+  left: 20px;
+  border-width: 12px 8px 0;
+  border-style: solid;
+  border-color: var(--ui-color-1) transparent;
+  display: block;
+  width: 0;
+}
+
+.speech-bubble.right::after { left: auto; right: 20px; }
+
+.speech-bubble.top::after {
+  bottom: auto;
+  top: -13px;
+  border-width: 0 8px 12px;
+}
+
+.speech-bubble.variant-1 {
+  background: var(--ui-color-3);
+  border-color: var(--ui-color-5);
+  transform: rotate(1deg);
+}
+
+.speech-bubble.variant-1::after { border-color: var(--ui-color-5) transparent; }
+
+.speech-bubble.variant-2 {
+  background: #FFFFFF;
+  border-color: var(--accent);
+  transform: rotate(-2deg);
+}
+
+.speech-bubble.variant-2::after { border-color: var(--accent) transparent; }
+
+.speech-bubble i { color: var(--ui-color-5); margin-right: 4px; }
+
+/* フッター */
+.footer {
+  text-align: center;
+  padding: 22px 16px;
+  background: linear-gradient(135deg, #1E1B4B 0%, #4F46E5 55%, #A5B4FC 100%);
+  border-radius: 20px;
+  color: #E0E7FF;
+  font-size: 14.5px;
+  margin-bottom: 10px;
+}
+
+.footer a { color: #F5F6FE; text-decoration: none; font-weight: 700; }
+.footer a:hover { text-decoration: underline; }
+
+/* フェードインスケール */
+.fade-in-scale {
+  opacity: 0;
+  transform: translateY(18px) scale(0.98);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.fade-in-scale.visible { opacity: 1; transform: none; }
+
+/* レスポンシブ */
+@media (max-width: 1600px) { .grid { grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); } }
+@media (max-width: 1200px) { .grid { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); } }
+@media (max-width: 900px)  { .grid { grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); } }
+@media (max-width: 480px) {
+  .header h1 { font-size: 25px; }
+  .card h2 { font-size: 18px; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header class="header fade-in-scale visible">
+    <div class="header-icon"><i class="fa-solid fa-book-atlas fa-beat-fade"></i></div>
+    <div class="channel"><i class="fa-brands fa-google fa-sm"></i>&nbsp; Google Cloud Tech（公式）</div>
+    <h1>Knowledge Catalog で実証する<br>〜PySpark ML とライブダッシュボードのグラウンディング〜</h1>
+    <p class="subtitle">Gabe Weiss による約4分のライブデモ。リテールバンクのデータサイエンティスト役として、<span style="font-weight:700;">Lakehouse の raw discovery</span> から <span style="font-weight:700;">XGBoost モデル学習</span>、ステージング済みマーケティングキャンペーン、<span style="font-weight:700;">ゼロトークンBIダッシュボード</span>までを一気通貫で実演。<span style="font-weight:700;">Knowledge Catalog（Dataplex Metadata）</span>＋ BigQuery ＋ PySpark ML による「グラウンディングされた ML パイプライン」の全貌を18枚のカードに整理します。</p>
+    <div class="date">📅 2026年10月9日公開（5分37秒）&nbsp;|&nbsp; 🎬 <a href="https://www.youtube.com/watch?v=T0GD_7nLX9Y" target="_blank" rel="noopener">YouTubeで視聴</a></div>
+  </header>
+
+  <div class="grid">
+
+    <!-- カード 1 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-atlas fa-4x fa-beat-fade" aria-hidden="true"></i>
+      </div>
+      <h2>① 動画概要: カタログが主役の4分間</h2>
+      <div class="card-content">
+        <p class="lead">Google Cloud の <span class="keyword-tag">Gabe Weiss</span> が、<span class="highlight">Knowledge Catalog（Dataplex Metadata）</span>を軸に据えた ML ワークフローを実演する短編デモ。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-person-chalkboard fa-lg"></i><span>登場人物: リテールバンクの<span class="keyword-tag">データサイエンティスト</span>と<span class="keyword-tag">マーケティングマネージャー</span>の2役</span></li>
+          <li><i class="fa-solid fa-diagram-project fa-lg"></i><span>流れ: データ発見 → PySpark 分析 → <span class="highlight">XGBoost 学習</span> → キャンペーン実行 → ライブBI</span></li>
+          <li><i class="fa-solid fa-link fa-lg"></i><span>一貫テーマ: あらゆる工程が <span class="keyword-tag">Knowledge Catalog</span> にグラウンディングされている点</span></li>
+          <li><i class="fa-solid fa-stopwatch fa-lg"></i><span>「数ヶ月かかった手作業が<span class="highlight">数分で完了</span>」という締めのメッセージ</span></li>
+        </ul>
+        <div class="stat-row">
+          <div class="stat-box"><span class="num"><em>5</em>分<em>37</em>秒</span><span class="lbl">動画の長さ</span></div>
+          <div class="stat-box"><span class="num"><em>18</em>枚</span><span class="lbl">このインフォグラフィック</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 2 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-building-columns fa-4x fa-bounce" aria-hidden="true"></i>
+      </div>
+      <h2>② ユースケース: 顧客ローン乗換の提案</h2>
+      <div class="card-content">
+        <p class="lead">舞台はリテールバンク。マーケティング支援のために、<span class="highlight">高金利クレジットカードから低金利個人ローンへの乗換</span>を見込める顧客を特定する ML モデルが必要。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-credit-card fa-lg"></i><span>現状: 顧客は<span class="keyword-tag">高金利のクレジットカード</span>残高を抱えている</span></li>
+          <li><i class="fa-solid fa-hand-holding-dollar fa-lg"></i><span>提案: 新しい<span class="keyword-tag">低金利の個人ローン</span>へ切り替えれば利払いを削減できる</span></li>
+          <li><i class="fa-solid fa-bullseye fa-lg"></i><span>目的: 乗換で<span class="highlight">節約になる顧客</span>と、実際に<span class="highlight">承諾しそうな顧客</span>の2段階で狙い撃ち</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <i class="fa-solid fa-quote-left fa-lg"></i>「私がリテールバンクのデータサイエンティストだとして——マーケティング支援の ML モデルを作る必要がある」
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 3 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-magnifying-glass-chart fa-4x fa-flip" aria-hidden="true"></i>
+      </div>
+      <h2>③ ステップ1: Gemini にデータ景観を質問</h2>
+      <div class="card-content">
+        <p class="lead">コードを書く前に、まず自然言語でデータを探索。「<span class="keyword-tag">顧客口座・カード支出・過去のローン提案</span>のデータはある? <span class="keyword-tag">データ景観を可視化して</span>」と Gemini に質問。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-wand-magic-sparkles fa-lg"></i><span>Gemini が<span class="highlight">事前構築済み Data Cloud スキル</span>のセットで応答</span></li>
+          <li><i class="fa-solid fa-layer-group fa-lg"></i><span>データエステート（データ資産）全体を<span class="keyword-tag">横断的に探索</span>できる点が特徴</span></li>
+          <li><i class="fa-solid fa-comments fa-lg"></i><span>探索の起点が SQL ではなく<span class="highlight">対話</span>——raw discovery から始まる Lakehouse ワークフロー</span></li>
+        </ul>
+        <div class="flow-arrow">
+          <i class="fa-solid fa-user"></i> 質問 <i class="fa-solid fa-arrow-right"></i> Gemini <i class="fa-solid fa-arrow-right"></i> データ景観の可視化
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 4 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-book-bookmark fa-4x fa-beat-fade" aria-hidden="true"></i>
+      </div>
+      <h2>④ Knowledge Catalog: メタデータの中央登記所</h2>
+      <div class="card-content">
+        <p class="lead">応答の裏側にあるのが <span class="highlight">Knowledge Catalog（Dataplex Metadata）</span>。Google Cloud 内とクロスクラウドのデータセットを、豊富なメタデータ付きで登録済み。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cloud fa-lg"></i><span><span class="keyword-tag">Google Cloud ＋ クロスクラウド</span>のデータセットを横断的に登録</span></li>
+          <li><i class="fa-solid fa-sitemap fa-lg"></i><span><span class="keyword-tag">リッチなメタデータ</span>: スキーマとグロッサリー（用語集）を保持</span></li>
+          <li><i class="fa-solid fa-robot fa-lg"></i><span>人間だけでなく<span class="highlight">Gemini エージェント</span>も同じカタログを読み書きに利用</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg"></i><span>ガバナンスされた単一の<span class="keyword-tag">信頼できる情報源</span>として機能</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 5 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-gear fa-4x fa-bounce" aria-hidden="true"></i>
+      </div>
+      <h2>⑤ 開発者もカタログに登録・記述できる</h2>
+      <div class="card-content">
+        <p class="lead">カタログは静的ではない。開発者が<span class="highlight">新しいデータセットやビジネスロジックを作成・登録・記述</span>でき、その説明も即座に人間と Gemini エージェントの両方へ開放。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-circle-plus fa-lg"></i><span>新規データセットの<span class="keyword-tag">作成・登録・説明付け</span>を簡単なオペレーションで実施</span></li>
+          <li><i class="fa-solid fa-people-arrows fa-lg"></i><span>登録された説明は<span class="highlight">人間とエージェントの双方</span>が参照——暗黙知の共有化</span></li>
+          <li><i class="fa-solid fa-rotate fa-lg"></i><span>ビジネスロジックも資産化され、<span class="keyword-tag">再利用可能な部品</span>として蓄積</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <i class="fa-solid fa-lightbulb fa-lg"></i>「データセットとその説明を、<span class="keyword-tag">人間と Gemini エージェントの両方</span>が使えるようにできる」
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 6 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-code fa-4x fa-flip" aria-hidden="true"></i>
+      </div>
+      <h2>⑥ PySpark コード生成とゼロコピー結合</h2>
+      <div class="card-content">
+        <p class="lead">「乗換で節約になる顧客を見つけて」と頼むと、Gemini が <span class="keyword-tag">PySpark コード</span>を生成。Lakehouse 上の顧客・カード支出データセットをクエリし、結果を <span class="keyword-tag">Lightning Engine</span>（BI エンジン）へ<span class="highlight">ゼロコピーでプッシュ</span>。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database fa-lg"></i><span>対象: Lakehouse の<span class="keyword-tag">顧客データセット</span>と<span class="keyword-tag">カード支出データセット</span></span></li>
+          <li><i class="fa-solid fa-bolt fa-lg"></i><span>事前構築済み Data Cloud スキル経由で<span class="highlight">0コピー結合（0 copy join）</span>を実行</span></li>
+          <li><i class="fa-solid fa-gears fa-lg"></i><span>データの複製なしに解析エンジン側で処理——<span class="keyword-tag">ムーブメント不要のフェデレーテッド解析</span></span></li>
+        </ul>
+        <div class="flow-arrow">
+          プロンプト <i class="fa-solid fa-arrow-right"></i> PySpark 生成 <i class="fa-solid fa-arrow-right"></i> ゼロコピー結合
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 7 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-window-restore fa-4x fa-beat-fade" aria-hidden="true"></i>
+      </div>
+      <h2>⑦ ブラックボックスなし: 次世代 Python ノートブック</h2>
+      <div class="card-content">
+        <p class="lead">生成物は鞘に収まらず、<span class="highlight">次世代 Python ノートブック上のライブ環境</span>で開くことができる。「何が起きているか」が常に見える設計。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-pen-to-square fa-lg"></i><span>PySpark コードを Gemini 内で<span class="keyword-tag">1行ずつライブ編集</span>可能</span></li>
+          <li><i class="fa-solid fa-square-poll-vertical fa-lg"></i><span>ドロップダウンを切り替えると、下流のチャート群が<span class="highlight">即座に再計算</span></span></li>
+          <li><i class="fa-solid fa-eye fa-lg"></i><span>「<span class="keyword-tag">none of this is in a black box</span>（黒箱なし）」——コード・データ・出力が常に露出</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 8 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-users-rectangle fa-4x fa-bounce" aria-hidden="true"></i>
+      </div>
+      <h2>⑧ 最初の成果: 5万人・平均3,400ドル</h2>
+      <div class="card-content">
+        <p class="lead">探索と集計だけでもう十分な価値。<span class="highlight">50,000人超の顧客</span>が乗換で節約できる見込みで、その平均額は <span class="highlight">3,400ドル</span>。</p>
+        <div class="stat-row">
+          <div class="stat-box"><span class="num"><em>50,000</em>人超</span><span class="lbl">乗換節約の見込み顧客</span></div>
+          <div class="stat-box"><span class="num"><em>$3,400</em></span><span class="lbl">平均節約額</span></div>
+        </div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-circle-question fa-lg"></i><span>次の問い: 節約になる顧客のうち、<span class="keyword-tag">実際に承諾するのは誰か</span>?</span></li>
+          <li><i class="fa-solid fa-arrow-turn-up fa-lg"></i><span>その答えには<span class="highlight">機械学習モデル</span>が必要——ステップ2への導入部</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <i class="fa-solid fa-face-smile fa-lg"></i>「素晴らしい。でも、<span class="keyword-tag">実際にイエスと言うのは誰か</span>を知りたい」
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 9 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-brain fa-4x fa-flip" aria-hidden="true"></i>
+      </div>
+      <h2>⑨ ステップ2: ML モデル構築をプロンプト</h2>
+      <div class="card-content">
+        <p class="lead">「<span class="keyword-tag">このオファーに乗り換える可能性が最も高い顧客</span>を特定する機械学習モデルを構築して」とプロンプトするだけで、学習パイプラインの生成が始まる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-terminal fa-lg"></i><span>分析コードと同じ対話の流れで<span class="highlight">モデリングへ移行</span>——文脈が切れない</span></li>
+          <li><i class="fa-solid fa-list-check fa-lg"></i><span>タスク: 各顧客の<span class="keyword-tag">乗換傾向（propensity）</span>をスコアリング</span></li>
+          <li><i class="fa-solid fa-database fa-lg"></i><span>教師データの調達も Gemini が<span class="highlight">カタログ経由で自動解決</span>（次カードへ）</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 10 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-clock-rotate-left fa-4x fa-beat-fade" aria-hidden="true"></i>
+      </div>
+      <h2>⑩ グラウンディング源: BigQuery の3年分の履歴</h2>
+      <div class="card-content">
+        <p class="lead">Gemini は Knowledge Catalog を通じて、<span class="keyword-tag">BigQuery に保存された過去3年分のキャンペーン履歴</span>を取得。これがモデルの学習と根拠のグラウンディング源になる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-database fa-lg"></i><span>教師データ: <span class="highlight">過去3年分のキャンペーン実績</span>（誰に誰が反応したか）</span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg"></i><span>カタログのメタデータで「どのテーブルが何を意味するか」を<span class="keyword-tag">自動特定</span></span></li>
+          <li><i class="fa-solid fa-anchor fa-lg"></i><span>捏造ではなく<span class="highlight">実在の企業データに錨を下ろす</span>＝グラウンディングの本質</span></li>
+        </ul>
+        <div class="flow-arrow">
+          Knowledge Catalog <i class="fa-solid fa-arrow-right"></i> BigQuery 履歴 <i class="fa-solid fa-arrow-right"></i> 学習データ
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 11 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-tree fa-4x fa-bounce" aria-hidden="true"></i>
+      </div>
+      <h2>⑪ XGBoost ＋ Managed Spark を自動選択</h2>
+      <div class="card-content">
+        <p class="lead">Data Cloud スキルを使って、Gemini が最適なアルゴリズム <span class="keyword-tag">XGBoost</span> と最適な学習サービス <span class="keyword-tag">Managed Spark</span> を選定。右側の画面には高品質なコードが並ぶ。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sort fa-lg"></i><span>アルゴリズム選定: 傾向スコアリングに適した<span class="highlight">XGBoost</span></span></li>
+          <li><i class="fa-solid fa-server fa-lg"></i><span>実行基盤選定: <span class="highlight">Managed Spark</span>——インフラ運用不要の学習環境</span></li>
+          <li><i class="fa-solid fa-table-columns fa-lg"></i><span>生成コードは<span class="keyword-tag">特徴量再構築に必要なカラム</span>を正しく把握している</span></li>
+          <li><i class="fa-solid fa-code-branch fa-lg"></i><span>カタログのスキーマ情報があるからこそ実現できる<span class="highlight">列レベルの正確性</span></span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 12 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-gauge-high fa-4x fa-flip" aria-hidden="true"></i>
+      </div>
+      <h2>⑫ 説明可能な評価: 適合率85%</h2>
+      <div class="card-content">
+        <p class="lead">Gemini が履歴テストデータでモデルを評価すると、<span class="highlight">適合率（precision）85%</span>。しかもどのシグナルが予測を牽引したかを説明してくれる。</p>
+        <div class="stat-row">
+          <div class="stat-box"><span class="num"><em>85</em>%</span><span class="lbl">モデルの適合率</span></div>
+          <div class="stat-box"><span class="num"><em>2</em>つ</span><span class="lbl">主要な牽引シグナル</span></div>
+        </div>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-credit-card fa-lg"></i><span>牽引要因1: <span class="keyword-tag">高金利のクレジットカード金利</span></span></li>
+          <li><i class="fa-solid fa-money-check-dollar fa-lg"></i><span>牽引要因2: <span class="keyword-tag">毎月安定した給与振込</span></span></li>
+          <li><i class="fa-solid fa-square-poll-horizontal fa-lg"></i><span>「<span class="highlight">すべてが説明可能（it's all explainable）</span>」——精度だけでなく根拠も提示</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 13 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-cloud-arrow-up fa-4x fa-beat-fade" aria-hidden="true"></i>
+      </div>
+      <h2>⑬ モデルを Knowledge Catalog に公開</h2>
+      <div class="card-content">
+        <p class="lead">品質に満足したら、その場でモデルを <span class="highlight">Knowledge Catalog へ公開</span>。ビジネスユーザーとエージェントが同じモデルを発見・利用できるようになる。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-share-nodes fa-lg"></i><span>公開先はデータと同じカタログ——<span class="keyword-tag">モデルも資産として一元管理</span></span></li>
+          <li><i class="fa-solid fa-user-tie fa-lg"></i><span><span class="keyword-tag">ビジネスユーザー</span>と<span class="keyword-tag">エージェント</span>が利用者</span></li>
+          <li><i class="fa-solid fa-handshake-angle fa-lg"></i><span>データサイエンティストの成果が<span class="highlight">現場に直接流通する経路</span>を確保</span></li>
+        </ul>
+        <div class="speech-bubble top variant-1">
+          <i class="fa-solid fa-arrow-up-from-bracket fa-lg"></i>「このモデルの品質が気に入った——このまま<span class="keyword-tag">Knowledge Catalog に公開</span>しよう」
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 14 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-user-pen fa-4x fa-bounce" aria-hidden="true"></i>
+      </div>
+      <h2>⑭ 視点切替: マーケティングマネージャー</h2>
+      <div class="card-content">
+        <p class="lead">ここでデモは視点を切り替える。今度は<span class="keyword-tag">マーケティングマネージャー</span>が、公開済みのあの ML モデルを自然言語で呼び出す。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-location-dot fa-lg"></i><span>指示: 「<span class="keyword-tag">イリノイ州</span>でこのオファーを最も受け入れそうな顧客を特定して」</span></li>
+          <li><i class="fa-solid fa-envelopes-bulk fa-lg"></i><span>続けて「<span class="keyword-tag">メールキャンペーン</span>と<span class="keyword-tag">デジタルマーケティング資材</span>を作成して」</span></li>
+          <li><i class="fa-solid fa-magnifying-glass fa-lg"></i><span>Gemini は<span class="highlight">Knowledge Catalog からモデルを発見して呼び出す</span>——技術的詳細を知る必要なし</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 15 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-bullhorn fa-4x fa-flip" aria-hidden="true"></i>
+      </div>
+      <h2>⑮ 同じエージェントでキャンペーンを完結</h2>
+      <div class="card-content">
+        <p class="lead">仕組みの鍵は「<span class="highlight">同じ Gemini エージェント上に構築済み</span>」という点。同じツール・スキル・メモリを使い、コンプライアンス準拠のメール文案から資材・リスト・ステージングまで一括生成。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-signature fa-lg"></i><span><span class="keyword-tag">コンプライアントなメール文案</span>をドラフト</span></li>
+          <li><i class="fa-solid fa-palette fa-lg"></i><span>クリエイティブ資材（<span class="keyword-tag">デジタル広告素材</span>）を生成</span></li>
+          <li><i class="fa-solid fa-file-csv fa-lg"></i><span>ターゲットセグメントの <span class="keyword-tag">CSV</span> を生成</span></li>
+          <li><i class="fa-solid fa-rocket fa-lg"></i><span>キャンペーン全体を <span class="keyword-tag">Google Marketing Platform</span> にステージング</span></li>
+        </ul>
+        <div class="flow-arrow">
+          モデル発見 <i class="fa-solid fa-arrow-right"></i> 文案・資材・CSV <i class="fa-solid fa-arrow-right"></i> GMP ステージング
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 16 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-chart-line fa-4x fa-beat-fade" aria-hidden="true"></i>
+      </div>
+      <h2>⑯ 1週間後: ライブデータのBIダッシュボード</h2>
+      <div class="card-content">
+        <p class="lead">キャンペーンを1週間運用したあと、効果測定も会話で完結。「<span class="keyword-tag">トップ5郡別の個人ローンキャンペーンの成績</span>を見せて」——<span class="highlight">ほんの数秒でライブデータのダッシュボード</span>が出現。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-map-location fa-lg"></i><span>軸は<span class="keyword-tag">上位5郡（top five counties）</span>——地域別の浸透を即座に把握</span></li>
+          <li><i class="fa-solid fa-bolt-lightning fa-lg"></i><span>集計は事前計算ではなく<span class="highlight">ライブデータへのクエリ</span></span></li>
+          <li><i class="fa-solid fa-plus fa-lg"></i><span>追加要求にも柔軟: 「KPIを1つ追加して」で<span class="keyword-tag">キャンペーン→ローン転換までの中央時間</span>という新指標を即座にタイル化</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード 17 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-coins fa-4x fa-bounce" aria-hidden="true"></i>
+      </div>
+      <h2>⑰ ゼロトークンBI: 動的クエリテンプレート</h2>
+      <div class="card-content">
+        <p class="lead">郡をクリックして掘り下けても、裏では <span class="keyword-tag">Knowledge Catalog に保存された動的クエリテンプレート</span>が働く。<span class="highlight">LLM トークンゼロで</span>チャートクエリを実行し、精度を損なわない。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-sliders fa-lg"></i><span>ダッシュボードは<span class="keyword-tag">対話型パラメータ制御</span>に対応——LLM なしで操作可能</span></li>
+          <li><i class="fa-solid fa-ban fa-lg"></i><span>チャートクエリを<span class="highlight">0 LLM トークン</span>で実行（精度の妥協なし）</span></li>
+          <li><i class="fa-solid fa-shield-halved fa-lg"></i><span>BI ダッシュボードは<span class="keyword-tag">鮮度とセキュリティを維持</span>し、企業データにグラウンディング</span></li>
+          <li><i class="fa-solid fa-share-from-square fa-lg"></i><span>ライブ結果をそのまま<span class="highlight">チームへ共有</span>できる</span></li>
+        </ul>
+        <div class="stat-row">
+          <div class="stat-box"><span class="num"><em>0</em></span><span class="lbl">チャートクエリのLLMトークン</span></div>
+          <div class="stat-box"><span class="num"><em>0</em>妥協</span><span class="lbl">精度への影響</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード 18 -->
+    <div class="card fade-in-scale">
+      <div class="mega-icon-container">
+        <i class="fa-solid fa-award fa-4x fa-flip" aria-hidden="true"></i>
+      </div>
+      <h2>⑱ まとめ: 数ヶ月の手作業が数分に</h2>
+      <div class="card-content">
+        <p class="lead">締めくくりは「<span class="highlight">何ヶ月もかかった手作業が、数分で完了した</span>」。エンタープライズグレードの、ガバナンスされ透明なワークフローだった、と総括。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-diagram-project fa-lg"></i><span>達成: ML モデル作成 → マーケターによる<span class="keyword-tag">リアルタイムデータの可視化・活用</span>まで一気通貫</span></li>
+          <li><i class="fa-solid fa-gauge-simple-high fa-lg"></i><span><span class="highlight">少ないトークン消費</span>と<span class="highlight">高精度</span>を両立</span></li>
+          <li><i class="fa-solid fa-book-atlas fa-lg"></i><span>そのすべてが <span class="keyword-tag">Knowledge Catalog にグラウンディング</span>——本デモの一貫した主張</span></li>
+        </ul>
+        <div class="speech-bubble top variant-2">
+          <i class="fa-solid fa-quote-right fa-lg"></i>「数ヶ月の手作業が<span class="keyword-tag">数分</span>で起こった——エンタープライズグレードで、ガバナンスされた、透明なワークフローで」
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div>📝 ソース: 🎬 動画: <a href="https://www.youtube.com/watch?v=T0GD_7nLX9Y" target="_blank" rel="noopener">Google Cloud Tech</a> — 「How Knowledge Catalog Grounds PySpark ML &amp; Live Dashboards」 | 📅 2026年10月9日</div>
+    <div style="margin-top: 6px;">🎨 このインフォグラフィックはデモ動画の内容を18枚のカードに整理したものです。</div>
+  </footer>
+
+</div>
+
+<script>
+  // スクロール連動のフェードインスケール
+  document.addEventListener('DOMContentLoaded', function () {
+    var cards = document.querySelectorAll('.fade-in-scale');
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12 });
+    cards.forEach(function (card) { observer.observe(card); });
+  });
+</script>
+</body>
+</html>

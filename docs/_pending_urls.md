@@ -20,3 +20,6 @@ https://www.youtube.com/watch?v=2dayUh6KeZU
 https://www.youtube.com/watch?v=I8LrisMcpYw
 https://www.youtube.com/watch?v=wE-bI707baw
 https://www.youtube.com/watch?v=OostCO7LiFg
+# 2026-10-10 カレーちゃんのAI道場 ライブアーカイブ（73分・字幕なし・音声DLがlive DVR窓で途切れる403）
+# news_id=7050002 POST済み・infographic_url未登録 → VOD完全化後に再取得
+https://www.youtube.com/watch?v=F1L0UCpu2i8

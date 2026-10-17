@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【ハンズオンレビュー】AI動画生成Framiaで1つのプロンプトから20秒CMを作る | AIニュース インフォグラフィック</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@400;700&family=Yomogi&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+:root {
+  /* 独自テーマ: スレート × サンフラワーイエロー (Slate & Sunflower Yellow) */
+  --main: #334155;      /* スレート700 */
+  --deep: #0F172A;      /* スレート900 */
+  --ink-dark: #1E293B;
+  --accent: #A16207;    /* イエロー700(視認性確保用の濃い黄金色) */
+  --bright: #FACC15;    /* イエロー400(ダーク背景用の明るい黄) */
+  --pale: #FEF9C3;      /* イエロー100 */
+  --bg-canvas: #F8FAFC; /* スレート50 */
+  --sub-green: #059669; /* 成功=グリーン */
+  --sub-red: #DC2626;   /* 注意=レッド */
+  --ink: #1E293B;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(ellipse 900px 520px at 6% -4%, rgba(51, 65, 85, 0.10), transparent),
+    radial-gradient(ellipse 960px 560px at 94% 3%, rgba(250, 204, 21, 0.14), transparent);
+  font-family: 'Zen Kurenaido', 'Kaisei Decol', sans-serif;
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.container { max-width: 2000px; margin: 0 auto; }
+
+/* ヘッダー */
+.header {
+  text-align: center;
+  padding: 38px 22px 30px;
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 52%, #334155 100%);
+  border-radius: 26px;
+  box-shadow: 0 14px 42px rgba(15, 23, 42, 0.45);
+  position: relative;
+  overflow: hidden;
+  color: #F8FAFC;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle 260px at 12% 20%, rgba(250, 204, 21, 0.28), transparent),
+    radial-gradient(circle 320px at 88% 80%, rgba(161, 98, 7, 0.32), transparent);
+  pointer-events: none;
+}
+
+.header::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 7px;
+  background: linear-gradient(90deg, #FDE047 0%, #EAB308 45%, #A16207 100%);
+}
+
+.header-icon {
+  font-size: 84px;
+  color: var(--bright);
+  animation: fa-float 3.2s ease-in-out infinite;
+  text-shadow: 0 6px 18px rgba(15, 23, 42, 0.55);
+}
+
+@keyframes fa-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.header h1 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 35px;
+  font-weight: 700;
+  margin: 14px 0 10px;
+  line-height: 1.45;
+  position: relative;
+}
+
+.header .subtitle {
+  font-family: 'Yomogi', cursive;
+  font-size: 18px;
+  color: var(--pale);
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.header .meta { font-size: 14px; color: #F8FAFC; position: relative; }
+.header .meta a { color: var(--bright); }
+
+/* 注目スペック・ストリップ */
+.stat-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+  margin: 0 0 26px;
+}
+
+.stat-box {
+  flex: 1;
+  min-width: 220px;
+  max-width: 430px;
+  background: linear-gradient(150deg, #FFFFFF 0%, var(--pale) 120%);
+  border: 2px solid rgba(51, 65, 85, 0.28);
+  border-radius: 18px;
+  padding: 14px 18px;
+  text-align: center;
+  box-shadow: 4px 5px 14px rgba(51, 65, 85, 0.13);
+  transition: transform 0.25s ease;
+}
+
+.stat-box:hover { transform: translateY(-4px); }
+
+.stat-box .stat-icon {
+  font-size: 30px;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.stat-box .num-big {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--main);
+  line-height: 1.15;
+}
+
+.stat-box .stat-label { font-size: 15px; font-weight: bold; color: var(--ink); }
+
+/* セクション見出し(区切り) */
+.divider-band {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin: 34px 6px 20px;
+  color: var(--main);
+  font-family: 'Kaisei Decol', serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.divider-band::before,
+.divider-band::after {
+  content: '';
+  height: 3px;
+  width: 22%;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  border-radius: 3px;
+}
+
+/* カードの並び */
+.section-layout {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  justify-content: center;
+}
+
+.section-card {
+  flex: 1;
+  min-width: 230px;
+  max-width: 450px;
+  background-color: #FFFFFF;
+  border: 2px solid rgba(51, 65, 85, 0.22);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: 5px 5px 16px rgba(51, 65, 85, 0.12);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.section-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(90deg, #334155, #EAB308, #FDE047);
+}
+
+.section-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 8px 10px 24px rgba(51, 65, 85, 0.22);
+  border-color: rgba(161, 98, 7, 0.55);
+}
+
+.mega-icon-container { text-align: center; margin: 14px 0 6px; }
+
+.mega-icon-container h2 {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--main);
+  margin: 10px 0 4px;
+  line-height: 1.45;
+}
+
+.mega-icon-container .card-no {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: bold;
+  color: #FFFFFF;
+  background: var(--main);
+  border-radius: 999px;
+  padding: 2px 14px;
+  margin-bottom: 6px;
+  letter-spacing: 0.08em;
+}
+
+.card-content { padding: 0 8px 12px; }
+
+.card-content p.lead { margin: 6px 0 10px; font-size: 15px; }
+
+.keyword-list { margin: 12px 0; padding: 0; list-style-type: none; }
+
+.keyword-list li {
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.keyword-list li i {
+  margin-right: 8px;
+  color: var(--accent);
+  min-width: 18px;
+  margin-top: 3px;
+}
+
+.keyword-tag {
+  background-color: var(--pale);
+  color: var(--ink);
+  padding: 2px 9px;
+  border-radius: 6px;
+  margin: 0 3px 3px 0;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 14px;
+  border: 1px solid rgba(51, 65, 85, 0.25);
+}
+
+.keyword-tag.accent {
+  background-color: var(--accent);
+  color: #FFFFFF;
+  border-color: var(--accent);
+}
+
+.result-tag {
+  background: linear-gradient(135deg, var(--main), var(--accent));
+  color: #FFFFFF;
+  padding: 2px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  font-weight: bold;
+  font-size: 14px;
+  margin: 2px 3px 2px 0;
+}
+
+/* 数値ハイライト */
+.num-hl {
+  font-family: 'Kaisei Decol', serif;
+  font-size: 30px;
+  font-weight: 700;
+  color: var(--main);
+  line-height: 1.1;
+}
+
+.num-unit { font-size: 15px; font-weight: bold; color: var(--accent); }
+
+/* ミニテーブル */
+.mini-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0 6px;
+  font-size: 14px;
+  background: #FFFFFF;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(51, 65, 85, 0.22);
+}
+
+.mini-table th {
+  background: linear-gradient(135deg, var(--main), var(--accent));
+  color: #FFFFFF;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.mini-table td {
+  padding: 6px 8px;
+  border-top: 1px solid var(--pale);
+  vertical-align: top;
+}
+
+.mini-table tr:nth-child(even) td { background-color: #FEFCE8; }
+
+/* 判定バッジ */
+.verdict-pass {
+  background: linear-gradient(135deg, #059669, #34D399);
+  color: #FFFFFF;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-weight: bold;
+  font-size: 14px;
+  display: inline-block;
+  margin: 2px 3px 2px 0;
+}
+
+.verdict-fail {
+  background: linear-gradient(135deg, #991B1B, #DC2626);
+  color: #FFFFFF;
+  padding: 2px 12px;
+  border-radius: 999px;
+  font-weight: bold;
+  font-size: 14px;
+  display: inline-block;
+  margin: 2px 3px 2px 0;
+}
+
+/* ポイントボックス */
+.point-box {
+  background: linear-gradient(135deg, var(--pale), #FFFFFF);
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  padding: 8px 12px;
+  margin: 10px 0;
+  font-size: 14.5px;
+}
+
+.p-label {
+  display: inline-block;
+  background: var(--main);
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: bold;
+  border-radius: 6px;
+  padding: 1px 9px;
+  margin-right: 7px;
+  vertical-align: middle;
+}
+
+.p-sub {
+  display: inline-block;
+  background: var(--bright);
+  color: var(--deep);
+  font-weight: bold;
+  border-radius: 6px;
+  padding: 0 8px;
+}
+
+/* タイムライン */
+.tl { list-style: none; margin: 10px 0 4px; padding: 0 0 0 24px; position: relative; }
+.tl::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #334155, #CA8A04, #FACC15);
+}
+.tl li { position: relative; margin-bottom: 10px; font-size: 14.5px; padding-left: 8px; }
+.tl li::before {
+  content: '';
+  position: absolute;
+  left: -21px;
+  top: 6px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 3px solid var(--accent);
+}
+
+/* 手書き風の吹き出し */
+.speech-bubble {
+  position: relative;
+  background: #FFFFFF;
+  border: 3px solid var(--main);
+  border-radius: 18px;
+  padding: 10px 14px;
+  margin: 16px 4px 10px;
+  font-family: 'Yomogi', cursive;
+  box-shadow: 3px 3px 10px rgba(51, 65, 85, 0.15);
+  transform: rotate(-1deg);
+}
+
+.speech-bubble.variant-1 { transform: rotate(1deg); border-color: var(--accent); }
+.speech-bubble.variant-2 { transform: rotate(-0.6deg); border-color: var(--bright); }
+
+/* 出現アニメーション */
+.fade-in-scale { animation: fadeInScale 0.7s ease both; }
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.92) translateY(14px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* フッター */
+.footer {
+  margin-top: 40px;
+  padding: 26px 20px;
+  background: linear-gradient(135deg, var(--deep) 0%, var(--main) 100%);
+  border-radius: 22px;
+  color: #F8FAFC;
+  text-align: center;
+  font-size: 15px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.38);
+}
+
+.footer a { color: var(--bright); text-decoration: underline; }
+.footer .handwritten { color: var(--pale); }
+
+/* レスポンシブ対応 */
+@media (max-width: 1600px) { .section-card { min-width: 280px; } }
+@media (max-width: 1200px) { .section-card { min-width: 320px; } }
+@media (max-width: 900px) { .section-card { min-width: 380px; } }
+@media (max-width: 768px) {
+  .section-layout { flex-direction: column; }
+  .section-card { width: 100%; min-width: auto; max-width: none; }
+  .header h1 { font-size: 26px; }
+  .divider-band { font-size: 21px; }
+  .stat-box { max-width: none; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ヘッダー -->
+  <header class="header">
+    <div class="header-icon"><i class="fa-solid fa-film" aria-hidden="true"></i></div>
+    <h1>【ハンズオンレビュー】AI動画生成「Framia」で<br>1つのプロンプトから20秒CMを作る</h1>
+    <div class="subtitle">Converge AIのFramiaを使い、架空のスポーツドリンク「VoltRush」の20秒シネマティックCMを1つのプロンプトから制作——最終シーンだけを部分的に修正できるかを検証</div>
+    <div class="meta">
+      <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> 2026年10月16日　
+      <i class="fa-brands fa-youtube" aria-hidden="true"></i> 動画: <a href="https://www.youtube.com/watch?v=CaOHa7uuytY" target="_blank" rel="noopener">Daniel | Tech &amp; Data「Framia AI Review (2026) A 20-Second Ad From 1 Prompt」</a>
+    </div>
+  </header>
+
+  <!-- 注目スペックストリップ -->
+  <div class="stat-strip">
+    <div class="stat-box">
+      <div class="stat-icon"><i class="fa-solid fa-keyboard" aria-hidden="true"></i></div>
+      <div class="num-big">1<span class="num-unit">プロンプト</span></div>
+      <div class="stat-label">ざっくりした概念だけでCM制作を開始</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-icon"><i class="fa-solid fa-stopwatch" aria-hidden="true"></i></div>
+      <div class="num-big">20<span class="num-unit">秒</span></div>
+      <div class="stat-label">完成したシネマティック商用動画の長さ</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-icon"><i class="fa-solid fa-photo-film" aria-hidden="true"></i></div>
+      <div class="num-big">4<span class="num-unit">クリップ</span></div>
+      <div class="stat-label">20秒を4つの連続シーンに自動分割して生成</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-icon"><i class="fa-solid fa-scissors" aria-hidden="true"></i></div>
+      <div class="num-big">1<span class="num-unit">シーンのみ</span></div>
+      <div class="stat-label">納得いかない最終シーンだけを再生成して修正</div>
+    </div>
+  </div>
+
+  <!-- ========== 第1章: Framiaとは何か ========== -->
+  <div class="divider-band"><i class="fa-solid fa-book-open" aria-hidden="true"></i> 第1章：Framiaの概要 <i class="fa-solid fa-film" aria-hidden="true"></i></div>
+
+  <div class="section-layout">
+
+    <!-- カード1 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 01</span>
+        <i class="fa-solid fa-bullhorn fa-5x" style="color: var(--accent); animation: fa-beat 2.6s infinite;" aria-hidden="true"></i>
+        <h2>本日のニュース: Framiaハンズオンレビュー</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">Daniel氏がAI動画生成ツール<span class="keyword-tag accent">Framia</span>を実際に使い、<b>1つのプロンプトから20秒のシネマティックCM</b>を制作する様子を紹介しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-flask" aria-hidden="true"></i><span>架空のスポーツドリンク<span class="keyword-tag">VoltRush</span>のCMを題材に、<span class="result-tag">初期生成→特定シーンの修正</span>までの一連の流れを実演</span></li>
+          <li><i class="fa-solid fa-user-pen" aria-hidden="true"></i><span>検証者はテック系YouTuberの<span class="keyword-tag">Daniel | Tech &amp; Data</span>氏</span></li>
+          <li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>本動画は<span class="keyword-tag">Framia提供のスポンサードレビュー</span>であることを動画内で明示</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 「エージェントに最初のワークフローを組ませ、弱い箇所だけ後から直す」——これが今回の検証テーマです。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード2 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 02</span>
+        <i class="fa-solid fa-triangle-exclamation fa-5x" style="color: var(--main); animation: fa-bounce 2.8s infinite;" aria-hidden="true"></i>
+        <h2>課題: 1つの悪いシーンが全体を台無しにする</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">Daniel氏は動画の冒頭で、AI動画制作のあるあるの<b>「1シーン問題」</b>を指摘しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-person-running" aria-hidden="true"></i><span><span class="keyword-tag">アスリートの見た目が突然変わる</span></span></li>
+          <li><i class="fa-solid fa-wine-bottle" aria-hidden="true"></i><span><span class="keyword-tag">製品(プロダクト)のデザインが変わってしまう</span></span></li>
+          <li><i class="fa-solid fa-unlink" aria-hidden="true"></i><span>ラストショットが<span class="keyword-tag">前のシーンと繋がって見えない</span></span></li>
+        </ul>
+        <div class="point-box">
+          <span class="p-label">真の課題</span>クリップをもう1本作ることではなく、<span class="p-sub">プロジェクト全体を作り直さずに弱点の1シーンだけ直す</span>こと
+        </div>
+      </div>
+    </div>
+
+    <!-- カード3 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 03</span>
+        <i class="fa-solid fa-diagram-project fa-5x" style="color: var(--accent); animation: fa-spin 8s linear infinite;" aria-hidden="true"></i>
+        <h2>Framiaとは——ワークフローキャンバス</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">Framiaは<span class="keyword-tag accent">Converge AI</span>が開発する、<b>ワークフローキャンバス</b>を中心としたクリエイティブワークスペースです。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-comments" aria-hidden="true"></i><span>チャットに<span class="keyword-tag">プロンプトを入力</span>すると、エージェントがそのアイデアを<b>視覚的な構造</b>に変換</span></li>
+          <li><i class="fa-solid fa-eye" aria-hidden="true"></i><span>キャンバス上で<span class="result-tag">動画がどう組み上がっていくかを追跡</span>できる</span></li>
+          <li><i class="fa-solid fa-rotate-left" aria-hidden="true"></i><span>構造が<b>後から見直しやすい</b>ので、1シーンだけ戻って調整しても周りに影響しない</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-magnifying-glass fa-lg" style="color: var(--main);"></i> 「構造を再訪しやすい」ことが、今回のレビューで試したいポイントだそうです。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード4 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 04</span>
+        <i class="fa-solid fa-wand-magic-sparkles fa-5x" style="color: var(--main); animation: fa-beat 3s infinite;" aria-hidden="true"></i>
+        <h2>Magic Nodeが次の一手を提案</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">制作が進むにつれ、<span class="keyword-tag accent">Magic Node</span>が<b>次に何を追加すると良さそうか</b>を提案してくれます。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>提案が妥当なら<span class="result-tag">そのまま採用</span>してフローを伸ばせる</span></li>
+          <li><i class="fa-solid fa-hand" aria-hidden="true"></i><span>違和感があれば<span class="keyword-tag">自分でフローを組み直す</span>ことも可能</span></li>
+          <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span>自動提案と手動制御の<span class="keyword-tag">いいとこ取り</span>ができる設計</span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> エージェント任せにせず、途中から自分の手で形を作れるのがFramiaの売りです。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========== 第2章: 制作セットアップ ========== -->
+  <div class="divider-band"><i class="fa-solid fa-sliders" aria-hidden="true"></i> 第2章：制作セットアップ <i class="fa-solid fa-pen-ruler" aria-hidden="true"></i></div>
+
+  <div class="section-layout">
+
+    <!-- カード5 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 05</span>
+        <i class="fa-solid fa-bottle-droplet fa-5x" style="color: var(--accent); animation: fa-bounce 2.6s infinite;" aria-hidden="true"></i>
+        <h2>今回の企画: 架空ドリンク「VoltRush」</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">Daniel氏は新しいワークフロープロジェクトを開き、エージェントに<b>1つのざっくりした概念</b>だけを渡しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>架空のスポーツドリンク<span class="keyword-tag accent">VoltRush</span>の<span class="result-tag">20秒の商用動画</span>を作りたい</span></li>
+          <li><i class="fa-solid fa-person-running" aria-hidden="true"></i><span>アスリートが激しいトレーニングを終えて<span class="keyword-tag">完全に疲れ切っている</span></span></li>
+          <li><i class="fa-solid fa-battery-full" aria-hidden="true"></i><span>VoltRushが<span class="keyword-tag">転換点</span>となり、エネルギーが高まっていく</span></li>
+          <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>最後は<span class="keyword-tag">きれいなプロダクトショット</span>で締める</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード6 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 06</span>
+        <i class="fa-solid fa-palette fa-5x" style="color: var(--main); animation: fa-spin 7s linear infinite;" aria-hidden="true"></i>
+        <h2>ビジュアルの指定: ダーク×エレクトリックブルー</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">スタイルの指定は<b>2点のみ</b>。それでいて印象は明確です。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-moon" aria-hidden="true"></i><span><span class="keyword-tag accent">ダークなシネマティック</span>な見た目</span></li>
+          <li><i class="fa-solid fa-bolt-lightning" aria-hidden="true"></i><span><span class="keyword-tag">エレクトリックブルーのアクセント</span>カラー</span></li>
+          <li><i class="fa-solid fa-clone" aria-hidden="true"></i><span>最も重視したのは<span class="result-tag">クリップ間のビジュアル一貫性</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> プロンプトは「暗めの映画っぽい映像+青の差し色」程度。細かいカメラ指定はありません。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード7 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 07</span>
+        <i class="fa-solid fa-robot fa-5x" style="color: var(--accent); animation: fa-beat 2.4s infinite;" aria-hidden="true"></i>
+        <h2>エージェント設定: オート実行モード</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">送信前にエージェントの設定を変更し、<b>どこまで自動で進むか</b>を確認しました。</p>
+        <table class="mini-table">
+          <tr><th>設定項目</th><th>今回の値</th></tr>
+          <tr><td>エージェント実行</td><td><b>auto-run(承認なし)</b></td></tr>
+          <tr><td>Reasoningモード</td><td><b>balanced(バランス)</b></td></tr>
+          <tr><td>その他</td><td>デフォルトのまま</td></tr>
+        </table>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-arrow-right" aria-hidden="true"></i><span>承認を待って止まらず<span class="result-tag">プラットフォームが勝手に組み続ける</span>状態に</span></li>
+          <li><i class="fa-solid fa-flag-checkered" aria-hidden="true"></i><span>「自分が介入する必要が出るまで、1つのアイデアをどこまで進められるか」を確認する狙い</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード8 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 08</span>
+        <i class="fa-solid fa-file-pen fa-5x" style="color: var(--main); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+        <h2>Script Creatorノードが構成を整理</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">リクエストを送ると、Framiaはすぐにワークフローキャンバス上で<b>構築を開始</b>しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-file-lines" aria-hidden="true"></i><span>最初に作られたのは<span class="keyword-tag accent">Script Creatorノード</span></span></li>
+          <li><i class="fa-solid fa-sitemap" aria-hidden="true"></i><span>ざっくりした概念を<span class="result-tag">構造化された動画プラン</span>に変換</span></li>
+          <li><i class="fa-solid fa-hands" aria-hidden="true"></i><span>手動セットアップなしで<span class="keyword-tag">キャンバス上にプロジェクト構成</span>が自動で形になる</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-pen-nib fa-lg" style="color: var(--main);"></i> ここからワークフローが一気に「整理されてる!」感が出てくる、とDaniel氏。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード9 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 09</span>
+        <i class="fa-solid fa-images fa-5x" style="color: var(--accent); animation: fa-float 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>支援アセットとサウンドトラックも自動</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">次にFramiaは、本編生成を支える<b>周辺アセット</b>を準備しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-image" aria-hidden="true"></i><span>生成アセットが<span class="keyword-tag accent">ダークなシネマティック風</span>を継承</span></li>
+          <li><i class="fa-solid fa-circle-half-stroke" aria-hidden="true"></i><span>元プロンプトの<span class="keyword-tag">エレクトリックブルーの方向性</span>がプロジェクト全体へ波及</span></li>
+          <li><i class="fa-solid fa-music" aria-hidden="true"></i><span><span class="result-tag">サウンドトラック</span>も同じビルドの一環として処理</span></li>
+        </ul>
+        <div class="point-box">
+          <span class="p-label">注意</span>実案件で使う場合は、最終トラックの商用利用前に<span class="p-sub">楽曲の権利を確認</span>する必要があるとDaniel氏が補足
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========== 第3章: 20秒CMの生成 ========== -->
+  <div class="divider-band"><i class="fa-solid fa-clapperboard" aria-hidden="true"></i> 第3章：20秒CMの生成 <i class="fa-solid fa-photo-film" aria-hidden="true"></i></div>
+
+  <div class="section-layout">
+
+    <!-- カード10 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 10</span>
+        <i class="fa-solid fa-list-ol fa-5x" style="color: var(--main); animation: fa-beat 3.2s infinite;" aria-hidden="true"></i>
+        <h2>20秒を4クリップに自動分割</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">FramiaはこのCMを、<b>繋がった4本のクリップ</b>に分割して生成しました。</p>
+        <ul class="tl">
+          <li><b>クリップ1</b>: 疲労——アスリートの消耗したムードを確立</li>
+          <li><b>クリップ2</b>: リカバリー(回復)</li>
+          <li><b>クリップ3</b>: 再生されたエネルギーへと徐々にシフト</li>
+          <li><b>クリップ4</b>: <span class="keyword-tag accent">VoltRushヒーローショット</span>で締め</li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 字幕の誤認識「wall brush hero shot」は「VoltRush hero shot」の聞き間違いと判断できます。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード11 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 11</span>
+        <i class="fa-solid fa-eye-low-vision fa-5x" style="color: var(--accent); animation: fa-float 3.4s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>進捗が見える新しいインターフェース</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">新しいUIには<b>進捗キュー(表示)</b>があり、Framiaが今何に取り組んでいるかが常に分かります。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-spinner" aria-hidden="true"></i><span>ワークフローが拡大しても<span class="keyword-tag">背景で何が起きているか分からない</span>状態にならない</span></li>
+          <li><i class="fa-solid fa-face-smile" aria-hidden="true"></i><span>Daniel氏もこの点を<span class="result-tag">好評価</span></span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード12 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 12</span>
+        <i class="fa-solid fa-layer-group fa-5x" style="color: var(--main); animation: fa-bounce 2.8s infinite;" aria-hidden="true"></i>
+        <h2>動画生成エンジンはSeedance 2.5</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">実際のクリップ生成には<span class="keyword-tag accent">Seedance 2.5</span>を使用しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-cube" aria-hidden="true"></i><span>重要なのは<span class="result-tag">同じワークフロー内で完結</span>すること</span></li>
+          <li><i class="fa-solid fa-arrow-right-arrow-left" aria-hidden="true"></i><span>クリップ生成のために<span class="keyword-tag">別ツールへ移し替える必要なし</span></span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-puzzle-piece fa-lg" style="color: var(--main);"></i> 企画→脚本→素材→生成→編集が1枚のキャンバス上に。工具を持ち替えないのが快適です。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード13 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 13</span>
+        <i class="fa-solid fa-circle-check fa-5x" style="color: var(--accent); animation: fa-beat 2.6s infinite;" aria-hidden="true"></i>
+        <h2>別々の生成でも「同一CM」の一体感</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">4本は<b>それぞれ別の生成</b>ですが、仕上がりは1本のCMとして繋がって見えます。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-moon" aria-hidden="true"></i><span><span class="keyword-tag">暗めのライティング</span>と<span class="keyword-tag">ブルーのアクセント</span>が全編で維持</span></li>
+          <li><i class="fa-solid fa-chart-line" aria-hidden="true"></i><span>第3クリップまでに<span class="result-tag">疲労→エネルギーの転換</span>がはっきり</span></li>
+          <li><i class="fa-solid fa-gauge-high" aria-hidden="true"></i><span>テンポ(ペーシング)も一貫しており、追いやすい展開</span></li>
+        </ul>
+        <div class="point-box">
+          <span class="p-label">第4クリップ</span>無理にアクションを詰め込まず<span class="p-sub">スローダウンしてプロダクトで締める</span>——VoltRushに独自の「見せ場」を与える構成
+        </div>
+      </div>
+    </div>
+
+    <!-- カード14 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 14</span>
+        <i class="fa-solid fa-file-export fa-5x" style="color: var(--main); animation: fa-float 3s ease-in-out infinite;" aria-hidden="true"></i>
+        <h2>自動エクスポートで20秒CMが完成</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">4本のクリップが揃うと、ワークフローが<b>最終編集+サウンドトラック</b>をまとめて完成させます。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-scissors" aria-hidden="true"></i><span>全クリップを最終編集へ取り込み<span class="result-tag">完全な20秒CMを自動エクスポート</span></span></li>
+          <li><i class="fa-solid fa-play" aria-hidden="true"></i><span>冒頭から通しで再生した結果、<span class="keyword-tag">想定以上にまとまっている</span>とDaniel氏</span></li>
+          <li><i class="fa-solid fa-id-card" aria-hidden="true"></i><span>ショットを1つずつ設計しなくても<span class="keyword-tag">一貫したビジュアルアイデンティティ</span>を獲得</span></li>
+        </ul>
+        <div class="speech-bubble variant-1">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 「個々のクリップは良くても、繋げると崩れる」のがAI動画の落とし穴——今回はそこをクリア。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========== 第4章: 部分修正と総評 ========== -->
+  <div class="divider-band"><i class="fa-solid fa-wrench" aria-hidden="true"></i> 第4章：部分修正と総評 <i class="fa-solid fa-trophy" aria-hidden="true"></i></div>
+
+  <div class="section-layout">
+
+    <!-- カード15 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 15</span>
+        <i class="fa-solid fa-bullseye fa-5x" style="color: var(--accent); animation: fa-beat 2.8s infinite;" aria-hidden="true"></i>
+        <h2>最終シーンだけを再依頼</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">CMの大部分は気に入ったものの、<b>エンディングをより強く</b>したい——そこでDaniel氏は同じワークフロー内のエージェントに戻りました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>依頼は<span class="result-tag">最終シーンのみのリファイン</span></span></li>
+          <li><i class="fa-solid fa-bolt" aria-hidden="true"></i><span>「よりドラマチックな<span class="keyword-tag accent">VoltRushヒーローショット</span>、製品をより強調」</span></li>
+          <li><i class="fa-solid fa-lock" aria-hidden="true"></i><span>条件は<span class="keyword-tag">その前のシーンは一切そのまま</span>維持すること</span></li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- カード16 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 16</span>
+        <i class="fa-solid fa-wand-sparkles fa-5x" style="color: var(--main); animation: fa-spin 9s linear infinite;" aria-hidden="true"></i>
+        <h2>リビジョンの中身: 全体再構築なし</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">Framiaの修正内容を覗くと、<b>狙い通りの調整</b>が入っていました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-crop-simple" aria-hidden="true"></i><span><span class="keyword-tag">フレーミングを引き締め</span>、ダークな見た目を一段強調</span></li>
+          <li><i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>缶の周囲に<span class="keyword-tag accent">より強いエレクトリックブルーの照明</span>を追加</span></li>
+          <li><i class="fa-solid fa-user-large" aria-hidden="true"></i><span>背景のアスリートは<span class="keyword-tag">柔らかく薄める</span>処理</span></li>
+        </ul>
+        <div class="point-box">
+          <span class="p-label">最重要ポイント</span>1ショットの変更だけで<span class="p-sub">CM全体を作り直さない</span>——最初の3クリップは元の位置のまま
+        </div>
+      </div>
+    </div>
+
+    <!-- カード17 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 17</span>
+        <i class="fa-solid fa-code-compare fa-5x" style="color: var(--accent); animation: fa-bounce 3s infinite;" aria-hidden="true"></i>
+        <h2>自動再エクスポートでバージョン比較</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">新しい最終シーンが完成すると、Framiaは<b>修正版を含むCM全体を自動で再エクスポート</b>しました。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-scale-balanced" aria-hidden="true"></i><span><span class="result-tag">2つのエンディングを並べて比較</span>可能</span></li>
+          <li><i class="fa-solid fa-hand-sparkles" aria-hidden="true"></i><span>シーケンスを手作業で組み直す必要なし</span></li>
+          <li><i class="fa-solid fa-thumbs-up" aria-hidden="true"></i><span>Daniel氏いわく<span class="keyword-tag">このワークフローで最も有用な部分</span></span></li>
+        </ul>
+        <div class="speech-bubble variant-2">
+          <span class="handwritten"><i class="fa-solid fa-lightbulb fa-lg" style="color: var(--accent);"></i> 初期ビルドはほぼ自動、気になる瞬間だけ後から制御できる——理想の分担です。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- カード18 -->
+    <div class="section-card fade-in-scale">
+      <div class="mega-icon-container">
+        <span class="card-no">CARD 18</span>
+        <i class="fa-solid fa-trophy fa-5x" style="color: var(--main); animation: fa-beat 2.4s infinite;" aria-hidden="true"></i>
+        <h2>まとめ: Daniel氏の総評</h2>
+      </div>
+      <div class="card-content">
+        <p class="lead">フルフローを試した結論は「<span class="result-tag">ほどよく制御できる、技術的になりすぎないAI動画制作</span>に最適」。</p>
+        <ul class="keyword-list">
+          <li><i class="fa-solid fa-star" aria-hidden="true"></i><span>かなりオープンな1つのアイデアから<span class="keyword-tag">初版が驚くほど完成度高</span></span></li>
+          <li><i class="fa-solid fa-wrench" aria-hidden="true"></i><span>ピンポイントのリファインで<span class="keyword-tag">ヒーローショットのインパクト向上</span></span></li>
+          <li><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i><span>一方でリビジョンで<span class="verdict-fail">製品デザインがわずかに変化</span>——<span class="verdict-pass">一貫性が重要な案件は各版の確認を</span></span></li>
+          <li><i class="fa-solid fa-hand-holding-dollar" aria-hidden="true"></i><span>本動画は<span class="keyword-tag">Framia by Converge AIのスポンサード動画</span>と明示</span></li>
+        </ul>
+        <div class="speech-bubble">
+          <span class="handwritten"><i class="fa-solid fa-pen-nib fa-lg" style="color: var(--accent);"></i> 「どこで時間を節約でき、どこで手動調整がまだ必要か」——20秒CMで両方が見えました。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- フッター -->
+  <footer class="footer">
+    <p>
+      <i class="fa-brands fa-youtube" aria-hidden="true"></i> 出典: <a href="https://www.youtube.com/watch?v=CaOHa7uuytY" target="_blank" rel="noopener">Framia AI Review (2026) A 20-Second Ad From 1 Prompt</a>(Daniel | Tech &amp; Data)
+    </p>
+    <p class="handwritten">本インフォグラフィックは動画内容を要約・整理したものです。文字起こしの誤認識(例: 「wall brush hero shot」→「VoltRush hero shot」)は、動画タイトルおよび説明欄の正式表記に基づいて補正しています。本動画はFramia(Converge AI)提供のスポンサードレビューであり、本ページは評価を保証するものではありません。</p>
+    <p style="margin-bottom: 0;"><i class="fa-solid fa-calendar-days" aria-hidden="true"></i> 2026年10月16日公開動画 | AIニュース インフォグラフィック</p>
+  </footer>
+
+</div>
+</body>
+</html>

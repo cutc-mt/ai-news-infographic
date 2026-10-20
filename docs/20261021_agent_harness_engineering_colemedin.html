@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIエージェント自身にハーネスエンジニアリングをさせる方法 | Cole Medin</title>
+<style>
+  :root{
+    --bg:#F5F3FB;
+    --panel:#FFFFFF;
+    --panel2:#F0EBFA;
+    --line:#DCD2F0;
+    --ink:#241536;
+    --sub:#655179;
+    --main:#6D28D9;
+    --main-deep:#4C1D95;
+    --main-soft:#ECE4FB;
+    --grn:#047857;
+    --grn-deep:#034E3B;
+    --grn-soft:#DCF3E9;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#EEE8FA 0%,#E4DAF6 55%,#DACFF2 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(4,120,87,.15),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(109,40,217,.1);color:var(--main-deep);border:1px solid rgba(109,40,217,.38);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--main)}
+  .hero p{color:var(--sub);font-size:14px;max-width:800px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.75);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(109,40,217,.07);border:1px solid rgba(109,40,217,.35);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--main);color:#F1EAFC;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:#3B1670}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(109,40,217,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(36,21,54,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#7C3AED,#4C1D95);color:#F1EAFC}
+  .b-grn{background:linear-gradient(135deg,#0A9B72,#03503D);color:#E4F7F0}
+  .b-line{background:rgba(101,81,121,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--main);border-color:rgba(109,40,217,.5)}
+  .pill.warn{color:var(--grn-deep);border-color:rgba(4,120,87,.65)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#2E1C44;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#2E1C44}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--grn-soft);border:1px solid rgba(4,120,87,.3);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--grn);color:#E8F8F2;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:#06392C}
+  .yomogi .name{font-weight:700;color:var(--grn-deep);margin-right:4px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#2E1C44;background:#FCFBFE}
+  table.tbl td b{color:var(--main-deep)}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FCFBFE;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#2E1C44}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--grn-deep);font-weight:800}
+  .score{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+  .score .box{flex:1 1 140px;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#FCFBFE;text-align:center}
+  .score .box .val{font-size:26px;font-weight:800;color:var(--main);line-height:1.2}
+  .score .box.after .val{color:var(--grn-deep)}
+  .score .box .lbl{font-size:11.5px;color:var(--sub)}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">AGENT ENGINEERING / HARNESS</span>
+  <h1>AIエージェントに<span class="hl">自分自身のハーネスエンジニアリング</span>をさせる方法<br>〜本番エージェントを2つの学習ループで継続改善するプレイブック〜</h1>
+  <p>Cole Medin氏が、コーディングエージェントの信頼性を高める手法「ハーネスエンジニアリング」が、本番環境のAIエージェントにもそのまま応用できることを解説する動画。LangChainのManaged Deep AgentsとLangSmith Engineを使い、エージェントが本番での実際の会話から教訓を学び、自分のルールやスキルの変更案を提案——人間が承認して初めて適用する仕組みをライブデモで紹介します。初期状態で14問中4問だった正答が、学習ループ後に13問まで向上した実測結果も公開されます。本インフォグラフィックは動画内容を再構成したものです。</p>
+  <div class="meta">
+    <span>チャンネル: Cole Medin</span>
+    <span>対象: LangChain Managed Deep Agents / LangSmith Engine</span>
+    <span>実測: 14問中4問正解 → 学習後に13問正解</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">「エージェントは放置すると品質が崩れ、全部人力で直すと破綻する——この動画が示す答えは<b>エージェントに自分の改善案を出させて、承認は人間が握る</b>こと。コーディングエージェントで確立されたプレイブックの本番転用です。CARD 01から見ていきましょう。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>全体像サマリ: 「ハーネス」をエージェント自身に改善させる2つのコアループ<small>コーディングエージェントの成功体験を、そのまま本番エージェントへ</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">ハーネスエンジニアリングとは、モデルを取り巻くすべて（ルール・ワークフロー・スキルなど）を時間をかけて改善していく手法。本動画では、本番環境でエージェントが犯したミスを追跡し、遡ってエージェントと対話しながら「二度と同じミスを起こさない」ようにルールとスキルを鍛える方法を紹介する。中核は2つのループ——①エージェントのメインメモリーで教訓を蓄積するループ、②本番トレースを監視して遡及的にハーネス自体を改善するループ。すべての変更には人間が承認関与する。</p>
+    <div class="flow">
+      <div class="step"><b>LOOP 1</b>本番会話から教訓をメモリーに蓄積（Context Hub）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>LOOP 2</b>トレースを分析しハーネス（ルール・指示）の変更案を提案</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>HUMAN</b>人間が承認してはじめて本番へ適用・バージョン管理</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「学ぶのはエージェント、決めるのは人間」。この役割分担が全体を貫くテーマですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>見落とされがちな事実: コーディングの知見が本番に転用できる<small>多くの人が気づいていない「同じ土俵」</small></h2>
+    <span class="badge b-grn">INSIGHT</span>
+    <ul>
+      <li> Cole Medin氏のチャンネルは今年、コーディング向けAIエージェントに集中してきた</li>
+      <li>コーディングエージェントの<b>信頼性を高める戦略の多くは、自動化・ビジネス用途の本番エージェントにそのまま応用できる</b></li>
+      <li>特に大きいのが「ハーネスエンジニアリング」というアイデア</li>
+      <li>最近の本番エージェントの多くは<b>コーディングエージェントとほぼ同じ構成</b>（ハーネス全体を大量のMarkdownで管理）になっている</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「コーディングエージェント特有の話でしょ」と思っている人こそ見るべき動画、という切り口から始まります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>ハーネスエンジニアリングの定義<small>ミスを追跡し、遡及的にルールとスキルを直す</small></h2>
+    <span class="badge b-main">CONCEPT</span>
+    <ul>
+      <li>ハーネス＝モデルを取り囲むルール・ワークフローなど<b>「モデルの外側」のすべて</b></li>
+      <li>具体的手法: <b>本番でエージェントが犯したあらゆるミスを追跡</b>する</li>
+      <li>後からエージェントと対話を重ね、<b>二度と同じミスが起きないよう</b>ルール・スキルをどう改善すべきかを見極める</li>
+      <li>コーディングエージェントで常々教えてきた手法が、<b>本番エージェントでも全く同じ</b>に機能する</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>ポイントは「学習させるのはモデルの重みではなく、外側のハーネス」ところ。モデルはどこでも差し替え可能です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>古いやり方 vs 新しいやり方<small>コード埋め込みの配線から、Markdownハーネスへ</small></h2>
+    <span class="badge b-grn">SHIFT</span>
+    <ul>
+      <li><b>古いやり方</b>: ツール用のPython / TypeScript関数を自作するなど、基盤（配線）の多くをコード内に直接組み込む</li>
+      <li><b>新しいやり方</b>: スキルをMarkdownとして記述し、<b>instructions.mdのようなグローバルルールやメモリー</b>で運用</li>
+      <li>Markdown中心の構成により<b>非常に高い柔軟性</b>が保たれる</li>
+      <li>性能に不満が出たら、コーディングエージェントの「システム進化」と同様に<b>Markdownを書き換えるだけで対応</b>できる</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>変更が「コードの再デプロイ」から「ドキュメントの編集」になる。改善ループの回転が桁違いに速くなります。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 05</span>
+    <h2>一対一対応表: コーディングエージェントの構成要素 ≒ 本番エージェント<small>エージェントエンジニアリングのコンポーネントはそのまま翻訳できる</small></h2>
+    <span class="badge b-main">MAPPING</span>
+    <table class="tbl">
+      <tr><th>ハーネスの構成要素</th><th>従来の本番エージェントでの対応物</th><th>役割</th></tr>
+      <tr><td><b>Rules（ルール）</b></td><td>システムプロンプトと完全に同じもの</td><td>エージェント全体の振る舞い規定</td></tr>
+      <tr><td><b>Sub-agents（サブエージェント）</b></td><td>委任を行うマルチエージェントワークフロー</td><td>タスクの分割と委譲</td></tr>
+      <tr><td><b>MCP Tools</b></td><td>外部システムとの接続</td><td>ツール・サービス連携</td></tr>
+      <tr><td><b>Skills（スキル）</b></td><td>ワークフロー（従来のツールの多くを置き換え）</td><td>手順の再利用可能なパッケージ</td></tr>
+      <tr><td><b>Hooks（フック）</b></td><td>ガードレール</td><td>ツール呼び出し毎・会話の開始/終了時に監視・ブロック</td></tr>
+    </table>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>この対応表が動画の背骨です。「CLAUDE.mdで鍛えたあの手法、うちのカスタマーサポートagentにも使えるんだ」と読み替えられます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>プラットフォーム選択: 自作 vs マネージド<small>デプロイと改善パイプラインを誰が管理するか</small></h2>
+    <span class="badge b-grn">PLATFORM</span>
+    <ul>
+      <li>Markdownでスキルやルールを作る場合、<b>それらを束ねて接続するシステム</b>が必要</li>
+      <li>デプロイやハーネスエンジニアリングのパイプラインを<b>自前管理したいなら自作も可能</b>（全く問題なし）</li>
+      <li>ただ多くの場合、<b>プラットフォーム利用の方が現実的</b></li>
+      <li>本動画のデモはすべて<b>LangChainのManaged Deep Agents</b>＋<b>LangSmith</b>で構築（本番で何度も機能を実証済み）</li>
+      <li>手法自体は<b>どの構築方法でも適用可能</b>な汎用なもの</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>LangChainは2年以上前の初投稿動画から使い続ける由縁あるフレームワーク。「常に最先端を走り続けている」のが理由だそうです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>実装の軽さ: agent.pyはわずか30行<small>ガードレールもツールもスキルも、すべてMarkdownで</small></h2>
+    <span class="badge b-main">ARCHITECTURE</span>
+    <ul>
+      <li>1〜2年前はガードレール・ツール・システムプロンプト構築に<b>膨大なコード</b>が必要だった</li>
+      <li>現在は<b>エージェント定義はたった30行</b>のagent.pyで完了</li>
+      <li>フォルダルートの<b>instructions.mdは自動読込</b>——コーディングエージェントのCLAUDE.md / AGENTS.mdと同じ仕組み</li>
+      <li><b>skillsフォルダ</b>は.claudeや.codexフォルダのような役割</li>
+      <li>LangChainが裏側で統合し、ローカル開発〜本番デプロイを簡単にパッケージ化</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「見覚えがある」という人はコーディングエージェントユーザー。その違和感のなさこそが転用のしやすさの証拠です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 08</span>
+    <h2>LOOP 1（メモリー）: 本番で迷ったら人間に聞く仕組み<small>エスカレーション受信箱と教訓の記録</small></h2>
+    <span class="badge b-grn">CORE LOOP 1</span>
+    <p class="body">どんな本番エージェントにも必要なのが、稼働中に教訓を学べる仕組み。ユーザーとの対話でエージェントが苦戦したら、それを検知して<b>不確実な状況を人間へエスカレーション</b>できるようにする。そのための「チームの受信箱（インボックス）」を用意し、人間が正しい答えを与えると、エージェントがそれを<b>教訓として確実に記録</b>する。記録はLangChainの呼ぶところの<b>Context Hub</b>に蓄積され、後からいつでも取り出せる——「この状況は前も対応したな。人間チームはこう修正してくれた。だから今回はこう答えよう」という推論ができるようになる。</p>
+    <div class="flow">
+      <div class="step"><b>1. 不確実性の検知</b>エージェントが迷ったら完全停止せずサポートを継続しつつ表面化</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>2. チーム受信箱へ</b>修正を待つ案件として人間にエスカレーション</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>3. 教訓を記録</b>人間の修正をメモリーに保存し次回に活用</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>LLMはハルシネーションを起こす一方、<b>不確実な点を表面化させる能力には驚かされる</b>——この性質を学習装置に変える発想が鍵です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>Context Hub: 教訓のナレッジベース化<small>全件を文脈に放り込まない検索戦略</small></h2>
+    <span class="badge b-main">MEMORY DESIGN</span>
+    <ul>
+      <li>教訓の用途は「顧客・ユーザーとの重要な状況への対応」を集めた<b>ナレッジベースの構築</b></li>
+      <li>人々のエージェントの使い方には<b>共通点が多い</b>——過去の教訓が将来に効く</li>
+      <li>当然ながら<b>効率的な検索戦略</b>を採用し、すべての教訓をメイン指示の文脈に詰め込むわけではない</li>
+      <li>エージェントが向上するにつれ、<b>エスカレーション数は時間とともに減少</b>——人間の負担が続かない設計</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「人間の管理者が永遠に世話を焼き続ける」わけではない点が重要。最初だけ手がかけて、あとは減っていく構造です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 10</span>
+    <h2>ライブデモの舞台: Dynamisメンバーヘルプデスク<small>すべて実際に受けた質問に基づくテストデータ</small></h2>
+    <span class="badge b-grn">DEMO SETUP</span>
+    <ul>
+      <li>対象は氏が実際に運用する<b>Dynamisメンバーヘルプデスクのデモ版</b>（カスタムダッシュボード）</li>
+      <li>コミュニティメンバーが<b>Archonやコース内容</b>について質問してくる状況を模擬</li>
+      <li>質問は<b>数週間前に実際に受けたもの</b>に基づくシンプルなデータセット</li>
+      <li>プロダクションバンドルのmemoryフォルダには、エスカレーション事例と<b>コアルール（agents.md）</b>が蓄積されていく</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「デモ用の都合のいいデータ」ではなく実運用由来の質問で検証している点が説得力です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>デモ①: 不確実性を正直に表面化<small>「断定するには十分な情報がありません」</small></h2>
+    <span class="badge b-main">DEMO 1</span>
+    <ul>
+      <li>メンバー「ニーナ」になりきり質問: <b>plan.mdの修正をローカルコミットしてArchonワークフローを実行したら古いコマンドテキストが使われた</b>——なぜ？</li>
+      <li>エージェントは即回答するが、<b>自信を持って断定できない</b>と明示</li>
+      <li>メモリ検索→診断スキル読込→メモリ更新まで<b>約10秒</b>で完了</li>
+      <li>チーム受信箱の案件は<b>4件→5件に増加</b>。質問内容とエージェントの回答が人間の承認待ちで並ぶ</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>完全停止して人間を待つのではなく、<b>サポートを続けながら不確実性を申告</b>する挙動が理想形として示されます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>デモ②: 人間の修正が10秒で学習に変わる<small>共有コアルール＋ユーザー個別メモリの二重更新</small></h2>
+    <span class="badge b-grn">DEMO 2</span>
+    <ul>
+      <li>正解は既に判明: <b>Archonはorigin mainからワークツリーを作る</b>ため、git pushして再実行すればよい</li>
+      <li>修正を送信して確定すると、<b>わずか10秒後</b>に新しい共有メモリ作成が確認できる</li>
+      <li><b>core agents.mdが更新</b>され、ニーナのプライベートメモリも更新</li>
+      <li>人間は「訂正する」か「正しく対応できたと認める」かを選択——どちらでもエージェントはメモリを更新</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>教訓の反映が「次のスプリント」ではなく<b>その場で10秒</b>。この即時性がループ1の威力です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>デモ③: 似て非なる質問へ自信を持って回答<small>記憶からの推論とユーザー別メモリ分離</small></h2>
+    <span class="badge b-main">DEMO 3</span>
+    <ul>
+      <li>次は別メンバー「オマール」: <b>Archon実行は成功してPRが作れたが、今朝の3コミットが差分に含まれない。バグか？</b></li>
+      <li>ニーナのケースと<b>全く同じではないが、教訓から推論できる程度に類似</b></li>
+      <li>今回は「不確実です」ではなく<b>「バグではない可能性が高い。それがArchonの仕組みそのもの」</b>と回答</li>
+      <li>Context Hubにはユーザーごとのメモリも確認できる——<b>ガードレールが分離を保証</b>し、ユーザー間でメモリが混線・閲覧されることはない</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>単純な再現ではなく<b>記憶ベースの汎化</b>を見せるのがこのデモの狙い。プライバシ面の設計言及もポイントです。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 14</span>
+    <h2>LOOP 2（ハーネス改善）: LangSmith Engineが失敗から修正案を作る<small>本番トレースという「無視できない最大の情報の宝庫」</small></h2>
+    <span class="badge b-grn">CORE LOOP 2</span>
+    <p class="body">メモリはContext Hubの重要部分だが、ハーネスの本体はコアとなるワークフローと指示。ループ2では、LangSmithが本番実行の<b>トレースデータをすべて取得</b>し、Engineがそれを収集して<b>実際のデータで発生した失敗に基づく改善提案</b>を自動生成する。提案には失敗の詳細説明が付き、必要ならLangSmithのトレースで証拠を確認できる——問題発生時にモデルが何をしていたかを会話単位で追跡可能。そしてお気に入りの部分というのが一番下の<b>修正案</b>: 「instructions.mdをこのように変更すべき」という具体的な差分を提示してくれる。コーディングエージェントの「システム進化」と同じで、ハーネス全体（ルール・ガードレール・指示）を調査し「この問題が二度と起きないように何を調整すべきか」を見つけ出す。提案は簡潔——文脈を詰め込んでルールを肥大化させないため。</p>
+    <div class="flow">
+      <div class="step"><b>1. トレース収集</b>LangSmithが本番実行をすべて記録</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>2. 失敗分析</b>Engineが実データの失敗を検出・説明</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>3. 修正案生成</b>instructions.mdなどへの変更案を提案</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>4. 承認して適用</b>人間が承認すれば即座に本番反映</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「本番のトレースは最大の情報源なのに、ほとんどの人が無視している」——ここを自動化に載せたのがこのエンジンです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>制御は人間が維持: 自律改修はさせない<small>承認ループに必ず人が関わる</small></h2>
+    <span class="badge b-main">STAYING IN CONTROL</span>
+    <ul>
+      <li>「適用」クリックで即本番反映＝<b>人間の監視下でのリアルタイム自己修復</b></li>
+      <li>ただしエージェントの<b>完全に自律的な自己改善は望まない</b>——制御を失い、どこへ向かうか分からなくなる</li>
+      <li>記憶・教訓・スキル・指示の変更すべてで<b>人間が一つひとつ関与</b></li>
+      <li>コーディングエージェントと同様に<b>プルリクエスト</b>でルールやスキルを更新する運用と同じことを、Managed Deep Agents＋LangSmith上で実現</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「エージェントに自分のハーネスをいじらせる」のと「無人で改変を許す」のは別物。動画全体で最も重要なテーマです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>バージョン管理・ロールバック・どこでもデプロイ<small>コミット履歴でハーネスの状態を完全掌握</small></h2>
+    <span class="badge b-grn">OPS</span>
+    <ul>
+      <li>Managed Deep Agentsには<b>コミット履歴そのもの</b>が存在——ハーネス各パーツの状態を逐把握</li>
+      <li>必要に応じて<b>バージョンの昇格やロールバック</b>が可能</li>
+      <li>修正を適用して結果が悪化しても<b>致命傷にならない</b>——システム全体を完全制御</li>
+      <li><b>Slack環境にもデプロイ済み</b>で、そこから直接Managed Deep Agentと対話可能</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>改善を回すほど履歴が積み上がるのに、いつでも前の状態に戻せる。安心して実験できる土台ですね。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 17</span>
+    <h2>実測結果: 14問中4問 → 14問中13問<small>2つのループが到達した精度</small></h2>
+    <span class="badge b-main">THE RESULTS</span>
+    <div class="score">
+      <div class="box"><div class="val">4 / 14</div><div class="lbl">初期ルール・スキルのみの正答数</div></div>
+      <div class="box after"><div class="val">13 / 14</div><div class="lbl">学習ループ＋改善適用後の正答数</div></div>
+    </div>
+    <ul>
+      <li>デモ用に用意した<b>14の質問</b>（実運用由来）で初期エージェントをテスト→<b>4問のみ正解</b></li>
+      <li>LangSmithのトレース機能による学習プロセスを経て、エージェント提案の改善を適用→<b>13問正解</b>へ</li>
+      <li>LLMは常に完璧とは限らず<b>100%の精度は出せない</b>——それでも2つのループで「非常に近い」ところまで到達</li>
+      <li>人間がループ内で承認しつつ、<b>エージェント自身にハーネスエンジニアリング</b>させている結果</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>4/14→13/14は派手なモデル差し替えではなく、<b>ハーネス改善だけで</b>達成されているところが本質です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 18</span>
+    <h2>まとめ: ハーネスエンジニアリングは一度きりの仕事ではない<small>特注ハーネス×モデル自由×継続改善×完全コントロール</small></h2>
+    <span class="badge b-grn">TAKEAWAY</span>
+    <ul>
+      <li>最大の教訓: <b>ハーネスエンジニアリングは継続的な営み</b>であり、それこそがManaged Deep Agentsの利点</li>
+      <li>エージェントに<b>特注のハーネス</b>を与え、<b>どのモデルでも使用可能</b></li>
+      <li>LangSmith Engineを重ねるで<b>ハーネスの継続的改善</b>が可能に——その間も常に<b>あなたが完全コントロール</b>を維持</li>
+      <li>LangSmithの試用リンクは概要欄にあり、コード<b>「ColeM」で50ドルのクレジット</b>が付与される</li>
+    </ul>
+    <div class="flow">
+      <div class="step"><b>教訓①</b>本番エージェントもコーディングエージェントと同じMarkdownハーネスで構築する</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>教訓②</b>メモリーとトレースの2ループでミスを教訓に変える</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>教訓③</b>すべての変更は人間の承認を通して本番に反映する</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「良いエージェントを作る」ではなく<b>「良くなり続けるエージェントの回路を作る」</b>。それがこの動画が教える設計思想です。</div></div>
+  </div>
+
+</div>
+
+<div class="foot">
+  出典: <a href="https://www.youtube.com/watch?v=TVhhmhvCovg" target="_blank" rel="noopener">Let Your AI Agent Do ITS OWN Harness Engineering (Here's How)（Cole Medin）</a><br>
+  本インフォグラフィックは動画内容を要約・整理したもので、LangChain Managed Deep Agents・LangSmith・Archon等の仕様・提供条件は公式サイトをご確認ください。本動画はLangChainの協賛を含みます。<br>
+  Generated: 2026-10-21 / AI News Infographic
+</div>
+
+</div>
+</body>
+</html>

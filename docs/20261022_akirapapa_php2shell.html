@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHP重大脆弱性(PHP2Shell)徹底整理 | 暫定策・適用・侵害チェック【あきらパパ】</title>
+<style>
+  :root{
+    --bg:#F5F2F0;
+    --panel:#FFFFFF;
+    --panel2:#F0EBE8;
+    --line:#DBD3CE;
+    --ink:#241F1E;
+    --sub:#6E635F;
+    --main:#8A1C12;
+    --main-deep:#5C0F08;
+    --main-soft:#F7E8E4;
+    --char:#43484D;
+    --char-deep:#292C30;
+    --char-soft:#EBECEE;
+    --slate:#585D62;
+    --slate-deep:#33373B;
+    --slate-soft:#ECEDEF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#FAF7F5 0%,#F3E9E5 55%,#EDEBEA 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(138,28,18,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(92,15,8,.08);color:var(--main-deep);border:1px solid rgba(138,28,18,.45);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--main)}
+  .hero h1 .au{color:var(--char-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(138,28,18,.06);border:1px solid rgba(138,28,18,.3);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--char);color:#EDEEF0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:var(--char-deep)}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(138,28,18,.3)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(36,31,30,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#A32718,#5C0F08);color:#FBEDE9}
+  .b-char{background:linear-gradient(135deg,#565C61,#292C30);color:#EDEEF0}
+  .b-slate{background:linear-gradient(135deg,#6B7076,#33373B);color:#ECEDEF}
+  .b-line{background:rgba(110,99,95,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--main-deep);border-color:rgba(92,15,8,.5)}
+  .pill.warn{color:var(--char-deep);border-color:rgba(41,44,48,.5)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#262022;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#262022}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--main-soft);border:1px solid rgba(138,28,18,.25);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--char);color:#EDEEF0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:#2B2725}
+  .yomogi .name{font-weight:700;color:var(--main-deep);margin-right:4px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#262022;background:#FDFBFA}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FDFBFA;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#262022}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--main);font-weight:800}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">SECURITY ALERT / PHP (PHP2Shell)</span>
+  <h1><span class="hl">PHP重大脆弱性「修正版までに何をする？」</span>——<br><span class="au">棚おろし・暫定策・パッチ適用・侵害チェックを全部整理【あきらパパ】</span></h1>
+  <p>2026年10月21日、国家サイバー統括室がPHPの重大な脆弱性について注意喚起を発表。「公開しているウェブサイトでPHPを使っているか確認し、日本時間の夜13時に公開される修正パッチをすぐ当てられるよう準備せよ」という内容だ。動画では<b>結論から「本命はパッチ、それまでの対策は時間稼ぎ」</b>と断じ、パッチ適用後も侵害チェックで足跡を調べるまでが作業だとする、<b>4つの時間軸</b>による完全な道筋を示す。</p>
+  <div class="meta">
+    <span>チャンネル: あきらパパ</span>
+    <span>対象: PHP / CERT EU / Cloudflare / PHP-FPM</span>
+    <span>構成: ①現状把握 ②棚おろし ③暫定策 ④適用と侵害チェック</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">「夜の城」に例えて最後まで話す回です。城の門（公開サーバー）だけでなく<b>すべての門を数える</b>こと、そして城主（開発者）の責任はパッチを当てて終わりではなく<b>泥棒の足跡調査まで</b>。CARD 01〜05で現状、06〜09で棚おろし、10〜13で暫定策、14〜18で適用と事後チェックを見ていきましょう。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>全体像サマリ: 本命はパッチ、暫定策は時間稼ぎ<small>作業は「4つの時間」に分けて整理する</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">国家サイバー統括室が10月21日に注意喚起を出したのは、PHPに<b>CVSS 9.2（10点満点）の重大脆弱性2件</b>が見つかったため。修正版は日本時間での公開予定を待つが、<b>攻撃は修正版より先に始まっている</b>。動画の結論は明快で、①<b>今すぐ棚おろし</b>（PHPが動いている場所を全部洗い出す）→②<b>修正版までは暫定策</b>（時間稼ぎ）→③<b>修正版が出たらすぐ適用</b>→④<b>その後に侵害チェック</b>、の4段階。例え話は「夜の城」。PHPは城、その城に重大な穴が見つかり、新しい壁材は23時に届く。それまでは柵と堀（暫定策）でしのぐ、という絵で最後まで話が進む。</p>
+    <div class="flow">
+      <div class="step"><b>① 今すぐ</b>棚おろし——全ての「門」を数える</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>② 修正版まで</b>暫定策——セッション進捗オフ・WAF・堀</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>③ 修正版公開後</b>即適用——4ステップ手順</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>④ 適用後</b>侵害チェック——足跡を調べて初めて終わり</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「パッチを当てたら終わりではありません」——この一言が全体の骨格です。勝負は<b>修正版が出てからどれだけ早く当てられるか</b>。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>公式発表の確定事項: 脆弱性2件、CVSSはどちらも9.2<small>修正版は日本時間での公開予定、影響バージョンはその時に判明</small></h2>
+    <span class="badge b-main">OFFICIAL</span>
+    <ul>
+      <li>PHP公式サイトが10月に<b>事前の予告（プレアナウンス）</b>を公開——重大な脆弱性が<b>2件</b></li>
+      <li>深刻さを示す <b>CVSSは2件とも9.2</b>（10点満点）という極めて高いスコア</li>
+      <li>修正版は<b>日本時間の夜13時の公開予定</b>。影響するバージョンと修正済みバージョンはその時に発表される</li>
+      <li>詳しい中身が漏れたり<b>悪用が見つかったりしたら前倒し公開もあり得る</b>と明記</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>公式はまだ中身を公開していません。だから動画では<b>「PHP公式の発表」と「報道・セキュリティ会社の情報」を明確に分けて</b>扱います。この切り分けが今回の重要ポイント。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>報道・セキュリティ会社情報: PHP2Shell、リモートコード実行の恐れ<small>EUのCERTは「ログインなしでサーバー上でプログラムを動かされる可能性」</small></h2>
+    <span class="badge b-char">PHP2SHELL</span>
+    <ul>
+      <li>報道機関やセキュリティ会社の情報として、この脆弱性は「<b>PHP2Shell</b>」と呼ばれている</li>
+      <li>ヨーロッパの緊急事態対応機関 <b>CERT EU は「ログインなしで、外部からサーバー上でプログラムを動かされる恐れがある」</b>と指摘——いわゆる認証前リモートコード実行の怖さ</li>
+      <li>本来は10月22日に公開される予定だった情報が、<b>その前にネットに出回ってしまった</b></li>
+      <li>つまり攻撃者は詳細を把握した状態で修正版を待っている可能性がある</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>情報漏れによって<b>防御側と攻撃側の持ち時間が同じ</b>になってしまいました。だから「待つ理由はない」のです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>攻撃はもう始まっている: Cloudflareが21日午後に観測<small>修正版の公開を待たず、悪用が先行</small></h2>
+    <span class="badge b-main">IN THE WILD</span>
+    <ul>
+      <li>Cloudflareは<b>日本時間21日午後4時43分頃から攻撃が出始めた</b>ことを観測</li>
+      <li>修正版が公開される<b>より前に攻撃が始まっている</b>ということ</li>
+      <li>修正版として報じられているのは<b>8.2から8.5までの4つの系列の新しい版</b></li>
+      <li><b>8.1より前はサポートが終了</b>しているため、公式の修正版は出ない見込み</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「パッチが出てから考えよう」は通用しません。<b>城に壁材が届く前から、泥棒はもう塀の外にいる</b>状態です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>自分事かどうか: サーバーサイド言語の約7割がPHP<small>「関係ない」と言い切れる人は少ない</small></h2>
+    <span class="badge b-slate">SCOPE</span>
+    <ul>
+      <li>サーバー側の言語が分かるウェブサイトのうち、<b>およそ7割がPHP</b>と言われている</li>
+      <li>WordPress などの CMS や受託開発のレガシー環境を含めれば<b>対象は非常に広い</b></li>
+      <li>公式に確定している情報はまだわずか——でも<b>「待つ理由はない」</b></li>
+      <li>個人サイト・社内システム・゙テナのどこかに PHP が潜んでいないか、まずは確認から</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>7割という数字が意味するのは、<b>攻撃者が「数撃てば当たる」スキャンを回せば広く命中する</b>ということ。標的型でなくても被害に遭います。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>例え話: 夜の城と、全部の門を数える作業<small>PHPは城、修正版は23時に届く新しい壁材</small></h2>
+    <span class="badge b-char">METAPHOR</span>
+    <p class="body">動画を貫く例えはこうだ。<b>夜の城（PHP）の塀に重大な穴が見つかった。新しい壁材（修正版）は23時に届く。それまでは柵と堀（暫定策）でしのぐ。</b>そして重要なのは、数えるべきは<b>表の門（公開Webサーバー）だけではない</b>こと。裏門、勝手口、すべての門——つまり PHP が動いている場所を全部洗い出すのが最初の作業になる。この「城」の絵を頭に置くと、以降の暫定策（堀を掘る・勝手口を閉める）と侵害チェック（城内の足跡を調べる）の位置づけがすべてつながる。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>セキュリティ対応を抽象論ではなく<b>「自分の城を守る物理的な作業」として捉え直す</b>と、作業の順番が自然に決まります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>第2章・今すぐやること: 棚おろし（インベントリ）<small>公開Webサーバー以外も、コンテナ・CI環境・開発PCまで全部</small></h2>
+    <span class="badge b-main">INVENTORY</span>
+    <ul>
+      <li>対象は<b>公開しているWebサーバーだけではない</b>——コンテナ（CI環境含む）、開発用パソコンまで、PHPが入っている場所を全部洗い出す</li>
+      <li>白を言えば「表の門だけじゃなく<b>全ての門を数える</b>」作業</li>
+      <li>洗い出し結果はリスト化し、<b>それぞれの現在前（稼働中バージョン）</b>を記録する</li>
+      <li>このリストがあるからこそ、修正版公開後に<b>即座に全てに適用できる</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>パッチ適用の速度は<b>棚おろしの精度</b>で決まります。見落とした門が、まさに破られる門になる。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>落とし穴: ターミナルのバージョンとWebサーバーのPHPは別物<small>確認は必ず「Web経由」で行う</small></h2>
+    <span class="badge b-char">PITFALL</span>
+    <ul>
+      <li>ターミナルで <span class="pill">php -v</span> 的に確認したバージョンと、<b>Webサーバーが実際に使っているPHPは設定が別</b>になっていることがある</li>
+      <li>なので確認は<b>Web経由</b>で行うのが正解</li>
+      <li>レンタルサーバーやマネージドサービスなら、<b>事業者に適用の予定を確認</b>する</li>
+      <li>ここで「実際に動いている版の本当の番号」を掴むのが目的——表示上の数字を鵜呑みにしない</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>よくある事故パターンです。「CLIは新しかったけど Web の PHP-FPM は古いまま」——<b>攻撃者は Web の口から入る</b>ので、そこを確認しないと意味がありません。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>8.1以前を使っているなら: ここが一番の山場<small>公式の修正版は届かない——系列アップの計画を今すぐ</small></h2>
+    <span class="badge b-slate">EOL BRANCH</span>
+    <ul>
+      <li>8.1より前の版は<b>サポートが終了</b>しており、公式の修正版は出ない見込み</li>
+      <li>使っているなら、<b>8.2以降への系列ごとのアップグレード計画を今すぐ立てる</b>のが最優先</li>
+      <li>ただし Linux のディストリビューションによっては、<b>古い版にも修正を当てて配布（バックポート）する</b>ことがある</li>
+      <li>今後、ディストリビューション側のお知らせも併せて確認すること</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>EOL 版を抱えたまま今回を乗り切る選択肢は実質<b>「隔離」か「系列アップ」の二択</b>です。見送りは選択肢に入りません。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 10</span>
+    <h2>第3章・暫定策①: セッションのアップロード進捗をオフに<small>PHP-FPMならプールごとの設定に固定して上書きを防ぐ</small></h2>
+    <span class="badge b-main">MITIGATION 1</span>
+    <ul>
+      <li>よく紹介される暫定策は、PHPの設定で<b>セッションのアップロード進捗（session.upload_progress）という機能をオフ</b>にすること</li>
+      <li>PHP-FPM なら<b>プールごとの設定</b>として固定すると、後から他のファイルで上書きされない</li>
+      <li>設定したら<b>再起動</b>。一時的な確認ページを Web 経由で開き、オフになっているのを確認</li>
+      <li>確認が済んだら<b>そのページはすぐ消す</b>——情報を与えるページを残しておかない</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>設定→再起動→Web経由で確認→確認ページ削除、までが<b>1セット</b>です。確認ページの放置は別のリスクになります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>正直な話: 設定では守れない、唯一の対策はパッチ<small>PHPコア開発者の見解——ファイルアップロード停止設定も効かない</small></h2>
+    <span class="badge b-char">HARD TRUTH</span>
+    <ul>
+      <li>PHP の中心的な開発者は<b>「設定では守れない。唯一の対策はパッチ」</b>と明言している</li>
+      <li>ファイルのアップロードを止める設定も<b>効かない</b>とされている</li>
+      <li>理由は<b>リクエストの中身は、その設定が効くより前に読み込まれてしまう</b>から</li>
+      <li>つまり暫定策はあくまで<b>「パッチ適用までの時間稼ぎ」の代わりにはならない」</b>——本命を忘れない</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>ここで動画が正直に見解を分けるのは信頼できるポイント。<b>「設定したから大丈夫」という安心が一番危険</b>です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>暫定策②: 城の外の堀——WAF（Cloudflare）を効かせる<small>ただしオリジンIPが知られていたら裏の勝手口から入られる</small></h2>
+    <span class="badge b-slate">MITIGATION 2</span>
+    <ul>
+      <li>Cloudflare は<b>無料プランも含めて緩和のルール</b>を用意している</li>
+      <li>ただしサーバーの本当の住所（<b>オリジンのIPアドレス</b>）が知られていたら、WAFを通らず<b>裏の勝手口から直接入られてしまう</b></li>
+      <li>なので <b>80番・443番ポートは Cloudflare のIPアドレスからだけ受け付ける</b>ように設定</li>
+      <li>「石垣（WAF）は勝手口を塞いで初めて効く」——このセットで初めて意味がある</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>WAFを入れた気になっていても、オリジン直撃（IP指定アクセス）を許していたら<b>素通り</b>されます。ポートの受付元制限までが堀です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>さらに攻めたい場合: マルチパートPOSTを止める・最後は切り離し<small>止めたら必ずフォームの動作確認を</small></h2>
+    <span class="badge b-slate">MITIGATION 3</span>
+    <ul>
+      <li>アップロードを使わない経路では、<b>マルチパートのPOSTリクエスト自体を止める</b>という手もある</li>
+      <li>ただし<b>フォームが動かなくなる</b>ことがあるので、止めたら必ず動作を確認する</li>
+      <li>どうしても守れないなら、<b>修正版が出るまでインターネットから切り離す</b>のも選択肢</li>
+      <li>判定: 暫定策は時間稼ぎ。石垣は勝手口を塞いで初めて効く</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「動かないサイト」も被害ですが、「踏み台にされるサーバー」はより重い被害。<b>切る勇気</b>も含めて判断しましょう。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 14</span>
+    <h2>第4章・修正版が出たら: 入手元をこの順で確認<small>「無い」場合は待つだけではなく次の手を打つ</small></h2>
+    <span class="badge b-main">PATCH SOURCES</span>
+    <p class="body">修正版が公開されたら、更新パッケージが出ているかを<b>①PHPの公式 → ②OSのパッケージ → ③Dockerのイメージ → ④レンタルサーバー等の事業者</b>の順に確認する。外部のリポジトリーでは<b>当日の更新がない</b>という報告もある。自分の使っている入手元に出ていないなら、ただ待つのではなく、<b>他の入手先を探すか、暫定策を継続する</b>判断が必要になる。</p>
+    <table class="tbl">
+      <tr><th>確認順</th><th>入手元</th><th>ポイント</th></tr>
+      <tr><td>1</td><td>PHP 公式</td><td>影響バージョン・修正版の正確な番号を最初にここで確認</td></tr>
+      <tr><td>2</td><td>OS パッケージ</td><td>ディストリのバックポート配布にも注目（CARD 09）</td></tr>
+      <tr><td>3</td><td>Docker イメージ</td><td>ベースイメージの更新が出るまで古いままになりがち——タグ確認</td></tr>
+      <tr><td>4</td><td>ホスティング事業者</td><td>レンタルサーバー・マネージドは適用予定を事業者に確認</td></tr>
+    </table>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「自分の入手元に今日は無かった」で止まらない。<b>暫定策を継続する判断</b>までがセットです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>パッチ適用の手順は4ステップ<small>当てて終わりではない——再起動・確認・動作試験まで</small></h2>
+    <span class="badge b-main">APPLY 4 STEPS</span>
+    <div class="flow">
+      <div class="step"><b>① 適用する</b>修正版を各環境へ当てる</div>
+      <div class="step"><b>② 再起動する</b>PHP-FPM / Webサーバーを確実に再起動</div>
+      <div class="step"><b>③ バージョン確認</b>Web経由で新しい版の番号を確かめる</div>
+      <div class="step"><b>④ 動作試験</b>ログイン・問い合わせフォーム等の大事な画面が動くか試す</div>
+    </div>
+    <ul>
+      <li>③は CARD 08 と同じ教訓——<b>実際に動いている版をWeb経由で</b>確認</li>
+      <li>④は「当てたけど実は壊れていた」を防ぐ最後の砦</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>④の動作試験は、<b>パッチ後のアクセスログ確認</b>（次カード）と同時に進めると効率的です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>第5章・当てた後に確かめること: 侵害チェック（足跡調査）<small>修正版より先に攻撃が始まっていた——当てたら終わりではない</small></h2>
+    <span class="badge b-char">COMPROMISE CHECK</span>
+    <ul>
+      <li>新しい版に変えた後、<b>夜の間に誰かが入っていないか足跡を調べる</b></li>
+      <li>アクセスログ: <b>アップロードがあるはずのない場所へのマルチパートPOST</b>、特に「<b>PHPセッション・アップロード進捗</b>」の文字を含むもの</li>
+      <li><b>最近追加・変更された .php ファイル</b>（見覚えのないWebシェルの痕跡）</li>
+      <li><b>見覚えのない管理ユーザー</b>、クーロンの予定外の通信も確認</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>ここが一番忘れやすい。攻撃はパッチ公開<b>前</b>から始まっていたので、<b>「当てた版に変えても、すでに入られていたら意味がない」</b>のです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 17</span>
+    <h2>まとめ: 結論の4行<small>最初の結論に戻る</small></h2>
+    <span class="badge b-slate">SUMMARY</span>
+    <ul>
+      <li><b>本命はパッチ</b>——暫定策の設定は「守れない」と開発者自身が言っている</li>
+      <li><b>暫定策は時間稼ぎ</b>——その時間で準備を整える</li>
+      <li><b>石垣（WAF）は勝手口（オリジンIP直撃）を塞いで初めて効く</b></li>
+      <li><b>当てた後に足跡を調べる</b>——パッチ適用で終わりではない</li>
+      <li>勝負は<b>修正版が出てからどれだけ早く当てられるか</b>——だから今のうちに門を数えて手順を決めておく</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>4行に圧縮すると、<b>「数える → しのぐ → 当てる → 調べる」</b>。夜の城の物語そのものです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 18</span>
+    <h2>今すぐの行動リスト<small>出典は動画の概要欄にまとめられています</small></h2>
+    <span class="badge b-line">ACTION LIST</span>
+    <ul>
+      <li><span class="pill up">今日</span> PHP の設置場所を棚おろし（Web・コンテナ・CI・開発PC）</li>
+      <li><span class="pill up">今日</span> 稼働中バージョンを<b>Web経由</b>で確認・リスト化</li>
+      <li><span class="pill warn">今日〜明日</span> session.upload_progress をオフ（プール固定）＋再起動＋確認</li>
+      <li><span class="pill warn">今日〜明日</span> WAFの緩和ルール確認と 80/443 の受付元を Cloudflare IP に制限</li>
+      <li><span class="pill warn">明日</span> 修正版公開後に4ステップ適用 → ログで足跡調査</li>
+      <li>8.1以前の環境は<b>8.2以降への系列アップ計画</b>を即日着手</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「一緒に乗り切りましょう」——出典は動画の概要欄にまとまっています。まずは<b>門を数える</b>ところから。</div></div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <p>出典: あきらパパ「【PHP2Shell】PHP重大脆弱性、修正版までに何をする？暫定策・適用・侵害チェックを全部整理」（2026年10月21日公開）<br>
+  <a href="https://www.youtube.com/watch?v=BEfrYy524WE" target="_blank" rel="noopener">https://www.youtube.com/watch?v=BEfrYy524WE</a></p>
+  <p>本ページは動画内容を要約・整理したインフォグラフィックです。技術的な判断は公式発表（php.net）および各事業者の情報をご確認ください。</p>
+</div>
+
+</div>
+</body>
+</html>

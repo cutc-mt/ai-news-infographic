@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIが見つけた2つの穴——PHPの深刻な脆弱性とeMudhra証明書の鍵漏れ｜ずんめたラボ</title>
+<style>
+  :root{
+    --bg:#F3F7FB;
+    --panel:#FFFFFF;
+    --panel2:#EAF2F9;
+    --line:#CBDCEA;
+    --ink:#33241A;
+    --sub:#6E5A4B;
+    --brown:#5D4033;
+    --brown-deep:#3E2A1E;
+    --brown-soft:#EFE7E0;
+    --sky:#0E9BD8;
+    --sky-deep:#0B6FA3;
+    --sky-soft:#E1F1FA;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#3E2A1E 0%,#4A3325 55%,#0B6FA3 160%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden;color:#F4FAFE}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(14,155,216,.35),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(14,155,216,.25);color:#DDF1FC;border:1px solid rgba(14,155,216,.7);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px;color:#FFFFFF}
+  .hero h1 .hl{color:#7DD3F5}
+  .hero p{color:#DDEBF5;font-size:14px;max-width:840px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:#C9DEEC}
+  .hero .meta span{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(255,255,255,.1);border:1px solid rgba(125,211,245,.45);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--sky);color:#0B2A3A;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:#EAF6FD}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(125,211,245,.45)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(51,36,26,.07)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--brown-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-brown{background:linear-gradient(135deg,#6D4C41,#3E2A1E);color:#F4EDE7}
+  .b-sky{background:linear-gradient(135deg,#38BDF8,#0B6FA3);color:#F2FAFF}
+  .b-warn{background:linear-gradient(135deg,#B45309,#7C2D12);color:#FBEEDC}
+  .b-line{background:rgba(110,90,75,.1);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--sky-deep);border-color:rgba(11,111,163,.5)}
+  .pill.warn{color:#8A4B18;border-color:rgba(138,75,24,.45)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#41301F;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--sky-deep)}
+  .card p.body{font-size:13.5px;color:#41301F}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--sky-soft);border:1px solid rgba(11,111,163,.35);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--brown);color:#F4EDE7;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:#2E4432}
+  .yomogi .bubble{color:#24404E}
+  .yomogi .name{font-weight:700;color:var(--brown-deep);margin-right:4px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sky-deep);font-size:12px}
+  table.tbl td{color:#41301F;background:#FFFFFF}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FFFFFF;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#41301F}
+  .flow .step b{display:block;color:var(--brown-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--sky-deep);font-weight:800}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--sky-deep);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">AI × SECURITY / ずんめたラボ</span>
+  <h1><span class="hl">AIが見つけた2つの穴</span>——PHPの深刻な脆弱性と<br>証明書の鍵漏れ、何が起きて自分は何をすればいい？</h1>
+  <p>2026年10月21日夜、PHPに<b>CVSS 9.2（Critical）の脆弱性2件</b>の修正版が公開された翌々日、同じ夜にはインドの認証局<b>eMudhra</b>の窓口が漏れた件も話題に。どちらも<b>発見のきっかけはAI</b>でした。でも「AIが見つけてくれたから安心」では済まない——<b>見つけたのはAI、守るのは人の更新</b>。PHPはサイトを動かす人が急いで直す話、証明書はブラウザを使う全員の話（主なブラウザは対策済み）。自分はどっち側で何をすべきか、18カードで整理します。</p>
+  <div class="meta">
+    <span>チャンネル: ずんめたラボ</span>
+    <span>動画: 【PHP・eMudhra】AIが見つけた2つの穴</span>
+    <span>公開: 2026年10月22日</span>
+    <span>構成: 全18カード</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">「今夜アップデートしてって通知が来たけど……僕のスマホは今夜何かしないといけないの？」——落ち着いて。まずは<b>どっちの話で・どっち側の人間か</b>を切り分けましょう。CARD 01から順に見ていきます。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>全体像サマリ: 今回の教訓は「見つけたのはAI、閉めるのは人」<small>PHP脆弱性と証明書鍵漏れ、2つの穴に共通する3段ロード</small></h2>
+    <span class="badge b-brown">OVERVIEW</span>
+    <p class="body">同じ夜に届いた2つのセキュリティニュース——<b>①PHPの深刻な脆弱性2件（サイトを動かす側の話）</b>と<b>②eMudhra証明書の鍵漏れ（ブラウザを使う全員の話）</b>。どちらも発見にAIが関わっていました。でも安心してはいけない理由は共通しています。<b>見つける道具は攻撃する側も同じように持てる</b>。差がつくのは「見つかってから直すまでの速さ」で、それを決めるのはAIではなく人の更新です。</p>
+    <div class="flow">
+      <div class="step"><b>STEP 1</b>PHPはサイトを動かす人がすぐ更新（持っていない人は見るだけ）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 2</b>証明書は主なブラウザがすでに遮断（ブラウザ任せでOKな部分）</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 3</b>全員、更新を後回しにしない</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「2つもあるの!? 僕はどっちに関係あるの？」——実は両方、でも役割が違う。この3段を頭に入れておくだけで迷わなくなります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>どっちに関係ある？ 役割分担を先に整理<small>「サイトを動かす人」と「見るだけの人」で対応が分かれる</small></h2>
+    <span class="badge b-sky">WHO SHOULD ACT</span>
+    <ul>
+      <li><b>PHPの方</b>→サイトやブログを動かしている人が急いで直す話</li>
+      <li><b>証明書の方</b>→ブラウザを使う全員に関係するが、主なブラウザはもう対策済み</li>
+      <li>スマホやパソコンの中身の話ではないので、端末のアップデートを今夜焦る必要はない</li>
+      <li>ただし開発で使う道具（後述）と「動かす側の知り合い」には連絡を</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「僕みたいにサイトを見るだけの人は、PHPの件で端末に入れる修正はない」んだって。まず自分の立ち位置を確かめるのが第一歩です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>そもそもPHPって何？<small>開いたページを「その場で組み立てて返す」 server-side の仕組み</small></h2>
+    <span class="badge b-brown">BASICS</span>
+    <p class="body">サイトを開いた時、中身をその場で組み立てて返す仕組みの1つ。ブログの記事一覧やネットショップのカートの中身を、アクセスのたびに生成しています。</p>
+    <ul>
+      <li>動画で引用されたW3Techsの調査では<b>サイトの約69.3%がPHP</b>を使用——およそ7割</li>
+      <li>WordPressをはじめ、見ている裏で動いている現場は非常に多い</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「7割なのだ。ほとんどなのだ」——ウェブの土台の言語だからこそ、ここに穴が開くと影響が一気に広がります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>PHPに深刻な脆弱性が2件、日本時間10月21日夜に修正版<small>CVSS 10点満点スケールで9.2、一番上の緊急区分</small></h2>
+    <span class="badge b-warn">CRITICAL</span>
+    <ul>
+      <li>深刻度は<b>CVSS 9.2</b>、最上位の緊急（Critical）区分</li>
+      <li>修正版は日本時間の<b>10月21日夜</b>に公開。例えばPHP 8.5系なら<b>8.5.12</b>へ、8.4系にも修正版（<b>8.4.38.2</b>）が出ている</li>
+      <li>1つ目の穴は<b>メモリが足りなくなった時の後片付け（cleanup）の不具合</b></li>
+      <li>2つ目は<b>片付けたはずの場所に前の利用者のデータが残り、次の人がそれを使ってしまう</b>不具合</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>机の例えが分かりやすい——「片付けたはずの机に前の人の書類が残っていて、次の人が使ってしまう」。残った書類から前の人の秘密が見えちゃうのです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>見つけたのはAI——Wizと研究者、3つのAIツール<small>最初の発見は「誰でも使えるAI」だけだった</small></h2>
+    <span class="badge b-sky">DISCOVERY</span>
+    <ul>
+      <li>発見者はセキュリティ会社<b>Wiz</b>の研究者。OpenAIも一緒に見つけたと说明している</li>
+      <li>Wizは使ったAIを3つ挙げている: 自社の<b>Wiz Atlas</b>、Googleの<b>Gemini 4 Argon</b>、OpenAIの<b>GPT-5.6</b></li>
+      <li>ただし研究者本人は「最初に見つけた時は<b>誰でも使えるAI</b>だけだった」とも記載（名前は非公表）</li>
+      <li>つまり特別な環境ではなく、一般の手でも穴探しを手伝える時代に</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「AIが3つも出てくるのだ」——ここが今回事象の肝。見つける側のハードルが下がったことは、良い面と悪い面の両方を持ちます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>10年以上誰にも気づかれず潜んでいた<small>過去10年の全バージョンが影響、古い部分はPHP 5.4.0の頃から</small></h2>
+    <span class="badge b-brown">SCOPE</span>
+    <ul>
+      <li>Wizは「過去10年に出たすべてのバージョンが影響を受ける」と说明</li>
+      <li>一番古い部分は<b>PHP 5.4.0 の頃から存在</b>——10年以上気づかれなかったことになる</li>
+      <li>古いPHPだから安全、ではないむしろ逆の関係</li>
+      <li>サポート切れのバージョンには修正が降ってこない点にも注意（CARD 11）</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「10年以上誰にも気づかれずに潜んでたのだ」——長年動き続けたコードにも、まだ見つかっていない穴があり得るという証明ですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>具体的に何をされる？ 条件が揃えば「ログインなし」で乗っ取り<small>一番怖いのは外部からの任意コード実行（RCE）</small></h2>
+    <span class="badge b-warn">IMPACT</span>
+    <ul>
+      <li>条件が揃えば<b>認証なしでサーバーに好きな命令を実行</b>させられる（RCE）——他人のパソコンを勝手に遠隔操作するイメージ。ただし乗っ取られるのはサイトが動いているサーバー側</li>
+      <li>Wizは<b>他の人のパスワードやログイン中の印（セッション情報）が漏れる</b>恐れもあると説明</li>
+      <li>PHP公式は<b>Apacheのmod_phpという動かし方では初期設定のまま攻撃が通る</b>と明記——設定ミスではない</li>
+      <li>Wizは試験環境で<b>WordPressやDrupalの上でも乗っ取れる</b>ことを確認済み</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「設定を間違えた人だけじゃないのだ」——初期設定のまま攻撃が通る、という公式の一文が今回の深刻さを物語っています。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>日本と海外の機関が一斉に呼びかけ<small>「すぐ更新できなければオフラインに」という強い表現も</small></h2>
+    <span class="badge b-brown">RESPONSE</span>
+    <ul>
+      <li>日本の報告機関は修正版公開前夜の夜10時前に「今夜11時の修正をすぐ当てられるよう準備を」と呼びかけ</li>
+      <li>すぐ当てるのが難しければ<b>サイトを一時的に止めるのも有効策</b>の一つと说明</li>
+      <li>アメリカの<b>FBI</b>も「すぐ更新できないならオフラインに」と報じられた</li>
+      <li>イギリスの国家サイバーセキュリティセンター<b>NCSC</b>も更新を要求</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「海外も同じなのだ」——止めることが推奨されるのは、穴が開いたまま動き続けるリスクの方が大きいから。いざという時の判断材料に。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>もう悪用されてる？——決めつけない、ただ楽観もしない<small>「されていない前提では動かない」</small></h2>
+    <span class="badge b-sky">STATUS</span>
+    <ul>
+      <li>PHP公式は<b>実際の悪用には触れていない</b></li>
+      <li>一方で<b>修正版が出る前に攻撃の動きを見た</b>という報道もある</li>
+      <li>結論：「されていない前提では動かないこと」</li>
+      <li>ペイロードが公開される前のこの時間帯が、対応の勝負どころ</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>確認と楽観の間で揺れる情報を、動画は「決めつけず・前提にしない」と整理しています。情報の読み方のお手本ですね。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 10</span>
+    <h2>【対応編】サイトを動かしている人がやること<small>一番大事なのは「直した版（パッチ）にすること」</small></h2>
+    <span class="badge b-warn">ACTION FOR OPERATORS</span>
+    <table class="tbl">
+      <tr><th>環境</th><th>やること</th></tr>
+      <tr><td>PHP 8.5系など自前管理</td><td>修正版へ更新（例: <b>8.5 → 8.5.12</b>。8.4系にも修正版 8.4.38.2 が出ている）</td></tr>
+      <tr><td>レンタルサーバー</td><td>まず<b>運営会社のお知らせ</b>で直した版になっているか確認</td></tr>
+      <tr><td>自分でLinuxに導入</td><td>配布元（ディストリビューション）が事前に修正を受け取っているので<b>更新パッケージを確認</b></td></tr>
+      <tr><td>古いPHP（サポート切れ）</td><td>公式からもう更新が出ない。<b>サポート中の範囲へ移行</b>するか、提供元の修正を確認</td></tr>
+    </table>
+    <ul>
+      <li>設定をいじって穴だけ塞ぐ回避策はNG——PHP公式は「<b>完全な回避策はなく更新だけが安全な選択</b>」と明記</li>
+      <li>更新がすぐできないなら、<b>一旦サイトを止める</b>ことも選択肢（FBI・NCSCと同じ考え方）</li>
+      <li>NCSCは「更新も停止もできなかったなら、直す前に<b>侵入された後や仕掛けがないか確かめる</b>」よう推奨——直すだけじゃなく入られていないかも見る</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「直すだけじゃなくて入られてないかも見るのだ」——応急処置の後に必ず確認を。これはインシデント対応の基本形です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>【閲覧者編】見るだけの人は何もしなくてOK<small>ただし「動かす側の知り合い」には伝えて</small></h2>
+    <span class="badge b-sky">ACTION FOR VIEWERS</span>
+    <ul>
+      <li>PHPの件で<b>自分のスマホやパソコンに入れる修正はない</b>——穴があるのはサーバー側</li>
+      <li>PHP公式や各国機関の呼びかけは、すべてサイトを動かす人向け</li>
+      <li>利用中のサイトが急に止まっていたら慌てない——<b>運営側が止めて対応している可能性</b>がある（実際に自社サイトを止めた組織も報じられた）</li>
+      <li>止まっていても<b>自分の端末を疑う必要はない</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「じゃあ僕は今夜寝てていいのだ」——PHPの件はね。でも寝る前に、この後のカードは読んでいきましょう。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>気をつけたい人: 自分のブログ・お店のサイトを持っている人<small>「サイトを作った先輩」は見る側じゃなく動かす側</small></h2>
+    <span class="badge b-brown">CHECK YOUR SIDE</span>
+    <ul>
+      <li>WordPressなどで自分のブログやお店のサイトを持っている人</li>
+      <li>サークルのサイトを作ってくれた先輩——<b>その人は「動かす側」</b></li>
+      <li>こういう人にはCARD 10の手順で確認してもらうよう、ちゃんと伝えておく</li>
+      <li>「多分自分は関係ない」で止めず、まず動かしているPHPのバージョンを確認</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「その先輩は見る側じゃなくて動かす側」——自分の周りに「動かす側」がいないか、ひとまず頭に浮かべてみるのが今夜の宿題です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>ここからは2つ目の穴: 証明書の「身分を出す窓口」の鍵漏れ<small>サイトの本物確認の仕組みをおさらい</small></h2>
+    <span class="badge b-sky">CERT BASICS</span>
+    <ul>
+      <li>サイトにつなぐとブラウザは「このサイトは本物か」を<b>身分証（証明書）</b>で確認している</li>
+      <li>証明書を発行するのは<b>認証局（CA）</b>。その下で実際に発行する窓口が<b>中間CA</b></li>
+      <li>窓口が署名をするために持つのが<b>秘密鍵</b>——本来は誰にも当てられない、ものすごく長い数</li>
+      <li>ところがインドの認証局<b>eMudhra</b>の窓口（中間CA）の鍵が<b>2の256乗より小さい数</b>だった</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「256なら僕でも数えられるのだ」——最大でも255回試せば当たるという世界。実際、<b>1秒もかからず8つ全部を割り出した</b>と報じられました。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 14</span>
+    <h2>弱い鍵の発見経緯と原因<small>コードの不具合で弱い鍵が生まれ、名前が似ていて取り違えられた</small></h2>
+    <span class="badge b-brown">ROOT CAUSE</span>
+    <ul>
+      <li>報告した研究者は、AIを使った方法で鍵を割り出したと説明（どのAIかは明かされていない）</li>
+      <li>研究者は8つの弱い鍵のうちの1つで<b>「問題が起きている」ことを示す証拠の署名</b>を作成</li>
+      <li>eMudhraの説明: <b>2025年4月はじめ</b>に鍵を作った際、<b>コードの不具合で弱い鍵</b>ができてしまった</li>
+      <li>しかも<b>名前が似ていたため本物の鍵と取り違えて使用</b>——発見は今年に入ってから</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「漏れてる鍵で問題が起きてるって署名したのだ」——脆弱性報告では「本当に作れること」を証明するのが慣習。悪意ある者なら銀行のサイトになりすませます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>窓口の鍵が漏れると何ができる？——「なりすまし」と2つの条件<small>誰にでも簡単にできる攻撃ではない</small></h2>
+    <span class="badge b-warn">THREAT MODEL</span>
+    <ul>
+      <li>窓口の鍵を持つ人は<b>どのサイトの身分証も作れる</b>——銀行やメールのサイトになりすまし可能</li>
+      <li>ただし条件①: <b>通信の途中に割り込める立場</b>が必要（通り道を横取りして偽物へつなぎ替える人）</li>
+      <li>条件②: 主要ブラウザは<b>公開の台帳（CTログ）に乗っていない身分証を信用しない</b>仕組み。この窓口の証明書は台帳に記録がなかった</li>
+      <li>そのため<b>主なブラウザでは攻撃が成立していなかった可能性が高い</b>（研究者たちのまとめページによる）</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「台帳に乗ってない身分証は門前払いなのだ」——でも注意。ブラウザ以外のソフトの多くは台帳を見ないので、そちは分からないのです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>対応タイムライン: 報告から4日で主要ブラウザが遮断完了<small>10月21日時点で実際の悪用例は確認されていない</small></h2>
+    <span class="badge b-sky">TIMELINE</span>
+    <table class="tbl">
+      <tr><th>日付</th><th>対応</th></tr>
+      <tr><td>10/17（報告当日）</td><td><b>Chrome と Firefox</b>が遮断（日本時間では18日早朝）</td></tr>
+      <tr><td>10/18</td><td><b>eMudhra自身が8つの証明書を失効</b></td></tr>
+      <tr><td>10/19</td><td><b>Apple</b>（Safari）が遮断</td></tr>
+      <tr><td>10/20</td><td><b>Microsoft</b>が遮断——主要どころは片付いた</td></tr>
+    </table>
+    <ul>
+      <li>Chrome と Firefox は裏で受け取っている<b>失効リストを配る方式</b>で対応——利用者の更新や再起動は不要だった</li>
+      <li>10月21日時点で実際に悪用された例は確認されていない（セキュリティチームの説明）</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「僕が寝てる間にブラウザが守れてたのだ」——主なブラウザを使っている人は自分で何もしなくても守られています。ここは怯えすぎない。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 17</span>
+    <h2>更新が必要なのは「台帳を見ない道具」——開発で使う人は要確認<small>確かめるボタンで、自分の環境が信用していないか試せる</small></h2>
+    <span class="badge b-brown">ACTION FOR DEVS</span>
+    <p class="body">ブラウザ以外で<b>自分の証明書リストを持っているソフト</b>は、配信された失効リストを見ないため更新が必要です。研究者たちのまとめページに対象が並んでいます。</p>
+    <ul>
+      <li>例: <b>cURL、Node.js、Python、OpenSSL</b>など——授業でPythonを入れた人も更新を</li>
+      <li><b>自動更新されない古い端末</b>も同様に注意</li>
+      <li>自分のブラウザが大丈夫かは、まとめページの<b>「確かめるボタン」</b>でテスト——危ない窓口の証明書を使ったテスト用サイトに<b>つながらなければ合格</b></li>
+      <li>番組側がMacのChromeで試したところ、6つの窓口×2つの発行元の<b>12通りすべて接続不可（合格）</b>。一方、macOS標準のcURLは<b>テストサイトにつながってしまった</b>——ブラウザは安全でも別の道具はまだ信じている、という差がある</li>
+      <li>ただし慣れていないなら<b>証明書ファイルの自分での書き換えはNG</b>。Linuxで信用を外す操作も一般の人には非推奨（まとめページ記載）。普通の人は<b>ブラウザとOSを最新に、会社の端末はIT部門の案内に従う</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「つながらない方が合格なのだ。試験みたいで面白いのだ」——安全確認が「つながらないこと」なのは新鮮ですが、理屈を知れば納得の作りです。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 18</span>
+    <h2>持ち帰り: 見つけるのはAI、閉めるのはあなた<small>差がつくのは「見つかってから直すまでの速さ」</small></h2>
+    <span class="badge b-brown">TAKEAWAYS</span>
+    <ul>
+      <li><b>1. PHPを動かしている人</b>: すぐ直した版へ。無理なら一旦止める——「先輩に伝えるのはこれ」</li>
+      <li><b>2. サイトを見るだけの人</b>: PHPの件で端末の作業はなし</li>
+      <li><b>3. 主なブラウザは遮断済み</b>: ブラウザとOSは最新にしておく</li>
+      <li><b>4. 開発の道具や古い端末は更新</b>。気になったら「確かめるボタン」で試す</li>
+    </ul>
+    <p class="body">AIに任せて安心とは言えない理由が2つ。①PHPの方は<b>2024年の点検で同じ種類の問題が見つかっていた</b>のに、悪用できると証明されなかったため直されていなかった。②証明書の方は、研究者が試したら<b>AIに作業を任せる仕組みに簡単な頼み方をしただけで鍵を割り出せた</b>。見つけるのが簡単になったのは、悪い人にとっても同じ。<b>見つける道具は攻撃する側も同じように持てる</b>——だからこそ、見つかってから閉めるまでの速さだけが人の側に残された差になります。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「鍵は長く、更新はすぐ。枝豆も早く茹でるほど美味しいのだ」——それは関係ないけど、早めが大事なのは同じね。気になるニュースがあったら、また一緒に確かめましょう。</div></div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <p>出典: 「【PHP・eMudhra】AIが見つけた2つの穴 PHPの深刻な脆弱性と証明書の鍵漏れ 何が起きて、自分は何をすればいい？｜今知っておきたい」（ずんめたラボ）<br>
+  <a href="https://www.youtube.com/watch?v=PZK45-DouvA">YouTubeで視聴する</a> ｜ <a href="../index.html">インフォグラフィック一覧へ戻る</a></p>
+</div>
+
+</div>
+</body>
+</html>

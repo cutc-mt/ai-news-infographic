@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>エージェントWebのセキュリティを民主化する | Cloudflare CTOに聞く脆弱性アポカリプスとゼロトラスト（No Priors）</title>
+<style>
+  :root{
+    --bg:#F5F6F4;
+    --panel:#FFFFFF;
+    --panel2:#E9EDE7;
+    --line:#CBD3C6;
+    --ink:#20261E;
+    --sub:#4E5A4A;
+    --main:#3F6212;
+    --main-deep:#365314;
+    --main-soft:#EFF5E6;
+    --slate:#334155;
+    --slate-deep:#1E293B;
+    --slate-soft:#E8EDF3;
+    --amber:#B45309;
+    --amber-deep:#92400E;
+    --amber-soft:#FBF0DD;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#EDF1E8 0%,#E4EBDC 55%,#F0F3EA 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(51,65,85,.12),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(63,98,18,.1);color:var(--main-deep);border:1px solid rgba(63,98,18,.4);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--amber-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(63,98,18,.07);border:1px solid rgba(63,98,18,.35);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#4D7C0F,#365314);color:#EFF5E6;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:#365314}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(63,98,18,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(32,38,30,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#4D7C0F,#365314);color:#EFF5E6}
+  .b-slate{background:linear-gradient(135deg,#475569,#1E293B);color:#E8EDF3}
+  .b-amber{background:linear-gradient(135deg,#D97706,#92400E);color:#FBF0DD}
+  .b-line{background:rgba(78,90,74,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--main-deep);border-color:rgba(77,124,15,.55)}
+  .pill.warn{color:var(--amber-deep);border-color:rgba(217,119,6,.5)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#28302A;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#28302A}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--slate-soft);border:1px solid rgba(51,65,85,.35);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#475569,#1E293B);color:#E8EDF3;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:#1E293B}
+  .yomogi .name{font-weight:700;color:var(--slate-deep);margin-right:4px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#28302A;background:#FCFDFB}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FCFDFB;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#28302A}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--amber);font-weight:800}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">NO PRIORS / CLOUDFLARE</span>
+  <h1>「エージェント・キディ」が起こす脆弱性アポカリプスと<br>Cloudflareが挑む<span class="hl">セキュリティの民主化</span> — CTO Dane Knechtインタビュー</h1>
+  <p>No PriorsのSarah Guoが、<b>Cloudflare CTO Dane Knecht</b>氏を迎えて対談。1日1兆リクエスト超を処理するネットワークの運営者ならではの視点で、<b>CVEの指数関数的増加</b>、TLS/WebPKIを守る鍵が種値「4」だけであった事案、国家ではなく<b>「エージェント・キディ」</b>と呼ぶべき攻撃者像、エンジニアリングの50%をセキュリティに充てる<b>18ヶ月の過渡期</b>、そして<b>エージェント向けマイクロペイメント・CloudflareOS・1000人インターン戦略</b>まで語り尽くします。</p>
+  <div class="meta">
+    <span>チャンネル: No Priors Podcast</span>
+    <span>ゲスト: Dane Knecht（Cloudflare CTO）</span>
+    <span>形式: 英語ポッドキャスト（本稿は日本語化）</span>
+    <span>動画: Democratizing Security for the Agentic Web with CloudFlare...</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">「AIはセキュリティ危機の元凶であり、同時に最速の解決手段でもある」——この<b>両面性</b>を貫く対談です。CARD 01からどうぞ。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>全体像サマリ: 危機の構造とCloudflareの回答<small>10年分が1年に圧縮された1年間</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">Knecht CTOいわく、この1年は「<b>10年分が1年に凝縮</b>」された感覚。Cloudflareの使命「より良いインターネットの構築を支援する」は15年間不変ですが、AIの台頭で焦点は「誰もがAIを使えるようにする」から<b>「AIセキュリティの意味を皆が急いで理解する」</b>へ移りました。対談は①外部からの侵入とデータ漏洩の両面、②CVE急増の実態、③防衛側の体制転換（レッドチーム増強・攻撃対象領域の縮小）、④エージェントWebの経済モデル（マイクロペイメント）、⑤社内変革（CloudflareOS・1000人インターン）という5層で展開します。</p>
+    <div class="flow">
+      <div class="step"><b>層1</b>AI時代の脆弱性急増</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>層2</b>攻撃者像の変化</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>層3</b>防御と組織の再設計</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>層4</b>エージェントWebの経済</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>層5</b>Cloudflareの社内実験</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「危機→体制→経済→組織」の順で読むと話の筋が掴みやすいです。まず現場の数字から入ります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>現状: CVE報告数が指数関数的に増加<small>Log4j級の事象が「年1回」から「毎週」に</small></h2>
+    <span class="badge b-amber">THREAT</span>
+    <ul>
+      <li>直近3〜6ヶ月、<b>CVE（共通脆弱性識別子）の報告数は指数関数的に増加</b></li>
+      <li>かつてLog4j・Shellshock級のインシデントは<b>年に1回あるかどうか</b>だった</li>
+      <li>その度にCloudflare社内は総力を挙げ、<b>無料版ユーザーも含め全顧客を保護</b>してきた</li>
+      <li>同社はインターネットの安全を<b>一種の公共財</b>とみなしている</li>
+      <li>その深刻事象がいまや<b>ほぼ毎週</b>（すべて公表されるわけではない）</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>衝撃の事例: TLS/WebPKIの鍵が「4」だけで守られていた<small>ランダム性の重要性とAIの解析力</small></h2>
+    <span class="badge b-amber">INCIDENT</span>
+    <ul>
+      <li>すべてのTLS・WebPKIを保護するインターネット上の鍵の一つの<b>シード値が単なる「4」</b>だったと判明</li>
+      <li>暗号技術の核心は<b>ランダム性</b>——Cloudflareがオフィスに<b>ラバランプ（溶岩ランプ）</b>を置く理由も同じ</li>
+      <li>初期値が「4」では<b>リバースエンジニアリングで解読されうる</b></li>
+      <li>AIはこの種の解析を<b>眠らず・疲れず</b>続けられる。レッドチームのエンジニア1人とは次元が違う</li>
+      <li>先週はOpenAIが<b>NIST曲線のシード（2000年公開分）を特定</b>したと記憶するとの言及——この分野の加速ぶりを示す</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「4」というシードは氷山の一角。要求水準が上がる中で、<b>モデル自体がサイバーセキュリティに長けてきている</b>のが本当の脅威です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>攻撃者像: 国家ではなく「エージェント・キディ」<small>高校生でもエージェントで脆弱性を見つける時代</small></h2>
+    <span class="badge b-amber">ACTOR</span>
+    <ul>
+      <li>最近の大規模脆弱性のいくつかは<b>国家によるものではない</b>——高校生のような層も関与</li>
+      <li>Knecht氏の命名: 「<b>エージェント・キディ</b>」（スクリプトキディのエージェント版）</li>
+      <li>CTF（セキュリティコンテスト）感覚でエージェントを特定領域に向けて運用</li>
+      <li>動機もあり: <b>バグバウンティで相当額</b>が支払われる</li>
+      <li>かつて国家が独占していたツールが、<b>エージェントと人数を通じて大衆に解放</b>された状況</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>悲観論への反論: 破滅よりも「業界の団結」<small>エアギャップ論とゼロトラスト移行の効果</small></h2>
+    <span class="badge b-slate">VIEW</span>
+    <ul>
+      <li>15年ぶりに真面目な技術者が「重要なものは<b>エアギャップ（物理隔離）</b>すべき」「インターネットは当面信用できない」と語り出した</li>
+      <li>Knecht氏の見方: 人間は適応力があり、危機では<b>業界が協力する</b></li>
+      <li>平時の競合が「もはや競合ではなくなる」——純粋に<b>重要インフラを守る</b>ことに注力</li>
+      <li>過去5〜10年で城壁型から<b>ゼロトラスト</b>へ移行済みの企業は、隔離せずとも<b>デバイスと通信フローを別手段で保護</b>できるため有利</li>
+      <li>結論: 「すべてがより強固になる」<b>それほど破滅的な見方はしていない</b></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>18ヶ月の過渡期: 工数の過半をセキュリティへ<small>「エンジニアリングの50%以上がセキュリティに」</small></h2>
+    <span class="badge b-slate">TRANSITION</span>
+    <ul>
+      <li>今年いっぱい〜来年〜<b>今後18ヶ月はチーム時間の大半がセキュリティ対策</b>に</li>
+      <li>基調講演の統計: <b>エンジニアリング業務の50%超がセキュリティに充てられる</b>ように</li>
+      <li>ただし<b>永遠には続かない</b>——短い過渡期と位置づける</li>
+      <li>将来はAIがコードの大半を精査し、<b>バグ・脆弱性のほとんどを発見</b>してくれる</li>
+      <li>Sarah Guo側の補足: 前週のGreg Brockman（OpenAI）発言——<b>2027年にはセキュリティ用トークンにエンジニアリング並みの費用</b>を費やすとの予測</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>第一原理: 攻撃対象領域（表面積）を削れ<small>「70年分のソフトウェアにパッチを当てている」</small></h2>
+    <span class="badge b-main">PRINCIPLE</span>
+    <ul>
+      <li>現状は<b>過去70年分のソフトウェアのパッチ適用</b>——一部は単純に後手</li>
+      <li>Knecht氏が第一原理として挙げるのは<b>攻撃対象領域の削減</b></li>
+      <li>最も簡単な対策: すべてのソフトウェアを見直し<b>「どう簡素化できるか」「コードのフットプリントをどう減らせるか」</b>を問う</li>
+      <li>その先: <b>形式検証・より安全なプログラミング言語・ランタイム組み込みの保護</b>の普及</li>
+      <li>課題: 初期のAIは<b>冗長で複雑なコードを好む</b>傾向——安全なソフトウェア創出にはまだ役立っていない</li>
+      <li>人間の判断が入る余地を残しつつ、<b>単体で安全に機能する設計</b>が重要</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>Sarah Guoの突っ込み: モデルは「10分の1の複雑さでやり直して」<small>簡素化は人間の役割か、モデル側で解決すべきか</small></h2>
+    <span class="badge b-line">DIALOGUE</span>
+    <ul>
+      <li>ホストの問い: 現在のモデルの自然な傾向は<b>必ずしも簡素化ではない</b>のでは？</li>
+      <li>「今の10分の1の複雑さでもう一度」と言いたくなる状況が日常化</li>
+      <li>これはエンジニアリング/セキュリティ側の役割か、<b>モデルレベルで解決すべきか</b>？</li>
+      <li>回答: かつて人間がそうだったように、<b>エージェントを含むあらゆるレベルで解決</b>が必要</li>
+      <li>エンジニア教育・セキュリティチームの関与・第三者の目——<b>対立的なレビュー</b>が不可欠</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>社内規範「Codex」: RFCを集約した行動指針集<small>エージェントも人間も同じ原則に従わせる</small></h2>
+    <span class="badge b-main">PRACTICE</span>
+    <ul>
+      <li>Cloudflareは社内開発のあり方を明確化——各チームの<b>RFC（技術仕様）を集約</b>した文書「Codex」を作成</li>
+      <li>安全で可用性の高いソフトウェア構築の指針、いわば<b>ベストプラクティスの「十戒」</b></li>
+      <li><b>エージェントにも従わせる</b>——レビュープロセスのあらゆる段階で活用し徹底</li>
+      <li>大雑把な作業はエージェント、深いレベルでは<b>人間がパフォーマンス検証とセキュリティ実行</b></li>
+      <li>※会話中の「コーデックス」はCloudflare社内の文書名（OpenAIのCodexとは別物）</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 10</span>
+    <h2>エージェントWebの現在地: 同じレールに人間とエージェント<small>1000ページ巡回するエージェントと経済モデルの不在</small></h2>
+    <span class="badge b-slate">AGENT WEB</span>
+    <ul>
+      <li>現在は<b>混沌とした過渡期</b>: 人間とエージェントが同じインターネット上で共存</li>
+      <li>エージェントは<b>人間向けに設計された非効率なWeb</b>を解析しようとしている</li>
+      <li>人間は記事を読み広告を見て経済に参加。エージェントは同じ時間で<b>1000ページを巡回</b>できる</li>
+      <li>それは素晴らしいが、<b>支える新しい経済モデルが必要</b></li>
+      <li>Web閲覧支援の「翻訳レイヤー」企業は多数あるが、本質は<b>不要なトークンの浪費</b>——サイト側はAPIという通信手段を以前から持っている</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>マイクロペイメントの実現: CPMを払うエージェント<small>「あと2年」を繰り返した決済が遂に動く</small></h2>
+    <span class="badge b-main">ECONOMY</span>
+    <ul>
+      <li>Substackのようなサイトは自社の<b>CPM（広告単価）を把握</b>しているはず</li>
+      <li>将来像: エージェントがコンテンツを読むか判断し、<b>そのCPMを支払うか決める</b>世界</li>
+      <li>そのためには<b>1秒間に数百万件のトランザクション</b>を処理できる新決済基盤が必要=マイクロペイメント</li>
+      <li>「あと2年で実現」と言われ続けてきたが、<b>エージェントがついに前進させる</b></li>
+      <li>Stripeの「X42」発表も言及——<b>HTTP 402（ティム・バーナーズ=リーが決済用に用意したコード）</b>の復活を高評価</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「広告の代替としてコンテンツ単価を直接払う」——エージェント時代のWeb収益の本命候補として、具体性が一段上がった議論です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>実装の先行製品: 収益化ゲートウェイとウォレット<small>ステーブルコインとOpenAIとの「Signals」</small></h2>
+    <span class="badge b-main">PRODUCTS</span>
+    <ul>
+      <li><b>コンテンツ収益化ゲートウェイ</b>: サイトをCloudflare背後に置くだけでマイクロトランザクション（少額決済）を導入可能</li>
+      <li><b>エージェント用ウォレット</b>の提供、取引促進のための<b>ステーブルコイン</b>導入も進行</li>
+      <li>OpenAIと共同の「<b>Signals</b>」: エージェントがWeb全体をクロールし続けたり同じページを再訪しなくて済む<b>コンテンツ発見</b>の仕組み</li>
+      <li>AIラボ側は効率的な情報取得、サイト運営者は<b>無尽蔵クロールによるインフラコスト</b>から解放——双方に利益</li>
+      <li>「成功」の定義: <b>料金を徴収するのではなく、運営者に報酬を支払う形</b>へ。クリエイター数を指数関数的に増やせる</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>CloudflareOS: 社内AI利用の安全な基盤<small>「会社OS」をフォークできるリファレンス設計</small></h2>
+    <span class="badge b-slate">PLATFORM</span>
+    <ul>
+      <li>従業員が日常的にAIを使うための<b>社内プラットフォーム「CloudflareOS」</b>をリリース</li>
+      <li>狙い: 顧客・社内データの外部漏洩を懸念しつつ、<b>新しいAIツールを安全に展開</b>しデータの流れを把握・ガバナンス</li>
+      <li>名称の由来: エージェントが増えるにつれ、<b>「Cloudflareらしさ」をエージェントに教育</b>する必要が生じたため</li>
+      <li>人間にはCloudflare Universityやオンボーディングで伝えてきたが、エージェントには<b>明確な定義と文書化</b>が必要だった</li>
+      <li>位置づけは<b>リファレンスアーキテクチャ</b>: 100種超の開発者ツールの上に自社の開発方法を示し、<b>他社がフォークして自社OSを構築</b>できる</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 14</span>
+    <h2>意外な事実: 使うのはエンジニアよりGTM・管理部門<small>「これは自分を置き換えるものではない」と気づくまで</small></h2>
+    <span class="badge b-slate">ADOPTION</span>
+    <ul>
+      <li>CloudflareOSの主力ユーザーは<b>市場参入（GTM）チームや管理部門</b>——エンジニアリングより利用が多い</li>
+      <li>当初の想定: AI利用の最大の障壁は<b>トレーニング</b>。チャットUIを渡すだけでは「白紙」と同じ</li>
+      <li>解決: 自社ビジネスに合わせて設計し、<b>必要なデータに即アクセス</b>できるガイド付き環境を用意</li>
+      <li>利用者はすぐに「<b>自分を置き換えるものではなく、仕事を良くするもの</b>」と実感</li>
+      <li>マーケティングチームは<b>数百の社内ツール</b>を構築——以前は外部代理店が必要だった作業を少人数で高速に</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>業務の再設計: 3チーム関与のメール配信を1ツールへ<small>「効率化」ではなく「スーパーパワー」を配る</small></h2>
+    <span class="badge b-amber">REDESIGN</span>
+    <p class="body">AIファーストな組織再編（人員との別れもあった）で、業務の流れを工場の現場のように再構築。代表例がPMによる顧客向けメール配信です。</p>
+    <table class="tbl">
+      <tr><th>以前の関与</th><th>役割</th></tr>
+      <tr><td>BIチーム</td><td>送信対象の顧客リスト作成</td></tr>
+      <tr><td>マーケティングチーム</td><td>メールのデザイン・トーン&amp;マナー調整</td></tr>
+      <tr><td>マーケ運用チーム</td><td>実際の配信実行</td></tr>
+    </table>
+    <ul>
+      <li>再設計後: PMが<b>コホート（対象グループ）を記述しメールを書く</b>→Cloudflareらしい表現に自動リライト→<b>マネージャー承認で送信</b></li>
+      <li>3チームで「効率化」する方向ではなく、<b>PMにスーパーパワーを与える1ツール</b>を導入</li>
+      <li>進行は<b>ボトムアップ</b>: 昨年初めにツールを全社に開放し、情熱のある人が自然に集まって主導</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>1000人インターン戦略: AIネイティブを採用する<small>200人→1000人、「AIを奪ったら仕事ができない」</small></h2>
+    <span class="badge b-main">HIRING</span>
+    <ul>
+      <li>2年前に約200人のインターンを採用——<b>生粋のAIネイティブ世代</b>だと実感</li>
+      <li>「AIを取り上げたら仕事ができない」が、彼らの方がツールを使いこなす。<b>良いこと</b>と断言（10年前のGoogle相当）</li>
+      <li>面白い副次効果: インターンを受け入れた<b>マネージャー側のAI導入が早まった</b></li>
+      <li>昨夏は5000人規模の会社で<b>1000人インターン</b>を採用——素晴らしい成果</li>
+      <li>効果①: AIで少人数でも速く実験できるため、<b>アイデアが倍増</b>する</li>
+      <li>効果②: 「フォーム記入をまだ手作業でやってた」と気づかされる——<b>AI活用はまだ自然に身についていない</b></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 17</span>
+    <h2>トークン予算の哲学: 使い方は本人に任せる<small>1日300ドルで「ご存知でしたか？」通知</small></h2>
+    <span class="badge b-amber">BUDGET</span>
+    <ul>
+      <li>前提: タスクごとのモデル選択を人間が判断するのは<b>ナンセンス</b>——インテリジェントに振り分けるべき</li>
+      <li>Cloudflareの実例: 計画立案は<b>フロンティアモデル</b>→実行は<b>オープンソースモデル</b>→レビュー・レッドチーミングで再びフロンティア</li>
+      <li>現時点では各人が<b>モデルやツールを自由に選択</b>。使用量ランキングは<b>あえて設けない</b></li>
+      <li>評価基準は<b>「何を世に出したか」</b>であり、消費トークン数ではない</li>
+      <li>配慮だけはある: <b>1日300ドル超</b>で本人にメール通知（「ご存知でしたか？」）→<b>500ドルでマネージャー</b>→<b>1000ドルでVP</b>に当日報告</li>
+      <li>通知を受けた人はたいてい「おや？」と思うだけで、むしろ喜ぶそう</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 18</span>
+    <h2>採用と防御の結論: 好奇心、レッドチーム4〜5体制、リリース停止なし<small>「エージェント・キディと脆弱性アポカリプス——解決は可能」</small></h2>
+    <span class="badge b-main">TAKEAWAY</span>
+    <ul>
+      <li>採用で最重視は<b>好奇心</b>——「私生活でAIを使っていない人は懸念材料」。意欲・好奇心・共感の強化が次世代人材の鍵</li>
+      <li>ユーモラスな実話: 社内メールエイリアス「agents」に仕事を送ると<b>スキルファイルを返信</b>——中身はインターン学生が作成していた。「全自動」と勘違いされたまま現場把握に成功</li>
+      <li>防御体制: 現在1つのレッドチーム→来年末までに<b>4〜5体制</b>へ増強。危機がプロセス改善の原動力になる</li>
+      <li><b>リリースを止めれば死</b>——開発停止は絶対にない。セキュリティと新機能の両立をAIで加速する</li>
+      <li>オープン/クローズド論: <b>いずれすべてオープンになるべき</b>。悪意ある者も大手も同じものを手に入れる。必要な多数を排除しているだけ</li>
+      <li>レッドチームを持たない組織への答え: <b>Cloudflareの背後に置くこと</b>。React級の脆弱性時に高度なWAF機能を<b>無料ユーザーにも全員提供</b>——創業前は大手CDN活用サイトは世界3000、いまや<b>数億サイト</b>。「セキュリティとパフォーマンスの民主化」が一貫した目標</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>番組まとめの「エージェント・キディと脆弱性アポカリプス、解決は可能」がそのまま本対談の結論。崩壊ではなく<b>18ヶ月の集中的な土工事</b>と捉える視点が示唆に富みます。</div></div>
+  </div>
+
+</div>
+
+<p class="foot">出典: No Priors Podcast「Democratizing Security for the Agentic Web with CloudFlare...」（ゲスト: Dane Knecht, Cloudflare CTO ／ ホスト: Sarah Guo）<br>本稿は動画内容を日本語で再構成したインフォグラフィックです。<a href="https://www.youtube.com/watch?v=6VprwfSc4Xk">元動画はこちら</a></p>
+</div>
+</body>
+</html>

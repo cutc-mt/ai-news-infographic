@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【Claude Code並列運用】チャエンさんの無料スキル「session-triage」を検証——見回りは1回いくら？——れん学長のAIツール実験室</title>
+<style>
+  :root{
+    --bg:#F5F8FC;
+    --panel:#FFFFFF;
+    --panel2:#EEF3FA;
+    --line:#D8E2EE;
+    --ink:#1B2733;
+    --sub:#4E617A;
+    --main:#1D4ED8;
+    --main-deep:#1E3A8A;
+    --main-soft:#E4EBFA;
+    --amber:#B45309;
+    --amber-deep:#92400E;
+    --amber-soft:#FBF0E1;
+    --slate:#334155;
+    --slate-deep:#1E293B;
+    --slate-soft:#EDF1F6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#E9F0FB 0%,#E2EBF8 55%,#EAEAF4 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(180,83,9,.10),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(29,78,216,.1);color:var(--main-deep);border:1px solid rgba(29,78,216,.4);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--amber-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(29,78,216,.07);border:1px solid rgba(29,78,216,.35);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#1D4ED8,#1E3A8A);color:#E4EBFA;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:var(--main-deep)}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(29,78,216,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(27,39,51,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#1D4ED8,#1E3A8A);color:#E4EBFA}
+  .b-amber{background:linear-gradient(135deg,#B45309,#92400E);color:#FBF0E1}
+  .b-slate{background:linear-gradient(135deg,#334155,#1E293B);color:#EDF1F6}
+  .b-line{background:rgba(78,97,122,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--amber-deep);border-color:rgba(180,83,9,.55)}
+  .pill.warn{color:var(--main-deep);border-color:rgba(29,78,216,.5)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#24313F;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#24313F}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--amber-soft);border:1px solid rgba(180,83,9,.35);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#B45309,#92400E);color:#FBF0E1;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:var(--amber-deep)}
+  .yomogi .name{font-weight:700;color:var(--amber-deep);margin-right:4px}
+  .yomogi.slate{background:var(--slate-soft);border-color:rgba(51,65,85,.35)}
+  .yomogi.slate .face{background:linear-gradient(135deg,#334155,#1E293B);color:#EDF1F6}
+  .yomogi.slate .bubble{color:var(--slate-deep)}
+  .yomogi.slate .name{color:var(--slate-deep)}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#24313F;background:#FDFEFF}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FDFEFF;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#24313F}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--amber);font-weight:800}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">AI TOOL LAB / 2026-10-25</span>
+  <h1>チャエンさんの無料スキル「session-triage」でClaude Codeの並列運用を楽に——<span class="hl">見回り1回のコスト</span>まで実測検証</h1>
+  <p>れん学長のAIツール実験室では、ChatGPT検証で知られるチャエン（@masahirochaen）さんが無料公開したClaude Codeスキル<b>「session-triage」</b>を実際に導入。15〜20個のセッションを同時に回す秘訣として、<b>15分おきにClaudeが全セッションの最後のやり取りを読み、セッション名の先頭にステータス絵文字を付け直す</b>仕組みを検証しました。導入5分の簡単セットアップから、1回あたりのAPI費用、自作「AI管制室」との比較まで、18カードに再構成します。</p>
+  <div class="meta">
+    <span>チャンネル: れん学長のAIツール実験室</span>
+    <span>公開: 2026年10月25日</span>
+    <span>スキル: session-triage（GitHubで無料公開）</span>
+    <span>本稿: 18カード・インフォグラフィック</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">「セッションを大量に開いて何が何だか分からない」を、<b>サイドバーの絵文字だけ</b>で解決するのがこのスキルの核心です。ただし<b>1日中回すと費用が積み上がる</b>点は要チェックです。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>今日の検証の全体像: 無料スキル「session-triage」とは何か<small>セッション乱立問題を絵文字一つで片付ける15分巡回システム</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">チャエンさんは「Claude Codeのセッションを15〜20個同時に回している秘訣はこれ」として、自作スキル<b>session-triage</b>をGitHubで無料公開しました。仕組みはシンプルで、<b>15分おきにClaudeが全セッションの一覧を取得し、前回から動いたセッションの最後のやり取りだけを読んで、状態を判定。セッション名（サイドバー表示）の先頭にステータス絵文字を付け直す</b>というもの。れん学長が実際に導入し、挙動・費用・自作管制室との違いまで検証しました。</p>
+    <div class="flow">
+      <div class="step"><b>15分ごと</b>Claudeが自動で見回り</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>動いた分だけ読む</b>最後のやり取りを解析</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>状態を判定</b>5種類に分類</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>絵文字を更新</b>名前の先頭に表示</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「自分が次に何をすればいいか」がサイドバーを見るだけで分かるようになり、<b>生産性が一気に上がる</b>とチャエンさんは説明しています。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>解決する課題: セッション乱立問題<small>開けば開くほど「どれが何だったか」分からなくなる</small></h2>
+    <span class="badge b-slate">PROBLEM</span>
+    <p class="body">Claude Codeで作業を並列で進めると、セッションがどんどん増えて<b>「何がどこまで進んでいて、次は誰の番か」が分からなくなる</b>問題が起きます。れん学長も同じ悩みを抱え、自作の「AI管制室」で管理してきました。今回の検証は、チャエンさんのsession-triageがその問題をどこまで解決するか、自作ツールとの比較も含めて試すというものです。</p>
+    <ul>
+      <li>並列運用ではセッションの見落としが課題に</li>
+      <li>れん学長は自作「AI管制室」を常用</li>
+      <li>第三者のスキルと自作ツールの<b>使い比べ</b>が本動画の主軸</li>
+    </ul>
+    <div class="yomogi slate"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>並列で回すほど効率は上がりますが、<b>監視コスト</b>も比例して増える——ここが常にトレードオフです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>中身は5つの状態だけ<small>「セッションが増えても待ちが一目で分かる」設計</small></h2>
+    <span class="badge b-main">5 STATUSES</span>
+    <p class="body">session-triageがセッションに付ける状態は<b>5つだけ</b>。作業中・確認中・返信待ち・要確認・完了です。数が絞られているため、サイドバーをパッと見ただけで「自分が判断を入れるもの」「下書きができて送るだけのもの」「Claudeが処理中のもの」を区別できます。</p>
+    <ul>
+      <li>状態は<b>作業中・確認中・返信待ち・要確認・完了</b>の5つ</li>
+      <li>セッションが増えても待ち案件が一目で分かる</li>
+      <li>「何をこの後すればいいか」が即座に判断できる</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>分類を増やしすぎない<b>5段階設計</b>が、パッと見の分かりやすさの鍵ですね。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 04</span>
+    <h2>ステータス絵文字の意味: 🔴📤👀⏳✅<small>セッション名の先頭に付く5記号の読み方</small></h2>
+    <span class="badge b-main">EMOJI GUIDE</span>
+    <table class="tbl">
+      <tr><th>絵文字</th><th>状態</th><th>意味・次のアクション</th></tr>
+      <tr><td><b>🔴 作業中</b></td><td>Claudeが処理中</td><td>バックグラウンドコマンドの実行など、<b>Claudeの番</b>。放置してOK</td></tr>
+      <tr><td><b>⏳ 確認中</b></td><td>Claudeが確認中</td><td>Claudeが検証・確認作業を進めている状態</td></tr>
+      <tr><td><b>📤 返信待ち・送るだけ</b></td><td>人間の番</td><td>メールや投稿の<b>下書きが完成</b>しており、送信するだけ</td></tr>
+      <tr><td><b>👀 要確認</b></td><td>人間の判断が必要</td><td>新案件メール対応など、<b>見落とすと危険な待ち</b>が残っている</td></tr>
+      <tr><td><b>✅ 完了</b></td><td>処理済み</td><td>そのセッションのタスクは<b>済み</b>。振り返り不要</td></tr>
+    </table>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>Claude Code本体でも作業中／要確認は色分け表示されますが、<b>「返信待ち（下書き完成）」まで区別できる</b>のがこのスキル独自の強みです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>仕組み: 15分後に6ステップで見回す<small>一覧取得→差分読み取り→状態判定→リネーム→まとめ→夜の片付け</small></h2>
+    <span class="badge b-main">HOW IT WORKS</span>
+    <p class="body">スキルの中身をざっと見ると、処理は<b>6ステップ</b>で構成されています。①セッション一覧を取得、②前回から<b>変わったものだけ</b>読み取り、③状態を決定、④セッション名を付け直し、⑤確認事項をまとめ、⑥夜にまとめて片付ける——という流れです。</p>
+    <ul>
+      <li>全セッションを毎回読むのではなく<b>動いた分だけ</b></li>
+      <li>状態判定とリネームを自動で実行</li>
+      <li>確認事項をまとめて<b>夜に一括処理</b>する運用設計</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「差分だけ読む」設計が、後の<b>費用削減（CARD 12）</b>に効いてきます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>実行方法: デスクトップアプリの定期実行スケジュール機能<small>15分おきの自動巡回は追加ツール不要</small></h2>
+    <span class="badge b-main">SCHEDULER</span>
+    <p class="body">15分おきの定期実行は、<b>Claudeデスクトップアプリのスケジュール機能</b>を使って回します。別途サーバーを立てたりcronを組んだりする必要はなく、アプリ内で完結します。れん学長は「15分おきで十分なのか」という点は検討の余地があるとしつつ、まずはデフォルト設定で試す方針です。</p>
+    <ul>
+      <li>Claudeデスクトップアプリの<b>定期実行（スケジュール）機能</b>を使用</li>
+      <li>追加インフラ不要・アプリ内で完結</li>
+      <li>巡回間隔の最適値は今後の検証課題</li>
+    </ul>
+    <div class="yomogi slate"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>頻度を上げれば追従性は上がりますが、<b>その分API費用も増える</b>——間隔設定は費用との兼ね合いです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>安心して放っておける理由: 触るのは「名前だけ」<small>メッセージの送信・停止・削除は一切しない</small></h2>
+    <span class="badge b-amber">SAFETY</span>
+    <p class="body">自動巡回スキルへの最大の不安は「勝手に操作されないか」ですが、session-triageが触るのは<b>セッションの名前だけ</b>。メッセージの送信・停止・削除はしません。つまり、実行中の作業を壊される心配なく放置できます。セッション名の先頭に絵文字が付く以上のことは起こらない、というのが安全設計の核心です。</p>
+    <ul>
+      <li>変更対象は<b>セッション名の先頭記号のみ</b></li>
+      <li>メッセージの送信・停止・削除はしない</li>
+      <li>実行中タスクを壊すリスクがなく<b>放置運用が可能</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>自動化スキルでは<b>「何を触らないか」の明示</b>が信頼の土台。ここがきちんと設計されています。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>必要なもの: Claudeデスクトップアプリの「コード」タブ<small>チャット側ではなく、Claude Code側で動かす</small></h2>
+    <span class="badge b-slate">REQUIREMENTS</span>
+    <p class="body">動作環境はシンプルで、必要なのは<b>Claudeデスクトップアプリ</b>。左側に「チャット」と「コード」のタブがありますが、session-triageは<b>コード（Claude Code）側</b>で使います。サイドバーのセッション一覧（スレッド一覧）がまさに管理対象です。<b>Windowsでも動作</b>するとチャエンさんが明記しています。</p>
+    <ul>
+      <li>Claudeデスクトップアプリ（<b>コードタブ</b>で運用）</li>
+      <li>定期実行はアプリのスケジュール機能</li>
+      <li>Windows環境でも利用可能</li>
+    </ul>
+    <div class="yomogi slate"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>れん学長が実演したのもすべてデスクトップアプリのコードタブでした。<b>チャット版とは違う</b>点に注意です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>導入手順①: 手動で入れる場合<small>GitHub手順に沿ってファイルを配置</small></h2>
+    <span class="badge b-main">INSTALL A</span>
+    <p class="body">公式の手順では、GitHubリポジトリ（chaenmasahiro0425/claude-session-triage）からデータをダウンロードして所定の場所に入れる、手動インストール手順が示されています。設定ファイルの書き方やスケジュール登録の方法もREADMEに記載されており、これに沿って進めれば導入できます。</p>
+    <ul>
+      <li>GitHubからスキル一式をダウンロード</li>
+      <li>設定・定期実行の登録手順もドキュメントに記載</li>
+      <li>Windowsでも同様に導入可能</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>とはいえ、次カードの方法なら<b>もっと簡単</b>に終わります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 10</span>
+    <h2>導入手順②: Claude Codeに頼むだけ——5分で完成<small>「このGitHub入れて」でインストールから設定まで完璧に済ませてくれる</small></h2>
+    <span class="badge b-amber">INSTALL B</span>
+    <p class="body">れん学長が実際に取った方法はこちら。<b>Claude CodeにチャエンさんのGitHubリンクを渡して「入れて」と頼むだけ</b>でした。Claude Codeがリポジトリを確認し、ダウンロード・配置・設定まで全部やってくれ、<b>5分ほどで導入完了</b>。しかも必要な設定まで書いてくれたといいます。スキル導入のハードルが極端に下がる好例です。</p>
+    <ul>
+      <li>GitHubのURLを渡して依頼するだけ</li>
+      <li>ダウンロード・配置・設定をClaude Codeが代行</li>
+      <li>実測<b>約5分</b>でセットアップ完了</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「スキルの導入自体をエージェントに任せる」——<b>メタな自動化</b>が当たり前になる時代ですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>実演: 自分のセッションに絵文字が付いた<small>iPhone買取・新案件メール・旧ブログPHP警告が一目で把握できた</small></h2>
+    <span class="badge b-main">DEMO</span>
+    <p class="body">導入後すぐに実運用のセッションへ絵文字が付与されました。<b>iPhoneの買取タスクは「済（✅）」</b>、<b>新しい案件メールへの対応は「要対応（👀）」</b>、<b>旧ブログのPHP警告対応も「要対応」として残っている</b>ことが可視化。さらに目のマークの付いたセッションを開くと「このセッションでは5つのバックグラウンドコマンドが完了している」まで分かりました。</p>
+    <ul>
+      <li>完了済みタスクと<b>見落としそうな未対応</b>が明確に分離</li>
+      <li>過去に遺れていた要対応案件まで発見できた</li>
+      <li>バックグラウンドコマンドの完了状況も把握可能</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「何もなかったら見落としていた」案件が残っているのが可視化されるのが<b>実用価値の核</b>です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 12</span>
+    <h2>見回りは1回いくら？——費用の実測値<small>初回約2.3ドル→2回目以降約0.9ドル、ただし1日96回回すと…</small></h2>
+    <span class="badge b-amber">COST</span>
+    <table class="tbl">
+      <tr><th>フェーズ</th><th>読み取る範囲</th><th>所要時間</th><th>API費用（1回あたり）</th></tr>
+      <tr><td><b>初回</b></td><td>全セッションを丸ごと読む</td><td>約5分</td><td><b>約2.3ドル</b></td></tr>
+      <tr><td><b>2回目以降</b></td><td>前回から動いたセッションのみ</td><td>約1分</td><td><b>約0.9ドル</b></td></tr>
+    </table>
+    <ul>
+      <li>15分おきで1日中動かすと<b>96回</b>実行される計算</li>
+      <li>回数×単価で考えると<b>放置コストは無視できない</b></li>
+      <li>差分読み取りにより2回目以降は費用が約6割減</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>動画タイトルの「見回りは1回いくら？」への答えがここ。<b>約0.9ドル/回</b>——ただし<b>1日フル稼働だと約86ドル/日</b>という試算も成り立ちます。業務時間だけに絞る等の運用設計が現実的です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>対抗馬: れん学長の自作「AI管制室」<small>AIを呼ばない0円管理——ただし会話の中身は読まない</small></h2>
+    <span class="badge b-slate">COMPARISON 1</span>
+    <p class="body">れん学長が普段使っているのは自作の<b>AI管制室</b>。ChatGPTデスクトップアプリのdots（AI秘書）が何を動かしているか一覧でき、全体管制室を開くと実行中のセッション（life-systemのClaude Code、スレッドマーク機能、15分ごとのセッション整理など）が盤面で把握できます。司令塔として<b>Opus（xhigh）</b>が全体を統括し、「実行中・あなたの番・判断待ち」が分かる構成です。こちらは<b>AIを呼ばず手元の記録を読むだけなので0円</b>——その代わり、会話の中身までは読みません。</p>
+    <ul>
+      <li>スレッド一覧と盤面で並列作業を俯瞰</li>
+      <li>司令塔モデルが各セッションの状況を集約</li>
+      <li><b>0円</b>ただし詳細な内容までは分からない</li>
+    </ul>
+    <div class="yomogi slate"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「安い・浅い」自作管制室 vs「詳しい・有料」のsession-triage——<b>一長一短</b>というのがれん学長の評価です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 14</span>
+    <h2>使い分けの結論: 両方組み合わせる<small>概要はsession-triage、詳細は管制室の盤面</small></h2>
+    <span class="badge b-main">COMPARISON 2</span>
+    <p class="body">比較の結果、れん学長の出した結論は<b>「両方組み合わせて使う」</b>。セッション名の絵文字だけ見ればいいsession-triageは、Claude Codeのデスクトップアプリ内で<b>手軽に一目確認</b>できる強みがあります。一方で「この中で何をやっているのか」まで踏み込むには管制室の盤面が有利。今後は両者の良いところを取り入れた自作ツールを作り込んでいく予定です。</p>
+    <ul>
+      <li>手軽さならsession-triage（アプリ内で完結）</li>
+      <li>詳細把握なら管制室の盤面表示</li>
+      <li>組み合わせた<b>次世代ツールを開発予定</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>ツール選びは二者択一ではなく<b>役割分担</b>で考えるのが2026年の主流ですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>並列運用の認知負荷を下げる<small>「AIが今何をしているか」を理解する教育効果も</small></h2>
+    <span class="badge b-amber">INSIGHT</span>
+    <p class="body">れん学長が管制室を公開・配布する理由は、並列スレッドでAIが何をしているか把握したい人にとって<b>認知負荷がかなり減る</b>から。実行中・あなたの番・判断待ちが分かると、AIの動きを理解する勉強にもなります。session-triageも同様に、多数のセッションを安心して並走させるための「窓」として機能します。</p>
+    <ul>
+      <li>待ち状態の可視化＝<b>認知負荷の削減</b></li>
+      <li>AIの並列動作を学ぶ教材としても有効</li>
+      <li>れん学長の管制室はnoteメンバーシップで配布中</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>エージェントを増やす時代ほど、<b>「見る窓」の設計</b>が生産性を左右します。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>15〜20セッション同時運用の実態<small>プロの検証者も「並列数」を稼ぐ仕組みを作り込んでいる</small></h2>
+    <span class="badge b-slate">CONTEXT</span>
+    <p class="body">チャエンさんは日々のChatGPT／Claude検証で<b>15〜20個のセッションを同時に回す</b>といい、その運用を支える裏技としてsession-triageを公開しました。れん学長の環境でも、life-systemのClaude Code、スレッドマーク機能、そしてこの15分ごとのセッション整理など<b>複数の定期処理が常時並走</b>しています。並列数を増やすこと自体は簡単で、難しいのは<b>その全体を維持管理する仕組み</b>です。</p>
+    <ul>
+      <li>検証業務ではセッション大量並走が日常</li>
+      <li>定期処理同士も並列で動くのが当たり前の時代に</li>
+      <li>課題は<b>並列を監視する仕組みの構築</b></li>
+    </ul>
+    <div class="yomogi slate"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「いくつ回せるか」より「いくつ把握できるか」——<b>監視がボトルネック</b>になる時代です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 17</span>
+    <h2>入手方法と関連リンク<small>GitHubで無料公開・メンバーシップ配布も</small></h2>
+    <span class="badge b-main">RESOURCES</span>
+    <p class="body">session-triageはGitHubリポジトリ<b>chaenmasahiro0425/claude-session-triage</b>で無料公開されています。導入は手順書に沿った手動のほか、Claude Codeへの依頼だけで完了する簡単ルートもあり（CARD 10）。れん学長のAI管制室はnoteのメンバーシップで配布されており、ブラッシュアップ版も今後配布される予定です。</p>
+    <ul>
+      <li>session-triage: GitHubで<b>無料公開中</b></li>
+      <li>導入はClaude Codeに頼むだけでもOK（約5分）</li>
+      <li>AI管制室はnoteメンバーシップで配布・改良予定</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>動画の説明欄にリンクがまとめられています。<b>今日から試せる</b>のが魅力です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 18</span>
+    <h2>まとめ: 並列運用は「監視の設計」で決まる<small>session-triageとAI管制室、それぞれの価値</small></h2>
+    <span class="badge b-main">TAKEAWAY</span>
+    <table class="tbl">
+      <tr><th>観点</th><th>session-triage</th><th>自作AI管制室</th></tr>
+      <tr><td>仕組み</td><td>15分おきにClaudeが動いたセッションを読み、絵文字を付け直す</td><td>AIを呼ばず手元の記録から盤面を表示</td></tr>
+      <tr><td>分かること</td><td>5状態（作業中・確認中・返信待ち・要確認・完了）＋会話の内容</td><td>実行中・あなたの番・判断待ちの全体像</td></tr>
+      <tr><td>費用</td><td>初回約2.3ドル／2回目以降<b>約0.9ドル</b>（1日96回の注意）</td><td><b>0円</b></td></tr>
+      <tr><td>安全性</td><td>触るのはセッション名のみ・送信停止削除はしない</td><td>読み取り主体で副作用的な操作なし</td></tr>
+      <tr><td>結論</td><td colspan="2"><b>両方組み合わせて使う</b>——手軽さでsession-triage、詳細は管制室。より良い統合ツールを今後開発予定</td></tr>
+    </table>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>セッションを大量並走させる時代の鍵は、<b>状態を「見える化」して認知負荷を削る仕組み</b>。費用と手軽さのバランスを見極めて、まずは5分セットアップから試してみてはいかがでしょうか。</div></div>
+  </div>
+
+</div>
+
+<footer class="foot">
+  <p>出典: れん学長のAIツール実験室「【ありがたい】チャエンさんの無料スキル『session-triage』をClaude Codeに入れてみた。見回りは1回いくら？」（2026年10月25日公開）</p>
+  <p>スキル配布元: GitHub（chaenmasahiro0425/claude-session-triage）※無料公開。数値・挙動は動画内の実測に基づきます。</p>
+</footer>
+
+</div>
+</body>
+</html>

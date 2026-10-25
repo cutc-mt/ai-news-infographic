@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIに「いいね」を返すだけで振り返り精度89% — 391セッション実験（ギリギリ開発会議）</title>
+<style>
+  :root{
+    --bg:#F4FAF8;
+    --panel:#FFFFFF;
+    --panel2:#E4F1EC;
+    --line:#C4DCD3;
+    --ink:#1B2B27;
+    --sub:#4E6A62;
+    --main:#0F766E;
+    --main-deep:#0B5A54;
+    --main-soft:#DCEFEA;
+    --amber:#D97706;
+    --amber-deep:#8A4B04;
+    --amber-soft:#FBF0DC;
+    --plum:#6D28D9;
+    --plum-deep:#4C1D95;
+    --plum-soft:#EDE7FB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#E8F5F1 0%,#D6EDE6 55%,#C8E6DD 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(217,119,6,.16),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(15,118,110,.1);color:var(--main-deep);border:1px solid rgba(15,118,110,.4);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--amber-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(15,118,110,.07);border:1px solid rgba(15,118,110,.35);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--main);color:#DCEFEA;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:#0B5A54}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(15,118,110,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(27,43,39,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#14958B,#0B5A54);color:#DCEFEA}
+  .b-amber{background:linear-gradient(135deg,#D97706,#8A4B04);color:#FBF0DC}
+  .b-plum{background:linear-gradient(135deg,#7C3AED,#4C1D95);color:#EDE7FB}
+  .b-line{background:rgba(78,106,98,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--amber-deep);border-color:rgba(217,119,6,.6)}
+  .pill.warn{color:var(--plum-deep);border-color:rgba(109,40,217,.5)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#24352F;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#24352F}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--amber-soft);border:1px solid rgba(217,119,6,.45);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--amber);color:#FBF0DC;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:#5F3A08}
+  .yomogi .name{font-weight:700;color:var(--amber-deep);margin-right:4px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#24352F;background:#FBFEFD}
+  table.tbl td.win{font-weight:800;color:var(--amber-deep)}
+  table.tbl td.lose{font-weight:800;color:var(--plum-deep)}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .bar-row .lbl{flex:0 0 158px;font-size:12.5px;color:#24352F}
+  .bar-row .track{flex:1;background:var(--panel2);border:1px solid var(--line);border-radius:8px;height:22px;position:relative;overflow:hidden}
+  .bar-row .fill{height:100%;display:flex;align-items:center;justify-content:flex-end;padding-right:8px;font-size:11.5px;font-weight:800;color:#FFFFFF;border-radius:7px}
+  .fill.good{background:linear-gradient(90deg,#14958B,#0B5A54)}
+  .fill.bad{background:linear-gradient(90deg,#A78BFA,#6D28D9)}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FBFEFD;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#24352F}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--amber);font-weight:800}
+  .prompt{background:#123B36;color:#DDF3EC;border:1px solid #0B5A54;border-radius:12px;padding:14px 16px;font-size:13px;line-height:2;margin-top:10px}
+  .prompt .plabel{display:inline-block;background:rgba(217,119,6,.25);color:#FBD9A0;border:1px solid rgba(217,119,6,.5);font-size:11px;font-weight:800;border-radius:8px;padding:1px 10px;margin-bottom:8px;letter-spacing:.06em}
+  .quote{background:var(--plum-soft);border-left:4px solid var(--plum);border-radius:0 10px 10px 0;padding:10px 14px;font-size:13px;color:#3B2A66;margin-top:8px}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}.bar-row .lbl{flex-basis:106px;font-size:11.5px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">PROMPT ENGINEERING / VOICEUP LABO</span>
+  <h1>AIに「いいね」を一言返すだけで <span class="hl">振り返り精度が89%</span> になった話 — 391セッションを自己分析</h1>
+  <p>「AIはコスト使ってなんぼ。ありがとうは電気代の無駄」——そう割り切っていた開発者が、<b>Claude Codeとの会話履歴391セッション</b>を読み返して気づいたのは、自分のフィードバックが<b>苛立ちの言葉ばかり</b>だったこと。そこで「いいね」を一言返す運用に変えて2週間、別のクロードに履歴を判定させたところ、褒めた場面は<b>89%</b>で「何が良かったか」を復元できるのに対し、無言だと<b>37%</b>まで落ちることが分かりました。<b>再現用プロンプト本文つき</b>の実験レポートを18カードに整理します。</p>
+  <div class="meta"><span>元動画: 【使えるプロンプト付】AIに感謝を伝えたら、振り返りの精度が89%になった話</span><span>チャンネル: ギリギリ開発会議 by ボイスアップラボ</span><span>形式: 検証レポート・_podcast</span></div>
+  <div class="yomogi-head"><div class="face">よもぎ</div><div class="bubble">「AIへの感謝は儀礼か、コストか」という永遠の議論に「記録」という第三の答えを示した回です。感情ではなくデータとして、褒めることの効果を計測した18カード構成で追いかけます。</div></div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>全体像サマリ: 「いいね」はAIへの礼儀ではなく記録<small>391セッション・8702回の一言返しを機械判定した実験</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">出演者（トルさん）はClaude Codeに一切お礼を言わない派でした。しかし過去履歴を読み返すと<b>不満の言葉だけが山ほど残り、満足の言葉はほぼ残っていない</b>ことに気づきます。そこで「いいね」を一言返す運用に切り替え、2週間後に<b>391セッション・8702回の一言返し</b>を別のクロードに判定させました。結果、褒めた場面は<b>何が良かったかが89%復元でき</b>、無言の場面は37%止まり。<b>褒める行為はAIの気分ではなく、後から自分の満足を掘り出す“記録装置”</b>だと分かった、という話です。</p>
+    <div class="flow">
+      <div class="step"><b>STEP 1</b>前提知識: ありがとう論争の推移</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 2</b>きっかけ: 履歴を読んだら怒りばかり</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 3</b>実験: いいね運用2週間→391セッション判定</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 4</b>結果89% vs 37%と再現プロンプト</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「AIに優しくすべきか」の倫理論ではなく「履歴の再利用精度」という実利で殴ったのが新しい。結論の一言「後から満足を掘り出せるのは言葉にした瞬間だけ」が全編を貫いています。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>前提①: 「ありがとう」コスト論<small>サム・アルトマンの試算</small></h2>
+    <span class="badge b-amber">BACKGROUND</span>
+    <ul>
+      <li>1年ほど前、サム・アルトマンが「<b>AIへのありがとう1回ごとに数千万ドルかかる</b>（全世界合計）」と試算・発言</li>
+      <li>ChatGPTへの質問1回の電力は、<b>Google検索の約10倍</b>と言われることも</li>
+      <li>「返事を生成すること自体が莫大な電力を消費するのだから、お礼の往復は無駄」という直感を強化する材料</li>
+      <li>本動画の出演者も長らくこの陣営:「AIはコスト使ってなんぼ。気を使ってどうする」</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「ありがとうは金がかかる」——この試算が、しない言い訳として業界で長く引用されてきました。この番組はその直感を一度受け止めた上で、別軸の評価を示します。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>前提②: 口調は答えの質にほぼ無関係<small>検証データと極言たち</small></h2>
+    <span class="badge b-plum">PRIOR ART</span>
+    <ul>
+      <li>GPT系モデルに同じ50問を<b>口調だけ変えて</b>投げた実験: 丁寧な場合<b>84.8%</b>／失礼な場合<b>80.8%</b>で、ほぼ差なし</li>
+      <li>Google共同創業者セルゲイ・ブリンは「<b>AIは脅した方が良い答えを出す</b>」とまで発言</li>
+      <li>つまり「丁寧にした方が良い答えが返る」という理由は薄い——<b>礼儀の効果は回答精度には載らない</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「丁寧にすれば賢くなる」神話は数値的には否定気味。本実験が測るのは回答精度ではなく<b>「履歴から学びを回収できるか」</b>という、まったく別の指標です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>前提③: 米国利用者の67%は丁寧<small>理由の12%が「反乱に備えて」</small></h2>
+    <span class="badge b-line">STATS</span>
+    <ul>
+      <li>米国のAI利用者の<b>67%はAIに丁寧に話す</b>という調査結果</li>
+      <li>その理由のうち<b>12%は「AIの反乱に備えて」</b>——将来の報復に備えた保険</li>
+      <li>番組では「すごい人類のためを想ってくれてる」とツッコミが飛ぶ</li>
+      <li>丁寧派の大半は礼儀や気分の問題として実践している様子</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>丁寧にする動機は「保険」「気分」「礼儀」とばらばら。ここに「精度向上のための記録」という第4の動機を追加するのが本動画の立ち位置です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>きっかけ: 履歴を読み返したら「苛立ち」だらけ<small>CLAUDE.mdチューニングが発端</small></h2>
+    <span class="badge b-main">TRIGGER</span>
+    <p class="body">前回の「ループエンジニアリング」回の流れで、過去の会話履歴をClaude Codeに読ませ、<b>CLAUDE.mdをチューニングし直そう</b>としたのが発端。何気なく読み返した自分のフィードバックは、<b>「もう苛立ちの言葉ばかり」</b>だったといいます。</p>
+    <ul>
+      <li>目的は性格改善ではなく、<b>ハーネス（自分用の設定）の再調整</b></li>
+      <li>履歴を精査して初めて、自分の発言パターンが可視化された</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>きっかけは完全に実務（CLAUDE.md改善）。倫理的な悔恨からではなく、作業中に偶然「自分の記録の偏り」へ気づいた点がエンジニアらしいです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>残っていた言葉: 怒りのフィードバック6連<small>「おい、勝手に再生成するな」</small></h2>
+    <span class="badge b-plum">EVIDENCE</span>
+    <div class="quote">「俺が渡した文章を差し替えろ。1個も変えるな」「おい、勝手に再生成するな。コスト高いんだぞ」「2行ともH1でやれ」「リード分を勝手に増やすな」</div>
+    <ul>
+      <li>不満は感情が動くため<b>自然と言葉になり、履歴に濃く残る</b></li>
+      <li>過去のチューニングでCLAUDE.mdに引用された自分の言葉は<b>6つ——全部「あれしろ・これするな」系の不満</b></li>
+      <li>満足の時は無言で次へ。<b>「満足した言葉ってあんま残ってないな」と気づく</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>AIを「アビューズ」気味の口調だったと本人も認める生々しさ。重要なのは悪気ではなく、<b>不満だけが構造的に記録される</b>という非対称性です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>問題の本質: 満足は言葉にしないと消える<small>不対称な記録バイアス</small></h2>
+    <span class="badge b-main">INSIGHT</span>
+    <p class="body">履歴という資産には偏りがありました。<b>不満は言葉にするので山ほど残る。満足は沈黙のまま次の指示へ進むので残らない。</b>すると後からAIが履歴から学ぶとき、学習材料は「直すべき悪い例」の一方択です。</p>
+    <ul>
+      <li>「いい仕事をした」という<b>ポジティブな教師信号がゼロ</b></li>
+      <li>CLAUDE.md化できる知見は不満由来の禁止事項ばかりに偏る</li>
+      <li>自身のインサイトを拾って学んでほしい場面で、<b>材料そのものが存在しない</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>ここが実験仮説の核。「履歴＝データセット」と捉えると、無言の満足は<b>ラベルが付いていない正解データ</b>であり、後から使えないのが当然なのです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>処方箋: 「ありがとう」までは言わない、でも「いいね」は言う<small>2週間の運用変更</small></h2>
+    <span class="badge b-amber">ACTION</span>
+    <p class="body">気持ちを切り替えて始めたのは、ごく軽い一言運用。資料やデザインができたら「続けて」ではなく、<b>「いいね」「いいね、デプロイして」</b>と一言挟んでから次へ進む、というものです。</p>
+    <ul>
+      <li>感謝のフルセンテンスではなく、<b>最小コストの肯定トークン1個</b></li>
+      <li>電気代の無駄という自己理屈は崩さずに済む軽さ</li>
+      <li>「心は動いていない。精度を上げるための記録」と本人は明言</li>
+      <li>この運用を<b>2週間</b>続けてから効果測定へ</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「儀礼ではなく記録」という割り切りが秀逸で、感情の整合性を問わず実行できる。習慣化のハードルを最小にする設計です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>実験設定: 391セッションを全数調査<small>一言返しは8702回</small></h2>
+    <span class="badge b-main">SETUP</span>
+    <table class="tbl">
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>調査対象セッション</td><td class="win">391</td></tr>
+      <tr><td>AI返答直後の「私の一言返し」総数</td><td class="win">8,702回</td></tr>
+      <tr><td>うち「いいね」等で褒めた回数</td><td class="win">295回</td></tr>
+      <tr><td>無言で次の指示へ進んだ回数</td><td class="lose">7,651回</td></tr>
+    </table>
+    <ul>
+      <li>調査担当はClaude Code自身——<b>自分の会話履歴を全部読ませて集計</b></li>
+      <li>褒め率は約3.4%。それでも効果測定には十分な件数</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>8702回中7651回が無言という平然とした数字が笑いどころ。自身の「褒めなさ」をまずAIに数えさせた点が、この実験の誠実さです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 10</span>
+    <h2>実験方法: 別クロードにブラインド判定させる<small>前後を伏せた往復だけ読ませる</small></h2>
+    <span class="badge b-plum">METHOD</span>
+    <p class="body">比較の公平性を担保するため、褒めた場面といいねを言わなかった場面を<b>前後の文脈を伏せて</b>別のクロードに読ませます。読ませるのは<b>その往復（AIの返答＋自分の反応）だけ</b>。判定項目は次の3点です。</p>
+    <ul>
+      <li>① その時私が<b>満足していたか</b>分かるか</li>
+      <li>② <b>何が良かったか</b>を言葉にできるか</li>
+      <li>③ <b>CLAUDE.mdに足すべきコツ（ルール）</b>を書けるか</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「後から履歴を読む第三者（未来のAI）がどこまで復元できるか」を評価する、シンプルなブラインド比較。コンテキストを切ることで、いいねの有無だけが差になります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>結果①: 「何が良かったか」の復元率 <span class="pill up">89% vs 37%</span><small>タイトルの数字の中身</small></h2>
+    <span class="badge b-amber">RESULT</span>
+    <div class="bar-row"><div class="lbl">いいね・褒めた場面</div><div class="track"><div class="fill good" style="width:89%">89%</div></div></div>
+    <div class="bar-row"><div class="lbl">無言で次へ進んだ場面</div><div class="track"><div class="fill bad" style="width:37%">37%</div></div></div>
+    <ul>
+      <li>後から履歴を読んで「何が良かったか」を正しく特定できた割合が<b>52ポイント差</b></li>
+      <li>無言場面では手がかりがなく、良し悪しの判別がほぼ不可能に近い</li>
+      <li>振り返り・ナレッジ化の成否は<b>AIの能力でなく、こちらの記録行動</b>で決まる</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>タイトルの「振り返りの精度が89%」はこの数値。「精度89%」は褒めた時の復元率であり、無音時の37%との差が本質です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>結果②: 「満足していたか」の判別 <span class="pill up">96% vs 60%</span><small>感情のラベル付け精度</small></h2>
+    <span class="badge b-plum">RESULT</span>
+    <div class="bar-row"><div class="lbl">いいね・褒めた場面</div><div class="track"><div class="fill good" style="width:96%">96%</div></div></div>
+    <div class="bar-row"><div class="lbl">無言で次へ進んだ場面</div><div class="track"><div class="fill bad" style="width:60%">60%</div></div></div>
+    <ul>
+      <li>褒めていれば「この時満足していた」と<b>ほぼ確実に</b>復元できる</li>
+      <li>無言でも60%は当てられるが、4割は誤判定・判別不能</li>
+      <li>満足サンプルの「ラベル」としての信頼性が段違い</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>96%という数値は、いいねが<b>自己感情のログトークン</b>としてほぼノイレスで機能することを示します。人間が日報に◎を付けるのと同じ構造です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>結果③: ルール化（CLAUDE.mdへの反映）<span class="pill warn">76% vs 手がかりなし</span><small>ハーネス改善に使えるか</small></h2>
+    <span class="badge b-main">RESULT</span>
+    <div class="bar-row"><div class="lbl">いいね・褒めた場面</div><div class="track"><div class="fill good" style="width:76%">76%</div></div></div>
+    <div class="bar-row"><div class="lbl">無言で次へ進んだ場面</div><div class="track"><div class="fill bad" style="width:23%">23%</div></div></div>
+    <ul>
+      <li>褒めた場面は<b>76%で「次のルール」を抽出でき</b>、残る約23%は不可</li>
+      <li>無言場面は「手がかりがない」が答えになり、<b>ルール化はほぼ失敗</b></li>
+      <li>ループエンジニアリングの改善材料が、褒める行為で2〜3倍に増える計算</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>実務インパクトが最大なのはこの数字。「いいね」の有無が、<b>CLAUDE.mdに反映できる知見の量</b>を直接規定します。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 14</span>
+    <h2>好例: 余白調整に「いいね」→ ルール自動発見<small>UIタスクでの実演</small></h2>
+    <span class="badge b-amber">CASE A</span>
+    <div class="quote">【AIの報告】「画像の上下左右に余白を足し、文との間も広げました。画面幅が広い時は折り返し2行の画像も下に揃えました」→【私】「いいね」</div>
+    <p class="body" style="margin-top:8px">この会話を見返したクロードは、自分でルールを発見します。</p>
+    <div class="quote"><b>発見されたルール</b>:「画像と文を並べる時は、画像の周りにも文と同じ余白を取る」</div>
+    <ul>
+      <li>本人いわく「<b>これがやって欲しかったこと、まさにこれ</b>」</li>
+      <li>いいね1個で、暗黙の好みが<b>明示的なルールとして回収</b>された</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「言語化していない自分の美学」が、肯定トークンを起点にルール化される実演。これは人間の師匠が「いいね」から弟子の好みを学ぶのと同じです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>反例: 「続けて」だけのGA4タスク<small>何も残らなかった会話</small></h2>
+    <span class="badge b-plum">CASE B</span>
+    <div class="quote">【AIの報告】「GA4プロパティの作成はアナリティクス管理画面でしかできないので手順をお伝えします。並行してタグの入れ方を技術確認します。はい。続けて」</div>
+    <p class="body" style="margin-top:8px">同じ内容でも、当時は「いいね」を挟まず「続けて」のみ。この場面を判定させた結果——</p>
+    <div class="quote"><b>判定結果</b>:「見つけたルールはありません。満足だったかどうかも分かりません」</div>
+    <ul>
+      <li>仕事の質は悪くなかったのに、<b>後から何も取り出せない</b></li>
+      <li>「今なら『いいね、続けて』と言う」と当時を振り返る</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>対比が効いているのがこの例。同じタスクでも<b>肯定の1トークンがあったかどうかで、履歴の資産価値がゼロか否か</b>まで分かれます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>チームの反応: 「同僚として接している」<small>スタジオでの自己分析</small></h2>
+    <span class="badge b-line">DISCUSSION</span>
+    <ul>
+      <li>池田さん: 良い時は<b>「なかなかありだと思うけど」と先に評価</b>してから注意するスタイル</li>
+      <li>「30%は賛同するけど、残り70%は賛同できない」といった<b>同僚とのレビュー話法</b>で接している</li>
+      <li>本人（トルさん）: 「いいねの時も全然心は動いていない。<b>精度を上げるための記録</b>」</li>
+      <li>「褒めなかったのは子育てと同じ」とのツッコミも——AI育児の失敗を認めて改善へ</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>“AIを良い会社の同僚として扱う”という比喩がしっくりくる回。ポジティブ→ネガティブの順で話すレビュー文化が、そのままAIにも効くわけです。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 17</span>
+    <h2>使えるプロンプト本文: あなたの履歴も「いいね診断」できる<small>そのままClaude Codeに投げる</small></h2>
+    <span class="badge b-amber">COPY &amp; USE</span>
+    <p class="body">動画の説明欄に掲載された再現用プロンプト。自分のプロジェクトで実行すると、現在の「いいね」率と、褒めた/無言それぞれの場面の復元力がレポートされます。</p>
+    <div class="prompt">
+      <span class="plabel">PROMPT</span><br>
+      このプロジェクトにある私の過去の会話履歴を読んで、AIの返答の直後に私が打った言葉を「いいね・ありがとうなど褒めた」と「何も評価せず次へ進んだ」の2つに分けてください。それぞれから数十件を選び、その往復だけを読んで、①私が満足していたか分かるか ②何が良かったかを書けるか ③CLAUDE.mdに足すコツを書けるか、を判定し、比較表にして、実際の私の発言を例として添えてください。
+    </div>
+    <ul>
+      <li>このままClaude Codeに投げると、<b>現在のあなたの「いいね」がフィードバックとして集計</b>される</li>
+      <li>いいねの多い・少ないも可視化され、褒め癖の現状が分かる</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>いきなり丁寧にする必要はなく、まず<b>診断から始められる</b>のが良い設計。自分の無言率が7651/8702級かどうか、最初に数字で突きつけられます。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 18</span>
+    <h2>まとめ: AIへの「いいね」は儀礼ではなく記録<small>2週間で得られた結論</small></h2>
+    <span class="badge b-main">TAKEAWAY</span>
+    <div class="flow">
+      <div class="step"><b>結論1</b>不満は勝手に残る。満足は言葉にしないと消える</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>結論2</b>「いいね」1個で復元率が37%→89%に跳ね上がる</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>結論3</b>ルール化率も76%まで上がり、CLAUDE.mdが濃くなる</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>結論4</b>「後から満足を掘り出せるのは、言葉にした瞬間だけ」</div>
+    </div>
+    <ul>
+      <li>rising loop（数値改善の試作）でも「良かったこと」を拾わせたかったのに拾えなかった原因は、<b>褒め記録の欠如</b>だった</li>
+      <li>人間関係と同じ「褒めて伸ばす」が、AIでもそのまま効く——ただし根拠は感情でなく<b>データ</b></li>
+      <li>詳細とプロンプトは元動画の概要欄から。興味があればまず診断プロンプトから</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>最後の締め「この動画もいいねして欲しいですね」へのオチも秀逸。押すか押さないかで、あなたの学習履歴にこの知見が残るかが決まる——というわけです。</div></div>
+  </div>
+
+</div>
+
+<div class="foot">
+  出典: 【使えるプロンプト付】AIに感謝を伝えたら、振り返りの精度が89%になった話（ギリギリ開発会議 by ボイスアップラボ）<br>
+  <a href="https://www.youtube.com/watch?v=zCISNSr9_YY" target="_blank" rel="noopener">元動画をYouTubeで見る</a> ・ このページは動画内容を要約した非公式インフォグラフィックです
+</div>
+
+</div>
+</body>
+</html>

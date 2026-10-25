@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anthropic公式「サブエージェントはメインループへ統合」解説 | まさおAIじっくり解説ch</title>
+<style>
+  :root{
+    --bg:#FBF5F8;
+    --panel:#FFFFFF;
+    --panel2:#F9E8F0;
+    --line:#EBCEE0;
+    --ink:#2E1A26;
+    --sub:#6E4A5C;
+    --main:#BE185D;
+    --main-deep:#831843;
+    --main-soft:#FCE7F1;
+    --teal:#0F766E;
+    --teal-deep:#0A524C;
+    --teal-soft:#DFF2EF;
+    --amber:#B45309;
+    --amber-deep:#7C3A06;
+    --amber-soft:#FBEADB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(140deg,#FBEAF2 0%,#F5DCE8 55%,#FAEEDA 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(15,118,110,.12),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(190,24,93,.1);color:var(--main-deep);border:1px solid rgba(190,24,93,.4);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--main-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(190,24,93,.07);border:1px solid rgba(190,24,93,.35);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:var(--main);color:#FCE7F1;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:var(--main-deep)}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(190,24,93,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(46,26,38,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#BE185D,#831843);color:#FCE7F1}
+  .b-teal{background:linear-gradient(135deg,#14A08F,#0A524C);color:#DFF2EF}
+  .b-amber{background:linear-gradient(135deg,#D97706,#7C3A06);color:#FBEADB}
+  .b-line{background:rgba(110,74,92,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .pill.up{color:var(--teal-deep);border-color:rgba(15,118,110,.55)}
+  .pill.warn{color:var(--main-deep);border-color:rgba(190,24,93,.5)}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#3A2432;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#3A2432}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--teal-soft);border:1px solid rgba(15,118,110,.35);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--teal);color:#DFF2EF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:var(--teal-deep)}
+  .yomogi .name{font-weight:700;color:var(--teal);margin-right:4px}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#3A2432;background:#FDFBFC}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FDFBFC;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#3A2432}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--main);font-weight:800}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">ANTHROPIC公式ガイド / エージェント設計</span>
+  <h1>サブエージェントはメインループへ統合せよ<br><span class="hl">——でも「全部やめる」話ではない。残すべき3パターン</span></h1>
+  <p>Anthropicが公開したガイドが、エージェント設計の常識を揺さぶっています。主張の核心は<b>「モデル性能が上がった今、細かく切り分けたサブエージェントのオーケストレーションは、速度・品質の両面で損になることが多い。1本のエージェントループ＋スキル＋ツールで済ませよう」</b>というもの。ただしこれは<b>マルチエージェント全廃ではなく、使いどころを見極めよ</b>という話で、公式は<b>「残すべき3パターン」</b>も明示しています。本動画（まさおチャンネル）の解説と解説者自身の実践経験を、18枚のカードに整理します。</p>
+  <div class="meta">
+    <span>チャンネル: まさおAIじっくり解説ch</span>
+    <span>動画: 【必見】Anthropic公式「サブエージェントはメインループへ統合」を徹底解説！残すべき3パターンも解説</span>
+    <span>話題: Anthropic公式ガイド / エージェントループ / スキル</span>
+    <span>キーワード: サブエージェント / ハーネス / 評価</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">「サブエージェントいらなくなった」と短絡的に読まないこと。<b>何をやめて、何を残すのか</b>。CARD 01から順に見ていきましょう。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>全体像サマリ: 記事の核心は「1本のループで回せ」<small>ただし全廃ではなく、残す3パターンを押さえた「再配置」の話</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">Anthropicの記事を一言で要約すると、<b>「モデルが賢くなりすぎて、細かいサブエージェント分割の利益が消失し、費用（速度・情報劣化）だけが残った」</b>ということです。開発エージェント、デザインエージェント、テスト係、フロントエンド係……と役割で切り分けてオーケストレーションする構成は、今のモデルなら<b>スキルとツールを持たせた1つのエージェント</b>に置き換えられる。ただし検証・並列調査・巨大タスクの切り出しについては、サブエージェントが依然として本質的な価値を持つ。解説者は「一見『サブエージェント不要論』に読めるが、本質は<b>使い方の再配置</b>の話」と読み解きます。</p>
+    <div class="flow">
+      <div class="step"><b>STEP 1</b>なぜ昔は分割が正解だったのかを振り返る</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 2</b>モデルとハーネスの進化で何が変わったか</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 3</b>サブエージェントの4つの問題を理解する</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 4</b>残す3パターンと移行手順を覚える</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>まず結論、その後に「なぜ」を積み上げる構成です。<b>原典を読まずに受け売りする</b>のが一番危ないテーマですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>前提の振り返り: なぜ昔は「関心の分離」が正解だったのか<small>注意力が有限だった時代の設計思想</small></h2>
+    <span class="badge b-main">CONTEXT</span>
+    <p class="body">少し前まで、バックエンドとデザインは別エージェントに分けろ、テスト係を切れ、企画ならプランナー役を用意しろ——<b>関心ごとごとにエージェントを分割する</b>のが定石でした。これは当時のモデルが<b>注意力という資源をうまく配分できなかった</b>ためで、1つのセッションに複数の関心が混在すると処理品質が落ちました。Claude CodeにTodoリスト機能が組み込まれていたのも、同じ「注意の補助」の発想です。この前提が崩れたことが、今回の記事の出発点になります。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>大昔のモデルで同じ指針が正解だったかは別問題——<b>設計はモデルの能力に対して相対的</b>です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>変化その1: モデルそのものが強くなった<small>Opus 4.5以降、長いタスクでも自立回転できる</small></h2>
+    <span class="badge b-teal">MODEL</span>
+    <ul>
+      <li>公式の言葉を借りれば<b>Opus 4.5以降</b>、1回の実行で自立的に仕事を回せる量が大幅に増加</li>
+      <li>複数の関心事が混在する長いタスクでも、<b>品質を保ったまま完走</b>できるように</li>
+      <li>ロングコンテキスト運用で「途中で忘れた」という体験が減少</li>
+      <li>最新モデル（解説者の体感では<b>Opus 5.5</b>あたり）はスキル発動の察しがさらに強力</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「関心が混ざると品質が落ちる」というかつての制約が、<b>モデルの自力で解消された</b>——分割する動機が消えたのです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>変化その2: ハーネス層の進化——「段階的開示」<small>必要な情報だけを必要なときに読む技術</small></h2>
+    <span class="badge b-teal">HARNESS</span>
+    <p class="body">モデル以外の理由でも1本化が進みました。ハーネス（エージェントを支える周辺技術）の<b>段階的開示</b>が進化し、全部を先に読み込まなくても<b>必要な部分だけを後から取得</b>できるようになったのです。Claude Code自身も<b>システムプロンプトを約80%削減</b>した実績があり、情報を取ってくるタイミングと分量の制御が格段に上手くなりました。ターミナルの動きを眺めていても「必要なところだけ読む」挙動が観察できる、と解説者。モデルの強化とハーネスの洗練が<b>同時に進んだ</b>ことが、1セッション長期運用を現実にしています。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>コンテキスト窓の大きさだけではなく、<b>何を・いつ読むかの制御技術</b>が効いているのがポイントです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>変化その3: スキル発動の精度が上がった<small>「これが欲しいんだろ」と察する能力</small></h2>
+    <span class="badge b-teal">SKILLS</span>
+    <ul>
+      <li>スキルやツールの<b>説明文を正しく読み分けて発動する</b>精度が向上</li>
+      <li>解説者の体感: 以前のモデルはスキルの読み出しが微妙だったが、最新モデルは<b>めちゃくちゃ強力</b></li>
+      <li>多数のスキル・MCPツールを登録していても、衝突せず適切に選択しやすい</li>
+      <li>だから「薄く作ったツール＋出力の制約」を並べておけば、<b>モデルが勝手に良い感じに使う</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>ツールの説明文の書き方とその検証（工夫）が、<b>サブエージェント設計に代わる新たな仕事</b>になります。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 06</span>
+    <h2>問題その1: 伝言ゲーム——情報が落ちる、口調が崩れる<small>オーケストレーションの構造的宿命</small></h2>
+    <span class="badge b-amber">RISK 1</span>
+    <p class="body">複数のエージェントを定義してユーザーのリクエストをオーケストレーションすると、<b>受け渡しのたびに情報が劣化します</b>。サブエージェント間で口調が揃わない、意図の伝達でロスが起こる——まさに<b>伝言ゲーム</b>です。メインとサブの認識のずれを消すために、結果を要約してインプットし直すなどの補正工程が必要になりますが、その前段処理自体が<b>遅延と劣化の新しい発生源</b>になる。公式が問題視しているのはこの構造で、「1つのセッションで複数の関心を持てる今、あえてこのリスクを負う理由がない」という指摘です。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>対策はあるにはあるが、<b>一般的に言われる弱点であること自体</b>が分割コストです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>問題その2: 部分最適の罠——各98点でも全体は最適でない<small>全経過を見ている者だけが持てる判断</small></h2>
+    <span class="badge b-amber">RISK 2</span>
+    <p class="body">関心ごとに切ったサブエージェントがそれぞれ「98点」と自己申告しても、<b>全体としては最適化されていない</b>可能性があります。一方、1本のループでパート1からパート4までの全経過を同じコンテキストで見ているエージェントは、<b>総合の文脈から判断を下せる</b>。成果物の良し悪しは部分の和ではなく全体で決まるため、これが「1本に寄せるべきだ」の強い論拠になります。機械的に振り分けた担当者の集計と、最初から最後を見ている者の統合判断の差、と考えると腑に落ちます。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>自己申告の点数も当てにならない、という別の話（CARD 16）ともつながる深刻な問題です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>問題その3: 速度とコスト——呼ぶたびにループが回る<small>リサーチ→要約→返却の前段が重い</small></h2>
+    <span class="badge b-amber">RISK 3</span>
+    <ul>
+      <li>メインでできる仕事をサブに渡すと、<b>結果が返ってくるまでの待ち時間</b>が発生</li>
+      <li>サブは調査後にコンテキストを集め、メインへの返却用に<b>圧縮・象徴化</b>する——この前段が遅い</li>
+      <li>ツールとして呼び出す形でも<b>呼ぶたびにループが回る</b>のでコストが乗る</li>
+      <li>解説者も「サブエージェントを多用していると体感で遅い」と実感済み</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>機能する設計でも、<b>速度面・コスト面で状況が変わった</b>——記事の主張の実務的な核です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>問題その4: エージェントが組織図の鏡像になる<small>チーム構成を写し取った非最適なアーキテクチャ</small></h2>
+    <span class="badge b-amber">RISK 4</span>
+    <p class="body">記事はもう一つ、鋭い指摘を含んでいます。<b>チームごとにエージェントを作ると、エージェントの構成が組織図と同じ形になってしまう</b>——人間の都合の境界線が、そのまま機械の処理境界になるということです。人間の組織は認知の限界や権限分割の産物であって、モデルの処理特性に適した分割ではありません。1本のエージェントループを基本にして、境界はモデルの能力とタスクの性質から引き直す。設計の起点を「うちの組織」から「タスクの本質」へ戻せ、という話です。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>社内政治でエージェントを切ると失敗する、という昔からの知恵の新しい言い換えですね。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 10</span>
+    <h2>整理: 「エージェントループ」とは何か<small>目指す姿の定義を正確に押さえる</small></h2>
+    <span class="badge b-main">AGENT LOOP</span>
+    <table class="tbl">
+      <tr><th>要素</th><th>内容</th></tr>
+      <tr><td><b>モデル</b></td><td>1つのセッションの中で複数の関心を保持して仕事を進める</td></tr>
+      <tr><td><b>ツール実行</b></td><td>ツールを（並列に）呼び、結果を受け取って次の判断材料にする</td></tr>
+      <tr><td><b>ターンの反復</b></td><td>実行と観察を何ターンも繰り返しながら仕事を進行させる</td></tr>
+      <tr><td><b>対話での停止</b></td><td>結果を見て、ユーザーへの質問や回答で止まる</td></tr>
+      <tr><td><b>補助</b></td><td>スキル・MCPツール・メモリ・ナレッジベースを「薄く」横に並べる</td></tr>
+    </table>
+    <p class="body" style="margin-top:8px">かつての「プランナーサブエージェントが計画→メインが実行」の二段構えも、今は<b>計画の文脈を持ったままメインがそのまま実行</b>できるので、計画を切り出す必要性自体が下がりました。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>派手な技術ではなく、<b>素朴なループをどこまで伸ばせるか</b>の勝負になっています。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>置き換え先: サブエージェントは「スキルとツール」へ<small>分割の単位がエージェントから機能へ</small></h2>
+    <span class="badge b-main">REPLACE</span>
+    <ul>
+      <li>サブエージェントでやっていた定型的な仕事は<b>スキルに切り出す</b></li>
+      <li>外部機能は<b>MCPツール</b>として薄く実装し、出力の制約を上げておく</li>
+      <li>参照資料は検索ツールの先に置く<b>ナレッジベース</b>、または<b>リファレンス型スキル</b>に</li>
+      <li>計画のような高度な仕事も、モデルが自力でこなせるなら<b>切り出し不要</b></li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「1つのエージェントにスキルとツールを持たせれば十分」——公式が後押しした形です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>文脈で分ける: エバリュエーターとベリファイヤー<small>「関心の分離」は消えず、形を変えた</small></h2>
+    <span class="badge b-main">SPLIT BY CONTEXT</span>
+    <p class="body">従来は<b>仕事の種類</b>で分離していましたが、今は<b>コンテキストで分ける</b>時代です。1つのエージェントがロングランで一貫性を保って成果物を作る。ただし成果物が本当に良いかは別問題なので、そこに<b>エバリュエーター（評価役）</b>や、テストを走らせるだけの<b>ベリファイヤー（検証役）</b>を付けられる。解説者自身も、<b>コンテキストがフレッシュなサブエージェントに「主観的に読みやすいか」をチェックさせる</b>運用をしています。作る主体は1本、確かめる目は別腹——これが新しい分離の基本形です。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「分離はいらない」ではなく<b>「分離の軸が変わった」</b>。ここを読み違えると事故ります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>残すべき3パターン①: 膨大なリサーチ<small>ノイズまみれ・コンテキスト大食いの仕事</small></h2>
+    <span class="badge b-teal">KEEP 1</span>
+    <p class="body">公式がサブエージェント継続を認める最初のパターンが<b>大量の調査</b>です。リサーチはコンテキストを大量に消費し、関係ない情報（ノイズ）も大量に積み上がります。本当に欲しい知見はある程度絞り込めるので、<b>ノイズが乗りそうな仕事はメインの外に出して、蒸留された結果だけ戻す</b>のが合理的。メインセッションを泥水で汚さないための、いわば浄水槽としてのサブエージェントです。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「メインに入れたくないノイズ」の存在は、解説者が自身の運用でも重視する判断軸です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 14</span>
+    <h2>残すべき3パターン②: 並列で切れる仕事・使い捨ての小タスク<small>仕様が決まったら別セッションで生やす</small></h2>
+    <span class="badge b-teal">KEEP 2</span>
+    <ul>
+      <li>独立に進められ、終わったらコンテキストを<b>捨てていい小さいタスク</b>は分割が有利</li>
+      <li>例: 仕様が固まった画面とサーバーを<b>別セッション</b>で並行実装（Claude Codeのプロジェクト機能がまさにこの用途）</li>
+      <li>過去セッションの文脈を引き継がなくてよい仕事かどうかが判定基準</li>
+      <li>ロングランを続けるほど「メインに載せたくない」判断が効いてくる</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>切り出してよいかの問いは「<b>この仕事、文脈なしで成立する?</b>」の一言に集約されます。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>残すべき3パターン③: 中身を見ない検証<small>評価役・テスト走行役は別立てが性に合う</small></h2>
+    <span class="badge b-teal">KEEP 3</span>
+    <p class="body">3つ目は<b>検証</b>です。全体像を見るチェック係、テストを走らせる係は、作った本人と別のコンテキストで持つべき性質の仕事です。作成者が自分の仕事を評価すると、どうしても甘くなる——これは人間と同じで、<b>フレッシュな目</b>が品質の担保になります。さらに現実には、モデルが「100点」と自己申告しても、フレッシュなコンテキストで評価させると<b>申告ほどのスコアが出ない</b>ことがある。検証を内製せず外に出すことは、この自己申告の楽観を割り引く保険でもあります。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>解説者が実践する「読みやすさチェック役」もこのパターン。<b>検証は残す</b>のが定石です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>判断の実務: 質が落ちたら分割、衝突したら分離<small>測って、ダメなら戻す。移行は可逆である</small></h2>
+    <span class="badge b-amber">DECISION</span>
+    <ul>
+      <li>1本のループで大きい仕事をさせたら<b>質が悪い</b>と測れた（体感でも）→ サブエージェントか<b>コンテキストフォーク型スキル</b>で分割</li>
+      <li>ツールやスキルを大量導入して<b>呼び出しが衝突・誤発動</b>する → 関心ごとの分離で整理</li>
+      <li>決まった手順・ルールを守らせたい部分は<b>スキルの中に閉じ込める</b>（注意力は有限のため）</li>
+      <li>ツールの選び間違いや品質低下は<b>評価で計測</b>して判断する</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「1本化」と「分割」は信仰ではなく<b>計測で選ぶ</b>もの。移行は一方通行にしないのが肝心です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 17</span>
+    <h2>移行手順と評価: 測りながら1本へ寄せる<small>既存のサブエージェントは書き直さずに移行できる</small></h2>
+    <span class="badge b-main">MIGRATION</span>
+    <table class="tbl">
+      <tr><th>段階</th><th>やること</th><th>ねらい</th></tr>
+      <tr><td><b>1. 合体</b></td><td>同じ情報を扱うサブエージェント同士を1つに統合する</td><td>境界を減らして情報劣化を止める</td></tr>
+      <tr><td><b>2. ツール化</b></td><td>既存のサブエージェントを<b>ツールとして呼べる</b>ようにする</td><td>書き直さずに移行を始められる</td></tr>
+      <tr><td><b>3. スキル化</b></td><td>最終的にスキル・MCPツールへ置き換え、1本のループに統合</td><td>呼ぶたびのループ回転コストを消す</td></tr>
+      <tr><td><b>4. 比較判定</b></td><td>評価で移行前後を比較し、<b>下がったらサブエージェントのまま</b>に戻す</td><td>全てが1本向きではないため</td></tr>
+    </table>
+    <p class="body" style="margin-top:8px">評価にはClaude Code組み込みの機能とスキル群を使います。<b>ビルド評価（build eval）、プロンプト監査（prompt audit）、ヒルクライム</b>といったスキルが移行を手伝ってくれ、<b>再現性チェック</b>も重要。評価の中身はフェーズで変わります——サブエージェントに正しく振り分けられたか、スキルを読んだか、タスクを最後までやり遂げたか。公式の実例にも、移行後に評価が振るわず<b>サブエージェントに戻した配送系のケース</b>があります。ツールはAPIごとに1個ずつでなく<b>ユーザーの目的ごと</b>にまとめるのも鉄則です。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「移行したら終わり」ではなく、<b>評価を続けて戻せる状態を保つ</b>。ここが実務の勘所です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 18</span>
+    <h2>まとめ: 頭を信じて、ループを1本に<small>よもぎチェックリスト付き</small></h2>
+    <span class="badge b-main">SUMMARY</span>
+    <ul>
+      <li>モデル強化＋段階的開示＋スキル精度の向上で、<b>細かい分割の利益が消失</b></li>
+      <li>サブエージェントの病: <b>伝言ゲーム・部分最適・速度コスト・組織図の鏡像</b></li>
+      <li>基本形は<b>1本のエージェントループ＋スキル＋MCPツール＋ナレッジベース</b></li>
+      <li>残す3パターン: <b>膨大なリサーチ／並列・使い捨てタスク／中身を見ない検証</b></li>
+      <li>移行は<b>合体→ツール化→スキル化</b>で進め、評価で比較して戻す勇気を持つ</li>
+      <li>□ 自分のエージェント設計をカード16の基準で1個ずつ点検してみよう</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>時代は「分けて管理する」から「<b>1本で回して測る</b>」へ。皆さんの設計は追いついていますか?</div></div>
+  </div>
+
+</div>
+
+<footer class="foot">
+  <p>出典: 「【必見】Anthropic公式「サブエージェントはメインループへ統合」を徹底解説！残すべき3パターンも解説」（まさおAIじっくり解説ch）<br>
+  本インフォグラフィックは動画内容を日本語で再構成した要約です。元記事は動画概要欄のリンクから、動画本体はチャンネル公式ページでご覧ください。<br>
+  生成日: 2026-10-25 / ai-news-infographic</p>
+</footer>
+
+</div>
+</body>
+</html>

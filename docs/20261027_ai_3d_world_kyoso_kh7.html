@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>【AIで3D制作】AIエージェントで3Dアニメーションの動く世界を作る——キャラクター設計・背景設計・トークン効率の徹底解説【Gemini】｜AI共創イノベーション</title>
+<style>
+  :root{
+    --bg:#FBF4F7;
+    --panel:#FFFFFF;
+    --panel2:#F9E9F0;
+    --line:#EAD0DC;
+    --ink:#3A1F2C;
+    --sub:#7A5064;
+    --main:#BE185D;
+    --main-deep:#9D174D;
+    --main-soft:#FBE3EE;
+    --slate:#334155;
+    --slate-deep:#1E293B;
+    --slate-soft:#E7ECF3;
+    --cocoa:#7C4A21;
+    --cocoa-deep:#5F3717;
+    --cocoa-soft:#F6EBDD;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(150deg,#FBE3EE 0%,#FAF0F4 45%,#F6EBDD 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(51,65,85,.10),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(190,24,93,.1);color:var(--main-deep);border:1px solid rgba(190,24,93,.4);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--cocoa-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:20px;background:rgba(190,24,93,.07);border:1px solid rgba(190,24,93,.35);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#BE185D,#9D174D);color:#FBE3EE;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:var(--main-deep)}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:rgba(190,24,93,.35)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-top:18px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(58,31,44,.05)}
+  .card.full{grid-column:1/-1}
+  .card .num{position:absolute;top:14px;right:16px;font-size:11px;color:var(--sub);letter-spacing:.08em}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:linear-gradient(135deg,#BE185D,#9D174D);color:#FBE3EE}
+  .b-slate{background:linear-gradient(135deg,#334155,#1E293B);color:#E7ECF3}
+  .b-cocoa{background:linear-gradient(135deg,#7C4A21,#5F3717);color:#F6EBDD}
+  .b-line{background:rgba(122,80,100,.12);color:var(--sub);border:1px solid var(--line)}
+  .pill{font-size:11px;color:var(--sub);border:1px solid var(--line);border-radius:999px;padding:2px 10px}
+  .card ul{list-style:none;margin-top:6px}
+  .card li{font-size:13.5px;color:#4A2A3A;padding-left:18px;position:relative;margin-bottom:7px}
+  .card li::before{content:"▸";position:absolute;left:2px;color:var(--main)}
+  .card p.body{font-size:13.5px;color:#4A2A3A}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--slate-soft);border:1px solid rgba(51,65,85,.35);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#334155,#1E293B);color:#E7ECF3;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:var(--slate-deep)}
+  .yomogi .name{font-weight:700;color:var(--slate-deep);margin-right:4px}
+  .yomogi.cocoa{background:var(--cocoa-soft);border-color:rgba(124,74,33,.35)}
+  .yomogi.cocoa .face{background:linear-gradient(135deg,#7C4A21,#5F3717);color:#F6EBDD}
+  .yomogi.cocoa .bubble{color:var(--cocoa-deep)}
+  .yomogi.cocoa .name{color:var(--cocoa-deep)}
+  table.tbl{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+  table.tbl th,table.tbl td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.tbl th{background:var(--panel2);color:var(--sub);font-size:12px}
+  table.tbl td{color:#4A2A3A;background:#FFFBFD}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin-top:10px}
+  .flow .step{flex:1 1 150px;background:#FFFBFD;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;color:#4A2A3A}
+  .flow .step b{display:block;color:var(--main-deep);font-size:12px;margin-bottom:2px}
+  .flow .arrow{align-self:center;color:var(--cocoa);font-weight:800}
+  .quote{background:var(--panel2);border-left:4px solid var(--cocoa);border-radius:0 10px 10px 0;padding:10px 14px;margin-top:8px;font-size:12.5px;color:#4A2A3A;white-space:pre-line}
+  .foot{margin-top:30px;text-align:center;color:var(--sub);font-size:12px;line-height:2}
+  .foot a{color:var(--main);text-decoration:none}
+  @media(max-width:640px){.hero{padding:26px 18px}.flow .arrow{transform:rotate(90deg);width:100%;text-align:center}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">AI共創イノベーション / 2026-10-26</span>
+  <h1>AIエージェントで動く3Dアニメの世界を作る——<span class="hl">キャラクター設計と背景設計</span>のコツは「トークン効率」と「自然界の数学」</h1>
+  <p>AI共創イノベーションのワンダ佐藤さんが、Gemini（Argon）やClaude Code、CodexなどのAIエージェントを使って、クリックとカーソルで歩き回れる3Dアニメーションの世界を構築する方法を解説します。テーマは「最高のものを作る」ではなく「いかにコスパよく作るか」。一番難しいキャラクターから作る順序設計、アニメ風に抑えてAI臭さを消す判断、1/f揺らぎ・フィボナッチ・ネイピア数・黄金比といった自然の数学での調整、そしてスーパーマリオ式の「使い回し」によるトークン節約まで、ChatGPTプラスやClaudeプロプランでも実現できる現実的な作り方を18カードに再構成します。</p>
+  <div class="meta">
+    <span>チャンネル: AI共創イノベーション</span>
+    <span>出演: ワンダ佐藤</span>
+    <span>URL: youtube.com/watch?v=kh7AwekVq9Q</span>
+    <span>本稿: 18カード・インフォグラフィック</span>
+  </div>
+  <div class="yomogi-head">
+    <div class="face">よもぎ</div>
+    <div class="bubble">3Dって高スペックな環境と高いプランが必要？——実は<b>アニメ風に割り切ればプラスプラン級でも動く世界</b>が作れます。鍵は人間の認知の癖と数学でした。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="num">CARD 01</span>
+    <h2>今日のテーマ: 「最高」ではなく「コスパ」で動く3D世界を作る<small>エージェント × ブラウザで動く探索型3Dアニメーション</small></h2>
+    <span class="badge b-main">OVERVIEW</span>
+    <p class="body">ワンダ佐藤さんが今回作ったのは、クリックやキーボードのカーソルで移動し、建物の中に入って注文までできる<b>3Dアニメーションの世界</b>です。めちゃくちゃリアルなものではなく、アニメーション的な質感で割り切るのが前提。その分コード量が抑えられ、ChatGPTプラスやClaudeプロプランといった<b>手頃なプランのAIエージェントでも作り込める</b>のが最大の売りです。不思議世界と江戸時代編の2作を題材に、効率よく作るための設計思想を紹介します。</p>
+    <div class="flow">
+      <div class="step"><b>STEP 1</b>キャラクター設計</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 2</b>背景・世界の設計</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 3</b>自然の数学で調整</div>
+      <div class="arrow">→</div>
+      <div class="step"><b>STEP 4</b>使い回しとトークン効率</div>
+    </div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「どこまで手を抜き、どこに力を入れるか」——その線引きの技術が本編の本体です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 02</span>
+    <h2>完成品の姿: ゲームなのか何なのか分からない「遊べる世界」<small>探索・図鑑・ランタン——全部AIに作らせる</small></h2>
+    <span class="badge b-cocoa">DEMO</span>
+    <ul>
+      <li>草を踏むと<b>ふわふわ</b>と弾む立体感のある地面</li>
+      <li><b>Lキー</b>でランタンに点火、火明かりが反射する夜の探索</li>
+      <li><b>スペース長押し</b>で生き物を探索し「図鑑」に登録（眠りボタルを発見）</li>
+      <li>建物に入って<b>注文</b>する、リセットボタンも実装</li>
+    </ul>
+    <div class="yomogi cocoa"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「ゲームなのか何なのか分からないもの」を作る遊び心が、<b>AIに指示を出す練習場</b>になります。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 03</span>
+    <h2>江戸時代編: 資料を調べて再現する作り込み<small>長屋・湯屋・旅館・将棋まで動く</small></h2>
+    <span class="badge b-slate">DEMO 2</span>
+    <p class="body">江戸時代編では、おもちゃ屋・居酒屋・長屋・団子屋（茶屋）・湯屋を<b>一つずつ調査して再現</b>。長屋には朝顔と井戸、旅館では2階に上がって食事・布団・着替え・富士山の展望が可能。湯屋では服のまま入浴して顔がはみ出る（調整対象）など、遊びと不具合の両方が同居。昼・夕・夜の切り替えで<b>影とライトアップの演出</b>まで動きます。五目並べや将棋で実際に遊えるインタラクションも。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 04</span>
+    <h2>コツ①: 一番難しいものから作る<small>＝キャラクター（特に髪の毛）</small></h2>
+    <span class="badge b-main">ORDER</span>
+    <p class="body">制作順序の最初のコツは、<b>一番難しいものから着手</b>すること。それがキャラクターです。特に<b>髪の毛のあるキャラクター</b>は3Dで最難関。髪のないタイプは難しくないものの、口を立体的に付けたり、丸を2つ当てたりと工夫が必要です。最初のキャラができたら、次のキャラクターは<b>丸ごと移植</b>。ゼロから作り直しません。</p>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>難所を最初に片付けるのはプロジェクト管理の基本——AI相手でも同じだった、というのが面白いところ。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 05</span>
+    <h2>コツ②: キャラが先、世界は後<small>最初のスタイルが世界観を統一する</small></h2>
+    <span class="badge b-cocoa">STYLE</span>
+    <p class="body">なぜキャラクターから作るのか。理由は<b>スタイルの伝播</b>です。まずアニメ風のキャラクターを作っておくと、その後に背景を作らせたとき、AIが<b>同じ雰囲気・色合いのアニメ風3D</b>で揃えてくれます。逆にリアル寄りのキャラで始めると、背景もリアル方向へ引っ張られます。「人物 → 世界をそれに合わせる」の順序が、統一感の最短ルートです。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 06</span>
+    <h2>コツ③: 作りすぎると「AI臭い」——リアルを捨てる判断<small>アニメと分かれば人間はリアルを求めない</small></h2>
+    <span class="badge b-slate">PSYCHOLOGY</span>
+    <p class="body">本物みたいに作り込みすぎると、かえって<b>違和感（AI臭さ）</b>が出ると佐藤さんは指摘します。そこで「これがアニメだと分かっている」状態にすることで、人間の心理は<b>そこまで立体感やリアルさを求めなくなる</b>。この認知の癖を利用して、見た目のクオリティをトークンで補う——つまり<b>人間の心の側で手を抜く</b>のがコツです。アニメ的レベルなら十分作り込める上に、コード量も膨らみません。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 07</span>
+    <h2>コツ④: 自然物だけに「ゆらぎ」を与える<small>完全な丸ではなく、ちょっと崩れた丸</small></h2>
+    <span class="badge b-main">DESIGN</span>
+    <p class="body">形の基本は<b>完全な丸ではなく「ちょっと崩れた丸」</b>。まず全体をシンプルに作り、後から自然物の部分だけ<b>1/f揺らぎ</b>などをプロンプトで与えます。順序が重要で、最初から揺らぎを入れても非効率。<b>人工物（建物など）は揺らぎなしでOK</b>、自然物（木・草・地形）だけ手を入れる、と切り分けるのがトークン効率の要です。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 08</span>
+    <h2>コツ⑤: ゲシュタルトで認知に働きかける<small>「パッと見、木に見える」で十分</small></h2>
+    <span class="badge b-cocoa">GESTALT</span>
+    <p class="body">円（幾何学）の集合だけで作られた木やキノコを見ても、人間は<b>「なんとなく木」「なんとなくキノコ」「トゲトゲだけど草」</b>と認識してくれる——これがゲシュタルト（形の心理学）の力です。厳密な再現ではなく「パッと見で分かる」水準を狙い、<b>人間の認知側に補完させる</b>ことで、コードとトークンを大幅に節約します。</p>
+    <div class="yomogi cocoa"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>描く側ではなく<b>見る側の脳の処理</b>で世界を完成させる、美しいズルです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 09</span>
+    <h2>コツ⑥: スーパーマリオ式の「使い回し」<small>雲と木が同じ形だった伝説の再現</small></h2>
+    <span class="badge b-slate">REUSE</span>
+    <p class="body">トークン効率の柱は<b>素材の使い回し</b>です。屋根と屋根、輪郭・目・鼻といったパーツを使い回し、<b>長さを変える・形を少し応用する・ノイズを入れる</b>だけで別の建物や人物に見せます。一見それぞれ違う建物に見えて、よく見ると同じ素材の組み合わせ——これはファミコン時代のスーパーマリオが雲と木でやったのと同じ発想です。素材が溜まるほど世界は作りやすくなります。</p>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 10</span>
+    <h2>設計方針: 「一気に作る」か「部分から合体させる」か<small>不思議世界＝一気 / 江戸編＝積み上げ</small></h2>
+    <span class="badge b-main">ARCHITECTURE</span>
+    <table class="tbl">
+      <tr><th>方式</th><th>向くケース</th><th>結果・注意点</th></tr>
+      <tr><td><b>一気に作る</b>（全体→調整）</td><td>架空の世界・史実の制約がないもの</td><td>早いが、柳がスパゲッティになる等の<b>破綻が出やすい</b>。違和感を後から調整</td></tr>
+      <tr><td><b>部分→合体</b>（積み上げ）</td><td>江戸時代など<b>再現したい対象がある</b>場合</td><td>おもちゃ屋・居酒屋・長屋を1個ずつ調査・作成してガッチャンこ。質は高いが手間がかかる</td></tr>
+    </table>
+    <p class="body">どちらからでも作れますが、<b>記録（史実）ではない自由な世界なら全体から</b>入った方がバランスが取りやすい、というのが結論です。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 11</span>
+    <h2>調整術①: 富士山の稜線は「ネイピア数」でなだらかに<small>自然の数学を当てはめるだけ</small></h2>
+    <span class="badge b-cocoa">MATH</span>
+    <p class="body">実践編では、尖りすぎた富士山を<b>ネイピア数（e）の指数関数</b>で調整しました。確かに山は指数関数的な立ち上がりを持ちますが、実物はもっと緩やか。数式を当てはめるだけで、そびえ立つ別の山が<b>穏やかな富士山</b>に変わります。 Claude Code上でのこの調整は、CodexでもGemini（Argon）でもAntigravityでも同じようにできるといいます。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 12</span>
+    <h2>調整術②: 桜の枝は「フィボナッチ」、花びらは「1/f」<small>黄金比も使い分ける自然界の文法</small></h2>
+    <span class="badge b-main">MATH 2</span>
+    <ul>
+      <li><b>桜の枝</b>: 枝が1か所に束ねるようについているのは不自然→<b>フィボナッチ</b>で配置し直す</li>
+      <li><b>花びらの落下</b>: <b>1/f揺らぎ＋ランダム性</b>で、速い時と遅い時がある自然なふわふわ落下に</li>
+      <li>その他、<b>黄金比</b>など数学的技法を使い分け、柔らかく自然な見た目へ</li>
+    </ul>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「何かおかしい」と感じたら、その正体は大抵<b>数式の欠落</b>です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 13</span>
+    <h2>調整術③: 違和感を見つけて「ツッコむ」サイクル<small>失敗は恥ではなく調整対象</small></h2>
+    <span class="badge b-slate">ITERATE</span>
+    <p class="body">柳がスパゲッティ状に垂れ下がる失敗や、湯屋で顔がはみ出す不具合は、<b>わざと調整前のまま残して見せる</b>ことで教材に変わります。作った世界を歩き回り、<b>「ここが変だ」とツッコむ → 数学的な根拠を添えて直させる</b>。このループを回すだけで、世界はだんだん自然な形に近づいていきます。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 14</span>
+    <h2>モデルの癖を知る: 枝は「上に集中」しがち<small>OpusもArgonも同じ傾向、だから分担させる</small></h2>
+    <span class="badge b-cocoa">MODELS</span>
+    <p class="body">AIに木を作らせると、<b>枝を上の方に集中的に固める</b>癖があるといいます。OpusでもArgonでも同じ傾向が見られたとのこと。対策は<b>「1つに集中して作らせるほうが質が高い」</b>ことを利用した分担です。Opusで調整できなければArgon、ArgonでダメならCodex——<b>モデルを切り替えながら試して、後から合体</b>させるマルチモデル運用が推奨されます。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 15</span>
+    <h2>必要なのは「中途半端な知識」の組み合わせ<small>専門知識より、幅の広い全体感</small></h2>
+    <span class="badge b-main">SKILL</span>
+    <p class="body">AIを使いこなすのに必要なのは、深い専門知識ではなく<b>いろんな分野の中途半端な知識を組み合わせる力</b>だと佐藤さんは言います。1/f揺らぎ・フィボナッチ・ネイピア数・ゲシュタルト——どれも「聞いたことはある」レベルで十分実用に効く。経営者が全体を見る力を持つのと同じで、<b>何をどこに当てはめるか分かる全体感</b>がAI時代の武器になります。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 16</span>
+    <h2>最後に大事なのは「責任を持つ」こと<small>自分の作ったものの品質は自分で保証</small></h2>
+    <span class="badge b-slate">MINDSET</span>
+    <p class="body">どんなにAIに作らせても、<b>最終的な責任は作った人間にある</b>——これが佐藤さんの締めのメッセージです。違和感の見逃しも、調整の放置も、すべて自分の作品の品質。AIが書いたコードだからOKではなく、<b>自分の目で世界を歩いて確認する</b>ことが、品質管理の最後の砦になります。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">CARD 17</span>
+    <h2>ビジネス応用: 営業資料・商品説明の3D化<small>遊びで培った技術が資料になる</small></h2>
+    <span class="badge b-cocoa">BUSINESS</span>
+    <p class="body">今回の技術はそのまま<b>ビジネスに応用可能</b>です。商品の立体資料や営業資料を3Dで作れば、商品説明の説得力が一段上がります。必要なプランはChatGPTならプラス、Claudeならプロ級——遊びで磨いたコスパ技法を業務に持ち込む発想で、後日ビジネス応用編も予定しているといいます。</p>
+    <div class="yomogi cocoa"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「遊びは本番のリハーサル」——雑に見える制作遊びが<b>そのまま業務スキル</b>になる好例です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="num">CARD 18</span>
+    <h2>まとめ: コスパよく3D世界を作る7つの原則<small>今日の内容を持ち帰れる形に</small></h2>
+    <span class="badge b-main">SUMMARY</span>
+    <ul>
+      <li><b>①一番難しいキャラから</b>作り、以降は丸ごと移植——スタイルが世界に伝播する</li>
+      <li><b>②リアルを捨ててアニメ風</b>に割り切り、AI臭さとトークンを同時に減らす</li>
+      <li><b>③自然物だけ揺らぎ</b>（1/f）、人工物はそのまま——与えるのは後からでよい</li>
+      <li><b>④ゲシュタルトで認知に頼る</b>——「パッと見で分かる」水準を狙う</li>
+      <li><b>⑤マリオ式の使い回し</b>——素材＋ノイズ＋長さ変化で別物に見せる</li>
+      <li><b>⑥自然の数学で調整</b>——ネイピア数（富士山）・フィボナッチ（枝）・1/f（花びら）</li>
+      <li><b>⑦モデルの癖を分担で活かす</b>——Opus／Argon／Codexを使い分けて合体</li>
+    </ul>
+    <div class="quote">AIに必要なのは専門知識ではなく、中途半端な知識を組み合わせる力。そして最後は、自分の作ったものに責任を持つこと。（ワンダ佐藤）</div>
+    <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>プラスプラン級の環境でも<b>動く世界</b>が作れる——3D制作の敷居を一気に下げる実践講座でした。</div></div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <p>出典: 「【AIで3D制作】AIエージェントで3Dアニメーションの動く世界を作る！キャラクター設計や背景設計を徹底解説【Gemini】」AI共創イノベーション（2026-10-26）<br>
+  <a href="https://www.youtube.com/watch?v=kh7AwekVq9Q">youtube.com/watch?v=kh7AwekVq9Q</a></p>
+  <p>本稿は動画内容を18カードのインフォグラフィックとして再構成した要約です。</p>
+</div>
+
+</div>
+</body>
+</html>

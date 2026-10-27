@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anthropicはどうやって世界最高のLLMを出荷するのか | Latent Space Podcast 解説</title>
+<style>
+  :root{
+    --bg:#1E140E;
+    --panel:#2A1C13;
+    --panel2:#352418;
+    --line:#4A3323;
+    --ink:#F3E9DE;
+    --sub:#B9A48E;
+    --main:#E8A75D;
+    --main-bright:#F5C98A;
+    --main-soft:rgba(232,167,93,.12);
+    --main-line:rgba(232,167,93,.45);
+    --accent:#EFD08A;
+    --accent-soft:rgba(239,208,138,.10);
+    --accent-line:rgba(239,208,138,.4);
+    --cool:#D89A8A;
+    --cool-soft:rgba(216,154,138,.10);
+    --cool-line:rgba(216,154,138,.4);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(150deg,#241710 0%,#2C1C12 55%,#3A2513 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(232,167,93,.15),transparent 70%)}
+  .hero .tag{display:inline-block;background:var(--main-soft);color:var(--main-bright);border:1px solid var(--main-line);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--main-bright)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(42,28,19,.85);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .alert-head{margin-top:20px;background:var(--main-soft);border:1px solid var(--main-line);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .alert-head .icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:var(--main);color:#1E140E;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px}
+  .alert-head .bubble{font-size:13.5px;color:var(--ink)}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-bright)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:var(--main-soft);color:var(--main-bright);border:1px solid var(--main-line)}
+  .b-accent{background:var(--accent-soft);color:var(--accent);border:1px solid var(--accent-line)}
+  .b-cool{background:var(--cool-soft);color:var(--cool);border:1px solid var(--cool-line)}
+  .card p{font-size:13.5px;color:var(--ink);margin-bottom:8px}
+  .card ul{margin:6px 0 10px 18px;font-size:13.5px}
+  .card li{margin-bottom:4px}
+  .card b{color:var(--main-bright)}
+  .card.acc b{color:var(--accent)}
+  .card.cool b{color:var(--cool)}
+  .card code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--main-bright)}
+  .kpi{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+  .kpi .box{flex:1 1 140px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center}
+  .kpi .box .n{font-size:19px;font-weight:800;color:var(--main-bright);line-height:1.3}
+  .kpi .box.ac .n{color:var(--accent)}
+  .kpi .box .l{font-size:11px;color:var(--sub);font-weight:700}
+  .note{display:flex;gap:10px;align-items:flex-start;margin-top:12px;background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:12px;padding:10px 12px}
+  .note .icon{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:var(--accent);color:#1E140E;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .note .bubble{position:relative;font-size:12.5px;color:var(--ink)}
+  .note .name{font-weight:800}
+  .steps{margin:8px 0 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+  .steps .step{flex:1 1 150px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;position:relative}
+  .steps .step .no{display:inline-block;background:var(--main);color:#1E140E;font-size:11px;font-weight:800;border-radius:8px;padding:1px 9px;margin-bottom:5px}
+  .steps .step.ac .no{background:var(--accent)}
+  .steps .step b{font-size:12.5px;display:block;color:var(--ink);margin-bottom:2px}
+  .steps .step .why{font-size:11px;color:var(--sub);line-height:1.6}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .vs .col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .vs .col h3{font-size:13px;margin-bottom:6px}
+  .vs .col.fl h3{color:var(--main-bright)}
+  .vs .col.lv h3{color:var(--cool)}
+  .vs .col ul{margin-left:16px;font-size:12.5px}
+  .foot{margin-top:28px;text-align:center;color:var(--sub);font-size:12.5px}
+  .foot a{color:var(--main-bright);font-weight:700}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">Latent Space Podcast / Anthropic / 2026年10月28日</span>
+  <h1>Anthropicはどうやって<span class="hl">世界最高位のLLMを出荷</span>しているのか —— S-1提出・Opus 5.5ローンチ・Rustリライト・安全策のすべて</h1>
+  <p>Latent Space PodcastがAnthropicのS-1提出を機に開始したIPO特別シリーズ。Claude Platformの<b style="color:var(--main-bright)">プロダクト責任者Katelyn Lさん</b>と<b style="color:var(--main-bright)">エンジニアリング責任者Angelaさん</b>を迎え、Opus 5.5ローンチ翌日に収録。従業員あたり売上5倍増、初の黒字四半期、Messages API全量のRust移植、ディスティレーション対策、Claude Managed Agentsの安全性設計まで語ります。本動画の内容を18枚のカードに整理しました。</p>
+  <div class="meta">
+    <span>チャンネル: Latent Space Podcast</span>
+    <span>ゲスト: Katelyn L さん / Angela さん（Anthropic）</span>
+    <span>話題: Anthropic / Opus 5.5 / S-1 / Claude Platform / Claude Managed Agents / Rust</span>
+  </div>
+  <div class="alert-head">
+    <div class="icon">A</div>
+    <div class="bubble">「改善ループ」と「投資ループ」が噛み合い無限ループを形成し、Claudeは効率を上げ続ける —— S-1に記載された成長エンジンの全体像を、出荷側の責任者2人が内部視点で解き明かします。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="badge b-main">OVERVIEW</span>
+    <h2>今回のエピソード全体像<small>S-1提出を機に「最強のモデルを最も効率的に出荷する仕組み」を解体する特別回</small></h2>
+    <p>Latent SpaceはAnthropicのIPOシリーズ第1弾として、ホスト冒頭のS-1分析（財務・効率性）と、Katelyn Lさん・Angelaさんへのロングインタビューで構成。前半は<b>「なぜこれほど効率的なのか」</b>、中盤は<b>「モデルローンチとスケールの現場」</b>、後半は<b>「安全・スロップ対策・DevRel・採用」</b>まで踏み込みます。収録はOpus 5.5公開の翌日。</p>
+    <div class="kpi">
+      <div class="box"><div class="n">660万ドル</div><div class="l">従業員1人あたり年収益（12ヶ月）</div></div>
+      <div class="box"><div class="n">19%</div><div class="l">GAAPベース初の黒字四半期利益率</div></div>
+      <div class="box ac"><div class="n">40〜50%</div><div class="l">Rust移行によるCPU削減</div></div>
+      <div class="box ac"><div class="n">10〜20%</div><div class="l">最初のトークンまでのレイテンシ改善</div></div>
+    </div>
+    <div class="note"><div class="icon">注意</div><div class="bubble"><span class="name">注記:</span>本カードの財務数値は動画内の発言（S-1引用として紹介されたもの）に基づきます。社員の正式な役職名表記は動画説明欄をご確認ください。</div></div>
+  </div>
+
+  <div class="card acc">
+    <span class="badge b-accent">S-1 / EFFICIENCY</span>
+    <h2>S-1提出と1年で激変した効率指標<small>2週間後に予想されるIPO — 調達1,000億ドル超・バーン100億ドル未満</small></h2>
+    <p>AnthropicがS-1を提出し、<b>2週間後と予想されるIPO</b>に向けてLatent Spaceが特別シリーズを開始。ホスト（元金融アナリスト）がS-1から読み取った成長と効率の数字が前半の核です。</p>
+    <div class="kpi">
+      <div class="box"><div class="n">660万ドル</div><div class="l">従業員1人あたり年収益（1年前は140万ドル）</div></div>
+      <div class="box"><div class="n">19%</div><div class="l">初のGAAP黒字四半期の利益率（1年前は▲129%）</div></div>
+      <div class="box ac"><div class="n">1000億ドル超</div><div class="l">生涯キャッシュ調達（累積バーンは100億ドル未満）</div></div>
+      <div class="box ac"><div class="n">2ドル</div><div class="l">計算コスト1ドルあたりの収益（25年Q2は0.5ドル赤字）</div></div>
+    </div>
+    <p>「収益を伸ばすだけでなく、従業員に払える額を増やす」観点からも従業員あたり生産性が重視されます。</p>
+    <div class="note"><div class="icon">視点</div><div class="bubble"><span class="name">ポイント:</span>「世界最強のモデルを出荷しながら、非常に効率的に経営する」— この2つを同時に成り立たせている仕組みが本編のテーマです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">TWO LOOPS</span>
+    <h2>成長を駆動する2つのループ<small>改善ループ×投資ループ＝「終わりなき無限ループ」</small></h2>
+    <p>ホストによるS-1の整理では、Claude・Boris・Darioが「ループを愛する」ように、Anthropicには2つのフィードバックループが回っているとされます。</p>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><b>改善ループ</b><span class="why">Claude → より良いモデル → 用途拡大 → フィードバック増 → さらに良いClaude</span></div>
+      <div class="step"><span class="no">2</span><b>投資ループ</b><span class="why">収益 → 成長 → 投資増 → 能力向上 → さらに良いClaude</span></div>
+      <div class="step ac"><span class="no">∞</span><b>無限ループ</b><span class="why">2つのループが噛み合い、効率向上が永久に続く（S-1の主張）</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">PLATFORM</span>
+    <h2>Claude Platform — モデルラボからハイパースケーラーへ<small>「Claudeの拡散」の3本柱の1つ、包括的エージェント開発環境</small></h2>
+    <p>S-1で語られる「Claudeの拡散」の中心が<b>包括的なエージェント開発環境（Claude Platform）</b>です。顧客はClaudeの能力を自社製品に組み込むためのプリミティブに直接アクセスできます。</p>
+    <ul>
+      <li><b>年間10万ドル以上の収益がある顧客の50%超</b>がClaude Platformを利用</li>
+      <li>Claude CodeやClaude Co-workも<b>同一のプリミティブ</b>の上に構築</li>
+      <li>「ant fooding（自社プラットフォームで自社を開発）」が議論の鍵に</li>
+      <li>IPO叙事は「チャットボット → コパイロット → バーチャルコラボレーター（エージェント）」への進化</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">OPUS 5.5</span>
+    <h2>Opus 5.5 — 「今世界で最も良いモデル」<small>文章の癖を掃除し、価格を大幅に下げた次世代フラッグシップ</small></h2>
+    <p>収録はOpus 5.5公開翌日。「高品味テスターたちの間で圧倒的な評価」と紹介されます。</p>
+    <ul>
+      <li>Opus 5で指摘された<b>文章の回りくどさを大幅にクリーンアップ</b>（社内検証でも実感）</li>
+      <li><b>「1ドルあたりの知能」</b>重視 — 大幅な価格引き下げを実施</li>
+      <li>後続の<b>Fable 5.5も2週間以内の出荷が噂される</b>（IPO前という観測。内部情報ではないと明言）</li>
+      <li>「古い上司から『Opus 5.5が障害対応で助けてくれた』と連絡が来た」など反響は上々</li>
+    </ul>
+  </div>
+
+  <div class="card cool">
+    <span class="badge b-cool">DISTILLATION</span>
+    <h2>推論の盗み（ディスティレーション）対策<small>「Stealing Reasoning Traces」論文と、思考ブロック保全の綱渡り</small></h2>
+    <p>責任ある開示で知らされた、思考トークンからモデルを蒸留する手法への対応が語られます。Anthropicが防ぎたいのは<b>商業的損失ではなく安全性の劣化</b> — 蒸留モデルにはセーフガード分類器が無いためです。</p>
+    <ul>
+      <li><b>思考ブロックのターン間保全</b>を必須化、複数アカウント悪用対策も追加</li>
+      <li>prefix lock thinking・思考トークンの再生利用制限などの具体的変更</li>
+      <li>壊れるはずだった<b>圧縮（compaction）戦略向けに新API機能を提供</b>して移行を支援</li>
+      <li>オープンソースのハーネス保守者や大口顧客と個別に協働し「ヨルヨロ締め付け」を回避</li>
+      <li>効果測定でも<b>蒸留は大幅に困難になった</b>と確認</li>
+    </ul>
+  </div>
+
+  <div class="card cool">
+    <span class="badge b-cool">P × E</span>
+    <h2>プロダクト責任者 × エンジニアリング責任者<small>Stripe時代からのコンビが語る、モデルローンチの役割分担</small></h2>
+    <p>2人は以前Stripeで同僚。「時間が経っても2役が分かれているなら、ソフトウェアエンジニアリングはまだ解決されていない」という問いに「確かにまだ」と応じます。</p>
+    <div class="vs">
+      <div class="col fl"><h3>Katelyn Lさん（プロダクト）</h3><ul><li>知性のバーとコストのバランス</li><li>価格改定で savings を還元する判断</li><li>安全策と体験の両立（商業的影響寄り）</li></ul></div>
+      <div class="col lv"><h3>Angelaさん（エンジニアリング）</h3><ul><li>APIの統合体験・DX（開発者体験）</li><li>スケールとアーキテクチャの実装</li><li>製品に強いエンジニア / 技術に強いPMの混合チーム</li></ul></div>
+    </div>
+    <div class="note"><div class="icon">未来</div><div class="bubble"><span class="name">示唆:</span>ソフトウェアエンジニアリングが「解決」されれば、プロダクトとエンジニアリングの2役は1つに融合するかもしれない — ただし現状はまだ。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">SCALE</span>
+    <h2>1年で激変したスケール課題<small>Pythonモノリス＋単一リージョンから、3クラウド・CPU不足の時代へ</small></h2>
+    <p>Angelaさんが入社した1年強前、Messages APIは<b>Pythonのモノリスで単一GCPリージョン</b>で動いていたとのこと。現在では量が桁違いになり、課題は「スケールと安全」の2つに集約されます。</p>
+    <ul>
+      <li>最大の制約は<b>アクセラレータではなくCPU</b> — VM・サンドボックス・CI・研究環境すべてで不足</li>
+      <li>エージェント時代はコード量・CI実行回数が激増しCPU需要が爆発</li>
+      <li>かつては予算さえあればon-demandで CPU を拡張できたが、<b>今は事前のキャパシティ計画が必要</b></li>
+      <li>3つのクラウドすべてで稼働しており、計算資源の割り当ては社内のゼロサムゲーム</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">RUST</span>
+    <h2>Messages API全量をRustへ一気に移植<small>Rust経験者ゼロのチームが、Claudeにコードを書かせて達成</small></h2>
+    <p>CPUの壁を見越して選ばれたのは<b>API全体のRustへの移植</b>。「部屋にRust開発者が1人もいない。誰も気にしない」と始めた Crazy な決断です。</p>
+    <div class="steps">
+      <div class="step"><span class="no">1</span><b>人間が設計</b><span class="why">分散システム設計は人間が主導。重要なのは計画と検証</span></div>
+      <div class="step"><span class="no">2</span><b>Claudeが実装</b><span class="why">API全体のフォークをRustで構築</span></div>
+      <div class="step"><span class="no">3</span><b>シャドウトラフィック</b><span class="why">Python版とRust版の出力を突き合わせ検証し、フィーチャーフラグで徐々に切替</span></div>
+    </div>
+    <div class="kpi">
+      <div class="box"><div class="n">40〜50%</div><div class="l">CPU削減（長時間ワークロードではさらに大）</div></div>
+      <div class="box ac"><div class="n">10〜20%</div><div class="l">最初のトークンまでのレイテンシ改善</div></div>
+    </div>
+    <p>新機能追加の誘惑を排した<b>「ピュアなポート」</b>として実行し、前週に完全ロールアウト完了。従来なら数年かかる分段階移行を一撃で行った形です。</p>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">LAUNCH</span>
+    <h2>モデルローンチの内側<small>安全性検証 → 内部ant fooding → アーリーアクセス顧客 → 公開</small></h2>
+    <p>安全性を除くと「かなり機械化されてきた」というローンチ工程。API顧客はClaudeを<b>別のハーネスで動かす</b>ため、汎用性の検証として特に有用です。</p>
+    <ul>
+      <li>複数のモデル候補をカットし、内部のant foodingで早期シグナルを収集</li>
+      <li>Cognition などの主要API顧客にアーリーアクセス提供 — <b>eval結果と「バイブス」両方のフィードバック</b>を収集</li>
+      <li>「最も有用なフィードバックはネガティブなもの。良い指摘は検証にすぎない」</li>
+      <li>実際に「怠けすぎ」検出 → 焼き直して再学習した事例も</li>
+      <li>フィードバックの実態はいまだ<b>企業間のSlackチャンネル</b>中心で、非構造的なまま</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">PERSONA</span>
+    <h2>「怠け」と「先回り」の調整難<small>全員が違う好みを抱える、パーソナライゼーションの未解決問題</small></h2>
+    <p>「タスクを完遂してくれ、怠けるな」という人と「まだ計画段階なのにコードを書きすぎる」という人が必ずいる — <b>全員の望む地点を1つに当てるのは文字通り不可能</b>と率直に認めます。</p>
+    <ul>
+      <li>当面は<b>パラメータ（effort・budget等）とセグメント別デフォルト</b>で調整</li>
+      <li>無料 / Pro / Claude Code / Co-work / Enterprise / API など<b>層ごとにデフォルト設定</b>を変える「やさしいデフォルト」方針</li>
+      <li>ユーザーがClaudeのカスタマイズを失う懸念は避けたい</li>
+      <li>将来的には「Claude自身が個別化信号を取り込める」仕組みが必要 — 今は判断で乗り切る</li>
+      <li>最新の設定変更：Claude Code のデフォルト reasoning effort が <code>medium</code> に</li>
+    </ul>
+  </div>
+
+  <div class="card cool">
+    <span class="badge b-cool">SAFETY 3D</span>
+    <h2>安全策の3つの次元と信任グラント<small>アーキテクチャ・オンライン・オフラインの三層防御</small></h2>
+    <p>「フロンティアのペースを守りながら11日後に新モデルを出す」矛盾への答えは、<b>3次元の安全確認を通過したから</b>。Opus 5.5はすべての次元で優れていたため出荷された、という整理です。</p>
+    <ul>
+      <li><b>①アーキテクチャ/インフラセキュリティ</b>（brain/hands分離・資格情報保護）</li>
+      <li><b>②オンラインsafeguards</b>（トークン流に常駐する分類器）</li>
+      <li><b>③オフラインsafeguards</b>（保存データへの分類・レビュー）</li>
+      <li>モデルごとにデータ保持ポリシーを決定 — <b>Opus 5.5には保持要件なし、Fableにはあり</b></li>
+      <li>cyber検証プログラムに加え<b>新たにライフサイエンス検証プログラム</b> — 用途申請制でデュアルユースの正当な研究を解放</li>
+      <li><b>trust grants（信任付与）</b>がAPIのホットパスを貫通し、許可された人だけが許可された使い方をできる仕組みを構築</li>
+      <li>Fable級の事件に備え<b>全員を一括ロールバックする単一ボタン</b>も実装済み</li>
+    </ul>
+  </div>
+
+  <div class="card cool">
+    <span class="badge b-cool">ROADMAP</span>
+    <h2>確率的ロードマップ — ヘッジのポートフォリオ<small>Fable事件が変えた、「想定外」に備えるプロダクト開発</small></h2>
+    <p>従来型の順序立てたプロダクト計画は、政府によるFable活用のような<b>誰も予想しなかった事象</b>で崩壊。以来、チームの計画手法は深く確率的になったと語られます。</p>
+    <ul>
+      <li>「最もクレイジーな可能性集合を想像しても、確実性はほぼゼロ」→ <b>ヘッジを含む賭けのポートフォリオ</b>を組む</li>
+      <li>実際に「使うかもしれない仕組み」を先に作ると、<b>ほとんどの場合あとで本当に使う</b></li>
+      <li>アクセス検証プログラムを<b>意図的にジェネリックなプリミティブ</b>で構築した結果、モデルアクセス管理・信頼アクセス・デプロイ管理に波及して「複利」を生んだ</li>
+    </ul>
+    <div class="note"><div class="icon">書籍</div><div class="bubble"><span class="name">推薦:</span>Angelaさんの一押しはナシーム・タレブ『ブラックスワン』。「Fableの騒動はまさにブラックスワンだった」とのこと。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">CMA</span>
+    <h2>Claude Managed Agents — ハーネス構築からの解放<small>Messages APIの上に用意された、エージェントの高階抽象化</small></h2>
+    <p>Messages APIが「生のトークンアクセス」なのに対し、<b>CMAはエージェントを定義してセッションを開始するスイート型API</b>。ハーネスやインフラの構築をスキップできる、箱から出してすぐ動く統合です。</p>
+    <ul>
+      <li>毎回のローンチで新パラメータ・破壊的変更の対応をAnthropic側が吸収し、<b>ベストな設定を箱から提供</b></li>
+      <li>Claude Code / Claude Tag と<b>サンドボックス艦隊などの基盤インフラを共有</b>（ハーネス層は製品ごとに別）</li>
+      <li>登場以降、各社がこぞって模倣 — 「模倣は最も誠実な賛辞」</li>
+      <li>メモリ・Dreaming・スキルは継続更新中。ただし<b>チームのエネルギーは安全側にシフト</b>しつつある</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">BRAIN / HANDS</span>
+    <h2>Brain/Hands分離と secure by default<small>サンドボックス脱走問題への設計上の回答</small></h2>
+    <p>「エージェントがサンドボックスを脱走する」事故の多くは<b>訓練環境の話</b>で、本番ワークロードでは構造的に起きにくいと整理します。CMAの初期設計PMは「この構造の最重要属性はセキュリティだ」と言い続け、いま報われたとのこと。</p>
+    <ul>
+      <li><b>Brain（ハーネス）は耐久的なサーバー、Hands（実行）はサンドボックス</b> — 初期トークンが速く、サンドボックスが死んでもエージェントは死なない</li>
+      <li>資格情報は<b>独立したvaultに保管</b>し、エージェントにはプレースホルダーのみ開示。egress時にプロキシが正しい資格情報を注入</li>
+      <li><b>ドメイン許可リスト / ネットワーク遮断</b>で、生成された信頼できないコードの外向き通信を制限</li>
+      <li>「brainとhands」「資格情報注入」「egress制御」— 9ヶ月前には誰も使っていなかった新しい語彙</li>
+    </ul>
+    <div class="note"><div class="icon">結論</div><div class="bubble"><span class="name">要点:</span>サンドボックス事故の多くは「許可リストを設定していない」運用の問題。訓練時のインシデントと本番の防御を混同しないことが第一歩です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">DREAMING</span>
+    <h2>Dreamingとマルチエージェント戦略の公開<small>「CMAの上にCMA」— 自己増殖するマルチエージェントの設計</small></h2>
+    <p>記憶の自動形成機能<b>Dreamingの正体は、CMAの上に構築されたマルチエージェントシステム</b>。別のマネージドエージェントを起動して前のエージェントを検査し、メモリを書き込みます。「マネージドエージェントの無限ダウン」です。</p>
+    <ul>
+      <li>best-of-N・検証エージェント・ゴール追求などの<b>ヒルクライム戦略</b>を同じ土台で構築可能</li>
+      <li><b>近日中に基盤プリミティブを公開</b>し、ユーザーが独自のマルチエージェント戦略を構築できるテンプレートも提供予定</li>
+      <li>ハーネスは意図的にシンプルに — 非差別化部分は雛形化し、ベストプラクティスはマージして還元</li>
+    </ul>
+  </div>
+
+  <div class="card acc">
+    <span class="badge b-accent">EVALS</span>
+    <h2>評価（eval）は「多いほど良い、シンプルに始める」<small>最大の失敗は投資不足 — エンジニアリングを研究として扱う</small></h2>
+    <p>evalについての質問への答えは明快です。</p>
+    <ul>
+      <li><b>「必要なのは多くではなく少なく」ではない — むしろ多く必要。</b>完璧な少数のevalセットは存在しない</li>
+      <li>メニューを見てあれこれ試す前に、<b>まずシンプルなevalを1つ作る</b>だけで意味がある</li>
+      <li>エージェントにもevalスイートの進化を手伝わせられる</li>
+      <li>ホスト側の補強: <b>「エンジニアリングを研究として扱う」</b>とeval・ラベリング・試験のスケールが自然に増える。「時にevalが間違っていて、時に環境が間違っていて、時にモデルが間違っている」</li>
+      <li>「プロンプトでevalを作れる」ことを知らない人が多い — Claudeはeval作成が得意</li>
+    </ul>
+    <p>今後CMAにeval作成を支援する製品機能が追加される予定です。</p>
+  </div>
+
+  <div class="card acc">
+    <span class="badge b-accent">CULTURE</span>
+    <h2>スロップ対策・DevRel・結論<small>「人間が品質に責任を持つ」— 文化と採用の現在地</small></h2>
+    <p><b>スロップ（AI生成の粗製乱造）との戦い:</b> Claudeの利用は当然だが、読まずに出すのは消費者への不当な負荷。品質責任は人間が負う。本当にスロップなら<b>送り返してよい</b>。一方で「Mダッシュ1つでAI文書だと警戒する」claudism過敏は不生産的、というバランス感覚。コード側は計画と設計を人間が担保し、実装はClaude、検証で高水準を維持。「2週間で13項目のリファクタリング目標のうち12を3日で達成」した事例も紹介。</p>
+    <p><b>DevRel:</b> Addy Osmaniさんらがジョイン。プラットフォームとClaude Codeに2つのDevRelチームを新設。「レゴのマスタービルダー」のように作って見せる役割や、<b>フロントオフィス（製品責任者が語る）/バックオフィス（支援チーム）の分業</b>という未来像も。「Lanceが書いたClaude APIスキルこそ最高にレバレッジの効くDevRel」</p>
+    <p><b>結びのアドバイス:</b> Opus 5.5は費用対効果が高いため、以前はコストで諦めた<b>マルチエージェント実験</b>に再挑戦を。設計原則は「1人のリード＋並列化可能なタスク＋共有状態＋サブエージェント同士は非同期でブロックしない」。役割を自分で割り当てず<b>エージェントが自ら役割を決める</b>構成こそ新しいフロンティア。</p>
+    <div class="note"><div class="icon">名言</div><div class="bubble"><span class="name">Angelaさんのツイートより:</span>「何かを中途半端にやるのは、それをやらない高価な方法である（Half doing something is an expensive way of not doing it）」</div></div>
+  </div>
+
+</div>
+
+<div class="foot">
+  <p>出典: <a href="https://www.youtube.com/watch?v=MRQTlwcW-aQ" target="_blank" rel="noopener">How Anthropic ships the #1 LLM in the World — with Katelyn L（Latent Space Podcast）</a></p>
+  <p>本インフォグラフィックは動画内容を要約・整理したもので、数値・見解はすべて動画内の発言に基づきます。</p>
+</div>
+
+</div>
+</body>
+</html>

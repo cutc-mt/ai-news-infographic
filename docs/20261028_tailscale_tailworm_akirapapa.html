@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tailscale「Tailworm」検証——10の指摘と1つの設定注意 | あきらパパ 2026.10.28</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Yomogi&display=swap');
+  :root{
+    --bg:#F5F5FB;
+    --panel:#FFFFFF;
+    --panel2:#EEF0FA;
+    --line:#DCDFF0;
+    --ink:#221E3F;
+    --sub:#6A6690;
+    --main:#312E81;
+    --main-deep:#1E1B4B;
+    --main-soft:#E4E4F8;
+    --cy:#0891B2;
+    --cy-deep:#0E5E75;
+    --cy-soft:#DDF2F7;
+    --dgr:#BE123C;
+    --dgr-deep:#881337;
+    --dgr-soft:#FCE8EE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(150deg,#F5F5FB 0%,#E6E9F9 55%,#DDF2F7 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(49,46,129,.12),transparent 70%)}
+  .hero .tag{display:inline-block;background:rgba(49,46,129,.1);color:var(--main-deep);border:1px solid rgba(49,46,129,.4);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--main-deep)}
+  .hero h1 .au{color:var(--cy-deep)}
+  .hero p{color:var(--sub);font-size:14px;max-width:860px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.78);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .alert-head{margin-top:20px;background:var(--dgr-soft);border:1px solid rgba(190,18,60,.4);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .alert-head .icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:var(--dgr);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+  .alert-head .bubble{font-size:13.5px;color:var(--dgr-deep)}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 1px 3px rgba(34,30,63,.05)}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:var(--main-soft);color:var(--main-deep);border:1px solid rgba(49,46,129,.35)}
+  .b-cy{background:var(--cy-soft);color:var(--cy-deep);border:1px solid rgba(8,145,178,.4)}
+  .b-dgr{background:var(--dgr-soft);color:var(--dgr-deep);border:1px solid rgba(190,18,60,.35)}
+  .card p{font-size:13.5px;color:var(--ink);margin-bottom:8px}
+  .card ul{margin:6px 0 10px 18px;font-size:13.5px}
+  .card li{margin-bottom:4px}
+  .card b{color:var(--main-deep)}
+  .card.cy b{color:var(--cy-deep)}
+  .card.dgr b{color:var(--dgr-deep)}
+  .card code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--main-deep)}
+  .kpi{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+  .kpi .box{flex:1 1 140px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center}
+  .kpi .box .n{font-size:20px;font-weight:800;color:var(--main-deep);line-height:1.3}
+  .kpi .box.cy .n{color:var(--cy-deep)}
+  .kpi .box.dgr .n{color:var(--dgr-deep)}
+  .kpi .box .l{font-size:11px;color:var(--sub);font-weight:700}
+  .note{display:flex;gap:10px;align-items:flex-start;margin-top:12px;background:var(--cy-soft);border:1px solid rgba(8,145,178,.35);border-radius:12px;padding:10px 12px}
+  .note .icon{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:var(--cy);color:#FFF;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:10px}
+  .note .bubble{position:relative;font-size:12.5px;color:var(--cy-deep);font-family:'Yomogi',cursive;line-height:1.9}
+  .note .name{font-weight:800}
+  .steps{margin:8px 0 4px;display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+  .steps .step{flex:1 1 150px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px;position:relative}
+  .steps .step .no{display:inline-block;background:var(--main);color:#FFF;font-size:11px;font-weight:800;border-radius:8px;padding:1px 9px;margin-bottom:5px}
+  .steps .step.cy .no{background:var(--cy)}
+  .steps .step.dgr .no{background:var(--dgr)}
+  .steps .step b{font-size:12.5px;display:block;color:var(--ink);margin-bottom:2px}
+  .steps .step .why{font-size:11px;color:var(--sub);line-height:1.6}
+  .verdict{margin-top:10px;background:var(--main-soft);border:1px solid rgba(49,46,129,.3);border-radius:12px;padding:10px 14px;font-size:13px;color:var(--main-deep)}
+  .tags4{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+  .tags4 span{font-size:12px;font-weight:700;border-radius:10px;padding:4px 12px;border:1px solid}
+  .t-claim{background:#FFF7E6;color:#8A5A00;border-color:rgba(180,120,0,.4)}
+  .t-official{background:#E4F5E9;color:#1B5E2A;border-color:rgba(30,120,50,.4)}
+  .t-fix{background:var(--cy-soft);color:var(--cy-deep);border-color:rgba(8,145,178,.4)}
+  .t-unverified{background:#F1F1F4;color:#555;border-color:#CCC}
+  .foot{margin-top:28px;text-align:center;color:var(--sub);font-size:12.5px}
+  .foot a{color:var(--main-deep);font-weight:700}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">あきらパパ / Tailscaleセキュリティ検証 / 2026年10月28日</span>
+  <h1><span class="hl">Tailscale「Tailworm」報告</span>は今も危ないのか——<br><span class="au">10の指摘+1つの設定注意</span>を公式告知と照合して防御策まで</h1>
+  <p>「11個の指摘」「ワーム」という強い言葉が並ぶTailworm報告。この数日で状況が大きく動き、<b>10月16日にTailscale公式が告知4件</b>を出し、<b>10月28日には修正版1.104.4の配布が始まりました</b>。この動画は公開情報の整理であり、攻撃の実証ではありません。18枚のカードに、判定と対策までまとめました（10月28日17:40時点の確認）。</p>
+  <div class="meta">
+    <span>チャンネル: あきらパパ</span>
+    <span>話題: Tailscale / Tailworm / SSH転送 / Headscale / Serve・Funnel / 1.104.4</span>
+    <span>確認: 2026年10月28日 17:40時点</span>
+  </div>
+  <div class="alert-head">
+    <div class="icon">!</div>
+    <div class="bubble">まず結論——<b>確認された問題の大半は1.104.4で修正済み。今できる第一歩は「全端末の更新」</b>。ただし Headscale 利用者はまだ修正待ち、更新までの間はSSH転送を止める設定と許可の絞り込みが公式の対策です。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="badge b-main">OVERVIEW</span>
+    <h2>全体像:「Tailworm」とは何だったのか<small>研究報告 → 公式告知4件 → 修正版1.104.4配布</small></h2>
+    <p>Tailscaleの脆弱性をまとめた研究報告「Tailworm」が、<b>「ワーム（自動で広がる悪意あるプログラム）」という強い言葉</b>とともに話題になりました。ただし内容を分解すると、重大度付きの指摘は<b>10件</b>、残る1件は<b>設定上の注意</b>。それぞれ公式の認識と修正状況は異なります。</p>
+    <div class="kpi">
+      <div class="box"><div class="n">11項目</div><div class="l">報告の番号付き指摘（数え直し）</div></div>
+      <div class="box"><div class="n">10件+1</div><div class="l">重大度付き10件＋設定注意1件</div></div>
+      <div class="box cy"><div class="n">4件</div><div class="l">10/16の公式告知（7項目を網羅）</div></div>
+      <div class="box cy"><div class="n">1.104.4</div><div class="l">10/28配布開始の修正版</div></div>
+    </div>
+    <div class="note"><div class="icon">あきら<br>パパ</div><div class="bubble"><span class="name">あきらパパ:</span>最初は「11項目」と言われていましたが、報告を数え直すと、重大度がついているのは10件。残る1件は研究者自身が「設定の注意」と分類した項目です。区別して見るのが第一歩です。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">METHOD</span>
+    <h2>検証の基本姿勢:4種類の「札」で分ける<small>主張と確認を混ぜない</small></h2>
+    <p>この動画は<b>公開されている報告・公式の告知・修正の記録を読んで整理したもの</b>で、攻撃を試したわけではありません。各項目に次の4種類の札をつけます。</p>
+    <div class="tags4">
+      <span class="t-claim">研究者の主張</span>
+      <span class="t-official">公式の確認</span>
+      <span class="t-fix">修正の記録</span>
+      <span class="t-unverified">未確認</span>
+    </div>
+    <ul>
+      <li>研究者がラボで再現したと書いていても、<b>それだけでは提供元が認めたことにはならない</b></li>
+      <li>研究者でも提供元でもない<b>第三者による再現は、調べた範囲では見つからなかった</b></li>
+      <li><b>実際の被害報告も見つかっていない</b>——ただし「被害がない」と言い切れるわけでもない</li>
+    </ul>
+    <p>確認は10月28日17:40時点。状況はまだ動いています。</p>
+  </div>
+
+  <div class="card cy">
+    <span class="badge b-cy">BASICS</span>
+    <h2>前提:Tailscaleを「大きな共同住宅」に例えると<small>動画の比喩をそのまま図式化</small></h2>
+    <ul>
+      <li><b>廊下</b> = テイルネット——離れたPCやサーバーをつなぐ専用の通路</li>
+      <li><b>部屋</b> = 端末——それぞれの機械</li>
+      <li><b>入居ルールの掲示板</b> = ポリシー（ACL）——誰がどこへ入れるかの許可一覧</li>
+      <li><b>マスターキーを持つ管理人</b> = 常駐プログラム（tailscaled）——<b>最強権限のrootで動いている</b></li>
+      <li><b>受付窓口</b> = Unixソケット——部屋の中でプログラム同士が話す窓口</li>
+    </ul>
+    <p>指摘の多くは「<b>管理人（root権限）が窓口の管理を甘くやっていた</b>」話として読めます。</p>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">CONDITION</span>
+    <h2>「外の誰でも入れる」話ではない<small>攻撃成立の前提条件</small></h2>
+    <p>SSH関連の問題を悪用するには、<b>すでに許可された端末に足場（SSH接続の権利）を持っている必要</b>があります。インターネット側の誰もがいきなり突ける話ではありません。</p>
+    <ul>
+      <li>条件：<b>ポリシーでSSH接続が許可されている</b>こと＋接続できる立場にあること</li>
+      <li>「ワーム」と呼べるかは<b>研究者と提供元で見方が分かれる</b>ところ</li>
+      <li>表現の怖さと、自分の使い方での実際の exposure は別個に評価する</li>
+    </ul>
+    <p>だからこそ「どの機能を・誰が・どこで使っているか」の見極めが重要です。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SSH ①</span>
+    <h2>SSHの転送がroot権限で行われる<small>一般ユーザーの接続なのに管理人が代理</small></h2>
+    <p><b>転送（ポートフォワーディング）</b>とは、接続を通して窓口まで話を取り次いでもらう機能。ところが一般ユーザーとして入った接続なのに、その取り次ぎを<b>管理人がroot権限でやってしまう</b>という問題です。</p>
+    <ul>
+      <li>判定：<b>研究者の再現＋公式告知14番が認める</b> → 修正は1.104.4に収録</li>
+      <li>届いてしまう例として公式は<b>Dockerの窓口</b>や<b>Tailscale自身の管理用窓口</b>を挙げる</li>
+      <li>更新できない間は<b>転送だけを止める設定を入れて常駐プログラムを再起動</b>（SSH自体は止めずに済む）</li>
+    </ul>
+    <p>補助案（動画の推論）：転送が必要な機械と不要な機械を分けておく。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SSH ②</span>
+    <h2>逆向きの転送で「本物の窓口」がすり替わる<small>rootの受付を外して別の受付に</small></h2>
+    <p><b>リバースフォワーディング</b>（相手側に受付を作る機能）が管理人の権限のまま作られるため、<b>rootが持つ本物の受付窓口を外して、別の受付に置き換えられてしまう</b>という問題です。</p>
+    <ul>
+      <li>判定：<b>研究者の再現＋公式告知14番</b> → 修正は1.104.4</li>
+      <li>怖いのは、置き換えられた受付に<b>本物だと思ったプログラムが話しかけると、やり取りが別の相手に渡る</b>こと</li>
+      <li>対策は①と同じ：<b>更新＋転送を止める設定</b></li>
+    </ul>
+    <p>補助案：更新後、Dockerのような大事な窓口を使うサービスがきちんと動くかも確認を（推論）。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SSH ③</span>
+    <h2>確認と使用の「隙間」で行き先が入れ替わる<small>Time-of-Check と Time-of-Use のずれ</small></h2>
+    <p>管理人は「この行き先なら安全」と確かめてから扉を開けます。その<b>確認した時と使う時のわずかな隙間に行き先が入れ替わってしまう</b>という指摘です。</p>
+    <ul>
+      <li>公式の告知も、この件を含めて<b>複数の弱点が重なり、許可の一覧が守りとして機能しなくなっていた</b>と説明</li>
+      <li>研究者は<b>新しい端末を登録できる鍵（auth key）まで届いた</b>と主張——ここは研究者の主張の札</li>
+      <li>修正では、<b>取り次ぎ自体を接続した本人の権限で行う</b>ように変更 → 対策は更新</li>
+    </ul>
+    <p>補助案：端末登録に使う鍵を<b>使い切り・期限の短いもの</b>にして、漏れた時の被害を小さく（推論）。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SSH ④</span>
+    <h2>許可されたSSH接続でメモリが増え続ける<small>盗まれる話ではなく「使えなくなる」話</small></h2>
+    <p>報告5番目の項目。許可されたSSH接続の中でやり取りを続けると、<b>常駐プログラムのメモリが増え続けて強制終了</b>してしまいます。</p>
+    <ul>
+      <li>判定：<b>公式告知15番が認める</b> → 修正は1.104.4に収録</li>
+      <li>常駐プログラムが止まると<b>その端末のテイルネット通信が全て途絶える</b>（DoS）</li>
+      <li>条件は「ポリシーで許されたSSH接続があること」。研究者は<b>メモリ上限と自動再起動</b>も推奨</li>
+    </ul>
+    <p>注意：<b>転送を止める設定はこの件には効かない</b>（推論）。遠くの機械には別の入り方も用意しておくと安心です。</p>
+  </div>
+
+  <div class="card full">
+    <span class="badge b-main">PART 1 VERDICT</span>
+    <h2>第1部判定:SSHの4件はすべて公式が認め、1.104.4で修正<small>ただし「治るのは更新した端末だけ」</small></h2>
+    <div class="steps">
+      <div class="step"><span class="no">①転送</span><b>root権限で取り次ぎ</b><div class="why">Docker・管理用ソケットに到達可／修正済み</div></div>
+      <div class="step"><span class="no">②逆転送</span><b>窓口のすり替え</b><div class="why">会話が別相手に渡る／修正済み</div></div>
+      <div class="step"><span class="no">③隙間</span><b>確認と使用のずれ</b><div class="why">許可一覧が機能しなくなる／修正済み</div></div>
+      <div class="step"><span class="no">④メモリ</span><b>肥大化と強制終了</b><div class="why">通信途絶のDoS／修正済み</div></div>
+      <div class="step dgr"><span class="no">更新まで</span><b>転送停止＋許可を絞る</b><div class="why">公式が示す暫定対策</div></div>
+    </div>
+    <div class="verdict">SSH系4件は<b>すべて「公式の確認」＋「修正の記録」あり</b>。全端末を1.104.4以降へ。更新までの間は転送を止める設定とSSHの許可を絞ることが公式の対策です。</div>
+  </div>
+
+  <div class="card full">
+    <span class="badge b-cy">PART 2 VERDICT</span>
+    <h2>第2部判定:中継と自前サーバーの2件は「使っている人だけの話」<small>未公開機能の解釈が分かれ、Headscaleは修正待ち</small></h2>
+    <div class="steps">
+      <div class="step"><span class="no">報告4番目</span><b>次世代App Connector</b><div class="why">決められていない行き先にも応答——研究者「公開コードに試験中機能として存在」／公式「開発中で未公開・安定版は無影響」。修正案は公開済みだが確認時点で取り込み前。安定版利用者は対応不要</div></div>
+      <div class="step"><span class="no">Headscale</span><b>自前管理サーバー</b><div class="why">ログイン前通信でメモリを使い果たせる（研究者報告）。悪意ある中継所（DERP）につながると端末側もメモリ枯渇——<b>こちらは1.104.4関連の修正記録を確認済み</b>。Headscale側は最新0.29.6時点でもまだ修正待ち</div></div>
+    </div>
+    <p>公式・研究者ともに<b>メモリ上限と外部公開の範囲を絞る</b>ことを推奨。補助案：試験中の機能を本番端末で有効にしない／更新情報を見張る担当を決めておく（いずれも推論）。Headscale運用者は公開範囲を絞って修正版を待ちましょう。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SERVE ①</span>
+    <h2>Serve:管理用ソケットへの転送を止められていなかった<small>影響は「端末の乗っ取り」につながる</small></h2>
+    <p><b>Serve</b>は部屋の中のサービスをテイルネットの住人に開く扉、<b>Funnel</b>はそれをインターネットという表通りまで開く扉です。報告7番目は、Serveで通信を部屋の中の受付窓口へ転送する設定をした時、<b>その先がTailscale自身の管理用窓口でも止める仕組みがなかった</b>という問題。</p>
+    <ul>
+      <li>判定：<b>公式告知16番が認める</b>。影響は<b>端末の乗っ取りにつながる</b>と明記</li>
+      <li>条件：その端末で<b>Serveの設定をかける人がいる</b>こと</li>
+      <li>修正版では<b>管理用窓口への転送を断る</b>ように。対策はUnixソケット転送を使う人の更新</li>
+    </ul>
+    <p>補助案：Serveの設定をかけられる人を必要な人だけに絞る（推論）。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SERVE ②</span>
+    <h2>Serve:安全確認が「設定を読み込んだ時」だけだった<small>後からの差し替えが効いてしまう</small></h2>
+    <p>転送先は安全だと最初に確かめても、<b>後から行き先を差し替えられると確認が効かない</b>という8番目の問題。</p>
+    <ul>
+      <li>判定：<b>公式告知16番が2つ目の弱点として認める</b></li>
+      <li>条件：<b>転送先の場所を他のユーザーが書き換えられる</b>こと</li>
+      <li>研究者は<b>影響は限られる</b>と評価</li>
+      <li>修正版では<b>繋ぐたびに確かめる</b>ように変更 → 対策は更新</li>
+    </ul>
+    <p>補助案：Serveの転送先にする窓口やフォルダーを<b>他のユーザーが書き込めない場所</b>に置く（推論）。</p>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">FUNNEL ③</span>
+    <h2>Funnel:許可の確認が端末内のコマンド側だけ<small>「設計通り」とされる未修正の項目</small></h2>
+    <p>表通りに扉を開けて良いかの確認が<b>端末の中のコマンドの側だけで行われている</b>——研究者はこれを守りとして弱い作りだと指摘（報告9番目）。</p>
+    <ul>
+      <li>公式は<b>「設計通り」</b>と説明：確認を外すには元々端末の管理者権限が必要で、管理者なら他のこともできてしまう、という考え方</li>
+      <li>研究者の状況表では<b>未修正のまま・見方が分かれる項目</b>。公式の対策は特になし</li>
+    </ul>
+    <p>補助案：Funnelを使う端末では<b>管理者権限を持つ人を絞り、表通りに開いている扉を時々確認</b>する（推論）。</p>
+  </div>
+
+  <div class="card">
+    <span class="badge b-main">NOTE ④</span>
+    <h2>設定の注意:Serveを「外側の網」にも開く設定<small>重大度なし——研究者も公式も見方が一致</small></h2>
+    <p>10番目の項目は、研究者自身が<b>「設定の注意」と分類</b>したもので重大度はついていません。Serveを<b>テイルネットの外側のネットワーク（LAN等）にも開く設定</b>があり、それを入れるとその通りに外へ開きます。</p>
+    <ul>
+      <li>公式も<b>「自分で入れる設定で設計通り」</b>と説明——ここは見方が一致</li>
+      <li>研究者は<b>この設定を入れないように</b>と注意喚起</li>
+    </ul>
+    <p>補助案：サービスの環境設定にこの名前の設定がないか、<b>名前だけでも点検</b>しておきましょう。</p>
+  </div>
+
+  <div class="card dgr">
+    <span class="badge b-dgr">SERVE ⑤</span>
+    <h2>暗号化Serveで権限情報が「混線」する<small>同じ相手の中での取り違い——なりすましではない</small></h2>
+    <p>報告11番目。Serveを暗号化して使い、1台に<b>権限の違う公開先を2つ以上</b>置いている時、同時に流れる通信の間で<b>アプリごとの権限の情報が別の公開先の分と混ざる</b>ことがありました。</p>
+    <ul>
+      <li>判定：<b>公式告知17番が認め、修正は10月25日に取り込み→1.104.4に収録</b></li>
+      <li>注意：同じ相手の中での取り違いで、<b>他の人に「なりすます」話ではない</b></li>
+      <li>影響を受けるのは<b>その情報で許可を決めているアプリだけ</b></li>
+    </ul>
+    <p>対策は暗号化Serveを使っている人の更新。補助案：権限の違うアプリを別の端末・別の公開先に分ける（推論）。</p>
+  </div>
+
+  <div class="card full">
+    <span class="badge b-main">PART 3 VERDICT</span>
+    <h2>第3部判定:ServeとFunnelの5件=「3件修正済み・2件は設計通り」<small>ポイントは「どこへ転送しているか」「誰が設定をかけるか」</small></h2>
+    <div class="steps">
+      <div class="step cy"><span class="no">修正済</span><b>管理ソケット転送</b><div class="why">告知16番／乗っ取りにつながる</div></div>
+      <div class="step cy"><span class="no">修正済</span><b>確認タイミング</b><div class="why">告知16番／繋ぐたびに確認へ</div></div>
+      <div class="step cy"><span class="no">修正済</span><b>権限情報の混線</b><div class="why">告知17番／10/25取り込み</div></div>
+      <div class="step"><span class="no">設計通り</span><b>Funnelの確認方法</b><div class="why">管理者権限の前提で運用で守る</div></div>
+      <div class="step"><span class="no">設計通り</span><b>外側の網へ開く設定</b><div class="why">入れないのが正解——名前を点検</div></div>
+    </div>
+    <div class="note"><div class="icon">あきら<br>パパ</div><div class="bubble"><span class="name">あきらパパ:</span>第2部の2件は「使っている人だけの話」。次世代App Connectorは公式には未公開機能、Headscaleは自前運用の人だけが修正待ちです。ServeとFunnelは、転送先と設定できる人を点検することが急所です。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="badge b-cy">ACTION</span>
+    <h2>今やること:3つのアクション<small>更新・暫定対策・ポリシー見直し</small></h2>
+    <div class="steps">
+      <div class="step cy"><span class="no">1</span><b>全端末を1.104.4以降に更新</b><div class="why">確認時点で配布サーバーのコンテナ版はまだ1.104.2——Docker利用者はタグ・バージョンを必ず確認</div></div>
+      <div class="step cy"><span class="no">2</span><b>更新できない機械は転送だけ止める</b><div class="why">SSHの転送を止める設定を入れて再起動。作業前に別の管理の入り方があるか必ず確認</div></div>
+      <div class="step cy"><span class="no">3</span><b>SSHのポリシーを見直す</b><div class="why">必要な人と端末だけに絞る／大事な機械は入る前にもう一度本人確認（チェックモード）——公式ブログ推奨</div></div>
+    </div>
+    <p><b>乗っ取りが疑われる時</b>：研究者は「端末を作り直すだけでは足りない」とします。端末の身元は鍵なので、作り直しても鍵が残っていればまた入られるからです。<b>管理画面から端末を削除し、関係する鍵を作り直す</b>までが一套の対応です。</p>
+    <div class="note"><div class="icon">あきら<br>パパ</div><div class="bubble"><span class="name">あきらパパ:</span>設定の名前や手順の詳細は動画画面と公式の告知が正です。作業の前に、必ず一次情報も確認してくださいね。</div></div>
+  </div>
+
+  <div class="card full">
+    <span class="badge b-main">SUMMARY</span>
+    <h2>まとめ:「Tailscaleは今も危ないのか」への答え<small>強い見出しより、自分が使っている機能を見る</small></h2>
+    <div class="kpi">
+      <div class="box cy"><div class="n">更新第一</div><div class="l">確認された問題の大半は1.104.4で修正済み</div></div>
+      <div class="box dgr"><div class="n">Headscale</div><div class="l">自前運用は修正待ち——公開範囲を絞って見張る</div></div>
+      <div class="box"><div class="n">札で分ける</div><div class="l">主張・公式確認・修正記録を混ぜない</div></div>
+      <div class="box"><div class="n">入り口を絞る</div><div class="l">使っている機能ごとに許可と設定者を点検</div></div>
+    </div>
+    <p>①まず<b>1.104.4以降に更新する</b>。②更新までは<b>転送を止めて許可を絞る</b>。③<b>研究者の主張と公式の確認を分けて見る</b>。調べた日時と出典は概要欄にまとまっています。状況はまだ動いているので、作業の前に公式の告知も必ず確かめてください。</p>
+    <div class="note"><div class="icon">あきら<br>パパ</div><div class="bubble"><span class="name">あきらパパ:</span>「ワーム」という言葉の怖さより、自分がSSH・Serve・Funnel・Headscaleのどれを使っているか。そこを点検して入口を絞ることが、今日できる一番確かな防御です。最後まで読んでくれてありがとう!</div></div>
+  </div>
+
+</div>
+
+<p class="foot">出典: <a href="https://www.youtube.com/watch?v=uiUYQ1UzSJg" target="_blank" rel="noopener">【Tailscale】Tailworm、今も危ない？10の指摘と1つの設定注意を、公式の告知と照合して防御策まで</a>（あきらパパ・2026年10月28日）<br>参照: Tailworm研究報告 / Tailscale公式告知（10月16日・4件）／修正版1.104.4（10月28日配布開始）<br>本カードは動画・公表情報の要約であり、セキュリティ対策の完全性を保証するものではありません。</p>
+</div>
+</body>
+</html>

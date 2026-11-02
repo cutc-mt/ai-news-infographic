@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DeepSeek「Super Agent」設計論徹底解説 — ルーター×ワーカーの二層構造で注意力の壁を超える | AI Code King</title>
+<style>
+  :root{
+    --bg1:#071A1C; --bg2:#0C262B; --bg3:#123339;
+    --card:#0A2024; --card2:#0E2A2F;
+    --accent:#2DD4BF; --accent2:#7DE8D8; --text:#ECFAF7; --sub:#A8C9C3;
+    --line:rgba(45,212,191,.32);
+    --yombg:rgba(45,212,191,.09); --yomline:rgba(45,212,191,.26);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI",Meiryo,sans-serif;
+    background:linear-gradient(145deg,var(--bg1) 0%,var(--bg2) 55%,var(--bg3) 100%);
+    background-attachment:fixed;color:var(--text);padding:32px 16px 48px;line-height:1.75}
+  .wrap{max-width:1080px;margin:0 auto}
+  header{background:linear-gradient(160deg,var(--card) 60%,rgba(45,212,191,.07));border:1px solid var(--line);
+    border-radius:18px;padding:30px 28px;margin-bottom:26px}
+  .tag{display:inline-block;background:linear-gradient(135deg,#0D9488,#14B8A6);color:#04211E;font-size:12px;
+    font-weight:700;letter-spacing:.08em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .meta{font-size:13px;color:var(--sub)}
+  .meta a{color:var(--accent2)}
+  .lead{font-size:14.5px;color:var(--sub);margin-top:12px}
+  .lead b{color:var(--accent)}
+  .yomogi-head{display:flex;gap:12px;align-items:flex-start;margin-top:18px;background:var(--yombg);
+    border:1px solid var(--yomline);border-radius:14px;padding:14px 16px}
+  .yomogi-head .face{flex-shrink:0;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#0F766E,#134E4A);
+    color:#D9FBF4;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+  .yomogi-head .bubble{position:relative;font-size:13.5px;color:var(--text)}
+  .yomogi-head .bubble::before{content:"";position:absolute;left:-6px;top:16px;border:6px solid transparent;border-right-color:var(--yomline)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+  .card{background:linear-gradient(160deg,var(--card) 60%,rgba(45,212,191,.05));border:1px solid var(--line);
+    border-radius:14px;padding:20px 20px 18px;position:relative}
+  .card.full{grid-column:1/-1}
+  .num{position:absolute;top:-12px;left:16px;background:linear-gradient(135deg,#14B8A6,#5EEAD4);
+    color:#06201D;font-weight:800;font-size:13px;padding:2px 12px;border-radius:999px}
+  .card h3{font-size:16px;margin:8px 0 8px;color:#fff}
+  .card p{font-size:13.5px;color:var(--sub)}
+  .card b{color:var(--accent)}
+  .badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 10px;border-radius:999px;
+    background:rgba(45,212,191,.13);color:var(--accent2);border:1px solid var(--line);margin-bottom:6px}
+  .yomogi{display:flex;gap:10px;align-items:flex-start;margin-top:14px;background:var(--yombg);
+    border:1px solid var(--yomline);border-radius:12px;padding:10px 12px}
+  .yomogi .face{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#0F766E,#134E4A);
+    color:#D9FBF4;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px}
+  .yomogi .bubble{position:relative;font-size:12.5px;color:var(--text)}
+  .yomogi .bubble::before{content:"";position:absolute;left:-5px;top:12px;border:5px solid transparent;border-right-color:var(--yomline)}
+  .yomogi .name{font-weight:800;color:var(--accent)}
+  .yomogi b{color:var(--accent)}
+  footer{margin-top:26px;background:rgba(10,32,36,.85);border:1px solid var(--line);border-radius:14px;
+    padding:18px 22px;font-size:13px;color:var(--sub)}
+  footer a{color:var(--accent2)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="tag">AIニュース 2026-11-02</span>
+    <h1>【注意力がボトルネック】DeepSeek「Super Agent」設計論徹底解説 — ルーター×ワーカーの二層構造・トリガー駆動・「サイレント修正」まで</h1>
+    <div class="meta">出典: <a href="https://www.youtube.com/watch?v=ZIcvDE0HoWE" target="_blank" rel="noopener">YouTube「AI Code King」</a> / 2026年11月2日処理分</div>
+    <p class="lead">DeepSeekのHarnessチームが長文記事<b>「Exploring Super Agent Design」</b>を公開。エージェントが自分で動けるほどに成熟した今、足を引っ張るのは<b>人間の注意力</b>だという問題意識から、<b>1つの「スーパーエージェント」にまとめる設計</b>を提案しています。動画の内容を18枚のカードに整理した。</p>
+    <div class="yomogi-head"><div class="face">よもぎ</div><div class="bubble">モデルや機能の宣伝ではなく<span style="color:var(--accent);font-weight:700">「人の管理できるセッション数には限界がある」</span>という現場の問題から組み立てた設計論、という点が本記事の価値です。順を追って見ていきましょう。</div></div>
+  </header>
+
+  <div class="grid">
+    <div class="card"><span class="num">1</span>
+      <h3>問題意識: 遅くなっているのは「あなた」</h3>
+      <span class="badge">概要</span>
+      <p>記事の出発点は、多くの開発者がすでに感じている<b>「エージェントを並べすぎると人間側が追いつかない」</b>という問題。人は<b>3〜5個のアクティブなセッション</b>を同時に追うのが精一杯で、それを超えると「どのセッションが何を知っているか」が分からなくなり、承認待ち放置や<b>同じプルリクエストを複数セッションが触る事故</b>が起きる。単一タスクはモデルの能力で、複数タスクは<b>人の注意力</b>で制限される。</p>
+    </div>
+    <div class="card"><span class="num">2</span>
+      <h3>スーパーエージェントの4条件</h3>
+      <span class="badge">定義</span>
+      <p>記事はスーパーエージェントに<b>4つの性質</b>を求める。①<b>継続的（Continuous）</b>: チャットでプランAを頼み、PRコメントでプランBに切り替えると文脈ごと理解する。②<b>生産的（Productive）</b>: 前のタスク完了を待たず次の指示を受けられる。③<b>能動的（Proactive）</b>: 常時状況を監視し、指示なしで重要な事柄に反応する。④<b>持続的（Persistent）</b>: 常時オンラインで、障害から自己回復する。</p>
+    </div>
+    <div class="card"><span class="num">3</span>
+      <h3>注意: これは「設計論」であり製品機能一覧ではない</h3>
+      <span class="badge">位置づけ</span>
+      <p>重要な前置きとして、この記事は<b>アーキテクチャの論考</b>であり、現行DeepSeek製品の機能リストではない。あわせてGitHubに<b>プロトタイプ「DSH Super Agent」</b>が公開されているが、公式には<b>「研究用コードであり製品ではない」</b>と明記されている。そのまま導入して使うものではないが、<b>設計思想は今すぐ応用できる</b>、というのが動画の立場。</p>
+      <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「論文・設計編」と「動く試作」が分かれている構図ですね。試作の注意点（カード16・18）もセットで押さえたいところです。</div></div>
+    </div>
+    <div class="card"><span class="num">4</span>
+      <h3>二層設計①: ルーター — 人と話す唯一の窓口</h3>
+      <span class="badge">設計</span>
+      <p>1つ目の大きなアイデアは<b>2層への分離</b>。第1層の<b>ルーター（Router）</b>は、人と会話して仕事を割り振る<b>長寿命の単一セッション</b>。自分では作業をせず、<b>bashツールなしでも動作する</b>設計になっている。「セッションを管理する対象」から解放し、チャットやGitHubコメントなど<b>既に使っている場所から1エージェントと話す</b>のがこの思想の核心。</p>
+    </div>
+    <div class="card"><span class="num">5</span>
+      <h3>二層設計②: ワーカー — 隔離されたクリーンな作業セッション</h3>
+      <span class="badge">設計</span>
+      <p>第2層の<b>ワーカー（Worker）</b>は<b>1タスクに1セッション・専用のクリーンなコンテキスト</b>を持ち、<b>人と直接話すことはない</b>。結果はルーターにのみ報告されるため、<b>あなたの耳に入るのは常に1つのエージェントだけ</b>。全イベントを1セッションに集めると文脈が混ざり、毎回新規セッションにすると速いがバラバラに返事が来る——という<b>トレードオフを両層で解消</b>している。</p>
+    </div>
+    <div class="card"><span class="num">6</span>
+      <h3>モデル選定の発想が逆転する</h3>
+      <span class="badge">設計</span>
+      <p>この構造では通常のエージェントチームと逆の<b>モデル配置</b>が正解になる。リーダーがタスクを深く理解して分割する従来型と違い、このルーターは<b>分割すらしない</b>——誰に何を渡すかと、タスク間の関係の記録だけ。そのため<b>ルーターには軽量モデルで十分</b>で、<b>コードを書くワーカーに最強モデルを置く</b>のが費用対効果の高い使い方。</p>
+      <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「調整役は軽く、現場は強く」。人間組織の設計にも通じる考え方で、後のコスト検証（カード15）ともつながります。</div></div>
+    </div>
+    <div class="card"><span class="num">7</span>
+      <h3>プロンプトではなく「トリガー」が入力になる</h3>
+      <span class="badge">設計</span>
+      <p>2つ目の大きなアイデアは入力の再定義。グループチャットの発言、メール、<b>レビューコメント、CIの結果</b>まで、すべてを<b>イベント＝「トリガー（Triggers）」</b>として統一的に扱う。あなたがプロンプトを打つことが唯一の入力、という従来のエージェント像を捨て、<b>開発現場に流れる情報すべてを起動材料</b>にする。</p>
+    </div>
+    <div class="card"><span class="num">8</span>
+      <h3>2段フィルタ: コードで粗く、モデルで細かく</h3>
+      <span class="badge">設計</span>
+      <p>トリガーの大半はノイズで、強力なモデルに全部読ませるのは費用の無駄。そこで①まず<b>通常のコード</b>（発信元の種別や許可リストなど）で除去できるものを落とし、②生き残ったものだけをモデルに渡し、<b>自然言語で書いたルール</b>に基づいて処理するか判断させる。高価な判断は必要な場所にだけ使う<b>2段構えのろ過</b>です。</p>
+    </div>
+    <div class="card"><span class="num">9</span>
+      <h3>購読方式: ワーカーがスレッドを直接ウォッチ</h3>
+      <span class="badge">設計</span>
+      <p>巧妙なのは、ワーカーが担当タスクを得た時点で<b>そのタスクのスレッド（例: プルリクエスト）を購読（Subscribe）</b>する点。以降の新イベントは<b>ワーカーへ直行</b>し、ルーターは中継不要。さらに<b>同じPRに2人のワーカーがいる場合は両者に同じイベントが届く</b>ため、衝突に<b>各自で気づける</b>。ルーターの負荷と転送ミスを構造的に減らす設計。</p>
+    </div>
+    <div class="card"><span class="num">10</span>
+      <h3>コンテキストをキャッシュとして扱い、「想起の連鎖」で辿る</h3>
+      <span class="badge">設計</span>
+      <p>コンテキストウィンドウを<b>キャッシュ</b>と見立てた供給順序も特徴的。モデルにはまず<b>IDと短い要約</b>を渡し、次に<b>おそらく必要なもの</b>、長い情報は切り詰めて<b>続きへのポインタ</b>だけを残す。すべてのオブジェクトがIDで関連付けられるため、数週間後に古いタスクを持ち出しても<b>リンクを辿って文脈を復元できる</b>——これを<b>「想起の連鎖（Chain of Recall）」</b>と呼ぶ。</p>
+    </div>
+    <div class="card"><span class="num">11</span>
+      <h3>未来を感じる仕組み: 「サイレントに再現して直す」</h3>
+      <span class="badge">運用</span>
+      <p>DeepSeek自身のユーザーグループで運用された方針がこれ。誰かが問題を報告すると、エージェントは<b>バックグラウンドで再現を試み、問題を確認できて単純な修正が見つかれば、議論が続いている間にプルリクエストを開く</b>。再現できない場合は<b>何も言わず静かに引っ込む</b>。人間の議論を邪魔せず修正だけが届く、という運用に動画も「かなり驚き」と評価。</p>
+      <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「能動的（Proactive）」の具体例がこれです。ただし余計なPRを大量生産しないよう、<b>再現の確認を出口条件</b>にしているのが肝心ですね。</div></div>
+    </div>
+    <div class="card"><span class="num">12</span>
+      <h3>稼働し続けるための土木工事</h3>
+      <span class="badge">運用</span>
+      <p>残りの設計は「止めない」工夫。長時間コマンドは<b>バックグラウンド実行</b>して応答性を確保。返信はチャネル別に変え、チャットでは<b>1返信100語のハード上限</b>が好成績——詳細な文章はPRに残す。エージェントループと状態は<b>クラウド</b>に置き、手元マシンは<b>コマンド実行だけの小さなデーモン</b>。さらに定期実行の<b>独立したウォッチドッグセッション</b>が異常を検知する——止まったエージェントは大抵<b>プロセスは元気なまま目的から外れる</b>から。</p>
+    </div>
+    <div class="card"><span class="num">13</span>
+      <h3>実験の前提: 検証したのは「スケジューリング」</h3>
+      <span class="badge">実験</span>
+      <p>実験結果は興味深いが、本人たちも<b>「結果は参考値（indicative）」</b>と明言。1実行あたり<b>約300メッセージ、うち実際の作業依頼は約20件</b>で、コーディング自体は<b>時間を消費するだけのツールでシミュレート</b>。つまりこの実験が測るのは<b>スケジューリングと管理の性能で、コードの品質ではない</b>点に注意。</p>
+    </div>
+    <div class="card"><span class="num">14</span>
+      <h3>実験①: 「プロンプトで委譲」は頼れない</h3>
+      <span class="badge">実験</span>
+      <p>スーパーエージェントの典型的タスク完了は<b>12.4分（遅いケースで15.7分）</b>。一方、単一セッションに「適切ならサブエージェントを使え」という中立プロンプトを与えた場合、<b>5回の実行で一度もサブエージェントを呼ばず</b>、遅いケースは<b>29.5分</b>。委譲を強く促すプロンプトでは5回中4回で委譵した。動画はこれを<b>「記事全体で最も有用な結果」</b>と評価——<b>委譵はプロンプトではなくシステムの構造で強制すべき</b>。</p>
+    </div>
+    <div class="card"><span class="num">15</span>
+      <h3>実験②: ルーターは1本で足りる、コストは安いモデルが鍵</h3>
+      <span class="badge">実験</span>
+      <p>ルーターは1分あたり約1件→約40件の決定になってもイベントがバッチ化され、<b>決定あたり6.4秒→1.6秒に短縮</b>。この規模のチームなら<b>ルーター1セッションで十分</b>。一方コストは、1実行で<b>約2,320万キャッシュ読み取りトークン</b>（パススルーなしでは約3,180万）。DeepSeek V4.1 Flashのオフピーク価格なら<b>1ドル未満</b>だが、高価なモデルでは<b>数ドル規模</b>に跳ね上がる——<b>この設計は安いモデルでこそ割に合う</b>。</p>
+      <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「スケールしても分割不要なルーター」と「安価なモデル前提の経済性」が噛み合って初めて成立する設計、というのが著者の含意ですね。</div></div>
+    </div>
+    <div class="card"><span class="num">16</span>
+      <h3>未解決: 長期記憶とセキュリティ</h3>
+      <span class="badge">限界</span>
+      <p>記事自身が未解決を認める点も重要。①<b>長期記憶</b>: システムが数か月動き続けた後の記憶の持ち方は依然として主要な限界。②<b>セキュリティ</b>: 外部イベントを読むエージェントは<b>プロンプトインジェクションにさらされる</b>。クラウド上のループが乗っ取られれば<b>接続した全マシンが連鎖的に危険</b>になる——公開グループチャットへの接続は慎重に、という警告。</p>
+    </div>
+    <div class="card"><span class="num">17</span>
+      <h3>今すぐ実践①: PandaCodeの「ボット」で二層構造を組む</h3>
+      <span class="badge">実践</span>
+      <p>動画では無料OSSのデスクトップアプリ<b>PandaCode</b>での再現手順を紹介。常駐エージェント<b>「ボット」</b>を複数作り、①<b>ルーターbot</b>（DeepSeek V4.1 Flash、返信100語未満、shell/editツールに<b>拒否ルール</b>を設定して自分で作業できないようにする）、②<b>ワーカーbot</b>（ビルド担当にKimi K3.1 Pro、レビュー担当にGLM 5.3など別モデル）を配置。bot間連携は<b>bot messagebotツール</b>で依頼と結果を往復させ、Telegram/Slack/Discordなどから<b>ペアリングコードで認証</b>した相手とだけ会話。さらに30分ごとにPRとCIを確認し詰まった時だけ知らせる<b>ウォッチドッグbot</b>、サーバー上で常駐させる<b>serveコマンド</b>やクラウド実行も利用できる。</p>
+      <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span>「拒否ルールでルーターの手を縛る」のは、実験①の教訓<b>（プロンプトではなく構造で委譲を強制）</b>の忠実な実装です。ここが再現の勘所ですね。</div></div>
+    </div>
+    <div class="card"><span class="num">18</span>
+      <h3>今すぐ実践②: 固定ジョブはスケジューラーに任せる + まとめ</h3>
+      <span class="badge">まとめ</span>
+      <p>定型業務は<b>Klein Pass</b>（月9.99ドルでKimi K3.1 Pro・GLM 5.3・Qwen 3.8 Max・DeepSeek V4.1 Flashなどを束ねた定額プラン）と、IDE外で並列セッションを回す<b>クライアントデスクトップ</b>のスケジュール機能（夜間PRレビュー・セキュリティスキャン等）に任せる運用も紹介。まとめると、DeepSeekの主張の核心は<b>「制約はもうモデルだけではない。1エージェントが話しかけ、隔離されたワーカーが作業し、安いコードがノイズを濾し、独立した監視が進捗を確認する」</b>という構造。試作のDSHリポジトリ（setup.mdを読ませてエージェントにセットアップさせる方式）を触る場合は<b>作業の承認なしで実行される</b>ため隔離環境限定で。</p>
+      <div class="yomogi"><div class="face">よもぎ</div><div class="bubble"><span class="name">よもぎ:</span><b>3〜5セッションの壁</b>を構造で超える——これが本記事の一行要約。週末にPandaCodeボットで小さく試せる、という着地も実践的でした。</div></div>
+    </div>
+  </div>
+
+  <footer>
+    出典: <a href="https://www.youtube.com/watch?v=ZIcvDE0HoWE" target="_blank" rel="noopener">I Tried Deepseek's New SuperAgent Harness... Is IT ANY GOOD?</a> — YouTube「AI Code King」(2026年)<br>
+    本インフォグラフィックは動画内容を要約・整理したものであり、著作権は元動画製作者に帰属します。
+  </footer>
+</div>
+</body>
+</html>

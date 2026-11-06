@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>1ヶ月セッション・数十億トークンを1ウィンドウで —— billion-contextプロキシ | AI Code King</title>
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#171022;
+    --panel:#201733;
+    --panel2:#281D40;
+    --line:#3D2E5C;
+    --ink:#EDE8F6;
+    --sub:#A99CC4;
+    --main:#B79BF9;
+    --main-deep:#D7C8FF;
+    --main-soft:rgba(183,155,249,.12);
+    --accent:#E4DEF2;
+    --accent-soft:rgba(228,222,242,.08);
+    --magenta:#F49BE4;
+    --magenta-soft:rgba(244,155,228,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(150deg,#201733 0%,#241640 55%,#2E1430 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(183,155,249,.18),transparent 70%)}
+  .hero .tag{display:inline-block;background:var(--main-soft);color:var(--main);border:1px solid rgba(183,155,249,.45);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px;color:var(--ink)}
+  .hero h1 .hl{color:var(--main)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(237,232,246,.05);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .hero .meta a{color:var(--main);text-decoration:none}
+  .leadbox{margin-top:20px;background:var(--main-soft);border:1px solid rgba(183,155,249,.4);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .leadbox .icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:var(--main);color:#171022;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  .leadbox .bubble{font-size:13.5px;color:var(--main-deep);font-family:'Yomogi',cursive;line-height:1.9}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:var(--main-soft);color:var(--main);border:1px solid rgba(183,155,249,.4)}
+  .b-acc{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(228,222,242,.35)}
+  .b-mg{background:var(--magenta-soft);color:var(--magenta);border:1px solid rgba(244,155,228,.4)}
+  .card p{font-size:13.5px;color:var(--ink);margin-bottom:8px}
+  .card ul{margin:6px 0 10px 18px;font-size:13.5px}
+  .card li{margin-bottom:4px}
+  .card b{color:var(--main-deep)}
+  .card .num{position:absolute;top:14px;right:16px;font-size:12px;font-weight:800;color:var(--sub);letter-spacing:.08em}
+  .bubble{position:relative;background:var(--panel2);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin:10px 0;font-size:13px;line-height:1.9}
+  .bubble .who{display:inline-block;font-size:11.5px;font-weight:800;color:var(--main);margin-right:8px;letter-spacing:.05em}
+  .bubble .txt{font-family:'Yomogi',cursive;color:var(--ink)}
+  .note{display:flex;gap:10px;align-items:flex-start;margin-top:12px;background:var(--magenta-soft);border:1px solid rgba(244,155,228,.35);border-radius:12px;padding:10px 12px}
+  .note .ic{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:var(--magenta);color:#171022;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  .note .bubble2{font-size:12.5px;color:#FBD9F3;font-family:'Yomogi',cursive;line-height:1.85}
+  .stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+  .stats .s{flex:1 1 150px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stats .s .v{font-size:22px;font-weight:800;color:var(--main)}
+  .stats .s .l{font-size:11.5px;color:var(--sub);margin-top:2px}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:10px 0}
+  .flow .step{flex:1 1 140px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px}
+  .flow .step b{display:block;color:var(--main);font-size:12px;margin-bottom:2px}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .vs .col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:12.5px}
+  .vs .col h3{font-size:13px;margin-bottom:6px}
+  .vs .col.us h3{color:var(--main)}
+  .vs .col.cn h3{color:var(--magenta)}
+  .vs .col ul{margin-left:16px}
+  code{background:rgba(183,155,249,.14);border:1px solid rgba(183,155,249,.3);border-radius:6px;padding:1px 7px;font-size:12.5px;color:var(--main-deep);font-family:Menlo,Consolas,monospace}
+  footer.end{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 20px;text-align:center}
+  footer.end p{font-size:13px;color:var(--sub)}
+  footer.end a{color:var(--main);font-weight:700}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">INFINITE CONTEXT PROXY — 2026.11.06</span>
+  <h1>1ヶ月続くセッション、1つのウィンドウで<span class="hl">数十億トークン</span> —— 「billion-context」プロキシがClaude Code・DeepSeekのコンテキスト限界を解除する</h1>
+  <p>AIコーディングエージェントとモデルAPIの間に置く小さなプロキシ「billion-context」。モデル自身に4つのツールを与えて履歴をインクリメンタルかつ可逆的に圧縮し、プロンプトキャッシュを95〜97%維持したままコンテキスト溢れをゼロにする。作者論文では4.5ヶ月・187.6億入力トークンを実運用し、第三者ベンチマークContextBenchではフルコンテキストを上回るF1 0.31を記録。ClinePass月9.99ドルとの組み合わせで、安価なオープンモデル×途切れないセッションを実現する方法をAI Code Kingが解説。</p>
+  <div class="meta">
+    <span>📺 <a href="https://www.youtube.com/watch?v=IeW7DDQeTgU">This Repo ENABLES Infinite Context in Claude Code &amp; Deepseek!</a></span>
+    <span>チャンネル: AI Code King (@AICodeKing)</span>
+    <span>公開: 2026-11-06</span>
+  </div>
+  <div class="leadbox">
+    <div class="icon">BC</div>
+    <div class="bubble">長期タスクでセッションが肥大化して困っていませんか？「billion-context」は3ヶ月足らずで3,700以上のスターを獲得したプロキシで、100Kウィンドウのモデルでも十分に動き、トークンコストを5分の1に抑えられます。今回は仕組み、ベンチマーク、そしてCline／Cline Desktop・PandaCodeとのセットアップ方法まで解説します。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card">
+    <span class="num">01</span>
+    <span class="badge b-main">今日のニュース俯瞰</span>
+    <h2>billion-context<small>GitHubで急速に注目を集めるコンテキスト圧縮プロキシ</small></h2>
+    <p>AIコーディングエージェントの長期利用における最大の痛点「セッション肥大化」を解決するオープンソースプロジェクト。エージェントのベースURLをプロキシに向けるだけで導入でき、Anthropic／OpenAI形式のAPIに対応するためほぼすべてのエージェントで動作する。</p>
+    <div class="stats">
+      <div class="s"><div class="v">3,700+</div><div class="l">スター（3ヶ月足らず）</div></div>
+      <div class="s"><div class="v">300+</div><div class="l">フォーク</div></div>
+      <div class="s"><div class="v">1/5</div><div class="l">トークンコスト</div></div>
+    </div>
+    <p><b>売りは「1ヶ月続く単一セッション」</b>。1つのウィンドウで数十億トークンを扱い、100Kウィンドウの安価なモデルでも十分に運用できる。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">02</span>
+    <span class="badge b-acc">課題</span>
+    <h2>コンテキストウィンドウが埋まると何が起きるか<small>長期タスクで誰もが直面する問題</small></h2>
+    <p>AIコーディングエージェントを長期のタスクで使うと、セッションが肥大化し続ける。ウィンドウが埋まったエージェントは次のどちらかに陥る。</p>
+    <ul>
+      <li><b>すべてを曖昧な要約に圧縮</b>して詳細を失う</li>
+      <li><b>機能不全に陥り、やり取りのたびに履歴全体を再送</b></li>
+    </ul>
+    <p>つまり<b>同じトークンの料金を何度も支払っている</b>状態。キャッシュされたトークンは安価なだけに、履歴再送はコスト面で重大な損失になる。</p>
+    <div class="note">
+      <div class="ic">!</div>
+      <div class="bubble2"> 定額プランでも5時間枠・週間・月間制限があるため、履歴再送が続くとすぐ制限に達してしまう。</div>
+    </div>
+  </div>
+
+  <div class="card full">
+    <span class="num">03</span>
+    <span class="badge b-main">仕組み</span>
+    <h2>エージェントとモデルAPIの「間」に置く小さなプロキシ<small>ベースURLを向けるだけで全リクエストが経由</small></h2>
+    <div class="flow">
+      <div class="step"><b>① エージェント</b>Claude Code / Cline / OpenCode など。ベースURLをプロキシに変更するだけ</div>
+      <div class="step"><b>② billion-context</b>会話を読み取り、完了した部分を圧縮してから転送</div>
+      <div class="step"><b>③ モデルAPI</b>Anthropic / OpenAI形式に対応。圧縮済みの履歴だけが届く</div>
+    </div>
+    <p>エージェント側の設定変更は最小限。<b>プロキシが会話を読み取り、完了した部分を圧縮してから実際のモデルへ転送する</b>という構造で、モデルから見れば常にコンパクトな履歴に見える。単に上限で履歴を切り捨てる方式とは異なり、失われた情報は後から復元できる。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">04</span>
+    <span class="badge b-mg">中核機能</span>
+    <h2>モデルに与えられる4つのツール<small>いつ・何を圧縮するかはモデル自身が判断</small></h2>
+    <ul>
+      <li><b>compress</b> — メッセージ範囲を詳細な要約にまとめる</li>
+      <li><b>decompress</b> — 詳細が必要になった際にその範囲を元に戻す</li>
+      <li><b>search context</b> — 圧縮されたすべての中身をキーワード検索</li>
+      <li><b>ACP status</b> — コンテキストの充填状況と圧縮可能な範囲を表示</li>
+    </ul>
+    <p>モデル自身がツールを呼び出して圧縮を制御する点が、エージェントに組み込まれた従来の要約機能との決定的な違い。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">05</span>
+    <span class="badge b-main">圧縮方式</span>
+    <h2>インクリメンタル・可逆・キャッシュ維持<small>切り捨てではなく小さな範囲ごとに要約</small></h2>
+    <p>圧縮は<b>増分式</b>。全体を一気にまとめるのではなく、小さな範囲ごとに要約する。そして<b>可逆的</b>で、いつでも展開可能。</p>
+    <div class="stats">
+      <div class="s"><div class="v">95–97%</div><div class="l">キャッシュヒット率（健全なセッション）</div></div>
+      <div class="s"><div class="v">&lt;2%</div><div class="l">圧縮にかかるコスト</div></div>
+    </div>
+    <p>プロンプトキャッシュを維持できる設計が鍵。キャッシュされたトークンは非常に安いため、ヒット率を保つことがコスト削減に直結する。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">06</span>
+    <span class="badge b-acc">作者論文</span>
+    <h2>4.5ヶ月の実運用データ<small>コンテキストオーバーフローはゼロ</small></h2>
+    <p>著者はリポジトリで論文を公開しており、実運用での検証結果が示されている。</p>
+    <div class="stats">
+      <div class="s"><div class="v">4.5ヶ月</div><div class="l">実運用期間</div></div>
+      <div class="s"><div class="v">17.4万</div><div class="l">モデル呼び出し</div></div>
+      <div class="s"><div class="v">187.6億</div><div class="l">入力トークン</div></div>
+      <div class="s"><div class="v">0</div><div class="l">200Kモデルのオーバーフロー</div></div>
+    </div>
+    <p>200Kコンテキストのモデルで<b>ウィンドウオーバーフローが一度も発生しなかった</b>という。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">07</span>
+    <span class="badge b-mg">第三者ベンチマーク 1/3</span>
+    <h2>ContextBench — フルコンテキストを上回る<small>DeepSeek V4.1 Flashで実行されたコーディング評価</small></h2>
+    <p>実際のリポジトリを探索するコーディングエージェント評価「ContextBench」では<b>billion-contextが1位</b>。</p>
+    <div class="vs">
+      <div class="col us"><h3>billion-context</h3><ul><li>F1スコア <b>0.31</b>（1位）</li><li>コスト <b>$4.61</b></li></ul></div>
+      <div class="col cn"><h3>フルコンテキスト</h3><ul><li>F1スコア 0.29</li><li>コスト $11.05</li></ul></div>
+    </div>
+    <p><b>コスト58%減で性能はわずかに向上</b>。圧縮してもコーディング性能は落ちないことを示唆する結果。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">08</span>
+    <span class="badge b-mg">第三者ベンチマーク 2/3</span>
+    <h2>LongMemEval — RAG最高設定を上回る<small>長期記憶評価でも健闘</small></h2>
+    <div class="vs">
+      <div class="col us"><h3>billion-context</h3><ul><li>正解率 <b>79.2%</b></li><li>コスト <b>71%削減</b></li></ul></div>
+      <div class="col cn"><h3>比較対象</h3><ul><li>フルコンテキスト 83.2%</li><li>最高のRAG設定 62.6%</li></ul></div>
+    </div>
+    <p>フルコンテキストには約4ポイント及ばないものの、<b>最良のRAG構成（62.6%）は大きく上回り</b>、しかもコストは71%削減。「安いのにほぼ同等」というトレードオフが魅力。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">09</span>
+    <span class="badge b-mg">第三者ベンチマーク 3/3</span>
+    <h2>148万トークンの極限テスト<small>フルコンテキストは全滅、billion-contextは生存</small></h2>
+    <div class="stats">
+      <div class="s"><div class="v">199/199</div><div class="l">フルコンテキストの失敗回数</div></div>
+      <div class="s"><div class="v">約30倍</div><div class="l">billion-contextの圧縮率</div></div>
+      <div class="s"><div class="v">全クリア</div><div class="l">billion-contextの結果</div></div>
+    </div>
+    <p>148万トークンという超大規模テストでは、フルコンテキストは199回中199回すべて失敗。一方billion-contextは<b>約30倍に圧縮しながらすべてのテストをクリア</b>した。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">10</span>
+    <span class="badge b-acc">魔法ではない</span>
+    <h2>「針を探す」テストでの低下<small>要約は意味を保つが、正確な単語は保たない</small></h2>
+    <p>圧縮の正確な一文を抽出する必要がある「ニードル（針探し）」テストでは、<b>69%→27%へとリコールが低下</b>。要約は意味を保持するが、すべての正確な単語を保持するわけではない。</p>
+    <div class="note">
+      <div class="ic">⚠</div>
+      <div class="bubble2"> 過去の特定の行を逐語的に必要とする場合、モデルはdecompressでその範囲を展開する必要がある。コーディングエージェントにとっては通常適切なトレードオフだが、この点は理解しておこう。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">11</span>
+    <span class="badge b-main">セットアップ 1/3</span>
+    <h2>インストールは「billy」コマンド<small>npmで一発、3つの使い方</small></h2>
+    <p>ローカルフォルダに<code>--prefix</code>を指定してインストールすると、<code>billy</code>コマンドが使えるようになる。</p>
+    <div class="bubble"><span class="who">INSTALL</span><span class="txt">npm install -g billion-context</span></div>
+    <ul>
+      <li><b>billy plugin install [クライアント名]</b> — Cursor、OpenCode、Continue などネイティブプラグインとして動作</li>
+      <li><b>billy [クライアント名]</b>（例: <code>billy claude</code>）— 設定変更なしでプロキシ経由起動</li>
+      <li><b>ベースURLの前置き</b> — 起動中のbillyのアドレスをプロキシとして設定（Clineでの使い方）</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">12</span>
+    <span class="badge b-main">セットアップ 2/3</span>
+    <h2>ClinePass — 月9.99ドルのオープンモデルプラン<small>OpenAI互換APIでClineの外でも利用可能</small></h2>
+    <p>Clineチームによる月額<b>$9.99</b>のプラン。複数のモデルを<b>通常より2〜5倍のレート制限</b>で利用できる。</p>
+    <ul>
+      <li>DeepSeek V4.1 Flash、Claude 3.5 Sonnet、Gemini 1.5 Pro、Qwen 2.5 Max、MiniMax O1 Flash など</li>
+      <li>ClineのダッシュボードでAPIキーを作成すれば、<b>OpenAI互換のCline API</b>経由で外部からも利用可</li>
+    </ul>
+    <div class="note">
+      <div class="ic">✓</div>
+      <div class="bubble2"> DeepSeek V4.1 Flashは今回のベンチマークで使われたものと同じモデルファミリー。検証結果をそのまま適用しやすい組み合わせ。</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">13</span>
+    <span class="badge b-main">セットアップ 3/3</span>
+    <h2>Cline / Cline Desktop の設定手順<small>ベースURLにプロキシを前置きするだけ</small></h2>
+    <div class="flow">
+      <div class="step"><b>① プロバイダー</b>Clineで「OpenAI Compatible」を選択</div>
+      <div class="step"><b>② ベースURL</b><code>localhost:8787/v1</code> + ClineのAPIアドレスを続けて入力</div>
+      <div class="step"><b>③ キー＆モデル</b>ClineのAPIキーを貼り付け、モデルに「ClinePass/DeepSeek V4.1 Flash」を指定</div>
+    </div>
+    <p>これでClineからのすべてのリクエストがbillion-context経由で圧縮され、ClinePassへ送られる。billion-contextのリポジトリにはOpenAI互換ベースURL経由のClineが<b>検証済みクライアント</b>として記載されており、Cline Desktopでも同様に動作する（プロバイダーリストのOpenAI互換項目で同じURL・キー・モデルを設定）。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">14</span>
+    <span class="badge b-acc">相性の理由</span>
+    <h2>なぜClinePass × billion-contextなのか<small>定額制の制限を履歴短縮で回避</small></h2>
+    <p>ClinePassは定額制だが、<b>5時間枠・週間制限・月間制限</b>が存在する。長時間セッションではやり取りのたびに履歴を再送信するため、すぐに制限へ達してしまう。</p>
+    <ul>
+      <li>billion-contextが<b>履歴を短縮</b> → 同じプランでもっと長く使える</li>
+      <li>DeepSeek V4.1 Flashは<b>ベンチマークと同じモデルファミリー</b></li>
+      <li>Cline Desktopは長期タスクに最適なスタンドアロンアプリで、並行セッション実行・ジョブスケジュール・Claude Code／Codex会話のインポート継続にも対応</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">15</span>
+    <span class="badge b-mg">運用モニタリング</span>
+    <h2>localhost:8787 のダッシュボード<small>キャッシュヒット率と圧縮効果を可視化</small></h2>
+    <p>実行を開始したらブラウザで<code>localhost:8787</code>を開くと、ダッシュボード・セッションリスト・ライブログ・設定エディタが表示される。</p>
+    <div class="bubble"><span class="who">REPORT</span><span class="txt">対応クライアントで「/acp cache」と入力 → キャッシュヒット率・圧縮によるトークン削減数・キャッシュが途切れた理由などを確認可能</span></div>
+    <p>実際にコストが削減できているかの検証に非常に便利。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">16</span>
+    <span class="badge b-mg">オーケストレーション</span>
+    <h2>PandaCodeとの組み合わせ<small>アーキテクト×ワーカー構成で圧縮が最も効く</small></h2>
+    <p>GUIでのオーケストレーションが必要ならPandaCodeがおすすめ。タスク全体を管理する<b>アーキテクト</b>が個別のワーカーへ作業を割り振る構成で、Clineはそのハーネスの一つ。</p>
+    <ul>
+      <li>アーキテクトのセッションが最も長く続き、コンテキストも最も肥大化 → <b>圧縮機能が最も威力を発揮</b></li>
+      <li>ワーカーはPi、OpenCode、Kimi Codeなどで実行可能。すべてBillyのネイティブプラグインを保有</li>
+    </ul>
+  </div>
+
+  <div class="card full">
+    <span class="num">17</span>
+    <span class="badge b-acc">注意点</span>
+    <h2>導入前に知っておくべき4つの制限<small>急速に進化するプロジェクト特有のリスク</small></h2>
+    <ul>
+      <li><b>進化が非常に速い</b> — 現在はバージョン0.121。デフォルトで自動更新されるが、マスターブランチはいつ壊れてもおかしくない。<b>NPMからリリース版をインストール</b>すること</li>
+      <li><b>--hostでのネットワーク実行は認証ゼロ</b> — 信頼できるネットワーク上でのみ運用すること</li>
+      <li><b>Claudeデスクトップアプリのコードタブはプロキシをバイパス</b> — 圧縮は適用されない</li>
+      <li><b>逐語リコールの低下</b> — 過去の特定の行を正確に必要とする場合はdecompressが必要。ドキュメントも巨大で専門的なため、セットアップには読み込みが必要</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">18</span>
+    <span class="badge b-main">まとめ</span>
+    <h2>安いオープンモデル×途切れないセッション<small>長期エージェント運用の現実解</small></h2>
+    <p>billion-contextは、モデルがキャッシュを維持したまま履歴を小さな範囲でツールにより圧縮・復元できるプロキシ。DeepSeek V4.1 Flashのベンチマークでは<b>フルコンテキストより安価で、コーディング性能はわずかに上回った</b>。</p>
+    <ul>
+      <li>Cline／Cline Desktopの前に置けば、<b>安価なオープンモデルと継続的なセッション</b>が手に入る</li>
+      <li>長時間のエージェントセッションが頻繁に終了したりコストがかさむ場合の有力な解</li>
+      <li>全体として<b>かなり優れたツール</b>との評価</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer class="end">
+  <p>出典: <a href="https://www.youtube.com/watch?v=IeW7DDQeTgU">This Repo ENABLES Infinite Context in Claude Code &amp; Deepseek!</a>（AI Code King / 2026-11-06公開）<br>
+  数値・手順は動画および説明欄の情報に基づく。billion-contextは急速に進化中のため、最新のドキュメントを参照のこと。</p>
+</footer>
+
+</div>
+</body>
+</html>

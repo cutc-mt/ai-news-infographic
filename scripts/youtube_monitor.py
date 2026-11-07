@@ -198,9 +198,13 @@ def filter_new_videos(videos: list, known_video_ids: set) -> list:
 
 
 def is_likely_short(video: dict) -> bool:
-    """タイトル/説明文からショート動画か判定する"""
+    """タイトル/説明文からショート動画か判定する。
+    裸の 'short' は誤検知（"in short", "shortcut" 等）を生むため、
+    明白なマーカー（ハッシュタグ・括弧表記）のみに限定する。
+    Shortsは最大3分なので実質的に duration フィルタ(<5分)が最終防線。
+    """
     text = (video.get('title', '') + ' ' + video.get('description', '')).lower()
-    indicators = ['#shorts', '#short', '[short]', '(short)', 'short']
+    indicators = ['#shorts', '#short', '[short]', '(short)']
     return any(ind in text for ind in indicators)
 
 
@@ -369,7 +373,11 @@ class YouTubeMonitor:
                 continue
 
             videos = self.get_latest_videos(channel_id, max_per_channel)
+            before_shorts = len(videos)
             videos = filter_shorts(videos)
+            if before_shorts > len(videos):
+                dropped = before_shorts - len(videos)
+                print(f"  ⏭️ {name}: {dropped} video(s) dropped as Shorts")
             videos = filter_by_date(videos, max_days=max_days)
 
             # チャンネル個別の必須キーワードフィルタ（例: PIVOTはAI関連語必須）

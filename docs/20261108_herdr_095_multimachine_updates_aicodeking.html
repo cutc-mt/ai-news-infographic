@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>tmuxから「エージェントのランタイム」へ —— Herdr v0.9.5 アップデート総点検 | AI Code King</title>
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1420;
+    --panel:#16202F;
+    --panel2:#1C2A3E;
+    --line:#33475F;
+    --ink:#EAF1FA;
+    --sub:#9FB2C8;
+    --main:#7AA8FF;
+    --main-deep:#BAD5FF;
+    --main-soft:rgba(122,168,255,.12);
+    --accent:#FFB454;
+    --accent-soft:rgba(255,180,84,.10);
+    --mint:#5FD4B8;
+    --mint-soft:rgba(95,212,184,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(150deg,#131C2E 0%,#1B2743 55%,#101726 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(255,180,84,.14),transparent 70%)}
+  .hero .tag{display:inline-block;background:var(--main-soft);color:var(--main);border:1px solid rgba(122,168,255,.45);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px;color:var(--ink)}
+  .hero h1 .hl{color:var(--main)}
+  .hero h1 .hl2{color:var(--accent)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(234,241,250,.05);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .hero .meta a{color:var(--main);text-decoration:none}
+  .leadbox{margin-top:20px;background:var(--accent-soft);border:1px solid rgba(255,180,84,.4);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .leadbox .icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:var(--accent);color:#0E1420;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:16px}
+  .leadbox .bubble{font-size:13.5px;color:#FFE9CC;font-family:'Yomogi',cursive;line-height:1.9}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:12.5px;font-weight:800;padding:3px 14px;border-radius:10px;letter-spacing:.04em;margin:8px 0 10px}
+  .b-main{background:var(--main-soft);color:var(--main);border:1px solid rgba(122,168,255,.4)}
+  .b-acc{background:var(--accent-soft);color:var(--accent);border:1px solid rgba(255,180,84,.4)}
+  .b-mg{background:var(--mint-soft);color:var(--mint);border:1px solid rgba(95,212,184,.4)}
+  .card p{font-size:13.5px;color:var(--ink);margin-bottom:8px}
+  .card ul{margin:6px 0 10px 18px;font-size:13.5px}
+  .card li{margin-bottom:4px}
+  .card b{color:var(--main-deep)}
+  .card .num{position:absolute;top:14px;right:16px;font-size:12px;font-weight:800;color:var(--sub);letter-spacing:.08em}
+  .yomogi{position:relative;background:var(--panel2);border:1px solid var(--line);border-left:4px solid var(--mint);border-radius:14px;padding:12px 14px;margin:10px 0;font-size:13px;line-height:1.9}
+  .yomogi .who{display:inline-block;font-size:11.5px;font-weight:800;color:var(--mint);margin-right:8px;letter-spacing:.05em}
+  .yomogi .txt{font-family:'Yomogi',cursive;color:var(--ink)}
+  .note{display:flex;gap:10px;align-items:flex-start;margin-top:12px;background:var(--main-soft);border:1px solid rgba(122,168,255,.35);border-radius:12px;padding:10px 12px}
+  .note .ic{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:var(--main);color:#0E1420;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px}
+  .note .bubble2{font-size:12.5px;color:#D9E6FF;font-family:'Yomogi',cursive;line-height:1.85}
+  .stats{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+  .stats .s{flex:1 1 150px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stats .s .v{font-size:22px;font-weight:800;color:var(--main)}
+  .stats .s .l{font-size:11.5px;color:var(--sub);margin-top:2px}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch;margin:10px 0}
+  .flow .step{flex:1 1 140px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:12.5px}
+  .flow .step b{display:block;color:var(--mint);font-size:12px;margin-bottom:2px}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+  .vs .col{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;font-size:12.5px}
+  .vs .col h3{font-size:13px;margin-bottom:6px}
+  .vs .col.us h3{color:var(--mint)}
+  .vs .col.cn h3{color:var(--accent)}
+  .vs .col ul{margin-left:16px}
+  code{background:rgba(122,168,255,.14);border:1px solid rgba(122,168,255,.3);border-radius:6px;padding:1px 7px;font-size:12.5px;color:var(--main-deep);font-family:Menlo,Consolas,monospace}
+  footer.end{margin-top:28px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 20px;text-align:center}
+  footer.end p{font-size:13px;color:var(--sub)}
+  footer.end a{color:var(--main);font-weight:700}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}.vs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">AGENT TERMINAL MULTIPLEXER — 2026.11.08</span>
+  <h1>tmuxから「<span class="hl">エージェントが住むランタイム</span>」へ —— ターミナルマルチプレクサ<span class="hl2">Herdr v0.9.5</span>の大量アップデートを総点検</h1>
+  <p>コーディングエージェント向けターミナルマルチプレクサ「Herdr」がv0.9.5に到達。tmuxのようにペインを分割しつつ、各エージェントが「作業中／質問待ち／完了」のどの状態かをサイドバーで把握できる。今回はマルチマシン統合、<code>--machine</code>フラグ、マルチクライアント、再起動してもセッションが戻る永続化、エージェントの自己状態申告といった更新を順に確認し、最後に同じ作者のデスクトップアプリ「PandaCode」との使い分けまで解説する。</p>
+  <div class="meta">
+    <span>📺 <a href="https://www.youtube.com/watch?v=LDxan-w2LVw">I Tried the new Herdr Updates... IS IT ANY GOOD?</a></span>
+    <span>チャンネル: AI Code King (@AICodeKing)</span>
+    <span>公開: 2026-11-08</span>
+  </div>
+  <div class="leadbox">
+    <div class="icon">🖥️</div>
+    <div class="bubble">エージェントを何台も立ち上げると「どの子が止まってるか分からない」「サーバーとノートPCで作業がバラバラ」になりがち。今回はローカルとSSH先の全マシンを1つの画面にまとめ、再起動してもエージェントが復活するようになったHerdrの新機能を、ひとつずつ見ていきます。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card">
+    <span class="num">01</span>
+    <span class="badge b-main">今日のニュース俯瞰</span>
+    <h2>Herdr v0.9.5 —— エージェントの状態が分かるtmux<small>GitHubスター約49,000の「エージェントが住むランタイム」</small></h2>
+    <p>Herdrは<b>コーディングエージェント向けのターミナルマルチプレクサ</b>。tmuxと同じようにペイン分割ができる上に、各エージェントが今<b>作業中・質問待ち（ブロック中）・完了</b>のどれなのかを把握し、サイドバーに表示してくれる。リポジトリはGitHubでスター約49,000、自己紹介は<b>「あなたのコーディングエージェントが住むランタイム」</b>。今回の動画ではv0.9.5の更新を1つずつ検証し、最後にPandaCodeとの比較で「どちらを使うべきか」に答える。</p>
+    <div class="stats">
+      <div class="s"><div class="v">v0.9.5</div><div class="l">現行バージョン</div></div>
+      <div class="s"><div class="v">49,000</div><div class="l">GitHubスター（直近）</div></div>
+      <div class="s"><div class="v">8本</div><div class="l">今回の主な更新</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">02</span>
+    <span class="badge b-acc">最大の更新</span>
+    <h2>①マシン統合 —— 1つの窓で全マシンを管理<small>リモートモードが「1対1のSSH」から「ローカル＋全SSH先」へ</small></h2>
+    <p>従来のリモートモードは<b>1クライアント対1SSHホスト</b>でそれがセッションの全体だった。今回の更新で、<b>1つのHerdrウィンドウがローカルマシンと保存済みの全SSHマシンをまとめて管理</b>できるようになった。</p>
+    <ul>
+      <li><code>herdr machine add</code>にSSHターゲットを渡すと、サイドバーの「local」の直下に即座に出現。ラベル不要でSSHホスト名をそのまま使用</li>
+      <li>対話実行時は接続先で<b>すでに動いているHerdrセッションを検出して選択</b>させ、二重起動を防止</li>
+      <li>エージェント一覧は<b>全マシンのエージェントが1つのリストに</b>。ノートPCのClaude CodeとサーバーのCodexが並び、サーバー側が承認待ちでも同じ場所で通知</li>
+      <li>各マシンは自動再接続。<b>サーバーが落ちてもノートPC側は動き続ける</b></li>
+      <li>キーボード操作もマシンをまたいで移動。Enter前にハイライト表示で送信先を確認できる</li>
+    </ul>
+    <div class="yomogi"><span class="who">よもぎ</span><span class="txt">「どのマシンのどの子が待ってるか」が一目で分かるの、地味に嬉しいですね。うっかり別のマシンにコマンドを送っちゃう事故も、ハイライト確認で防げるのが良いです。</span></div>
+  </div>
+
+  <div class="card">
+    <span class="num">03</span>
+    <span class="badge b-main">CLI拡張</span>
+    <h2>②<code>--machine</code>フラグ —— 窓を開けずに他マシンを操作<small>さらに「エージェントがエージェントを動かす」ことも可能に</small></h2>
+    <p><code>herdr --machine &lt;マシン名&gt;</code>のように指定すると、<b>Herdrのウィンドウを開かずに任意のコマンドを保存済みマシンに対して実行</b>できる。例えばローカルのターミナルから<code>agent list</code>を叩けばサーバー上のエージェント一覧がそのまま表示される。</p>
+    <ul>
+      <li>重要なのは<b>エージェント自身もこのフラグを使える</b>こと。ノートPCのエージェントがサーバー上に別のエージェントを起動し、プロンプトを送り、完了を待って出力を読み取る、という連携が可能</li>
+      <li>利用には<b>両マシンのHerdrを新バージョンに更新</b>する必要がある</li>
+      <li>リモートコマンドが失敗した場合、<b>ローカルでの代わり実行には絶対にフォールバックしない</b> —— 誤って別環境で動かしてしまう事故を防ぐ安全設計</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">04</span>
+    <span class="badge b-mg">接続体験</span>
+    <h2>③接続まわりの改善 —— 状態確認・再ログイン・Windows対応<small>パスワードもMFAもターミナルの中で完結</small></h2>
+    <p>マシンの接続管理が大きく賢くなった。</p>
+    <ul>
+      <li><code>herdr machine status</code>が<b>保存済み全マシンを一括チェック</b>。対話入力は不要</li>
+      <li>パスワードやMFAが必要なマシンは<code>herdr machine reconnect</code>で<b>ターミナル内でログインを完了</b>できる</li>
+      <li>接続が切れたマシンは<b>30秒ごとに自動再チェック</b>。復旧後に再起動なしで復帰</li>
+      <li><b>WindowsのSSHホストにも接続可能</b>に（従来は不可）</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">05</span>
+    <span class="badge b-acc">帯域の工夫</span>
+    <h2>④低回線でも使える —— SSH通信の徹底効率化<small>ホテルWi-Fiでもビルドログのストリームが追える</small></h2>
+    <p>作者いわく「帯域にかなり時間をかけた」という通信の最適化。</p>
+    <ul>
+      <li>SSH接続に<b>圧縮（compression）</b>を導入</li>
+      <li>タイピングやペイン切替の際、<b>画面全体を再送しない</b>ように変更</li>
+      <li>スクロールする出力は<b>変化した行だけを送信</b></li>
+    </ul>
+    <p>エージェントがホテルのWi-Fi経由でビルドログをストリームしていても<b>実用に耐える</b>という。細い回線でのリモート開発が現実的になる、地味ながら効く改善だ。</p>
+    <div class="yomogi"><span class="who">よもぎ</span><span class="txt">リモート作業で回線が細いと、もう「画面がもたつく」だけで作業が崩れますよね。差分だけ送る設計、エージェント時代の必須事項な気がします。</span></div>
+  </div>
+
+  <div class="card">
+    <span class="num">06</span>
+    <span class="badge b-main">マルチクライアント</span>
+    <h2>⑤UIを各クライアントで実行<small>ノートPCとデスクトップが同じサーバーを別々に眺められる</small></h2>
+    <p>ターミナルUIが<b>サーバー上ではなく各クライアント側で動く</b>ようになった。内部仕様の変更だが、効果は即座に体感できる。</p>
+    <ul>
+      <li>ノートPCとデスクトップを<b>同じサーバーに接続</b>しても、それぞれ別のワークスペース・別のタブを同時に表示可能</li>
+      <li>例えばノートPCはフロントエンドのプロジェクト、デスクトップはバックエンドのエージェント監視、という分担ができる</li>
+      <li>テーマ・メニュー・コピーモードも<b>クライアントごとに独立</b>。片方の画面の設定がもう片方を壊さない</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">07</span>
+    <span class="badge b-mg">アップデート安全化</span>
+    <h2>⑥更新でエージェントを殺さない<small>前回の動画で指摘された問題への回答</small></h2>
+    <p>以前はHerdrの更新がサーバー停止を意味し、<b>全ペインの全エージェントが道連れ</b>だった。作者が前回の動画で不満を挙げた点で、それが今回きちんと直った。</p>
+    <ul>
+      <li>クライアントの更新は<b>互換性のあるサーバーとその実行中エージェントを放置</b>する</li>
+      <li>サーバー側に機能が無い場合、<b>その操作だけが無効化</b>され、他は動き続ける</li>
+      <li>どうしてもサーバー置き換えが必要な場合は<b>事前に確認を求め、デフォルトは「いいえ」</b></li>
+      <li><code>herdr update</code>実行後は<b>旧バージョンのままのサーバーを一覧表示</b>し、それぞれ再起動するコマンドを提示。保存済みマシンの更新もリマインド</li>
+    </ul>
+  </div>
+
+  <div class="card full">
+    <span class="num">08</span>
+    <span class="badge b-acc">永続化</span>
+    <h2>⑦再起動・電断・クラッシュからセッションを守る<small>作者いちおしの「壊れた時にしか気づかない」改善</small></h2>
+    <p>今回の更新で作者がお気に入りに挙げるのが永続化。<b>OS再起動やシャットダウンでセッションが失われる</b>問題への多層防御だ。</p>
+    <div class="flow">
+      <div class="step"><b>① 終了前セーブ</b>Mac再起動／Windows終了時に、アプリが閉じ始める<b>前</b>に状態を保存</div>
+      <div class="step"><b>② 原子書き込み</b>保存はディスク書き込み後に旧ファイルを置換。クラッシュ・電断でも壊れたファイルが残らない</div>
+      <div class="step"><b>③ スナップショット</b>レイアウトのスナップショットを<b>最大48世代</b>保存し、手動復旧も可能</div>
+      <div class="step"><b>④ 生存性</b>Mac/Linuxでは起動元シェルを閉じてもサーバーは存続。プロセス/スレッド枯渇時もサーバーはペインを道連れにしない</div>
+    </div>
+    <p>さらにセッション復帰時、エージェントは<b>1体ずつ100ミリ秒間隔で起動</b>（デフォルト）するようになった。20体のエージェントを抱えたセッションではCPU負荷が全く違い、間隔は設定の<code>startup per agent delay</code>で調整できる。</p>
+    <div class="yomogi"><span class="who">よもぎ</span><span class="txt">「全部同時に起動してファンが唸る」あるある……。0.1秒ずつずらすだけで変わるなら、地味なのに効きますね。電断してもファイルが壊れない設計も安心です。</span></div>
+  </div>
+
+  <div class="card">
+    <span class="num">09</span>
+    <span class="badge b-main">長期視点の最重要</span>
+    <h2>⑧エージェントが自分の状態を申告する<small>個別統合でも画面読み取りでもなく、自己申告へ</small></h2>
+    <p>作者が「長期で最も重要」と評価する更新。従来Herdrはエージェントごとに<b>ビルトイン統合を持つか、画面を読んで推測する</b>必要があった。今後はエージェント自身がHerdrに直接状態を伝えられる。</p>
+    <ul>
+      <li>公式ガイド「<b>add Herdr support to your agent</b>」を公開。エージェントは<b>作業中／ブロック中／アイドル</b>を自己申告できる</li>
+      <li>自分のセッションを<b>再開する正確なコマンド</b>も申告可能。サーバー再起動後、Herdrが同じペイン・同じフォルダでそのコマンドを実行し、会話がそのまま復元される</li>
+      <li><b>ビルトイン対応なしで復元が成立</b>する —— ツールが「ランタイム」になる瞬間。Herdrは新エージェントを追いかけ続けなくてよく、エージェント側が自分を差し込める</li>
+      <li>新しいエージェントの検出を追加。Claude Code・Codex・OpenCode・AntiGravityほか多数の状態検出バグも修正</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">10</span>
+    <span class="badge b-mg">QoL詰め合わせ ①</span>
+    <h2>⑨移動と操作の快適化<small>goto・複数プリフィックスキー・ペインクリア</small></h2>
+    <p>細かいが、どれも実用的な品質向上セット。まずは移動とキー操作まわり。</p>
+    <ul>
+      <li><b>goto</b>が全エージェントとターミナルを<b>ワークスペースごとにグループ化した行</b>で表示。ステータスとパス付きで、左右キーでワークスペース間を移動。多数のエージェントの中から「自分を待っている1体」を見つける最速手段になる</li>
+      <li><b>プリフィックスキーを複数持てる</b>ように。例えば<code>ctrl+space</code>と<code>ctrl+s</code>の両方を設定すれば、筋肉記憶が2つの環境に分かれていても両方使える</li>
+      <li><b>clear paneアクション</b>で画面とスクロールバッファを消しつつ、現在のプロンプト行は保持。Vimのようなフルスクリーンアプリには干渉しない</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">11</span>
+    <span class="badge b-acc">QoL詰め合わせ ②</span>
+    <h2>⑩入力・リンク・画像・プラグイン<small>普段のイライラを1つずつ解消</small></h2>
+    <p>テキスト入力と表示まわりの改善に加え、大量の修正が含まれる。</p>
+    <ul>
+      <li>テキスト入力欄が<b>普通のテキストボックス同様</b>に。カーソル移動・単語単位削除・<code>ctrl+arrow</code>系ショートカットがリネームや検索でも使える</li>
+      <li><b>リンク上でctrlを押すとハイライト</b>してから開ける</li>
+      <li>ペイン内画像が<b>標準のKitty graphics</b>に対応</li>
+      <li><code>herdr plugin update</code>でGitHubプラグインを<b>一括更新</b>。実行中のプラグインプロセスは次回実行まで旧ファイルで動き続ける</li>
+      <li>修正: ペインクリック時の余計なエスケープ送信（動作中エージェントの中断）を排除、大量ペイン時のサーバーCPUを大幅削減、ワークスペース唯一のペインを閉じる前に確認を追加、ほか多数</li>
+    </ul>
+    <div class="yomogi"><span class="who">よもぎ</span><span class="txt">「前に困ったあの小さい不満、直ってるかも」と思って更新ノートを見る楽しみがありますね。積み重なると段違いに心地よく使えます。</span></div>
+  </div>
+
+  <div class="card">
+    <span class="num">12</span>
+    <span class="badge b-main">対決の前提</span>
+    <h2>Herdr vs PandaCode —— 端末か、デスクトップか<small>視聴者からの定番の質問に作者が回答</small></h2>
+    <p>「Herdrが全マシンのエージェントを動かせるなら、なぜPandaCodeを使うのか？」という質問が多く寄せられる。著者の答えは<b>「正直、働き方次第」</b>。</p>
+    <div class="vs">
+      <div class="col us">
+        <h3>Herdr（ターミナル）</h3>
+        <ul>
+          <li>各エージェントに<b>本物のターミナルペイン</b>を与える</li>
+          <li>端末で動くものは何でも動く —— <b>まだ存在しない未来のエージェント含む</b></li>
+        </ul>
+      </div>
+      <div class="col cn">
+        <h3>PandaCode（デスクトップアプリ）</h3>
+        <ul>
+          <li>インストール済みのエージェント（Claude Code、Codex、Kimi Code、OpenCode、GLMなど）を<b>チャットスレッド</b>として表示</li>
+          <li>画面ではなく会話として向き合うUI</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="num">13</span>
+    <span class="badge b-mg">比較①リモート</span>
+    <h2>マシン横断のやり方は2通り<small>SSHで潜るか、サーバー管理から逃げるか</small></h2>
+    <p>リモート作業はどちらも可能だが、アプローチが正反対。</p>
+    <ul>
+      <li><b>Herdr</b>: SSH前提。マシンを追加すればそのエージェントが一覧に並ぶ。<b>すでにSSHボックスで生活している人</b>に合う</li>
+      <li><b>PandaCode</b>: オプトインのマルチマシンモードで、エージェントが別マシンでスレッドを起動して待機できる。<code>panda serve</code>で予備機・サーバー上で動かせば、<b>ノートPCがスリープしてもボットは動き続ける</b></li>
+      <li>単発の長時間タスクなら、run-onメニューで<b>クラウドサンドボックス</b>を選択。変更はローカルのワークツリーに戻る</li>
+    </ul>
+    <p>結論: どちらもリモートはできるが、<b>SSH常用者にはHerdr、サーバー管理をしたくない人にはPandaCode</b>。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">14</span>
+    <span class="badge b-acc">比較②状態と承認</span>
+    <h2>「待ってるのは誰？」への2つの答え<small>ペインに飛ぶか、ボタンを押すか</small></h2>
+    <p>両ツールともサイドバーで「動いているもの・自分を待つもの・完了したもの」を教えてくれる。違いは<b>その後の一手</b>。</p>
+    <ul>
+      <li><b>Herdr</b>: 画面を読み取る（あるいは今回の自己申告）で状態を把握。承認は<b>ペインに飛んでターミナルで応答</b></li>
+      <li><b>PandaCode</b>: 各エージェントを独自インターフェース経由で操作。承認はプロンプト欄上の<b>細いバーのApprove/Denyボタン</b>、質問は選択肢付きカードで出現</li>
+    </ul>
+    <div class="yomogi"><span class="who">よもぎ</span><span class="txt">同じ「様子を見る」でも、キーボード派とクリック派で心地よさが全然違いますよね。自分の手癖で選ぶのが一番です。</span></div>
+  </div>
+
+  <div class="card">
+    <span class="num">15</span>
+    <span class="badge b-main">比較③永続性と更新</span>
+    <h2>止まないエージェント、消えない会話<small>どちらも「動いてるものを殺さない」方向へ</small></h2>
+    <p>永続化と更新は今回のHerdrの目玉と、PandaCodeの既存の強みがまっすぐぶつかる領域。</p>
+    <ul>
+      <li><b>Herdr</b>: 今回の更新で<b>生のターミナルセッションごと再起動後に復元</b>。resumeコマンド申告により任意のエージェントが会話を正確に復帰させる。プリフィックス統合より<b>ターミナル全体の復元はこちらが上</b></li>
+      <li><b>PandaCode</b>: 全スレッドをローカルDBに保存し、開き直して会話を継続。利用上限に達したら<b>resume at reset</b>で、上限リセット後にタスクが自動再開</li>
+      <li><b>更新</b>: 両ツールとも実行中エージェントを殺さない設計に。PandaCodeはエージェントが誰も作業中でない時だけ自己更新し、各コーディングエージェントの更新も<b>ワンクリック</b></li>
+    </ul>
+  </div>
+
+  <div class="card full">
+    <span class="num">16</span>
+    <span class="badge b-mg">比較④独自進化</span>
+    <h2>重ならない領域 —— CLIの深さ vs GUIの豊かさ<small>「併用が一番合理的」という著者の実践</small></h2>
+    <div class="vs">
+      <div class="col us">
+        <h3>Herdrだけのもの</h3>
+        <ul>
+          <li><b>プラグイン機構</b>（Kitty画像・プロセスなど）</li>
+          <li><b>複数クライアント</b>が別ワークスペースを同時閲覧</li>
+          <li><b>CLIをエージェントにスクリプトさせる</b> —— エージェントがエージェントを操る強力な構成</li>
+        </ul>
+      </div>
+      <div class="col cn">
+        <h3>PandaCodeだけのもの</h3>
+        <ul>
+          <li>ターンごとの<b>diff</b>、changesパネルからのコミット、<b>2クリックでmainへマージ</b></li>
+          <li>要素を選んでエージェントに送れる<b>内蔵ブラウザ</b>、タスクボード、<b>エージェントチーム</b>（設計者が異なるモデルのワーカーへ分割）</li>
+          <li>Telegram/Slackボット、全プラン上限を一覧する<b>利用状況ページ</b></li>
+        </ul>
+      </div>
+    </div>
+    <p>著者の推奨: <b>端末生活・SSH常時接続・誰も対応していないエージェント使いならHerdr</b>（長時間セッションの信頼性が今回大きく上がった）。<b>変更レビュー・チーム実行・クリック中心ならPandaCode</b>。そして正直なところ<b>併用して良い</b> —— 著者自身、サーバー上の長時間ジョブはHerdr、ノートPCでの日常のレビューとチーム実行はPandaCodeで、互いに干渉しないという。</p>
+  </div>
+
+  <div class="card">
+    <span class="num">17</span>
+    <span class="badge b-acc">注意点・限界</span>
+    <h2>1.0前夜の荒波 —— 率直な限界の記録<small>急速なリリースペースの副作用も可視化</small></h2>
+    <p>Herdrは<b>まだバージョン1.0未満</b>で、その影響も正直に見える。</p>
+    <ul>
+      <li>v0.9.2で旧ペイングラフィックスAPIを削除 → 利用側は<b>標準Kitty graphicsへ移行</b>が必要に。0.9.3はエスケープ系ショートカット修正、0.9.5は0.9.4の翌日リリースという速さ</li>
+      <li>0.9.5ではCodexの状態検出が一歩後退（起動警告解消のためturn hooksの導入をやめたため）。<code>herdr integration install codex</code>で更新が必要</li>
+      <li>ZSH＋Powerlevel10kで<b>ペインリサイズ時にプロンプトが繰り返されるバグは未解決</b></li>
+      <li><code>--machine</code>は両マシンの新バージョンが前提</li>
+      <li>PandaCode側も、アプリ未署名による初回警告、対応エージェントのみ実行、エージェント側変更への追従が必要などの限界</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="num">18</span>
+    <span class="badge b-mg">まとめ</span>
+    <h2>「いいサイドバー付きtmux」から全マシンのランタイムへ<small>ターミナルで2〜3体以上のエージェントを走らせる人全員に</small></h2>
+    <p>著者の総括: Herdrは<b>tmuxのいいサイドバー</b>から、<b>自分が持つ全マシンでエージェントを走らせ、再起動を生き延び、エージェントが自分を差し込めるランタイム</b>へ進化した。端末で一度に2〜3体以上のエージェントを動かすなら、このバージョンは間違いなく試す価値がある。diff・チーム・ブラウザまで欲しい人はPandaCodeが担う、という分担。</p>
+    <div class="stats">
+      <div class="s"><div class="v">全マシン</div><div class="l">1窓でエージェント管理</div></div>
+      <div class="s"><div class="v">再起動</div><div class="l">超えて復元されるセッション</div></div>
+      <div class="s"><div class="v">自己申告</div><div class="l">エージェントが自分を接続</div></div>
+    </div>
+    <div class="note"><div class="ic">🖥️</div><div class="bubble2">エージェントの数だけ管理コストも増える時代、「どこで誰が動いてるか」を1つの窓に集約するランタイムの価値は今後さらに上がりそうです。詳細な実演は動画でどうぞ！</div></div>
+  </div>
+
+</div>
+
+<footer class="end">
+  <p>出典: <a href="https://www.youtube.com/watch?v=LDxan-w2LVw">I Tried the new Herdr Updates... IS IT ANY GOOD?</a>（AI Code King / 2026-11-08公開）<br>
+  内容・数値は動画および字幕の情報に基づく。Herdr・PandaCodeは更新が速いプロジェクトのため、最新のリポジトリを参照のこと。</p>
+</footer>
+
+</div>
+</body>
+</html>

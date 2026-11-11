@@ -27,11 +27,13 @@ def extract_info(filepath):
     if subtitle_match:
         subtitle = re.sub(r'<[^>]+>', '', subtitle_match.group(1)).strip()
 
-    # Extract date from content
-    content_date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', content)
-    if content_date_match:
-        y, m, d = content_date_match.groups()
-        file_date = f"{y}{int(m):02d}{int(d):02d}"
+    # Extract date from content — only as fallback when filename has no date
+    # (filename prefix is authoritative; body dates like "11月17日廃止" must not override it)
+    if not date_match:
+        content_date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', content)
+        if content_date_match:
+            y, m, d = content_date_match.groups()
+            file_date = f"{y}{int(m):02d}{int(d):02d}"
 
     return {
         'filename': basename,

@@ -26,14 +26,19 @@ def update_index_html(index_file_path, docs_folders):
                         infographic_content = f.read()
                         title_match = re.search(r'<title>(.*?)</title>', infographic_content, re.IGNORECASE)
                         title = title_match.group(1) if title_match else filename
+                        # Extract source YouTube URL (for 新着誤検知防止 / traceability)
+                        yt_match = re.search(r'https://www\.youtube\.com/watch\?v=[A-Za-z0-9_-]{11}', infographic_content)
+                        yt_url = yt_match.group(0) if yt_match else ''
                 except Exception as e:
                     print(f"Error reading {file_path}: {e}")
                     title = filename # Fallback title
+                    yt_url = ''
 
                 infographics.append({
                     'date': datetime.strptime(date_str, '%Y%m%d'),
                     'title': title,
-                    'filename': f'{url_prefix}{filename}' # Relative path for href with forward slash
+                    'filename': f'{url_prefix}{filename}', # Relative path for href with forward slash
+                    'yt_url': yt_url
                 })
 
     # Sort infographics by date in descending order
@@ -42,7 +47,8 @@ def update_index_html(index_file_path, docs_folders):
     # Generate new list items for index.html
     new_list_items = []
     for info in infographics:
-        new_list_items.append(f'            <li><a href="{info["filename"]}">{info["date"].strftime("%Y%m%d")} - {info["title"]}</a></li>')
+        yt_link = f' <a href="{info["yt_url"]}" target="_blank" rel="noopener">▶動画</a>' if info.get('yt_url') else ''
+        new_list_items.append(f'            <li><a href="{info["filename"]}">{info["date"].strftime("%Y%m%d")} - {info["title"]}</a>{yt_link}</li>')
     
     new_ul_content = "\n".join(new_list_items)
 

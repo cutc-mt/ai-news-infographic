@@ -14,11 +14,13 @@ def update_index_html(index_file_path, docs_folders):
     # Get all HTML files in each folder
     for folder_path, url_prefix in docs_folders:
         for filename in os.listdir(folder_path):
-            if re.match(r'^\d{8}[-_].*\.html$', filename):
+            m8 = re.match(r'^(\d{8})[-_].*\.html$', filename)
+            m10 = re.match(r'^(\d{4}-\d{2}-\d{2})[-_].*\.html$', filename)
+            if m8 or m10:
                 file_path = os.path.join(folder_path, filename)
 
                 # Extract date from filename
-                date_str = filename[:8]
+                date_str = m8.group(1) if m8 else m10.group(1)
 
                 # Read the infographic file to get its title
                 try:
@@ -35,7 +37,7 @@ def update_index_html(index_file_path, docs_folders):
                     yt_url = ''
 
                 infographics.append({
-                    'date': datetime.strptime(date_str, '%Y%m%d'),
+                    'date': datetime.strptime(date_str, '%Y%m%d' if len(date_str)==8 else '%Y-%m-%d'),
                     'title': title,
                     'filename': f'{url_prefix}{filename}', # Relative path for href with forward slash
                     'yt_url': yt_url

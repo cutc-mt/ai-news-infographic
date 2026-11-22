@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inkling 2 Miniは「ローカルOpus」なのか？ ループトランスフォーマー徹底解説 | AI Code King</title>
+<link href="https://fonts.googleapis.com/css2?family=Yomogi&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#041016;
+    --panel:#0A1C26;
+    --panel2:#0E2634;
+    --line:#1C4254;
+    --ink:#EAF6FB;
+    --sub:#8FB6C6;
+    --main:#22D3EE;
+    --main-deep:#8FE9F7;
+    --main-soft:rgba(34,211,238,.12);
+    --accent:#F472B6;
+    --accent-soft:rgba(244,114,182,.13);
+    --cool:#5EEAD4;
+    --cool-soft:rgba(94,234,212,.12);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",Meiryo,sans-serif;line-height:1.8}
+  .wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+  header.hero{background:linear-gradient(150deg,#041016 0%,#082031 55%,#0B2E42 100%);border:1px solid var(--line);border-radius:20px;padding:36px 28px;margin-bottom:28px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-70px;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(34,211,238,.2),transparent 70%)}
+  .hero .tag{display:inline-block;background:var(--main-soft);color:var(--main);border:1px solid rgba(34,211,238,.45);font-size:12px;font-weight:700;letter-spacing:.12em;padding:4px 14px;border-radius:999px;margin-bottom:14px}
+  .hero h1{font-size:clamp(20px,3.4vw,30px);line-height:1.45;margin-bottom:12px}
+  .hero h1 .hl{color:var(--main)}
+  .hero p{color:var(--sub);font-size:14px;max-width:820px}
+  .hero .meta{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px;font-size:12px;color:var(--sub)}
+  .hero .meta span{background:rgba(255,255,255,.07);border:1px solid var(--line);padding:3px 12px;border-radius:999px}
+  .hero .meta a{color:var(--main-deep);text-decoration:none}
+  .leadbox{margin-top:20px;background:var(--main-soft);border:1px solid rgba(34,211,238,.4);border-radius:14px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+  .leadbox .icon{flex-shrink:0;width:44px;height:44px;border-radius:12px;background:var(--main);color:#04222C;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:18px}
+  .leadbox .bubble{font-size:13.5px;color:var(--main-deep);font-family:'Yomogi',cursive;line-height:1.9}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px 18px;position:relative;box-shadow:0 2px 8px rgba(3,12,18,.5)}
+  .card.full{grid-column:1/-1}
+  .card h2{font-size:16.5px;margin-bottom:4px;line-height:1.5;color:var(--main-deep)}
+  .card h2 small{display:block;font-size:11.5px;color:var(--sub);font-weight:600;letter-spacing:.04em;margin-top:2px}
+  .badge{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.08em;padding:2px 10px;border-radius:999px;margin-bottom:8px;background:var(--accent-soft);color:var(--accent);border:1px solid rgba(244,114,182,.4)}
+  .badge.pink{background:var(--accent-soft);color:var(--accent);border-color:rgba(244,114,182,.4)}
+  .badge.cool{background:var(--cool-soft);color:var(--cool);border-color:rgba(94,234,212,.4)}
+  .badge.cy{background:var(--main-soft);color:var(--main);border-color:rgba(34,211,238,.4)}
+  .card p{font-size:13.5px;color:var(--ink);margin-top:8px}
+  .card ul{margin:8px 0 0 1.2em;font-size:13px;color:var(--ink)}
+  .card li{margin-bottom:4px}
+  .card .say{margin-top:12px;background:var(--cool-soft);border:1px solid rgba(94,234,212,.35);border-radius:12px;padding:10px 12px;position:relative}
+  .card .say::before{content:"";position:absolute;left:18px;top:-7px;width:14px;height:14px;background:var(--panel);border-left:1px solid rgba(94,234,212,.35);border-top:1px solid rgba(94,234,212,.35);transform:rotate(45deg)}
+  .card .say .name{font-size:10.5px;color:var(--cool);font-weight:700;letter-spacing:.06em}
+  .card .say .txt{font-family:'Yomogi',cursive;font-size:13px;color:var(--ink);line-height:1.9}
+  .kpi{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+  .kpi div{flex:1 1 120px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:center}
+  .kpi .num{font-size:22px;font-weight:800;color:var(--main)}
+  .kpi .lbl{font-size:11px;color:var(--sub)}
+  .note{margin-top:8px;font-size:11.5px;color:var(--sub)}
+  .arrow-flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;font-size:12.5px}
+  .arrow-flow span{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:6px 12px;color:var(--ink)}
+  .arrow-flow em{color:var(--main);font-style:normal;font-weight:700}
+  table.gd{width:100%;border-collapse:collapse;margin-top:10px;font-size:12.5px}
+  table.gd th,table.gd td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  table.gd th{background:var(--panel2);color:var(--main-deep)}
+  table.gd td{color:var(--ink)}
+  table.gd td.g{color:var(--cool);font-weight:700}
+  table.gd td.w{color:var(--accent);font-weight:700}
+  footer.closs{margin-top:28px;background:linear-gradient(140deg,#0A1C26 0%,#0C2836 100%);border:1px solid var(--line);border-radius:18px;padding:26px 22px;text-align:center}
+  footer.closs h2{font-size:17px;color:var(--main-deep);margin-bottom:10px}
+  footer.closs p{font-size:13px;color:var(--sub);max-width:760px;margin:0 auto 14px}
+  footer.closs a.btn{display:inline-block;background:var(--main);color:#04222C;font-weight:800;font-size:14px;padding:12px 28px;border-radius:999px;text-decoration:none}
+  footer.closs .ch{margin-top:12px;font-size:12px;color:var(--sub)}
+  footer.closs .ch a{color:var(--main-deep);text-decoration:none}
+  @media(max-width:720px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <span class="tag">新モデル徹底レビュー ローカルLLM</span>
+  <h1>中間層を3周して賢くなる<span class="hl">ループトランスフォーマー</span> — Thinking Machines「Inkling 2 Mini」は32GB Macで動く「ローカルOpus」なのか</h1>
+  <p>AI Code Kingさんによる解説動画。Thinking Machines Labが2026年11月20日に公開したオープンウェイトモデル「Inkling 2 Mini」。1トークンあたり48回のレイヤーパスを実現するループ機構、32GB Macでのローカル実行要件、OpenRouterの料金、Artificial AnalysisやSWE-benchのベンチマーク、そしてKing本人が実施した5つの実務テスト（Pythonパッチ、ツール呼び出し、SQLite修正、ログCLI、正規表現インスペクター）の結果まで、約3セントで回した全検証をまとめて解説します。</p>
+  <div class="meta">
+    <span>2026.11.22 公開</span>
+    <span>AI Code King（@AICodeKing）</span>
+    <span>Thinking Machines Lab 発表: 2026.11.20</span>
+    <span><a href="https://www.youtube.com/watch?v=JFoMJ17MOOA">YouTubeで視聴する</a></span>
+  </div>
+  <div class="leadbox">
+    <div class="icon">🔁</div>
+    <div class="bubble">「ローカルでOpus級」って、聞き飽きた宣伝文句に聞こえますよね。でも今回は層を3回ループさせるという本当に変わった設計なんです。32GBのMacでどこまで実用になるか、全部自分で試してみました。</div>
+  </div>
+</header>
+
+<div class="grid">
+
+  <div class="card full">
+    <span class="badge cy">INTRO #01</span>
+    <h2>Inkling 2 Miniとは：ラップトップで動くThinking Machinesの新モデル<small>Introducing Inkling 2 Mini (Nov 20, 2026)</small></h2>
+    <p><strong>Inkling 2 Mini</strong>はThinking Machines Labが2026年11月20日にリリースしたオープンウェイトの高速モデル。<strong>ループトランスフォーマー（looped transformer）</strong>を採用し、モデルの中間層を1トークンごとに3回実行することで、少ないパラメータ数でも深い推論を可能にしています。エージェント型コーディングのような推論品質が効くタスクで真価を発揮する設計です。</p>
+    <div class="kpi">
+      <div><div class="num">26.4B</div><div class="lbl">総パラメータ（MoE）</div></div>
+      <div><div class="num">3.4B</div><div class="lbl">アクティブパラメータ</div></div>
+      <div><div class="num">5.4B</div><div class="lbl">ループ込みの重み活性化/トークン</div></div>
+      <div><div class="num">約20GB</div><div class="lbl">メモリフットプリント</div></div>
+    </div>
+    <div class="note">重みの大部分はNVFP4で学習・デプロイされ、最後の4層のみMXFP8。オープンウェイトでHugging Faceから公開、Tinkerでも推論・ファインチューニング可能。</div>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#02</span>
+    <h2>ループの仕組み：24層保存して中間12層を3周<small>Looped Transformer: 24 Layers, Middle 12 × 3 Passes</small></h2>
+    <p>Miniが保持するのは<b>24層</b>。そのうち<b>中間の12層を3回繰り返し実行</b>するため、1トークンあたりのレイヤーパスは<b>48回</b>になります。層を増やさず「計算の深さ」だけを稼ぐのがループトランスフォーマーの肝です。</p>
+    <div class="arrow-flow">
+      <span>24層を保持</span><em>→</em>
+      <span>中間12層を3回実行</span><em>→</em>
+      <span><b>1トークン＝48パス</b></span>
+    </div>
+    <div class="say"><div class="name">ヨモギのひとこと</div><div class="txt">層の数を増やすと重さも増えちゃうけど、同じ層を何周もすれば頭は良くなって体重はほぼそのまま。ダイエットしながら賢くなる、みたいな仕組みですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#03</span>
+    <h2>なぜループ？ 思考を書き出さずに長く考える<small>More Reasoning Without Longer Chain-of-Thought</small></h2>
+    <p>ループにより、モデルは<b>推論を文字に書き出さずに長く考えられる</b>ようになります。これはモニタリング（Chain of Thoughtを読んでモデルの行動を監視する能力）とのトレードオフを意識した設計です。同時公開の研究用可変ループ版では、CoTなしの時間視野が<b>1パス16秒→3パス37秒</b>に伸び、逐次推論ベンチマークは学習時の2倍にあたる<b>10ループ</b>まで性能が伸び続けました。</p>
+    <ul>
+      <li>5パス時の推論テキストは1パス時の<b>半分以下</b>（GPQA Diamond比較で1,661トークン級に圧縮）に</li>
+      <li>それでも人間が読めるCoTは維持</li>
+      <li>ただしCoTの長さ制御（controllability）は苦手で指示遵守率は1%未満</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#04</span>
+    <h2>32GB Macで動くのか：ローカル実行要件<small>Local Run: 32GB Unified Memory, 17.6GB GGUF</small></h2>
+    <p>Thinking MachinesはApple Silicon Macで<b>32GB以上のユニファイドメモリ</b>を推奨。Unslothの<b>4ビットGGUF版は17.6GB</b>なので、32GB MacならOS稼働中でも載せられます。<b>Ollama</b>にも公式に登録済みで、<code>ollama run inkling-2-mini</code>一本で起動します。</p>
+    <div class="kpi">
+      <div><div class="num">32GB〜</div><div class="lbl">推奨ユニファイドメモリ</div></div>
+      <div><div class="num">17.6GB</div><div class="lbl">Unsloth 4bit GGUF</div></div>
+      <div><div class="num">約20GB</div><div class="lbl">ネイティブ重量時</div></div>
+    </div>
+    <div class="note">公開デモでは、M5 Pro 48GB MacBook Proを機内モードにしてオフラインでフライトシミュレータを数分で構築。SGLang / vLLM / Ollama / Unsloth / NVIDIA Dynamoなどオープンソース推論スタックにも対応。</div>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#05</span>
+    <h2>OpenRouterの料金：入力$0.10・出力$0.40<small>OpenRouter Pricing via Prime Intellect</small></h2>
+    <p>ホスト版はOpenRouter経由で利用可能。提供は<b>Prime Intellect</b>で、料金は<b>100万入力トークン$0.10、100万出力トークン$0.40</b>。Kingの実測では、5つの実務テストと全リトライを含む<b>19リクエスト合計で約3セント</b>でした。</p>
+    <div class="kpi">
+      <div><div class="num">$0.10</div><div class="lbl">入力 / 1M tokens</div></div>
+      <div><div class="num">$0.40</div><div class="lbl">出力 / 1M tokens</div></div>
+      <div><div class="num">約3¢</div><div class="lbl">19リクエスト総コスト</div></div>
+    </div>
+    <div class="say"><div class="name">ヨモギのひとこと</div><div class="txt">ローカルで回せない人も、ほぼ「タダ同然」で全部試せちゃう値段設定。迷ったらまずOpenRouterで3セントだけ払って感触を見るのがおすすめです。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge pink">#06</span>
+    <h2>Artificial Analysisのスコア：Qwen3.8-27Bと同点<small>AA Intelligence Index v5.0: 20.1, Tied with Qwen</small></h2>
+    <p>第三者評価のArtificial Analysis Intelligence Indexでは<b>20.1</b>を記録し、同サイズ帯最強格の<b>Qwen3.8-27Bと同点</b>。Gemma 4 31BやMuse Glimmerを大きく引き離しました。ただし動画では、速度とコストの数値も踏まえて「総合力で判断すべき」と注意を促します。</p>
+    <table class="gd">
+      <tr><th>モデル</th><th>AA Index v5.0</th></tr>
+      <tr><td>Inkling 2 Mini</td><td class="g">20.1</td></tr>
+      <tr><td>Qwen3.8-27B</td><td class="g">20.1</td></tr>
+      <tr><td>Nemotron 3.5 Super VL</td><td>13.6</td></tr>
+      <tr><td>Muse Glimmer</td><td>6.3</td></tr>
+      <tr><td>Gemma 4 31B</td><td class="w">4.4</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <span class="badge pink">#07</span>
+    <h2>コーディングベンチマーク：SWE-bench Verified 79.2%<small>Coding Benchmarks: DeepSWE, Vibe Code Bench &amp; More</small></h2>
+    <p>Thinking Machinesの報告値では<b>SWE-bench Verified（bashのみ）79.2%</b>、SWE-Bench Multilingual 73.7%と、100B未満のオープンウェイトモデルをリード。DeepSWE v1.1（48.2%）とVals Index v2.2（46.5%）でも同帯最高を主張します。</p>
+    <table class="gd">
+      <tr><th>ベンチマーク</th><th>Inkling 2 Mini</th><th>Qwen3.8-27B</th></tr>
+      <tr><td>SWE-bench Verified (bash)</td><td class="g">79.2%</td><td>77.8%</td></tr>
+      <tr><td>SWE-Bench Multilingual</td><td class="g">73.7%</td><td>70.0%</td></tr>
+      <tr><td>Vibe Code Bench v1.1</td><td class="g">77.9%</td><td>64.9%</td></tr>
+      <tr><td>PMPP-Hard (AUC)</td><td class="g">455.8</td><td>262.5</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <span class="badge pink">#08</span>
+    <h2>KingBench 4をスキップした理由<small>Why KingBench 4 Was Skipped for This Model</small></h2>
+    <p>いつもの自作ベンチ「KingBench 4」は、モデルに<b>大規模アプリを一発で構築させる</b>重いテスト。26.4Bのローカル向けモデルには<b>荷が重すぎて意味のある比較にならない</b>と判断し、今回は見送りました。代わりに「ローカルモデルに実際に任せる仕事」を想定した5つの実務テストで評価する方針です。</p>
+    <div class="arrow-flow">
+      <span>KingBench 4＝巨大ワンショット開発</span><em>→</em>
+      <span>サイズ不相応と判断</span><em>→</em>
+      <span><b>実務5種テストに置き換え</b></span>
+    </div>
+    <div class="note">この判断自体が「Miniの適正サイズ感」を示すデータポイント：フラッグシップ対決の土俵ではない、というのがKingの見立て。</div>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#09</span>
+    <h2>reasoning effort別の速度：low 4秒 vs high 15.4秒<small>Hosted Speed at Low / Medium / High Effort</small></h2>
+    <p>同じキャッシュ修正タスクをlow／medium／highの3段階の推論努力で実行。結果は<b>全レベルで9/9チェック合格</b>。所要時間は<b>low 4秒、high 15.4秒</b>と約4倍の差が出ました。速度重視ならlowで十分なケースが多い、というのが実践的な示唆です。</p>
+    <div class="kpi">
+      <div><div class="num">4.0s</div><div class="lbl">low effort で修正完了</div></div>
+      <div><div class="num">15.4s</div><div class="lbl">high effort で修正完了</div></div>
+      <div><div class="num">9/9</div><div class="lbl">全レベルでチェック合格</div></div>
+    </div>
+    <div class="say"><div class="name">ヨモギのひとこと</div><div class="txt">頑張って考えたぶん遅くなるのに、結果は同じ。だったら最初はlowで投げて、ダメなときだけhighに上げるのが時間もお金も節約できるコツですね。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge cool">TEST ① #10</span>
+    <h2>Pythonパッチ：レートリミッターは競合に慎重<small>Patching Python: Rate Limiter Under Contention</small></h2>
+    <p>Pythonのレートリミッター修正タスク。パッチ後のテストでは<b>16件の同時リクエストのうち1件だけ</b>が通るという保守的な挙動になりました。ただしロックを外して独自テストを走らせると<b>元のテストは全通過</b>。動くには動くが、同時実行まわりは要確認です。</p>
+    <ul>
+      <li>修正自体は正しく適用、キャッシュバグは全 effort で解消</li>
+      <li>同時16リクエスト→<b>1件のみ通過</b>（過剰に厳格）</li>
+      <li>ロック除去でオリジナルテストは合格 → <b>競合動作は要ダブルチェック</b></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge cool">TEST ② #11</span>
+    <h2>ツール呼び出し：autoモデルが完全勝利<small>Tool Calling &amp; Strict JSON: Auto 8/8 vs Required 5/8</small></h2>
+    <p>JSONマイグレーション計画を厳密なJSONで出力させるツール呼び出しテストでは、<b>autoモードが完全なJSONを返して8/8チェック合格</b>。一方、tool呼び出しを必須にするrequiredモードは<b>2回のツール呼び出しを怠って5/8</b>に終わりました。</p>
+    <table class="gd">
+      <tr><th>モード</th><th>結果</th><th>評価</th></tr>
+      <tr><td>tool_choice: auto</td><td class="g">8/8 合格・完全なJSON計画</td><td>推奨</td></tr>
+      <tr><td>tool_choice: required</td><td class="w">5/8・ツール呼び出し2回欠落</td><td>注意</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <span class="badge cool">TEST ③ #12</span>
+    <h2>SQLite修正：売上は1セント単位で一致<small>SQLite Joins Fixed, Rolling Total Dropped January</small></h2>
+    <p>SQLiteのクエリ修正タスクでは、結合後の<b>売上集計が1セントのズレもなく一致</b>。しかし<b>ローリング合計が1月分のデータを取りこぼす</b>バグが残りました。金額計算の正確さと、期間集計の境界条件は別物だという教訓です。</p>
+    <div class="arrow-flow">
+      <span>JOIN修正</span><em>→</em>
+      <span class="g">売上＝1セント単位で一致</span><em>→</em>
+      <span class="w">rolling total で1月が欠落</span>
+    </div>
+    <div class="say"><div class="name">ヨモギのひとこと</div><div class="txt">合計が合ってるから油断すると、年度の境目だけこぼれてたりするんですよね。期間の最初と最後、必ず自分で見返しましょう。</div></div>
+  </div>
+
+  <div class="card">
+    <span class="badge cool">TEST ④ #13</span>
+    <h2>ログCLI作成：Unicodeの罠にはまる<small>Logpeek CLI: The Unicode Case Match It Missed</small></h2>
+    <p>ログ閲覧CLI「Logpeek」を1から作成。基本機能は動いたものの、<b>Unicodeのケースマッチ（大文字・小文字の扱い）を見落とす</b>ミスが発覚。非ASCII文字の検索・比較はローカルモデルの鬼門であることが改めて浮き彫りになりました。</p>
+    <ul>
+      <li>CLIの骨格・フィルタ機能は正しく実装</li>
+      <li><b>Unicode正規化・ケース変換の考慮漏れ</b></li>
+      <li>教訓：多言語テキストを扱う処理は人間が必ず確認</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge cool">TEST ⑤ #14</span>
+    <h2>正規表現インスペクター：11/11チェック全合格<small>Single-File Regex Inspector: 11/11 Checks Passed</small></h2>
+    <p>単一ファイルの正規表現インスペクターツール構築が今シリーズの白星。<b>全11チェックに合格</b>し、ライブハイライト表示や<b>無効なパターン入力からの復帰</b>といった縁の下の動作まで実装しました。小規模ユーティリティ開発はMiniの得意領域です。</p>
+    <div class="kpi">
+      <div><div class="num">11/11</div><div class="lbl">チェック全合格</div></div>
+      <div><div class="num">1ファイル</div><div class="lbl">単一ファイル構成</div></div>
+      <div><div class="num">◯</div><div class="lbl">不正パターン復帰</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#15</span>
+    <h2>総コスト検算：19リクエストで約3セント<small>Total Spend: ~$0.03 Across All Tests and Retries</small></h2>
+    <p>5つの実務テストと全リトライを含む<b>19リクエスト</b>の総コストは<b>約3セント</b>。low effort中心に回せば、1セント未満で1日分の小修正を賄える計算になります。ローカル実行前にOpenRouterで気軽に試算・検証できる価格帯です。</p>
+    <table class="gd">
+      <tr><th>項目</th><th>値</th></tr>
+      <tr><td>総リクエスト数（リトライ込み）</td><td>19件</td></tr>
+      <tr><td>総コスト</td><td class="g">約$0.03</td></tr>
+      <tr><td>入力 / 出力単価</td><td>$0.10 / $0.40 per 1M tokens</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#16</span>
+    <h2>どの仕事を任せる？ 任せない？<small>Which Jobs I'd Give It — and Which I Wouldn't</small></h2>
+    <p>Kingの結論：<b>32GB Mac上でlow〜medium effortのピンポイント修正と小規模ユーティリティ開発</b>ならMiniに任せたい。逆に<b>巨大なアプリを一発生成するような仕事は大型モデル</b>に回すべき。ダブルチェック必須なのは、並行処理（レートリミッター）、期間集計の境界（SQLite）、Unicodeの扱い（ログCLI）の3点です。</p>
+    <ul>
+      <li><b>任せる</b>: フォーカスされた修正、単一ツール・CLI作成、正規表現まわり</li>
+      <li><b>任せない</b>: 巨大ワンショット開発 → フラッグシップモデルへ</li>
+      <li><b>再確認</b>: 同時実行制御・日次/月次の集計境界・非ASCII処理</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <span class="badge cy">#17</span>
+    <h2>省エネ性能：1ジュールあたりの知能でトップ級<small>Intelligence per Joule: 0.703 on DGX Spark</small></h2>
+    <p>Stanfordの「Intelligence per Watt」研究では、NVIDIA DGX Spark上のMiniが<b>0.703</b>を記録し、Qwen3.6-35B-A3B（0.430）やGemma-4-26B-A4B（0.159）、Qwen3.5-27B（0.036）を圧倒。Thinking Machinesは、<b>1台のオフラインMacBookで20体の常駐エージェント（Thinkyville住人）を一括管理</b>するデモも公開し、「ローカルで常駐エージェント多数」のユースケースを前面に打ち出しています。</p>
+    <div class="kpi">
+      <div><div class="num">0.703</div><div class="lbl">Intelligence per Joule</div></div>
+      <div><div class="num">20体</div><div class="lbl">Mac 1台で常駐エージェント</div></div>
+      <div><div class="num">0.036</div><div class="lbl">Qwen3.5-27B（比較）</div></div>
+    </div>
+  </div>
+
+  <div class="card full">
+    <span class="badge cool">#18</span>
+    <h2>結論：「Local Opus」なのか？<small>Verdict: Is Inkling 2 Mini Really a Local Opus?</small></h2>
+    <p>答えは<b>「限定された意味でYes」</b>。集中した修正と小さなユーティリティなら、32GB MacのローカルでもOpus級の手応えがあり、コストも実質無料。しかし巨大アプリの一発生成や、並行処理・集計境界・Unicodeのようなデリケートな領域では、まだ大型モデルと人間のレビューが必要です。 安く速く常駐させられる「<b>ローカルの実務隊員</b>」として使うのが正解、というのがKingの評価でした。</p>
+    <ul>
+      <li><b>◎</b>: low/medium effortでのピンポイント修正・小ツール開発（regex inspectorは11/11）</li>
+      <li><b>△</b>: 同時実行・期間集計・Unicode → 必ず人間がダブルチェック</li>
+      <li><b>✕</b>: 巨大ワンショット開発 → KingBench 4級の仕事は大型モデルへ</li>
+      <li>料金（$0.10/$0.40）と省エネ性能（0.703）を考えれば「試さない理由はない」</li>
+    </ul>
+  </div>
+
+</div>
+
+<footer class="closs">
+  <h2>ループで賢くなる、小さくて実用的な新モデル</h2>
+  <p>中間層3周という奇抜な設計で、26.4B/3.4BアクティブというサイズながらSWE-bench Verified 79.2%を達成したInkling 2 Mini。5つの実務テストと約3セントの検証から見えた強み（小ツール開発・集中修正）と弱点（並行処理・Unicode・期間集計）まで、ぜひ本編で詳細を確認してください。</p>
+  <a class="btn" href="https://www.youtube.com/watch?v=JFoMJ17MOOA">YouTubeでこの動画を見る</a>
+  <div class="ch">AI Code King（@AICodeKing）／動画: <a href="https://www.youtube.com/watch?v=JFoMJ17MOOA">Inkling 2 Mini is "Local Opus"?</a><br>
+  参考: <a href="https://thinkingmachines.ai/news/inkling-2-mini/">Thinking Machines Lab 発表記事</a> ／ <a href="https://openrouter.ai/thinkingmachines/inkling-2-mini">OpenRouter</a> ／ <a href="https://ollama.com/library/inkling-2-mini">Ollama</a> ／ <a href="https://artificialanalysis.ai/models/inkling-2-mini">Artificial Analysis</a> ／ <a href="https://huggingface.co/thinkingmachines/Inkling-2-Mini">Hugging Face</a></div>
+</footer>
+
+</div>
+</body>
+</html>

@@ -10,9 +10,16 @@ def extract_info(filepath):
         content = f.read(5000)  # Only read header section
 
     basename = os.path.basename(filepath)
-    # Extract date prefix from filename (YYYYMMDD)
+    # Extract date prefix from filename (YYYYMMDD or YYYY-MM-DD)
     date_match = re.match(r'(\d{8})', basename)
-    file_date = date_match.group(1) if date_match else '00000000'
+    dashed_match = re.match(r'(\d{4})-(\d{2})-(\d{2})', basename)
+    if date_match:
+        file_date = date_match.group(1)
+    elif dashed_match:
+        y, m, d = dashed_match.groups()
+        file_date = f"{y}{m}{d}"
+    else:
+        file_date = '00000000'
 
     # Extract <title> tag
     title_match = re.search(r'<title>(.*?)</title>', content, re.DOTALL)
@@ -29,7 +36,7 @@ def extract_info(filepath):
 
     # Extract date from content — only as fallback when filename has no date
     # (filename prefix is authoritative; body dates like "11月17日廃止" must not override it)
-    if not date_match:
+    if not date_match and not dashed_match:
         content_date_match = re.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', content)
         if content_date_match:
             y, m, d = content_date_match.groups()
@@ -185,9 +192,12 @@ def main():
         from datetime import datetime
         month = datetime.now().strftime('%Y%m')
     
-    # Find all HTML files for this month
-    pattern = os.path.join(docs_dir, f'{month}*.html')
-    files = sorted(glob.glob(pattern))
+    # Find all HTML files for this month (YYYYMMDD*.html and YYYY-MM-DD*.html naming)
+    dashed_month = f"{month[:4]}-{month[4:]}"
+    files = sorted(set(
+        glob.glob(os.path.join(docs_dir, f'{month}*.html')) +
+        glob.glob(os.path.join(docs_dir, f'{dashed_month}-*.html'))
+    ))
     
     if not files:
         print(f"No HTML files found for month {month}")
